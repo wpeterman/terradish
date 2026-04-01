@@ -4,4 +4,4 @@
 #'
 #' @name radish_measurement_model
 #' @seealso \code{\link{leastsquares}}, \code{\link{mlpe}}, \code{\link{generalized_wishart}}
-NULL
+radish_measurement_model <- NULL

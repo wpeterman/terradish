@@ -48,6 +48,7 @@
                                        inherits = FALSE)
     else
       conductance_model_factory <- get(state$conductance_model_factory_name,
+                                       envir = globalenv(),
                                        mode = "function",
                                        inherits = TRUE)
   }
@@ -102,9 +103,25 @@
   fun
 }
 
-.can_use_namespace_workers <- function(namespace = "terradish")
+.use_namespace_workers <- function(namespace = "terradish")
 {
-  namespace %in% loadedNamespaces() && nzchar(system.file(package = namespace))
+  if (file.exists(file.path(getwd(), "R", "radish_grid.R")))
+    return(FALSE)
+
+  if (!(namespace %in% loadedNamespaces()))
+    return(FALSE)
+
+  ns_path <- tryCatch(getNamespaceInfo(asNamespace(namespace), "path"),
+                      error = function(e) NULL)
+  if (is.null(ns_path))
+    return(FALSE)
+
+  cwd <- tryCatch(normalizePath(getwd(), winslash = "/", mustWork = FALSE),
+                  error = function(e) NULL)
+  ns_path <- tryCatch(normalizePath(ns_path, winslash = "/", mustWork = FALSE),
+                      error = function(e) ns_path)
+
+  !identical(ns_path, cwd)
 }
 
 .validate_theta_grid <- function(theta, parameter_names)
@@ -198,7 +215,7 @@
     {
       if (use_namespace_workers)
         return(get(fun_name, envir = asNamespace("terradish"), inherits = FALSE))
-      return(get(fun_name, mode = "function", inherits = TRUE))
+      return(get(fun_name, envir = globalenv(), mode = "function", inherits = TRUE))
     }
     fun
   }
@@ -259,7 +276,7 @@
   )
   measurement_model_name <- .parallel_fun_name(
     measurement_model,
-    c("leastsquares", "mlpe", "generalized_wishart")
+    c("leastsquares", "mlpe", "generalized_wishart", "wishart_covariance")
   )
 
   if (use_namespace_workers)
@@ -275,13 +292,12 @@
   {
     worker_files <- c("R/backtracking.R", "R/hager_zhang.R", "R/newton_raphson.R",
                       "R/radish_conductance_model.R", "R/leastsquares.R",
-                      "R/mlpe.R", "R/generalized_wishart.R",
+                      "R/mlpe.R", "R/generalized_wishart.R", "R/wishart_covariance.R",
                       "R/radish_subproblem.R", "R/radish_algorithm.R")
     worker_wd <- getwd()
     clusterExport(cl, varlist = c("worker_files", "worker_wd"), envir = environment())
     clusterEvalQ(cl, {
       setwd(worker_wd)
-      library(Matrix)
       for (f in worker_files)
         source(f)
       NULL
@@ -387,7 +403,7 @@
   }
   else
   {
-    use_namespace_workers <- .can_use_namespace_workers("terradish")
+    use_namespace_workers <- .use_namespace_workers()
     results <- .radish_grid_parallel_results(
       theta = theta,
       term_labels = term_labels,
@@ -651,7 +667,7 @@ radish_distance <- function(theta,
     cl <- makeCluster(length(splits))
     on.exit(stopCluster(cl), add = TRUE)
     worker_libpaths <- .libPaths()
-    use_namespace_workers <- .can_use_namespace_workers("terradish")
+    use_namespace_workers <- .use_namespace_workers()
     worker_state$use_namespace_workers <- use_namespace_workers
     if (use_namespace_workers)
     {
@@ -671,7 +687,6 @@ radish_distance <- function(theta,
       clusterExport(cl, varlist = c("worker_files", "worker_wd"), envir = environment())
       clusterEvalQ(cl, {
         setwd(worker_wd)
-        library(Matrix)
         for (f in worker_files)
           source(f)
         NULL

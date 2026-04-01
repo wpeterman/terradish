@@ -46,11 +46,7 @@ generated and returned.}
 fits and grid evaluation.}
 
 \item{...}{Additional arguments passed to \code{\link{radish}}, such as
-\code{control}. Landmark approximation arguments
-(\code{approximation} and \code{approximation_control}) are also forwarded
-to the held-out \code{\link{radish_grid}} evaluation.
-\code{approximation = "coarse_raster"} is currently applied only to the
-held-out grid evaluation, while the training fit remains exact.}
+\code{control}.}
 }
 \value{
 A named list containing the training fit, test-set log-likelihood,

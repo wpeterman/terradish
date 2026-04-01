@@ -15,6 +15,50 @@
   as.vector(.as_base_matrix(x))
 }
 
+.response_partial_format <- function(partial_S, S)
+{
+  partial_S <- .as_base_matrix(partial_S)
+  n_response <- ncol(partial_S)
+  n_lower <- sum(lower.tri(S))
+  n_lower_diag <- sum(lower.tri(S, diag = TRUE))
+  n_full <- length(S)
+
+  if (n_response == n_lower)
+    return("lower")
+  if (n_response == n_lower_diag)
+    return("lower_diag")
+  if (n_response == n_full)
+    return("full")
+
+  stop("Unsupported response-derivative dimension in `measurement_model`.", call. = FALSE)
+}
+
+.expand_response_partials <- function(x, S, format)
+{
+  x <- .as_base_vector(x)
+  out <- matrix(0, nrow(S), ncol(S))
+
+  if (identical(format, "lower"))
+  {
+    out[lower.tri(out)] <- x
+    return(out + t(out))
+  }
+
+  if (identical(format, "lower_diag"))
+  {
+    out[lower.tri(out, diag = TRUE)] <- x
+    diag_vals <- diag(out)
+    out <- out + t(out)
+    diag(out) <- diag_vals
+    return(out)
+  }
+
+  if (identical(format, "full"))
+    return(matrix(x, nrow(S), ncol(S)))
+
+  stop("Unknown response-derivative format.", call. = FALSE)
+}
+
 radish_subproblem <- function(g, E, S, nu, phi = NULL, nonnegative = TRUE, validate = FALSE, control = NewtonRaphsonControl(ctol = 1e-10, ftol = 1e-10, verbose = TRUE))
 {
   phi_default <- g(E = E, S = S, nonnegative = nonnegative)
@@ -70,13 +114,16 @@ radish_subproblem <- function(g, E, S, nu, phi = NULL, nonnegative = TRUE, valid
   #       dtheta/dy = -[\partial (dl/dtheta)/\partial theta]^{-1} \partial (dl/dtheta)/partial y
   # so, need the change in the gradient with y
   partial_S   <- .as_base_matrix(fit$partial_S)
+  partial_S_format <- .response_partial_format(partial_S, S)
   jacobian_S  <- function(dotdotE)
   { 
     #why is this nonzero when on boundary?
-    dotdotE_matrix               <- .as_base_matrix(dotdotE)
-    dphi_dS                     <- matrix(0, nrow(S), ncol(S))
-    dphi_dS[lower.tri(dphi_dS)] <- -.as_base_vector(dotdotE_matrix) %*% partial_E %*% invhess %*% partial_S
-    dphi_dS                     <- dphi_dS + t(dphi_dS)
+    dotdotE_matrix <- .as_base_matrix(dotdotE)
+    dphi_dS <- .expand_response_partials(
+      -.as_base_vector(dotdotE_matrix) %*% partial_E %*% invhess %*% partial_S,
+      S = S,
+      format = partial_S_format
+    )
     return (fit$jacobian_S(dotdotE_matrix) + dphi_dS)
   }
 

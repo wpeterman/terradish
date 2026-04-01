@@ -1,7 +1,12 @@
-.radish_measurement_model <- function(model)
+.radish_measurement_model <- function(model, subset = NULL)
 {
   if (inherits(model, "radish_measurement_model"))
+  {
+    subsetter <- attr(model, "subsetter", exact = TRUE)
+    if (!is.null(subset) && is.function(subsetter))
+      return(subsetter(subset))
     return(model)
+  }
 
   if (!is.character(model) || length(model) != 1L)
     stop("`model` must be a measurement-model function or one of 'mlpe', 'wishart', or 'ls'")
@@ -293,11 +298,7 @@ radish_parameters <- function(Results_dir,
 #' @param cores Number of worker processes to use in downstream \code{radish}
 #'   fits and grid evaluation.
 #' @param ... Additional arguments passed to \code{\link{radish}}, such as
-#'   \code{control}. Landmark approximation arguments
-#'   (\code{approximation} and \code{approximation_control}) are also forwarded
-#'   to the held-out \code{\link{radish_grid}} evaluation.
-#'   \code{approximation = "coarse_raster"} is currently applied only to the
-#'   held-out grid evaluation, while the training fit remains exact.
+#'   \code{control}.
 #'
 #' @return A named list containing the training fit, test-set log-likelihood,
 #'   train/test indices, and optionally the full-data fit.
@@ -370,7 +371,7 @@ radish_cv <- function(pts,
     as.formula("gd_mat ~ 1")
   environment(fmla_radish) <- environment()
 
-  measurement_model <- .radish_measurement_model(model)
+  measurement_model_train <- .radish_measurement_model(model, subset = train_)
   dots <- list(...)
   training_dots <- dots
   approximation <- if ("approximation" %in% names(dots))
@@ -389,7 +390,7 @@ radish_cv <- function(pts,
   training_surface <- conductance_surface(covariates, pts[train_, , drop = FALSE],
                                           directions = directions)
   fit <- .fit_radish_with_fallback(fmla_radish, training_surface,
-                                   measurement_model = measurement_model,
+                                   measurement_model = measurement_model_train,
                                    nu = nu,
                                    cores = cores,
                                    dots = training_dots,
@@ -401,11 +402,12 @@ radish_cv <- function(pts,
   gd_mat <- gd_mat_full[test_, test_, drop = FALSE]
   test_surface <- conductance_surface(covariates, pts[test_, , drop = FALSE],
                                       directions = directions)
+  measurement_model_test <- .radish_measurement_model(model, subset = test_)
   ll <- radish_grid(theta = matrix(coef(fit), nrow = 1),
                     formula = fmla_radish,
                     data = test_surface,
                     conductance_model = loglinear_conductance,
-                    measurement_model = measurement_model,
+                    measurement_model = measurement_model_test,
                     nu = nu,
                     cores = cores,
                     approximation = approximation,
@@ -421,8 +423,9 @@ radish_cv <- function(pts,
   {
     gd_mat <- gd_mat_full
     full_surface <- conductance_surface(covariates, pts, directions = directions)
+    measurement_model_full <- .radish_measurement_model(model)
     out$full_mod <- .fit_radish_with_fallback(fmla_radish, full_surface,
-                                              measurement_model = measurement_model,
+                                              measurement_model = measurement_model_full,
                                               nu = nu,
                                               theta = fit$mle$theta,
                                               cores = cores,

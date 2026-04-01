@@ -1,0 +1,210 @@
+---
+title: "Concurrent IBE and IBR in terradish"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Concurrent IBE and IBR in terradish}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  warning = FALSE,
+  message = FALSE
+)
+```
+
+## Overview
+
+`terradish` is built around two model layers:
+
+- A conductance model that turns raster covariates into a resistance surface.
+- A measurement model that relates pairwise resistance distances to pairwise genetic distances.
+
+That split makes it natural to fit isolation by environment (IBE) and isolation
+by resistance (IBR) concurrently:
+
+- Keep IBR on the conductance side, where raster covariates determine movement
+  through space.
+- Add IBE on the measurement-model side as fixed endpoint-difference covariates
+  between sampling locations.
+
+This vignette walks through a small comparison set:
+
+- IBD: no environmental or resistance predictors.
+- IBE only: endpoint-difference covariates, but no resistance-surface predictors.
+- IBR only: raster predictors in the conductance model.
+- Joint IBE + IBR: both together.
+
+## Example Data
+
+```{r}
+library(terradish)
+library(terra)
+
+data(melip)
+melip.altitude <- terra::unwrap(melip.altitude)
+melip.forestcover <- terra::unwrap(melip.forestcover)
+melip.coords <- terra::unwrap(melip.coords)
+
+# keep the vignette compact and quick to fit
+keep <- 1:12
+gd_mat <- melip.Fst[keep, keep, drop = FALSE]
+coords <- melip.coords[keep]
+
+# scale raster covariates before fitting the conductance model
+covariates <- c(terra::scale(melip.altitude),
+                terra::scale(melip.forestcover))
+names(covariates) <- c("altitude", "forestcover")
+
+surface <- conductance_surface(covariates, coords, directions = 8)
+```
+
+## Construct IBE Covariates
+
+The new helper `pairwise_endpoint_covariates()` converts site-level
+environmental values into one or more pairwise endpoint-difference covariates.
+
+```{r}
+names(melip.altitude) <- "altitude_site"
+
+z_ibe <- pairwise_endpoint_covariates(
+  melip.altitude,
+  coords = coords,
+  transform = "absdiff",
+  scale = TRUE
+)
+
+head(z_ibe)
+dim(z_ibe)
+```
+
+Here we use absolute pairwise altitude differences, but the helper also
+supports squared differences and multivariate Euclidean or Manhattan
+environmental distances.
+
+## Build the Joint MLPE Measurement Model
+
+`mlpe_covariates()` wraps the pairwise endpoint-difference covariates into an
+MLPE measurement model with mean structure
+
+\[
+S_{ij} = \alpha + \beta R_{ij} + Z_{ij}\gamma + e_{ij}.
+\]
+
+```{r}
+g_ibe <- mlpe_covariates(z_ibe)
+```
+
+## Fit IBD, IBE-only, IBR-only, and Joint Models
+
+```{r}
+ctrl <- NewtonRaphsonControl(maxit = 8, verbose = FALSE)
+
+fit_ibd <- radish(
+  gd_mat ~ 1,
+  data = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe,
+  leverage = FALSE,
+  control = ctrl
+)
+
+fit_ibe <- radish(
+  gd_mat ~ 1,
+  data = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = g_ibe,
+  leverage = FALSE,
+  control = ctrl
+)
+
+fit_ibr <- radish(
+  gd_mat ~ altitude + forestcover,
+  data = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe,
+  leverage = FALSE,
+  control = ctrl
+)
+
+fit_joint <- radish(
+  gd_mat ~ altitude + forestcover,
+  data = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = g_ibe,
+  leverage = FALSE,
+  control = ctrl
+)
+```
+
+The conductance coefficients remain on the `theta` side:
+
+```{r}
+coef(fit_ibr)
+coef(fit_joint)
+```
+
+The IBE coefficient lives in the nuisance-parameter vector `phi` because it is
+part of the measurement model rather than the conductance model:
+
+```{r}
+summary(fit_joint)$phi
+```
+
+## Compare the Model Set
+
+For a quick comparison on the same focal set, `cv_model_selection()` can rank
+the four models by likelihood and AIC.
+
+```{r}
+comparison <- cv_model_selection(
+  list(
+    list(train_mod = fit_ibd,   cv_loglik = fit_ibd$loglik,   full_mod = fit_ibd),
+    list(train_mod = fit_ibe,   cv_loglik = fit_ibe$loglik,   full_mod = fit_ibe),
+    list(train_mod = fit_ibr,   cv_loglik = fit_ibr$loglik,   full_mod = fit_ibr),
+    list(train_mod = fit_joint, cv_loglik = fit_joint$loglik, full_mod = fit_joint)
+  ),
+  cv_names = c("IBD", "IBE", "IBR", "IBE + IBR"),
+  aic = TRUE
+)
+
+comparison$loglik_tab
+comparison$AIC_tab
+```
+
+## Cross-validation
+
+`radish_cv()` now knows how to rebuild `mlpe_covariates()` models on train/test
+subsets, as long as the measurement model was created from
+`pairwise_endpoint_covariates()` or from site-level covariates that can be
+converted by that helper.
+
+```{r}
+cv_joint <- radish_cv(
+  pts = coords,
+  covariates = covariates,
+  fmla = gd_mat ~ altitude + forestcover,
+  model = g_ibe,
+  prop_train = 2 / 3,
+  seed = 1,
+  fit_full = FALSE,
+  control = ctrl
+)
+
+cv_joint$cv_loglik
+```
+
+## Interpretation
+
+A useful way to read the joint model is:
+
+- `theta` asks whether landscape permeability affects effective movement among
+  sites.
+- `gamma` asks whether endpoint environmental mismatch explains additional
+  genetic differentiation after accounting for resistance distance.
+
+In other words, the joint model estimates the unique contribution of IBR and
+IBE rather than forcing them to compete in a single predictor class.

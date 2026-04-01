@@ -95,7 +95,7 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 
 .radish_measurement_model_name <- function(model)
 {
-  known <- c("leastsquares", "mlpe", "generalized_wishart")
+  known <- c("leastsquares", "mlpe", "generalized_wishart", "wishart_covariance")
   ns_env <- asNamespace("terradish")
   for (nm in known)
   {
@@ -563,8 +563,9 @@ radish <- function(formula,
   {
     ihess      <- .safe_hessian_inverse(fit$hessian)
     leverage_S <- -matrix(fit$partial_S, length(S), length(theta)) %*% ihess
-    leverage_S[upper.tri(S),] <- 0
     leverage_S <- array(leverage_S, dim = c(nrow(S), ncol(S), length(theta)))
+    for (k in seq_along(theta))
+      leverage_S[, , k] <- (leverage_S[, , k] + t(leverage_S[, , k])) / 2
     leverage_X <- array(NA, dim = dim(fit$partial_X))
     for (k in 1:length(theta))
       leverage_X[,,k] <- -fit$partial_X[,,k] %*% ihess

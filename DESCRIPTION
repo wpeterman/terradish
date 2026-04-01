@@ -12,11 +12,13 @@ Description: Maximum likelihood estimation for parameterized conductance models
     via Newton and quasi-Newton methods, for moderate-sized problems
     such as spatial grids with fewer than a million cells.
 License: BSD_3_clause + file LICENSE
-Suggests: numDeriv, nloptr, adegenet, testthat (>= 3.0.0)
+Suggests: numDeriv, nloptr, adegenet, testthat (>= 3.0.0),
+    knitr, rmarkdown
 Imports: Rcpp (>= 1.0.4), terra, Matrix, nlme, MASS,
     parallel, methods, stats, utils
 Depends: R (>= 3.5.0)
 LinkingTo: Rcpp, RcppArmadillo, RcppEigen
+VignetteBuilder: knitr
 RoxygenNote: 7.3.3
 Encoding: UTF-8
 Config/testthat/edition: 3

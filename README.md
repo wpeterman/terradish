@@ -98,9 +98,30 @@ fit_mlpe_interaction <- radish(melip.Fst ~ forestcover * altitude, surface,
 anova(fit_mlpe, fit_mlpe_interaction)
 
 # test against null model of IBD
-fit_mlpe_ibd <- radish(melip.Fst ~ 1, surface, 
+fit_mlpe_ibd <- radish(melip.Fst ~ 1, surface,
                        terradish::loglinear_conductance, terradish::mlpe)
 anova(fit_mlpe, fit_mlpe_ibd)
+
+# concurrent IBE + IBR:
+# build endpoint-difference covariates from site-level environment and
+# keep the resistance surface on the conductance side
+z_ibe <- pairwise_endpoint_covariates(melip.altitude, melip.coords,
+                                      transform = "absdiff", scale = TRUE)
+g_ibe <- mlpe_covariates(z_ibe)
+
+fit_ibe_only <- radish(melip.Fst ~ 1, surface,
+                       terradish::loglinear_conductance, g_ibe)
+fit_ibr_only <- fit_mlpe
+fit_joint <- radish(melip.Fst ~ forestcover + altitude, surface,
+                    terradish::loglinear_conductance, g_ibe)
+
+# compare IBD, IBE-only, IBR-only, and joint models
+cv_model_selection(list(
+  list(train_mod = fit_mlpe_ibd, cv_loglik = fit_mlpe_ibd$loglik, full_mod = fit_mlpe_ibd),
+  list(train_mod = fit_ibe_only, cv_loglik = fit_ibe_only$loglik, full_mod = fit_ibe_only),
+  list(train_mod = fit_ibr_only, cv_loglik = fit_ibr_only$loglik, full_mod = fit_ibr_only),
+  list(train_mod = fit_joint, cv_loglik = fit_joint$loglik, full_mod = fit_joint)
+), aic = TRUE)
 
 # categorical covariates:
 # categorical raster layers should be factor-valued, see ?terra::as.factor

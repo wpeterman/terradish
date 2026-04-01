@@ -39,7 +39,7 @@ assemble_model_matrix <- function(formula, spdat)
 #'
 #' @name radish_conductance_model_factory
 #' @seealso \code{\link{linear_conductance}}, \code{\link{loglinear_conductance}}
-NULL
+radish_conductance_model_factory <- NULL
 
 #' Log-link conductance model
 #'
