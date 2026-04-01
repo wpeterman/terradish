@@ -1,0 +1,877 @@
+setRefClass("FunctionCall", fields = list(count = "integer"))
+
+.safe_hessian_inverse <- function(x)
+{
+  tryCatch(solve(x), error = function(e) ginv(x))
+}
+
+.radish_amg_control_defaults <- function()
+{
+  list(
+    adaptive = TRUE,
+    tol_early = 1e-4,
+    tol_mid = 1e-6,
+    tol_final = 1e-8,
+    maxit_early = 100L,
+    maxit_mid = 250L,
+    maxit_final = 400L,
+    warmup_evals = 3L
+  )
+}
+
+.radish_solver_control_for_phase <- function(solver, solver_control = NULL, eval_count = 0L, final = FALSE)
+{
+  if (!solver %in% c("amg", "auto"))
+    return(solver_control)
+
+  control <- if (is.null(solver_control)) list() else as.list(solver_control)
+  defaults <- .radish_amg_control_defaults()
+  control <- modifyList(defaults, control)
+
+  if (!isTRUE(control$adaptive))
+  {
+    if (is.null(control$tol) && !is.null(control$tol_final))
+      control$tol <- control$tol_final
+    if (is.null(control$maxit) && !is.null(control$maxit_final))
+      control$maxit <- control$maxit_final
+    return(control)
+  }
+
+  phase <- if (isTRUE(final))
+    "final"
+  else if (as.integer(eval_count) <= as.integer(control$warmup_evals))
+    "early"
+  else
+    "mid"
+
+  control$tol <- switch(
+    phase,
+    early = control$tol_early,
+    mid = control$tol_mid,
+    final = control$tol_final
+  )
+  control$maxit <- switch(
+    phase,
+    early = as.integer(control$maxit_early),
+    mid = as.integer(control$maxit_mid),
+    final = as.integer(control$maxit_final)
+  )
+  control$adaptive_phase <- phase
+  control
+}
+
+.radish_landmark_control_defaults <- function()
+{
+  list(
+    n_landmarks = NULL,
+    fraction = 0.5,
+    min_landmarks = 8L,
+    max_landmarks = 64L,
+    method = "spacefill",
+    seed = NULL,
+    exact_refine = TRUE
+  )
+}
+
+.normalize_landmark_control <- function(control, n_focal)
+{
+  control <- if (is.null(control)) list() else as.list(control)
+  defaults <- .radish_landmark_control_defaults()
+  control <- modifyList(defaults, control)
+
+  requested <- control$n_landmarks
+  if (is.null(requested))
+  {
+    requested <- ceiling(n_focal * control$fraction)
+    requested <- max(as.integer(control$min_landmarks), as.integer(requested))
+    requested <- min(as.integer(control$max_landmarks), requested)
+  }
+
+  requested <- min(as.integer(control$max_landmarks), requested, as.integer(n_focal))
+  control$n_landmarks <- as.integer(requested)
+  control$method <- match.arg(control$method, c("spacefill", "random", "sequential"))
+  control
+}
+
+.radish_measurement_model_name <- function(model)
+{
+  known <- c("leastsquares", "mlpe", "generalized_wishart")
+  ns_env <- asNamespace("terradish")
+  for (nm in known)
+  {
+    obj <- get0(nm, envir = ns_env, mode = "function", inherits = FALSE)
+    if (!is.null(obj) &&
+        identical(formals(model), formals(obj)) &&
+        identical(body(model), body(obj)))
+      return(nm)
+  }
+  NULL
+}
+
+.deme_coordinates <- function(data)
+{
+  coords <- data$vertex_coordinates
+  if (is.null(coords) || is.null(data$demes))
+    return(NULL)
+  coords <- as.matrix(coords)
+  if (nrow(coords) < max(data$demes))
+    return(NULL)
+  coords[data$demes, , drop = FALSE]
+}
+
+.spacefill_landmarks <- function(coords, k)
+{
+  n <- nrow(coords)
+  if (k >= n)
+    return(seq_len(n))
+
+  center <- colMeans(coords, na.rm = TRUE)
+  d_center <- rowSums(sweep(coords, 2, center, FUN = "-")^2)
+  picked <- integer(k)
+  picked[1] <- which.min(d_center)
+
+  min_dist <- rowSums(sweep(coords, 2, coords[picked[1], ], FUN = "-")^2)
+  min_dist[picked[1]] <- -Inf
+
+  for (i in 2:k)
+  {
+    picked[i] <- which.max(min_dist)
+    d_new <- rowSums(sweep(coords, 2, coords[picked[i], ], FUN = "-")^2)
+    min_dist <- pmin(min_dist, d_new)
+    min_dist[picked[seq_len(i)]] <- -Inf
+  }
+
+  sort(unique(as.integer(picked)))
+}
+
+.landmark_indices <- function(data, n_focal, control)
+{
+  if (control$n_landmarks >= n_focal)
+    return(seq_len(n_focal))
+
+  if (!is.null(control$seed))
+  {
+    old_seed_exists <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+    if (old_seed_exists)
+      old_seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+    on.exit({
+      if (old_seed_exists)
+        assign(".Random.seed", old_seed, envir = .GlobalEnv)
+      else if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
+        rm(".Random.seed", envir = .GlobalEnv)
+    }, add = TRUE)
+    set.seed(control$seed)
+  }
+
+  idx <- switch(
+    control$method,
+    random = sort(sample.int(n_focal, control$n_landmarks)),
+    sequential = unique(as.integer(round(seq(1, n_focal, length.out = control$n_landmarks)))),
+    spacefill = {
+      coords <- .deme_coordinates(data)
+      if (is.null(coords))
+        sort(sample.int(n_focal, control$n_landmarks))
+      else
+        .spacefill_landmarks(coords, control$n_landmarks)
+    }
+  )
+
+  if (length(idx) < control$n_landmarks)
+  {
+    missing <- setdiff(seq_len(n_focal), idx)
+    idx <- sort(c(idx, missing[seq_len(control$n_landmarks - length(idx))]))
+  }
+
+  idx
+}
+
+.radish_landmark_subset <- function(data, S, approximation_control = NULL)
+{
+  n_focal <- nrow(S)
+  control <- .normalize_landmark_control(approximation_control, n_focal)
+  idx <- .landmark_indices(data, n_focal, control)
+
+  subset_data <- data
+  subset_data$demes <- data$demes[idx]
+  if (!is.null(data$rhs))
+    subset_data$rhs <- data$rhs[, idx, drop = FALSE]
+
+  list(
+    data = subset_data,
+    S = S[idx, idx, drop = FALSE],
+    index = idx,
+    control = control,
+    used = length(idx) < n_focal
+  )
+}
+
+.run_radish_optimizer <- function(theta, optfn, optimizer, control)
+{
+  if (optimizer == "newton")
+    return(BoxConstrainedNewton(theta, optfn, control = control))
+  BoxConstrainedBFGS(theta, optfn, control = control)
+}
+
+#' Optimize a parameterized conductance surface
+#'
+#' Uses maximum likelihood to fit a parameterized conductance surface to genetic data,
+#' given a function relating spatial data to conductance (a "conductance model")
+#' and a function relating resistance distance (covariance) to genetic distance
+#' (a "measurement model").
+#'
+#' @param formula A formula with a matrix of observed genetic distances on the lhs, and covariates used in the creation of \code{data} on the rhs
+#' @param data An object of class \code{radish_graph} (see \code{\link{conductance_surface}})
+#' @param conductance_model A function of class \code{radish_conductance_model_factory} (see \code{\link{radish_conductance_model_factory}})
+#' @param measurement_model A function of class \code{radish_measurement_model} (see \code{\link{radish_measurement_model}})
+#' @param nu Number of genetic markers (potentially used by \code{measurement_model})
+#' @param theta Starting values for optimization
+#' @param leverage Compute influence measures and leverage?
+#' @param nonnegative Force regression-like \code{measurement_model} to have nonnegative slope?
+#' @param conductance Retained for backward compatibility. Only
+#'   \code{conductance = TRUE} is currently implemented.
+#' @param optimizer The optimization algorithm to use: \code{newton} uses the exact Hessian, with computational cost that grows linearly with the number of parameters; while \code{bfgs} uses an approximation with much reduced cost (but slower overall convergence)
+#' @param control A list containing options for the optimization routine (see \code{\link{NewtonRaphsonControl}} for list)
+#' @param validate Numerical validation of leverage via package \code{numDeriv} (very slow, use for debugging small examples)
+#' @param cores Number of worker processes to use for Hessian and leverage calculations. \code{1} evaluates serially.
+#' @param solver Linear-system solver used for the reduced Laplacian. \code{"direct"} uses sparse Cholesky updates; \code{"auto"} conservatively chooses between the direct and AMG backends based on graph size and right-hand-side count; \code{"amg"} uses smoothed-aggregation AMG-preconditioned conjugate gradients; \code{"pcg"} uses incomplete-Cholesky preconditioned conjugate gradients; \code{"pcg_jacobi"} keeps the older Jacobi-preconditioned prototype.
+#' @param solver_control Optional named list of solver settings passed to \code{\link{radish_algorithm}}. For \code{solver = "direct"}, supported entries include \code{factorization}, \code{supernodal_min_vertices}, \code{supernodal_max_rhs}, and \code{perm}. For \code{solver = "auto"}, supported selection entries include \code{auto_direct_max_vertices}, \code{auto_amg_min_vertices}, and \code{auto_direct_max_rhs}. For \code{solver = "amg"} or \code{"auto"}, \code{radish()} also understands an adaptive schedule with entries such as \code{adaptive}, \code{tol_early}, \code{tol_mid}, \code{tol_final}, \code{maxit_early}, \code{maxit_mid}, \code{maxit_final}, and \code{warmup_evals}. AMG controls also support \code{reuse_preconditioner} to reuse multigrid hierarchy information across nearby optimization steps when possible.
+#' @param approximation Exploratory approximation used during optimization. \code{"none"} uses the full focal set throughout. \code{"landmark"} optimizes first on a space-filling subset of focal populations and then refines on the full likelihood when supported by the measurement model.
+#' @param approximation_control Optional named list controlling the landmark approximation. Supported entries include \code{n_landmarks}, \code{fraction}, \code{min_landmarks}, \code{max_landmarks}, \code{method} (\code{"spacefill"}, \code{"random"}, or \code{"sequential"}), \code{seed}, and \code{exact_refine}. The final reported fit is still evaluated on the full data. For \code{measurement_model = leastsquares}, landmark exact-refinement is guarded and the approximation stage is skipped.
+#'
+#' @details By "parameterized conductance surface", what is meant is a model
+#' where the per-vertex conductance (and thus resistance distance) is a function of
+#' spatial covariates. The choice of function is referred to in this package as
+#' the "conductance model". The inverse problem (and the purpose of this
+#' package) is to estimate the parameters of the conductance model, by relating
+#' the (unknown, modeled) resistance distance to observed genetic dissimilarity
+#' via a probability model (referred to as the "measurement model" throughout
+#' this package).
+#'
+#' For example, a log-linear choice of conductance model is:
+#'
+#'   \code{vertex_conductance[i] = exp(covariates[i,] \%*\% theta)}
+#'
+#' where \code{theta} are unknown parameters, \code{covariates} is a design
+#' matrix with each row representing a vertex in the graph (cell in the
+#' raster). The conductance of a given edge -- an offdiagonal entry in the
+#' graph Laplacian -- is:
+#'
+#'   \code{edge_conductance[i,j] = vertex_conductance[i] + vertex_conductance[j]}
+#'
+#' if argument \code{conductance = TRUE}, and
+#'
+#'   \code{edge_conductance[i,j] = 1/(1/vertex_conductance[i] + 1/vertex_conductance[j])}
+#'
+#' otherwise. This alternative parameterization is not currently implemented,
+#' so \code{conductance} must be \code{TRUE}. This differs by a factor of two
+#' from CIRCUITSCAPE, where the edge 
+#' conductance/resistance is the average of the vertex conductance/resistance.
+#'
+#' \code{radish} estimates \code{theta} (and thus the conductance) by maximum likelihood; by finding the
+#' values of \code{theta} (and associated conductance) that result in
+#' resistance distances that are closest to the observed genetic distances,
+#' according to some measure of fit (like least squares). The optimization is
+#' done via Newton's method (default; requires computation of Hessian) or via the BFGS
+#' algorithm (requires gradient only) if argument \code{optimizer = "bfgs"}. 
+#'
+#' For an explanation of how categorical spatial covariates are handled, see
+#' \code{details} of \code{\link{conductance_surface}} and the examples below.
+#' The dummy coding of categorical covariates is done by the function passed to
+#' \code{conductance_model} (e.g.  \code{terradish::loglinear_conductance}).
+#' Currently, all of the built-in conductance models in \code{terradish} use the
+#' default contrast coding (e.g. for a categorical covariate with \code{K}
+#' factors, the estimated parameters are the \code{K-1} mean differences
+#' against a reference category). The intercept is excluded if it is not
+#' identifiable.
+#'
+#' If the fit is on the boundary (e.g. no spatial genetic structure) or is the
+#' null model of isolation-by-distance, the fitted object will not contain
+#' influence/leverage/gradient/hessian.
+#'
+#' @return An object of class \code{radish} containing the fitted conductance
+#'   parameters, optimized nuisance parameters, log-likelihood, model
+#'   comparison statistics, and optional leverage diagnostics. See
+#'   \code{\link{terradish_methods}} for the available S3 methods.
+#'
+#' @examples
+#'
+#' library(terra)
+#' 
+#' data(melip)
+#' melip.altitude <- terra::unwrap(melip.altitude)
+#' melip.forestcover <- terra::unwrap(melip.forestcover)
+#' melip.coords <- terra::unwrap(melip.coords)
+#' 
+#' # scaling spatial covariates helps avoid numeric overflow
+#' covariates <- c(terra::scale(melip.altitude),
+#'                 terra::scale(melip.forestcover))
+#' names(covariates) <- c("altitude", "forestcover")
+#' 
+#' # create parameterized conductance surface
+#' surface <- conductance_surface(covariates, melip.coords, directions = 8)
+#' 
+#' fit_nnls <- radish(melip.Fst ~ altitude * forestcover, data = surface, 
+#'                    terradish::loglinear_conductance, terradish::leastsquares)
+#' summary(fit_nnls)
+#' 
+#' # a different "measurement_model" that incorporates dependence
+#' # among pairwise measurements
+#' fit_mlpe <- radish(melip.Fst ~ altitude * forestcover, data = surface, 
+#'                    terradish::loglinear_conductance, terradish::mlpe)
+#' summary(fit_mlpe)
+#'
+#' # conductance surface with 95% CI
+#' fitted_conductance <- conductance(surface, fit_mlpe, quantile = 0.95)
+#' 
+#' # test for an interaction using a likelihood ratio test
+#' fit_mlpe_interaction <- radish(melip.Fst ~ forestcover * altitude, data = surface, 
+#'                                terradish::loglinear_conductance, terradish::mlpe)
+#' anova(fit_mlpe, fit_mlpe_interaction)
+#' 
+#' # test against null model of IBD using a LRT
+#' fit_mlpe_ibd <- radish(melip.Fst ~ 1, data = surface, 
+#'                        terradish::loglinear_conductance, terradish::mlpe)
+#' anova(fit_mlpe, fit_mlpe_ibd)
+#'
+#' # categorical covariates:
+#' # categorical raster layers should be factor-valued, see ?terra::as.factor
+#' # and 'details' section of ?conductance_surface
+#' forestcover_class <- cut(terra::values(melip.forestcover)[,1], breaks = c(0, 1/6, 1/3, 1))
+#' melip.forestcover_cat <- terra::setValues(melip.forestcover, as.numeric(forestcover_class))
+#' melip.forestcover_cat <- terra::as.factor(melip.forestcover_cat)
+#'
+#' RAT <- levels(melip.forestcover_cat)[[1]]
+#' RAT$VALUE <- levels(forestcover_class) #explicitly define level names
+#' levels(melip.forestcover_cat) <- RAT
+#' 
+#' covariates_cat <- c(melip.forestcover_cat, melip.altitude)
+#' names(covariates_cat) <- c("forestcover", "altitude")
+#' 
+#' surface_cat <- conductance_surface(covariates_cat, melip.coords, directions = 8)
+#' 
+#' fit_mlpe_cat <- radish(melip.Fst ~ forestcover + altitude, surface_cat, 
+#'                        terradish::loglinear_conductance, terradish::mlpe)
+#' summary(fit_mlpe_cat)
+#'
+#' @export
+
+radish <- function(formula, 
+                   data,
+                   conductance_model = loglinear_conductance, 
+                   measurement_model = mlpe, 
+                   nu = NULL, 
+                   theta = NULL,
+                   leverage = TRUE, 
+                   nonnegative = TRUE, 
+                   conductance = TRUE, 
+                   optimizer = c("newton", "bfgs"), 
+                   control = NewtonRaphsonControl(verbose = TRUE, ctol = 1e-6, ftol = 1e-6), 
+                   validate = FALSE,
+                   cores = 1L,
+                   solver = c("direct", "auto", "amg", "pcg", "pcg_jacobi"),
+                   solver_control = NULL,
+                   approximation = c("none", "landmark"),
+                   approximation_control = NULL)
+{
+  stopifnot(inherits(formula, "formula"))
+  stopifnot(inherits(data, "radish_graph"))
+  stopifnot(inherits(conductance_model, "radish_conductance_model_factory"))
+  stopifnot(inherits(measurement_model, "radish_measurement_model"))
+  stopifnot(length(cores) == 1, is.numeric(cores), cores >= 1)
+  if (!isTRUE(conductance))
+    stop("`conductance = FALSE` is not currently supported.", call. = FALSE)
+  solver <- match.arg(solver)
+  approximation <- match.arg(approximation)
+
+  # get response, remove lhs from formula
+  terms    <- terms(formula)
+  vars     <- as.character(attr(terms, "variables"))[-1]
+  response <- attr(terms, "response")
+  S        <- if(response) get(vars[attr(terms, "response")], parent.frame())
+              else stop("'formula' must have genetic distance matrix on lhs")
+  is_ibd   <- length(vars) == 1
+  formula  <- if (!is_ibd) reformulate(attr(terms, "term.labels"))
+              else formula(~1)
+
+  # "conductance_model" (a factory) is then responsible for parsing formula,
+  # constructing design matrix, and returning actual "conductance_model"
+  conductance_model <- conductance_model(formula, data$x)
+
+  # initialize theta
+  default <- attr(conductance_model, "default")
+  if (is.null(theta))
+    theta <- default
+  else
+    stopifnot(length(theta) == length(default))
+  names(theta) <- names(default)
+
+  optimizer <- match.arg(optimizer)
+  fcalls    <- new("FunctionCall", count = 0L)
+  make_optfn <- function(eval_data, eval_S, phi_state, solver_state)
+  {
+    function(par, gradient, hessian)
+    {
+      fcalls$count <- fcalls$count + 1L
+      current_solver_control <- .radish_solver_control_for_phase(
+        solver = solver,
+        solver_control = solver_control,
+        eval_count = fcalls$count,
+        final = FALSE
+      )
+      fit <- radish_algorithm(f = conductance_model,
+                              g = measurement_model,
+                              s = eval_data,
+                              S = eval_S,
+                              nu = nu,
+                              phi = phi_state$value,
+                              theta = c(par),
+                              gradient = gradient,
+                              hessian = hessian,
+                              partial = FALSE,
+                              nonnegative = nonnegative,
+                              cores = cores,
+                              solver = solver,
+                              solver_control = current_solver_control,
+                              solver_warm_start = solver_state$warm_start,
+                              solver_reuse_state = solver_state$reuse_state)
+      phi_state$value <- fit$phi
+      solver_state$warm_start <- fit$solver_warm_start
+      solver_state$reuse_state <- fit$solver_reuse_state
+      fit
+    }
+  }
+
+  approximation_info <- list(type = "none", used = FALSE)
+
+  if (!is_ibd)
+  {
+    measurement_model_name <- .radish_measurement_model_name(measurement_model)
+    landmark_problem <- NULL
+    if (identical(approximation, "landmark"))
+    {
+      landmark_problem <- .radish_landmark_subset(data, S, approximation_control = approximation_control)
+      if (isTRUE(landmark_problem$used) &&
+          isTRUE(landmark_problem$control$exact_refine) &&
+          identical(measurement_model_name, "leastsquares"))
+      {
+        approximation_info <- list(
+          type = "landmark",
+          used = FALSE,
+          stage = "disabled_for_leastsquares_exact_refine",
+          n_landmarks = landmark_problem$control$n_landmarks,
+          full_focal = nrow(S),
+          focal_fraction = landmark_problem$control$n_landmarks / nrow(S),
+          method = landmark_problem$control$method,
+          landmark_index = landmark_problem$index,
+          exact_refine = TRUE,
+          refine_guard = "disabled_for_leastsquares"
+        )
+        landmark_problem <- NULL
+      }
+    }
+
+    iters <- 0L
+    exact_phi_state <- new.env(parent = emptyenv())
+    exact_phi_state$value <- NULL
+    exact_solver_state <- new.env(parent = emptyenv())
+    exact_solver_state$warm_start <- NULL
+    exact_solver_state$reuse_state <- NULL
+
+    if (!is.null(landmark_problem) && isTRUE(landmark_problem$used))
+    {
+      approximation_info <- list(
+        type = "landmark",
+        used = TRUE,
+        stage = "optimization_only",
+        n_landmarks = landmark_problem$control$n_landmarks,
+        full_focal = nrow(S),
+        focal_fraction = landmark_problem$control$n_landmarks / nrow(S),
+        method = landmark_problem$control$method,
+        landmark_index = landmark_problem$index,
+        exact_refine = isTRUE(landmark_problem$control$exact_refine)
+      )
+
+      approx_phi_state <- new.env(parent = emptyenv())
+      approx_phi_state$value <- NULL
+      approx_solver_state <- new.env(parent = emptyenv())
+      approx_solver_state$warm_start <- NULL
+      approx_solver_state$reuse_state <- NULL
+
+      approx_problem <- .run_radish_optimizer(
+        theta = theta,
+        optfn = make_optfn(landmark_problem$data, landmark_problem$S, approx_phi_state, approx_solver_state),
+        optimizer = optimizer,
+        control = control
+      )
+      iters <- iters + approx_problem$iters
+      theta <- c(approx_problem$par)
+      names(theta) <- names(default)
+
+      exact_phi_state$value <- approx_phi_state$value
+      exact_solver_state$reuse_state <- approx_solver_state$reuse_state
+    }
+
+    if (!isTRUE(approximation_info$used) || isTRUE(approximation_info$exact_refine))
+    {
+      exact_problem <- .run_radish_optimizer(
+        theta = theta,
+        optfn = make_optfn(data, S, exact_phi_state, exact_solver_state),
+        optimizer = optimizer,
+        control = control
+      )
+      iters <- iters + exact_problem$iters
+      theta <- c(exact_problem$par)
+      names(theta) <- names(default)
+    }
+  }
+  else
+  {
+    iters <- 0L
+    theta <- c(default)
+    exact_phi_state <- new.env(parent = emptyenv())
+    exact_phi_state$value <- NULL
+    exact_solver_state <- new.env(parent = emptyenv())
+    exact_solver_state$warm_start <- NULL
+    exact_solver_state$reuse_state <- NULL
+  }
+
+  final_solver_control <- .radish_solver_control_for_phase(
+    solver = solver,
+    solver_control = solver_control,
+    eval_count = fcalls$count,
+    final = TRUE
+  )
+  fit <- radish_algorithm(f = conductance_model, g = measurement_model, 
+                          s = data, S = S, nu = nu, theta = theta, phi = exact_phi_state$value,
+                          gradient = TRUE, hessian = TRUE, partial = leverage,
+                          nonnegative = nonnegative, cores = cores,
+                          solver = solver, solver_control = final_solver_control,
+                          solver_warm_start = exact_solver_state$warm_start,
+                          solver_reuse_state = exact_solver_state$reuse_state)
+  fit$solver_warm_start <- NULL
+  fit$solver_reuse_state <- NULL
+
+  fit$response <- S
+
+  if (fit$boundary)
+    warning("Optimum for subproblem is on boundary (e.g. no spatial genetic structure): cannot optimize theta.\nTry different starting values.")
+  no_coef <- fit$boundary || is_ibd 
+
+  # calculate leverage for genetic distance and spatial covariates
+  leverage <- leverage && !no_coef
+  if (leverage)
+  {
+    ihess      <- .safe_hessian_inverse(fit$hessian)
+    leverage_S <- -matrix(fit$partial_S, length(S), length(theta)) %*% ihess
+    leverage_S[upper.tri(S),] <- 0
+    leverage_S <- array(leverage_S, dim = c(nrow(S), ncol(S), length(theta)))
+    leverage_X <- array(NA, dim = dim(fit$partial_X))
+    for (k in 1:length(theta))
+      leverage_X[,,k] <- -fit$partial_X[,,k] %*% ihess
+  }
+  num_leverage_S <- NULL
+  num_leverage_X <- NULL
+
+  # numerical validation of derivatives
+  validate <- validate && !no_coef
+  if (validate)
+  {
+    warning("`validate = TRUE` is not currently implemented for `radish()`; skipping numerical leverage validation.",
+            call. = FALSE)
+    validate <- FALSE
+  }
+
+  out <- list(call           = match.call(),
+              formula        = formula,
+              dim            = c("vertices" = nrow(data$x),
+                                 "focal"    = nrow(S),
+                                 "edge"     = ncol(data$adj)),
+              cost           = c("newton_steps"   = iters,
+                                 "function_calls" = fcalls$count + 1),
+              submodels      = list("f" = conductance_model,
+                                    "g" = measurement_model),
+              fit            = fit,
+              loglik         = -fit$objective,
+              df             = (!no_coef)*length(theta) + length(fit$phi),
+              aic            = 2*fit$objective + 2*(!no_coef)*length(theta) + 2*length(fit$phi),
+              mle            = list("theta"    = if(no_coef) NULL else theta,
+                                    "gradient" = if(no_coef) NULL else -fit$gradient,
+                                    "hessian"  = if(no_coef) NULL else -fit$hessian),
+              approximation  = approximation_info,
+              leverage       = list("S" = if(!leverage) NULL else leverage_S,
+                                    "X" = if(!leverage) NULL else leverage_X,
+                                    "validate" = if(!validate || !leverage) NULL 
+                                                 else list("S" = num_leverage_S,
+                                                           "X" = num_leverage_X))
+              )
+  class(out) <- "radish"
+  out
+}
+
+#' Methods for fitted terradish models
+#'
+#' S3 methods for working with fitted objects returned by \code{\link{radish}}
+#' and summaries returned by \code{\link[base:summary]{summary()}}.
+#'
+#' @param x A fitted \code{radish} object.
+#' @param object,alternative Fitted \code{radish} objects.
+#' @param digits Number of digits to print.
+#' @param signif.stars Should significance stars be printed in coefficient
+#'   tables?
+#' @param type Type of fitted values to return.
+#' @param nsim Number of simulated response matrices to generate.
+#' @param seed Optional random seed used by \code{simulate()}.
+#' @param k Penalty multiplier supplied to \code{AIC()}.
+#' @param method Simulation method.
+#' @param ... Additional arguments passed through to generic methods.
+#'
+#' @return
+#' \itemize{
+#'   \item \code{print()} returns its input invisibly.
+#'   \item \code{summary()} returns an object of class \code{summary.radish}.
+#'   \item \code{coef()} returns the fitted conductance coefficients.
+#'   \item \code{fitted()} returns fitted responses, distances, or covariance.
+#'   \item \code{simulate()} returns one or more simulated response matrices.
+#'   \item \code{anova()} returns a likelihood-ratio comparison table.
+#'   \item \code{logLik()} returns a \code{logLik} object.
+#'   \item \code{AIC()} returns Akaike's Information Criterion.
+#'   \item \code{residuals()} returns the residual genetic-distance matrix.
+#' }
+#'
+#' @name terradish_methods
+NULL
+
+#' @rdname terradish_methods
+#' @method print radish
+#' @export
+print.radish <- function(x, digits = max(3L, getOption("digits") - 3L), ...)
+{
+  cat("Conductance surface estimated by maximum likelihood\n")
+  cat("Call:   ", paste(deparse(x$call), sep = "\n", collapse = "\n"), "\n\n", sep = "")
+  if (!x$fit$boundary && !is.null(x$mle$theta))
+  {
+    cat("Coefficients:\n")
+    print.default(format(x$mle$theta, digits = digits), print.gap = 2L, quote = FALSE)
+  }
+  else
+  {
+    cat("No coefficients\n")
+  }
+  cat("\n")
+  cat("Loglikelihood:", x$loglik, paste0("(", x$df), "degrees freedom)   AIC:", x$aic, "\n")
+  invisible(x)
+}
+
+#' @rdname terradish_methods
+#' @method summary radish
+#' @export
+summary.radish <- function(object, ...)
+{
+  x <- object
+  tol <- sqrt(.Machine$double.eps) #for checking singularity
+
+  no_coef <- x$fit$boundary || is.null(x$mle$theta)
+  if (!no_coef)
+  {
+    ztable <- matrix(0, length(x$mle$theta), 4)
+    colnames(ztable)      <- c("Estimate", "Std. Error", "z value", "Pr(>|z|)")
+    rownames(ztable)      <- names(x$mle$theta)
+    ztable[,"Estimate"]   <- x$mle$theta
+    ztable[,"Std. Error"] <- sqrt(diag(solve(x$fit$hessian)))
+    ztable[,"z value"]    <- ztable[,"Estimate"]/ztable[,"Std. Error"]
+    ztable[,"Pr(>|z|)"]   <- pmin(2*(1 - pnorm(abs(ztable[,"z value"]))), 1)
+
+    ehess <- eigen(x$fit$hessian)
+
+    if (any(ehess$values < 0))
+      warning("Hessian matrix has negative eigenvalues: possibly a saddle point")
+    if (any(abs(ehess$values) < tol * max(abs(ehess$values))))
+      warning("Hessian matrix is singular or nearly singular: model is probably non-identifiable")
+
+    vcov <- ehess$vectors %*% diag(1/ehess$values, nrow = nrow(x$fit$hessian)) %*% t(ehess$vectors)
+    vcor <- cov2cor(vcov)
+    rownames(vcor) <- colnames(vcor) <- 
+      rownames(vcov) <- colnames(vcov) <- 
+        rownames(ztable)
+  }
+
+  out <- list(boundary      = x$fit$boundary,
+              phi           = x$fit$phi[,1],
+              ztable        = if (no_coef) NULL else ztable,
+              vcor          = if (no_coef) NULL else vcor,
+              vcov          = if (no_coef) NULL else vcov,
+              gradnorm      = if (no_coef) NA else sqrt(sum(x$mle$gradient^2)),
+              loglik        = x$loglik,
+              df            = x$df,
+              aic           = x$aic,
+              fcalls        = x$cost["function_calls"],
+              iters         = x$cost["newton_steps"],
+              call          = x$call,
+              dim           = x$dim
+              )
+  class(out) <- "summary.radish"
+  out
+}
+
+#' @rdname terradish_methods
+#' @method print summary.radish
+#' @export
+print.summary.radish <- function(x, digits = max(3L, getOption("digits") - 3L), signif.stars = getOption("show.signif.stars"), ...)
+{
+  cat("Conductance surface with", x$dim["vertices"], "vertices", 
+      paste0("(", x$dim["focal"]), "focal) estimated by maximum likelihood\n")
+  cat("Call:   ", paste(deparse(x$call), sep = "\n", collapse = "\n"), "\n\n", sep = "")
+  cat("Loglikelihood:", x$loglik, paste0("(", x$df), "degrees freedom)\nAIC:", x$aic, "\n\n")
+  cat("Number of function calls:", x$fcalls, "\n")
+  cat("Number of Newton-Raphson steps:", x$iters, "\n")
+  cat("Norm of gradient at MLE:", x$gradnorm, "\n\n")
+  if (length(x$phi))
+  {
+    cat("Nuisance parameters:\n")
+    print.default(format(x$phi, digits = digits), print.gap = 2L, quote = FALSE)
+    cat("\n")
+  }
+  if (!x$boundary && !is.null(x$ztable))
+  {
+    cat("Coefficients:\n")
+    printCoefmat(x$ztable, digits = digits, signif.stars = signif.stars, na.print = "NA", ...)
+    if (nrow(x$ztable) > 1)
+    {
+      cat("\n")
+      cat("Correlation of Coefficients:\n")
+      print(as.dist(x$vcor))
+    }
+  }
+  else if (x$boundary)
+  {
+    cat("Model fit is on boundary (e.g. no genetic structure), no meaningful coefficients\n")
+  }
+  else
+  {
+    cat("No coefficients\n")
+  }
+  invisible(x)
+}
+
+#' @rdname terradish_methods
+#' @method coef radish
+#' @export
+coef.radish <- function(object, ...)
+{
+  if (!is.null(object$mle$theta))
+    return(object$mle$theta)
+  else
+    return(c())
+}
+
+#' @rdname terradish_methods
+#' @method fitted radish
+#' @export
+fitted.radish <- function(object, type = c("response", "distance", "covariance"), ...)
+{
+  type <- match.arg(type)
+  if (type == "response")
+    as.matrix(object$fit$fitted)
+  else if (type == "distance")
+    dist_from_cov(as.matrix(object$fit$covariance))
+  else if (type == "covariance")
+    as.matrix(object$fit$covariance)
+}
+
+#' @rdname terradish_methods
+#' @method simulate radish
+#' @export
+simulate.radish <- function(object, nsim = 1, seed = NULL, method = c("permutation", "parametric"), ...)
+{
+  if (!is.null(seed))
+    set.seed(seed)
+  method <- match.arg(method)
+  if (method == "parametric")
+  {
+    stop("Parametric simulation not yet supported")
+  } 
+  else if (method == "permutation") 
+  {
+    fit <- fitted(object)
+    resid  <- residuals(object)
+    sims   <- array(NA, c(nrow(resid), ncol(resid), nsim))
+    for (i in 1:nsim)
+    {
+      ind <- sample(1:nrow(resid))
+      sims[,,i] <- fit + resid[ind,ind]
+    }
+  }
+  if (nsim == 1) sims[,,1] else sims
+}
+
+#' @rdname terradish_methods
+#' @method anova radish
+#' @export
+anova.radish <- function(object, ..., alternative = NULL)
+{
+  dots <- list(...)
+  if (is.null(alternative))
+    alternative <- dots[[1]]
+  stopifnot(class(object) == "radish" && class(alternative) == "radish")
+  stopifnot(!object$fit$boundary && !alternative$fit$boundary)
+
+  if (object$df >= alternative$df)
+  {
+    full <- object
+    reduced <- alternative
+  } 
+  else
+  {
+    full <- alternative
+    reduced <- object
+  }
+
+  form_reduced <- paste("Null:", paste(reduced$formula, collapse = " "))
+  form_full    <- paste("Alt:", paste(full$formula, collapse = " "))
+
+  Chisq <- 2 * (full$loglik - reduced$loglik)
+  Df    <- full$df - reduced$df
+  P     <- pchisq(Chisq, Df, lower.tail = FALSE)
+  Ll    <- c(reduced$loglik, full$loglik)
+  Np    <- c(reduced$df, full$df)
+
+  out <- cbind("logLik" = Ll, 
+               "Df" = Np, 
+               "ChiSq" = c(NA, Chisq), 
+               "Df(ChiSq)" = c(NA, Df), 
+               "Pr(>Chi)" = c(NA, P))
+  rownames(out) <- c("Null", "Alt")
+
+  attr(out, "heading") <- c("Likelihood ratio test",
+                           form_reduced, form_full)
+  class(out) <- "anova"
+  out
+}
+
+#' @rdname terradish_methods
+#' @method logLik radish
+#' @export
+logLik.radish <- function(object, ...)
+{
+  val <- object$loglik
+  attr(val, "df") <- object$df
+  class(val) <- "logLik"
+  val
+}
+
+#' @rdname terradish_methods
+#' @method AIC radish
+#' @export
+AIC.radish <- function(object, ..., k = 2)
+{
+  object$aic
+}
+
+#' @rdname terradish_methods
+#' @method residuals radish
+#' @export
+residuals.radish <- function(object, ...)
+{
+  fit <- fitted(object)
+  object$fit$response - fit
+}

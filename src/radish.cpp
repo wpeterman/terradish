@@ -1,0 +1,418 @@
+#include <RcppArmadillo.h>
+#include <RcppEigen.h>
+#include <cmath>
+#include <vector>
+
+// [[Rcpp::depends(RcppArmadillo, RcppEigen)]]
+
+namespace {
+
+void validate_edge_pairs(const arma::vec& conductance, const arma::umat& edge_pairs)
+{
+  if (edge_pairs.n_cols != 2)
+    Rcpp::stop("`edge_pairs` must have two columns");
+
+  const arma::uword N = conductance.n_elem;
+  if (N < 2)
+    Rcpp::stop("need at least two vertices");
+
+  for (arma::uword edge = 0; edge < edge_pairs.n_rows; ++edge)
+  {
+    const arma::uword i = edge_pairs(edge, 0);
+    const arma::uword j = edge_pairs(edge, 1);
+    if (i < 1 || j < 1 || i > N || j > N || i == j)
+      Rcpp::stop("vertex index out of bounds");
+  }
+}
+
+arma::vec reduced_laplacian_diagonal(const arma::vec& conductance, const arma::umat& edge_pairs)
+{
+  const arma::uword N = conductance.n_elem;
+  const arma::uword Nred = N - 1;
+  arma::vec diagonal(Nred, arma::fill::zeros);
+
+  for (arma::uword edge = 0; edge < edge_pairs.n_rows; ++edge)
+  {
+    const arma::uword ii = edge_pairs(edge, 0) - 1;
+    const arma::uword jj = edge_pairs(edge, 1) - 1;
+    const double w = conductance.at(ii) + conductance.at(jj);
+
+    if (ii < Nred)
+      diagonal.at(ii) += w;
+    if (jj < Nred)
+      diagonal.at(jj) += w;
+  }
+
+  return diagonal;
+}
+
+arma::vec reduced_laplacian_matvec(const arma::vec& conductance,
+                                   const arma::umat& edge_pairs,
+                                   const arma::vec& x)
+{
+  const arma::uword N = conductance.n_elem;
+  const arma::uword Nred = N - 1;
+  if (x.n_elem != Nred)
+    Rcpp::stop("dimension mismatch in reduced_laplacian_matvec");
+
+  arma::vec y(Nred, arma::fill::zeros);
+  for (arma::uword edge = 0; edge < edge_pairs.n_rows; ++edge)
+  {
+    const arma::uword ii = edge_pairs(edge, 0) - 1;
+    const arma::uword jj = edge_pairs(edge, 1) - 1;
+    const double w = conductance.at(ii) + conductance.at(jj);
+
+    if (ii < Nred)
+      y.at(ii) += w * x.at(ii);
+    if (jj < Nred)
+      y.at(jj) += w * x.at(jj);
+
+    if (ii < Nred && jj < Nred)
+    {
+      y.at(ii) -= w * x.at(jj);
+      y.at(jj) -= w * x.at(ii);
+    }
+  }
+
+  return y;
+}
+
+Eigen::SparseMatrix<double> reduced_laplacian_eigen(const arma::vec& conductance,
+                                                    const arma::umat& edge_pairs)
+{
+  const arma::uword N = conductance.n_elem;
+  const arma::uword Nred = N - 1;
+  std::vector<Eigen::Triplet<double>> triplets;
+  triplets.reserve(2 * edge_pairs.n_rows + Nred);
+  Eigen::VectorXd diagonal = Eigen::VectorXd::Zero(static_cast<Eigen::Index>(Nred));
+
+  for (arma::uword edge = 0; edge < edge_pairs.n_rows; ++edge)
+  {
+    const arma::uword ii = edge_pairs(edge, 0) - 1;
+    const arma::uword jj = edge_pairs(edge, 1) - 1;
+    const double w = conductance.at(ii) + conductance.at(jj);
+
+    if (ii < Nred)
+      diagonal[static_cast<Eigen::Index>(ii)] += w;
+    if (jj < Nred)
+      diagonal[static_cast<Eigen::Index>(jj)] += w;
+
+    if (ii < Nred && jj < Nred)
+    {
+      triplets.emplace_back(static_cast<Eigen::Index>(ii), static_cast<Eigen::Index>(jj), -w);
+      triplets.emplace_back(static_cast<Eigen::Index>(jj), static_cast<Eigen::Index>(ii), -w);
+    }
+  }
+
+  for (arma::uword i = 0; i < Nred; ++i)
+    triplets.emplace_back(static_cast<Eigen::Index>(i),
+                          static_cast<Eigen::Index>(i),
+                          diagonal[static_cast<Eigen::Index>(i)]);
+
+  Eigen::SparseMatrix<double> A(static_cast<Eigen::Index>(Nred),
+                                static_cast<Eigen::Index>(Nred));
+  A.setFromTriplets(triplets.begin(), triplets.end());
+  A.makeCompressed();
+  return A;
+}
+
+} // namespace
+
+// [[Rcpp::export]]
+arma::sp_mat assemble_reduced_laplacian(const arma::vec& conductance, const arma::umat& edge_pairs)
+{
+  validate_edge_pairs(conductance, edge_pairs);
+
+  const arma::uword N = conductance.n_elem;
+  const arma::uword Nred = N - 1;
+  arma::vec diagonal = reduced_laplacian_diagonal(conductance, edge_pairs);
+
+  std::vector<arma::uword> rows;
+  std::vector<arma::uword> cols;
+  std::vector<double> vals;
+  rows.reserve(2 * edge_pairs.n_rows + Nred);
+  cols.reserve(2 * edge_pairs.n_rows + Nred);
+  vals.reserve(2 * edge_pairs.n_rows + Nred);
+
+  for (arma::uword edge = 0; edge < edge_pairs.n_rows; ++edge)
+  {
+    const arma::uword i = edge_pairs(edge, 0);
+    const arma::uword j = edge_pairs(edge, 1);
+
+    const arma::uword ii = i - 1;
+    const arma::uword jj = j - 1;
+    const double w = conductance.at(ii) + conductance.at(jj);
+
+    if (ii < Nred && jj < Nred)
+    {
+      rows.push_back(ii);
+      cols.push_back(jj);
+      vals.push_back(-w);
+      rows.push_back(jj);
+      cols.push_back(ii);
+      vals.push_back(-w);
+    }
+  }
+
+  for (arma::uword i = 0; i < Nred; ++i)
+  {
+    rows.push_back(i);
+    cols.push_back(i);
+    vals.push_back(diagonal.at(i));
+  }
+
+  arma::umat locations(2, rows.size());
+  arma::vec values(vals.size());
+  for (arma::uword k = 0; k < rows.size(); ++k)
+  {
+    locations(0, k) = rows[k];
+    locations(1, k) = cols[k];
+    values.at(k) = vals[k];
+  }
+
+  return arma::sp_mat(locations, values, Nred, Nred, true, true);
+}
+
+// [[Rcpp::export]]
+Rcpp::List pcg_reduced_laplacian_ic(const arma::mat& rhs,
+                                    const arma::vec& conductance,
+                                    const arma::umat& edge_pairs,
+                                    Rcpp::Nullable<arma::mat> x0 = R_NilValue,
+                                    const double tol = 1e-8,
+                                    const int maxit = 1000)
+{
+  validate_edge_pairs(conductance, edge_pairs);
+
+  const arma::uword Nred = conductance.n_elem - 1;
+  if (rhs.n_rows != Nred)
+    Rcpp::stop("[pcg_reduced_laplacian_ic] rhs has incompatible number of rows");
+
+  arma::mat initial_guess;
+  if (x0.isNotNull())
+  {
+    initial_guess = Rcpp::as<arma::mat>(x0);
+    if (initial_guess.n_rows != rhs.n_rows || initial_guess.n_cols != rhs.n_cols)
+      Rcpp::stop("[pcg_reduced_laplacian_ic] x0 must match rhs dimensions");
+  }
+
+  Eigen::SparseMatrix<double> A = reduced_laplacian_eigen(conductance, edge_pairs);
+  Eigen::ConjugateGradient<Eigen::SparseMatrix<double>,
+                           Eigen::Lower | Eigen::Upper,
+                           Eigen::IncompleteCholesky<double>> solver;
+  solver.setTolerance(tol);
+  solver.setMaxIterations(maxit);
+  solver.compute(A);
+  if (solver.info() != Eigen::Success)
+    Rcpp::stop("[pcg_reduced_laplacian_ic] incomplete Cholesky factorization failed");
+
+  arma::mat solution(rhs.n_rows, rhs.n_cols, arma::fill::zeros);
+  Rcpp::LogicalVector converged(rhs.n_cols, false);
+  Rcpp::IntegerVector iterations(rhs.n_cols, maxit);
+  arma::vec residual_norm(rhs.n_cols, arma::fill::zeros);
+
+  for (arma::uword col = 0; col < rhs.n_cols; ++col)
+  {
+    Eigen::Map<const Eigen::VectorXd> b(rhs.colptr(col), static_cast<Eigen::Index>(rhs.n_rows));
+    Eigen::VectorXd x;
+    if (x0.isNotNull())
+    {
+      Eigen::Map<const Eigen::VectorXd> guess(initial_guess.colptr(col),
+                                              static_cast<Eigen::Index>(rhs.n_rows));
+      x = solver.solveWithGuess(b, guess);
+    }
+    else
+      x = solver.solve(b);
+
+    const double bnorm = std::max(1.0, b.norm());
+    converged[col] = solver.info() == Eigen::Success;
+    iterations[col] = solver.iterations();
+    residual_norm.at(col) = solver.error() * bnorm;
+    std::copy(x.data(), x.data() + x.size(), solution.colptr(col));
+  }
+
+  return Rcpp::List::create(
+    Rcpp::Named("solution") = solution,
+    Rcpp::Named("converged") = converged,
+    Rcpp::Named("iterations") = iterations,
+    Rcpp::Named("residual_norm") = residual_norm
+  );
+}
+
+// [[Rcpp::export]]
+Rcpp::List pcg_reduced_laplacian(const arma::mat& rhs,
+                                 const arma::vec& conductance,
+                                 const arma::umat& edge_pairs,
+                                 Rcpp::Nullable<arma::mat> x0 = R_NilValue,
+                                 const double tol = 1e-8,
+                                 const int maxit = 1000)
+{
+  validate_edge_pairs(conductance, edge_pairs);
+
+  const arma::uword Nred = conductance.n_elem - 1;
+  if (rhs.n_rows != Nred)
+    Rcpp::stop("[pcg_reduced_laplacian] rhs has incompatible number of rows");
+
+  arma::mat initial_guess;
+  if (x0.isNotNull())
+  {
+    initial_guess = Rcpp::as<arma::mat>(x0);
+    if (initial_guess.n_rows != rhs.n_rows || initial_guess.n_cols != rhs.n_cols)
+      Rcpp::stop("[pcg_reduced_laplacian] x0 must match rhs dimensions");
+  }
+
+  arma::vec diagonal = reduced_laplacian_diagonal(conductance, edge_pairs);
+  if (arma::any(diagonal <= 0))
+    Rcpp::stop("[pcg_reduced_laplacian] non-positive diagonal encountered");
+
+  arma::mat solution(rhs.n_rows, rhs.n_cols, arma::fill::zeros);
+  Rcpp::LogicalVector converged(rhs.n_cols, false);
+  Rcpp::IntegerVector iterations(rhs.n_cols, maxit);
+  arma::vec residual_norm(rhs.n_cols, arma::fill::zeros);
+
+  for (arma::uword col = 0; col < rhs.n_cols; ++col)
+  {
+    const arma::vec b = rhs.col(col);
+    arma::vec x = x0.isNotNull() ? initial_guess.col(col) : arma::vec(rhs.n_rows, arma::fill::zeros);
+    arma::vec r = b - reduced_laplacian_matvec(conductance, edge_pairs, x);
+    const double bnorm = std::max(arma::norm(b, 2), 1.0);
+    double rnorm = arma::norm(r, 2);
+
+    if (rnorm <= tol * bnorm)
+    {
+      converged[col] = true;
+      iterations[col] = 0;
+      residual_norm.at(col) = rnorm;
+      solution.col(col) = x;
+      continue;
+    }
+
+    arma::vec z = r / diagonal;
+    arma::vec p = z;
+    double rz_old = arma::dot(r, z);
+
+    for (int iter = 0; iter < maxit; ++iter)
+    {
+      arma::vec Ap = reduced_laplacian_matvec(conductance, edge_pairs, p);
+      const double denom = arma::dot(p, Ap);
+      if (denom <= 0)
+        Rcpp::stop("[pcg_reduced_laplacian] non-positive search direction");
+
+      const double alpha = rz_old / denom;
+      x += alpha * p;
+      r -= alpha * Ap;
+      rnorm = arma::norm(r, 2);
+
+      if (rnorm <= tol * bnorm)
+      {
+        converged[col] = true;
+        iterations[col] = iter + 1;
+        residual_norm.at(col) = rnorm;
+        solution.col(col) = x;
+        break;
+      }
+
+      z = r / diagonal;
+      const double rz_new = arma::dot(r, z);
+      const double beta = rz_new / rz_old;
+      p = z + beta * p;
+      rz_old = rz_new;
+
+      if (iter == maxit - 1)
+      {
+        residual_norm.at(col) = rnorm;
+        solution.col(col) = x;
+      }
+    }
+  }
+
+  return Rcpp::List::create(
+    Rcpp::Named("solution") = solution,
+    Rcpp::Named("converged") = converged,
+    Rcpp::Named("iterations") = iterations,
+    Rcpp::Named("residual_norm") = residual_norm
+  );
+}
+
+// [[Rcpp::export]]
+arma::vec backpropagate_laplacian_to_conductance (const arma::mat& tGl, const arma::mat& tGr, const arma::umat& tadj)
+{
+  if (tadj.n_rows != 2)
+    Rcpp::stop("[backpropagate_gradient] tadj.n_rows != 2");
+
+  if (tGl.n_rows != tGr.n_rows || tGl.n_cols != tGr.n_cols)
+    Rcpp::stop("[backpropagate_gradient] dim(tGl) != dim(tGr)");
+
+  const unsigned N = tGl.n_cols;
+
+  arma::vec djj (N);
+  for (unsigned vertex = 0; vertex < N; ++vertex)
+    djj.at(vertex) = -arma::dot(tGl.col(vertex), tGr.col(vertex));
+
+  arma::vec dl_dC (N+1, arma::fill::zeros);
+  unsigned i, j;
+  double dij;
+
+  for (unsigned edge = 0; edge < tadj.n_cols; ++edge)
+  {
+    j = tadj.at(0, edge);
+    i = tadj.at(1, edge);
+    if (i <= j) 
+      continue;
+    else if (i > N)
+      Rcpp::stop("[backpropagate_gradient] vertex out of bounds");
+    else if (i == N)
+    {
+      dl_dC.at(i) += djj.at(j);
+      dl_dC.at(j) += djj.at(j);
+    }
+    else
+    {
+      dij = djj.at(i) + djj.at(j) + 
+        arma::dot(tGl.col(i), tGr.col(j)) +
+        arma::dot(tGl.col(j), tGr.col(i));
+      dl_dC.at(i) += dij;
+      dl_dC.at(j) += dij;
+    }
+  }
+
+  return dl_dC;
+}
+
+// [[Rcpp::export]]
+arma::sp_mat backpropagate_conductance_to_laplacian (const arma::vec& dgrad__ddl_dC, const arma::umat& tadj)
+{
+  if (tadj.n_rows != 2)
+    Rcpp::stop("[backpropagate_conductance] tadj.n_rows != 2");
+
+  const unsigned N = dgrad__ddl_dC.n_elem - 1;
+
+  unsigned i, j;
+  double dij;
+
+  arma::vec diagonal (N, arma::fill::zeros),
+            offdiagonal (tadj.n_cols, arma::fill::zeros);
+
+  for (unsigned edge = 0; edge < tadj.n_cols; ++edge)
+  {
+    j = tadj.at(0, edge);
+    i = tadj.at(1, edge);
+
+    if (i <= j)
+      continue;
+    else if (i > N)
+      Rcpp::stop("[backpropagate_conductance] vertex out of bounds");
+
+    dij = dgrad__ddl_dC.at(i) + dgrad__ddl_dC.at(j);
+    diagonal.at(j) += dij;
+    if (i != N)
+    {
+      offdiagonal.at(edge) = -dij;
+      diagonal.at(i) += dij;
+    }
+  }
+
+  arma::sp_mat dgrad__ddl_dQn (tadj, offdiagonal, N, N);
+  dgrad__ddl_dQn.diag() = diagonal;
+
+  return arma::trimatu(dgrad__ddl_dQn);
+}
