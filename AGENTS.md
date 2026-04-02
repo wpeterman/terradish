@@ -47,8 +47,16 @@ Typical files and directories that may be relevant:
 
 ## Updating rules
 - When making a commit, increase the version by 0.0.1, unless a larger increment is specified.
-- Provide a succinct, minimal review of what the update contains 
-- Correspondingly, update the version in the DESCRIPTION
+- Provide a succinct, minimal review of what the update contains.
+- Correspondingly, update the version in `DESCRIPTION`.
+- Do not commit changes until explicitly asked. Minor related edits can accumulate into one commit.
+
+## Development workflow
+- Work on one feature or fix at a time, ideally on a dedicated branch.
+- Make code/doc/test changes first, then inspect `git status` and `git diff` before committing.
+- Run `devtools::document()`, `devtools::test()`, and `devtools::check(args = "--no-manual")` before a final commit when feasible.
+- If Pandoc is unavailable in the current shell, `devtools::check(args = "--no-manual", build_args = "--no-build-vignettes", document = FALSE)` can be used as a pre-check, but run one final vignette-enabled check in RStudio when vignette files changed.
+- After validation, bump the package version once, make one concise commit for the batch of related changes, and merge to `master` only after that branch is stable.
 
 ## Validation expectations
 After making changes, recommend the relevant validation commands. Common commands include:
