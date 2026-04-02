@@ -1,23 +1,41 @@
 Package: terradish
 Type: Package
 Title: Fast Gradient-Based Optimization of Resistance Surfaces
-Version: 0.0.2
-Date: 2026-03-28
+Version: 0.0.3
+Date: 2026-04-02
 Authors@R: c(
-    person(given = c("Nathaniel", "S."), family = "Pope",
-           role = c("aut", "cre"), email = "nspope@utexas.edu"),
-    person(given = "Bill", family = "Peterman", role = "aut")
-  )
+  person(
+    given = c("Nathaniel", "S."),
+    family = "Pope",
+    role = c("aut", "cre"),
+    email = "nspope@utexas.edu"
+  ),
+  person(given = "Bill", family = "Peterman", role = "aut")
+)
 Description: Maximum likelihood estimation for parameterized conductance models
-    via Newton and quasi-Newton methods, for moderate-sized problems
-    such as spatial grids with fewer than a million cells.
+  via Newton and quasi-Newton methods, for moderate-sized problems
+  such as spatial grids with fewer than a million cells.
 License: BSD_3_clause + file LICENSE
-Suggests: numDeriv, nloptr, adegenet, testthat (>= 3.0.0),
-    knitr, rmarkdown, pkgload
-Imports: Rcpp (>= 1.0.4), terra, Matrix, nlme, MASS,
-    parallel, methods, stats, utils
-Depends: R (>= 3.5.0)
+Depends: R (>= 4.0.0)
+Imports:
+  MASS,
+  Matrix,
+  methods,
+  nlme,
+  parallel,
+  Rcpp (>= 1.0.4),
+  stats,
+  terra,
+  utils
 LinkingTo: Rcpp, RcppArmadillo, RcppEigen
+Suggests:
+  adegenet,
+  knitr,
+  nloptr,
+  numDeriv,
+  pkgload,
+  rmarkdown,
+  testthat (>= 3.0.0)
 VignetteBuilder: knitr
 RoxygenNote: 7.3.3
 Encoding: UTF-8

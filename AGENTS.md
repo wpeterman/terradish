@@ -45,6 +45,11 @@ Typical files and directories that may be relevant:
 - Do not remove failing tests merely to make checks pass unless explicitly instructed and justified.
 - If behavior changes intentionally, update tests to reflect the new contract and note that clearly.
 
+## Updating rules
+- When making a commit, increase the version by 0.0.1, unless a larger increment is specified.
+- Provide a succinct, minimal review of what the update contains 
+- Correspondingly, update the version in the DESCRIPTION
+
 ## Validation expectations
 After making changes, recommend the relevant validation commands. Common commands include:
 
