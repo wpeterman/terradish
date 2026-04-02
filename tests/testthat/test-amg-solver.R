@@ -5,7 +5,7 @@ test_that("AMG solver matches direct solver on melip subproblem", {
   model <- loglinear_conductance(~ altitude + forestcover, surface$x)
   fst <- ifelse(melip.Fst < 0, 0, melip.Fst)
 
-  fit_direct <- radish_algorithm(
+  fit_direct <- terradish_algorithm(
     model,
     leastsquares,
     surface,
@@ -16,7 +16,7 @@ test_that("AMG solver matches direct solver on melip subproblem", {
     solver = "direct"
   )
 
-  fit_amg <- radish_algorithm(
+  fit_amg <- terradish_algorithm(
     model,
     leastsquares,
     surface,
@@ -43,7 +43,7 @@ test_that("AMG solver matches direct solver on melip subproblem", {
 })
 
 test_that("adaptive AMG schedule stages early and final tolerances", {
-  early <- terradish:::.radish_solver_control_for_phase(
+  early <- terradish:::.terradish_solver_control_for_phase(
     solver = "amg",
     solver_control = list(
       adaptive = TRUE,
@@ -59,7 +59,7 @@ test_that("adaptive AMG schedule stages early and final tolerances", {
     final = FALSE
   )
 
-  late <- terradish:::.radish_solver_control_for_phase(
+  late <- terradish:::.terradish_solver_control_for_phase(
     solver = "amg",
     solver_control = list(
       adaptive = TRUE,
@@ -75,7 +75,7 @@ test_that("adaptive AMG schedule stages early and final tolerances", {
     final = FALSE
   )
 
-  final <- terradish:::.radish_solver_control_for_phase(
+  final <- terradish:::.terradish_solver_control_for_phase(
     solver = "amg",
     solver_control = list(
       adaptive = TRUE,
@@ -108,7 +108,7 @@ test_that("auto solver resolves conservatively on the bundled melip graph", {
   dat <- melip_fixture(1:8)
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
 
-  resolution <- terradish:::.radish_resolve_solver(
+  resolution <- terradish:::.terradish_resolve_solver(
     s = surface,
     solver = "auto",
     n_vertices = nrow(surface$x)
@@ -120,7 +120,7 @@ test_that("auto solver resolves conservatively on the bundled melip graph", {
 })
 
 test_that("auto solver keeps moderately large graphs on the direct backend by default", {
-  resolution <- terradish:::.radish_resolve_solver(
+  resolution <- terradish:::.terradish_resolve_solver(
     s = list(rhs = matrix(0, nrow = 25, ncol = 25)),
     solver = "auto",
     n_vertices = 1000000L
@@ -132,26 +132,26 @@ test_that("auto solver keeps moderately large graphs on the direct backend by de
 })
 
 test_that("direct factorization chooser switches to supernodal only for large graphs", {
-  default_control <- terradish:::.radish_direct_control_defaults()
+  default_control <- terradish:::.terradish_direct_control_defaults()
 
   expect_equal(
-    terradish:::.radish_resolve_direct_factorization(default_control, n_vertices = 22443L, n_rhs = 37L),
+    terradish:::.terradish_resolve_direct_factorization(default_control, n_vertices = 22443L, n_rhs = 37L),
     "simplicial_ldl"
   )
 
   expect_equal(
-    terradish:::.radish_resolve_direct_factorization(default_control, n_vertices = 250000L, n_rhs = 25L),
+    terradish:::.terradish_resolve_direct_factorization(default_control, n_vertices = 250000L, n_rhs = 25L),
     "supernodal_ll"
   )
 })
 
-test_that("radish final AMG fit uses final tolerance", {
+test_that("terradish final AMG fit uses final tolerance", {
   dat <- melip_fixture(1:8)
   melip.Fst <- dat$melip.Fst
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
 
   fit <- suppressWarnings(
-    radish(
+    terradish(
       melip.Fst ~ altitude + forestcover,
       data = surface,
       conductance_model = loglinear_conductance,
@@ -177,13 +177,13 @@ test_that("radish final AMG fit uses final tolerance", {
   expect_equal(fit$fit$solver_info$target_maxit, 75L)
 })
 
-test_that("auto solver reports the resolved backend in radish fits", {
+test_that("auto solver reports the resolved backend in terradish fits", {
   dat <- melip_fixture(1:8)
   melip.Fst <- dat$melip.Fst
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
 
   fit_direct <- suppressWarnings(
-    radish(
+    terradish(
       melip.Fst ~ altitude + forestcover,
       data = surface,
       conductance_model = loglinear_conductance,
@@ -194,7 +194,7 @@ test_that("auto solver reports the resolved backend in radish fits", {
   )
 
   fit_amg <- suppressWarnings(
-    radish(
+    terradish(
       melip.Fst ~ altitude + forestcover,
       data = surface,
       conductance_model = loglinear_conductance,
@@ -231,7 +231,7 @@ test_that("direct solver reports factorization mode and can reuse templates", {
   model <- loglinear_conductance(~ altitude + forestcover, surface$x)
   fst <- ifelse(melip.Fst < 0, 0, melip.Fst)
 
-  fit1 <- radish_algorithm(
+  fit1 <- terradish_algorithm(
     model,
     leastsquares,
     surface,
@@ -242,7 +242,7 @@ test_that("direct solver reports factorization mode and can reuse templates", {
     solver = "direct"
   )
 
-  fit2 <- radish_algorithm(
+  fit2 <- terradish_algorithm(
     model,
     leastsquares,
     surface,
@@ -255,7 +255,7 @@ test_that("direct solver reports factorization mode and can reuse templates", {
     solver_reuse_state = fit1$solver_reuse_state
   )
 
-  fit_super <- radish_algorithm(
+  fit_super <- terradish_algorithm(
     model,
     leastsquares,
     surface,
@@ -300,7 +300,7 @@ test_that("AMG hierarchy reuse is threaded across nearby evaluations", {
     reuse_preconditioner = TRUE
   )
 
-  fit1 <- radish_algorithm(
+  fit1 <- terradish_algorithm(
     model,
     leastsquares,
     surface,
@@ -312,7 +312,7 @@ test_that("AMG hierarchy reuse is threaded across nearby evaluations", {
     solver_control = control
   )
 
-  fit2 <- radish_algorithm(
+  fit2 <- terradish_algorithm(
     model,
     leastsquares,
     surface,

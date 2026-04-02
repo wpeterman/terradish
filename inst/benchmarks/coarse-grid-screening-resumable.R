@@ -368,7 +368,7 @@ source("C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/ter
   cat("Running exact fit baseline...\n")
   fst <- surface_case$fst
   exact_fit <- .elapsed_run(suppressWarnings(
-    terradish::radish(
+    terradish::terradish(
       fst ~ cont1 + cont2,
       data = surface_case$surface,
       conductance_model = terradish::loglinear_conductance,
@@ -385,7 +385,7 @@ source("C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/ter
 .run_exact_grid <- function(theta, surface_case, base_config)
 {
   fst <- surface_case$fst
-  .elapsed_run(terradish::radish_grid(
+  .elapsed_run(terradish::terradish_grid(
     theta = theta,
     formula = fst ~ cont1 + cont2,
     data = surface_case$surface,
@@ -400,7 +400,7 @@ source("C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/ter
 .run_coarse_grid <- function(theta, surface_case, base_config, factor)
 {
   fst <- surface_case$fst
-  .elapsed_run(terradish::radish_grid(
+  .elapsed_run(terradish::terradish_grid(
     theta = theta,
     formula = fst ~ cont1 + cont2,
     data = surface_case$surface,
@@ -417,7 +417,7 @@ source("C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/ter
 {
   fst <- surface_case$fst
   .elapsed_run(suppressWarnings(
-    terradish::radish(
+    terradish::terradish(
       fst ~ cont1 + cont2,
       data = surface_case$surface,
       conductance_model = terradish::loglinear_conductance,

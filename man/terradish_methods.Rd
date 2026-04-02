@@ -12,6 +12,16 @@
 \alias{logLik.radish}
 \alias{AIC.radish}
 \alias{residuals.radish}
+\alias{print.terradish}
+\alias{summary.terradish}
+\alias{print.summary.terradish}
+\alias{coef.terradish}
+\alias{fitted.terradish}
+\alias{simulate.terradish}
+\alias{anova.terradish}
+\alias{logLik.terradish}
+\alias{AIC.terradish}
+\alias{residuals.terradish}
 \title{Methods for fitted terradish models}
 \usage{
 \method{print}{radish}(x, digits = max(3L, getOption("digits") - 3L), ...)
@@ -44,15 +54,46 @@
 \method{AIC}{radish}(object, ..., k = 2)
 
 \method{residuals}{radish}(object, ...)
+
+\method{print}{terradish}(x, digits = max(3L, getOption("digits") - 3L), ...)
+
+\method{summary}{terradish}(object, ...)
+
+\method{print}{summary.terradish}(
+  x,
+  digits = max(3L, getOption("digits") - 3L),
+  signif.stars = getOption("show.signif.stars"),
+  ...
+)
+
+\method{coef}{terradish}(object, ...)
+
+\method{fitted}{terradish}(object, type = c("response", "distance", "covariance"), ...)
+
+\method{simulate}{terradish}(
+  object,
+  nsim = 1,
+  seed = NULL,
+  method = c("permutation", "parametric"),
+  ...
+)
+
+\method{anova}{terradish}(object, ..., alternative = NULL)
+
+\method{logLik}{terradish}(object, ...)
+
+\method{AIC}{terradish}(object, ..., k = 2)
+
+\method{residuals}{terradish}(object, ...)
 }
 \arguments{
-\item{x}{A fitted \code{radish} object.}
+\item{x}{A fitted \code{terradish} object.}
 
 \item{digits}{Number of digits to print.}
 
 \item{...}{Additional arguments passed through to generic methods.}
 
-\item{object, alternative}{Fitted \code{radish} objects.}
+\item{object, alternative}{Fitted \code{terradish} objects.}
 
 \item{signif.stars}{Should significance stars be printed in coefficient
 tables?}
@@ -70,7 +111,9 @@ tables?}
 \value{
 \itemize{
   \item \code{print()} returns its input invisibly.
-  \item \code{summary()} returns an object of class \code{summary.radish}.
+  \item \code{summary()} returns an object of class
+    \code{summary.terradish}, with legacy \code{summary.radish}
+    compatibility retained.
   \item \code{coef()} returns the fitted conductance coefficients.
   \item \code{fitted()} returns fitted responses, distances, or covariance.
   \item \code{simulate()} returns one or more simulated response matrices.
@@ -81,6 +124,6 @@ tables?}
 }
 }
 \description{
-S3 methods for working with fitted objects returned by \code{\link{radish}}
+S3 methods for working with fitted objects returned by \code{\link{terradish}}
 and summaries returned by \code{\link[base:summary]{summary()}}.
 }

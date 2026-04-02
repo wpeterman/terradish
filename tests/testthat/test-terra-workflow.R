@@ -1,6 +1,7 @@
 test_that("conductance_surface and conductance work with terra inputs", {
   fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
 
+  expect_s3_class(fx$surface, "terradish_graph")
   expect_s3_class(fx$surface, "radish_graph")
   expect_true(inherits(fx$surface$stack, "SpatRaster"))
 

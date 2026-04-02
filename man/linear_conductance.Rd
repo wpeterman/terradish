@@ -9,7 +9,7 @@ linear_conductance(formula, x)
 \arguments{
 \item{formula}{Model formula describing which spatial covariates to include.}
 
-\item{x}{Data frame of spatial covariates from a \code{radish_graph}.}
+\item{x}{Data frame of spatial covariates from a \code{terradish_graph}.}
 }
 \description{
 A function of class "conductance_model" that represents a linear

@@ -103,7 +103,7 @@ g_ibe <- mlpe_covariates(z_ibe)
 ```{r}
 ctrl <- NewtonRaphsonControl(maxit = 8, verbose = FALSE)
 
-fit_ibd <- radish(
+fit_ibd <- terradish(
   gd_mat ~ 1,
   data = surface,
   conductance_model = loglinear_conductance,
@@ -112,7 +112,7 @@ fit_ibd <- radish(
   control = ctrl
 )
 
-fit_ibe <- radish(
+fit_ibe <- terradish(
   gd_mat ~ 1,
   data = surface,
   conductance_model = loglinear_conductance,
@@ -121,7 +121,7 @@ fit_ibe <- radish(
   control = ctrl
 )
 
-fit_ibr <- radish(
+fit_ibr <- terradish(
   gd_mat ~ altitude + forestcover,
   data = surface,
   conductance_model = loglinear_conductance,
@@ -130,7 +130,7 @@ fit_ibr <- radish(
   control = ctrl
 )
 
-fit_joint <- radish(
+fit_joint <- terradish(
   gd_mat ~ altitude + forestcover,
   data = surface,
   conductance_model = loglinear_conductance,
@@ -175,15 +175,54 @@ comparison$loglik_tab
 comparison$AIC_tab
 ```
 
+`cv_model_selection()` is convenient when you already have cross-validation
+objects or want to keep held-out log-likelihood and information-criterion
+ranking together in one place.
+
+If you already have fitted `terradish` models and only want an
+information-criterion table, `aic_table()` is a simpler helper:
+
+```{r}
+# Use the fitted models directly when you only want model ranking.
+model_table_aic <- aic_table(
+  list(fit_ibd, fit_ibe, fit_ibr, fit_joint),
+  mod_names = c("IBD", "IBE", "IBR", "IBE + IBR")
+)
+
+# AICc can be useful when the number of focal populations is modest
+# relative to the number of estimated parameters.
+model_table_aicc <- aic_table(
+  list(fit_ibd, fit_ibe, fit_ibr, fit_joint),
+  mod_names = c("IBD", "IBE", "IBR", "IBE + IBR"),
+  AICc = TRUE
+)
+
+# BIC applies a stronger complexity penalty than AIC.
+model_table_bic <- aic_table(
+  list(fit_ibd, fit_ibe, fit_ibr, fit_joint),
+  mod_names = c("IBD", "IBE", "IBR", "IBE + IBR"),
+  BIC = TRUE
+)
+
+model_table_aic
+```
+
+For an entry-level workflow, a good rule of thumb is:
+
+- Start with held-out log-likelihood if prediction is your main goal.
+- Use AIC or AICc when you want a quick likelihood-based model ranking on the
+  same data set.
+- Use BIC when you want a stricter penalty on model complexity.
+
 ## Cross-validation
 
-`radish_cv()` now knows how to rebuild `mlpe_covariates()` models on train/test
+`terradish_cv()` now knows how to rebuild `mlpe_covariates()` models on train/test
 subsets, as long as the measurement model was created from
 `pairwise_endpoint_covariates()` or from site-level covariates that can be
 converted by that helper.
 
 ```{r}
-cv_joint <- radish_cv(
+cv_joint <- terradish_cv(
   pts = coords,
   covariates = covariates,
   fmla = gd_mat ~ altitude + forestcover,
@@ -196,6 +235,87 @@ cv_joint <- radish_cv(
 
 cv_joint$cv_loglik
 ```
+
+That result is based on one random split of the focal populations into a
+training set and a test set. A single split is helpful for a quick check, but
+it can be noisy if the result depends strongly on which sites happened to land
+in the training set.
+
+`terradish_cv_replicates()` repeats that same process across multiple random
+splits and summarizes the held-out log-likelihood:
+
+```{r}
+# Repeat the same train/test workflow across several random splits.
+cv_joint_reps <- terradish_cv_replicates(
+  pts = coords,
+  covariates = covariates,
+  fmla = gd_mat ~ altitude + forestcover,
+  model = g_ibe,
+  seeds = c(1, 2, 3),
+  fit_full = FALSE,
+  keep_fits = FALSE,
+  control = ctrl
+)
+
+# The print method gives a quick overview.
+cv_joint_reps
+
+# summary() adds the replicate count and the range of held-out loglikelihood.
+summary(cv_joint_reps)
+```
+
+In practice:
+
+- Use `terradish_cv()` when you want one quick train/test split.
+- Use `terradish_cv_replicates()` when you want a more stable sense of average
+  predictive performance.
+
+## Saved Results Utilities
+
+Some workflows fit `terradish` models once, save them to disk, and later come
+back to extract parameter summaries. The saved-results helpers are designed for
+that downstream step rather than for model fitting itself.
+
+`terradish_results()` lets you inspect what a terradish-style results directory
+contains:
+
+```{r}
+# Create a temporary results directory for demonstration.
+tmp_results <- tempfile("terradish-results-")
+dir.create(tmp_results)
+
+# Save one fitted model and a simple AllResults object.
+saveRDS(fit_joint, file.path(tmp_results, "fit--mlpe.rds"))
+saveRDS(
+  list(
+    effect_size = coef(fit_joint),
+    pts = coords,
+    covariates = covariates
+  ),
+  file.path(tmp_results, "AllResults_list.rds")
+)
+
+# Inspect what terradish can recover from the directory.
+results_info <- terradish_results(tmp_results)
+names(results_info)
+```
+
+`terradish_parameters()` then extracts a compact coefficient table from the
+saved fitted model:
+
+```{r}
+# Extract fitted conductance coefficients and their standard errors.
+parameter_table <- terradish_parameters(
+  tmp_results,
+  model = "mlpe",
+  save_table = FALSE
+)
+
+parameter_table
+```
+
+This is especially useful in simulation studies, where you may want to compare
+known effect sizes against the fitted values from many saved runs.
 
 ## Interpretation
 

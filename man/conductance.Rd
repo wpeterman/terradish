@@ -2,19 +2,22 @@
 % Please edit documentation in R/radish_graph.R
 \name{conductance}
 \alias{conductance}
+\alias{conductance.terradish_graph}
 \alias{conductance.radish_graph}
 \title{Estimate conductance from a fitted model}
 \usage{
 conductance(x, ...)
 
+\method{conductance}{terradish_graph}(x, fit, quantile = 0.95, ...)
+
 \method{conductance}{radish_graph}(x, fit, quantile = 0.95, ...)
 }
 \arguments{
-\item{x}{A \code{radish_graph} object.}
+\item{x}{A \code{terradish_graph} object.}
 
 \item{...}{Additional arguments passed to methods.}
 
-\item{fit}{A fitted object returned by \code{\link{radish}}.}
+\item{fit}{A fitted object returned by \code{\link{terradish}}.}
 
 \item{quantile}{Confidence level used to compute conductance intervals.}
 }
@@ -25,7 +28,7 @@ If the graph retains its raster stack, a three-layer
 }
 \description{
 Returns fitted conductance values, and confidence intervals when available,
-for a \code{radish_graph} and fitted \code{radish} object.
+for a \code{terradish_graph} and fitted \code{terradish} object.
 }
 \examples{
 library(terra)
@@ -40,7 +43,7 @@ covariates <- c(terra::scale(melip.altitude),
 names(covariates) <- c("altitude", "forestcover")
 surface <- conductance_surface(covariates, melip.coords, directions = 8)
 
-fit <- radish(melip.Fst ~ forestcover + altitude, surface,
+fit <- terradish(melip.Fst ~ forestcover + altitude, surface,
               loglinear_conductance, leastsquares,
               control = NewtonRaphsonControl(maxit = 5))
 

@@ -1,4 +1,4 @@
-.radish_algorithm_derivative_chunk <- function(idx, state)
+.terradish_algorithm_derivative_chunk <- function(idx, state)
 {
   if (!length(idx))
     return(list())
@@ -20,7 +20,7 @@
   }
 
   rhs_block <- if (length(rhs_blocks) == 1L) rhs_blocks[[1]] else do.call(cbind, rhs_blocks)
-  solved_block <- as.matrix(.radish_solver_solve(state$solver_state, rhs_block)$solution)
+  solved_block <- as.matrix(.terradish_solver_solve(state$solver_state, rhs_block)$solution)
   n_rhs <- ncol(state$Zn)
 
   lapply(seq_along(idx), function(m)
@@ -75,7 +75,7 @@
 
   adj <- s$adj
   if (is.null(adj))
-    stop("`radish_graph` is missing both `edge_pairs` and `adj`")
+    stop("`terradish_graph` is missing both `edge_pairs` and `adj`")
   edge_pairs <- t(adj) + 1L
   storage.mode(edge_pairs) <- "integer"
   edge_pairs
@@ -111,7 +111,7 @@
   forceSymmetric((Q + Qd)[reduced_index, reduced_index, drop = FALSE])
 }
 
-.radish_auto_solver_defaults <- function()
+.terradish_auto_solver_defaults <- function()
 {
   list(
     auto_direct_max_vertices = 750000L,
@@ -120,7 +120,7 @@
   )
 }
 
-.radish_resolve_solver <- function(s, solver, n_vertices, solver_control = NULL)
+.terradish_resolve_solver <- function(s, solver, n_vertices, solver_control = NULL)
 {
   rhs <- .graph_rhs(s, n_vertices)
   n_rhs <- ncol(rhs)
@@ -134,7 +134,7 @@
                 n_rhs = as.integer(n_rhs)))
 
   control_list <- if (is.null(solver_control)) list() else as.list(solver_control)
-  auto_defaults <- .radish_auto_solver_defaults()
+  auto_defaults <- .terradish_auto_solver_defaults()
   auto_overrides <- control_list[intersect(names(control_list), names(auto_defaults))]
   auto_control <- modifyList(auto_defaults, auto_overrides)
 
@@ -167,7 +167,7 @@
        n_rhs = as.integer(n_rhs))
 }
 
-.radish_amg_reuse_signature <- function(control)
+.terradish_amg_reuse_signature <- function(control)
 {
   list(
     coarse_enough = as.integer(control$coarse_enough),
@@ -180,7 +180,7 @@
   )
 }
 
-.radish_direct_control_defaults <- function()
+.terradish_direct_control_defaults <- function()
 {
   list(
     factorization = "auto",
@@ -190,7 +190,7 @@
   )
 }
 
-.radish_resolve_direct_factorization <- function(control, n_vertices, n_rhs)
+.terradish_resolve_direct_factorization <- function(control, n_vertices, n_rhs)
 {
   factorization <- if (is.null(control$factorization)) "auto" else control$factorization
   factorization <- match.arg(factorization, c("auto", "simplicial_ldl", "simplicial_ll", "supernodal_ll"))
@@ -205,7 +205,7 @@
   "simplicial_ldl"
 }
 
-.radish_direct_signature <- function(control, factorization)
+.terradish_direct_signature <- function(control, factorization)
 {
   list(
     factorization = factorization,
@@ -228,7 +228,7 @@
   solver_control <- if (is.null(solver_control)) NULL else as.list(solver_control)
 
   defaults <- switch(solver,
-                     direct = .radish_direct_control_defaults(),
+                     direct = .terradish_direct_control_defaults(),
                      amg = list(tol = 1e-8,
                                 maxit = 400L,
                                 coarse_enough = 1000L,
@@ -257,18 +257,18 @@
   modifyList(defaults, solver_control)
 }
 
-.radish_solver_setup <- function(s, conductance, solver, solver_control = NULL, solver_reuse_state = NULL)
+.terradish_solver_setup <- function(s, conductance, solver, solver_control = NULL, solver_reuse_state = NULL)
 {
   requested_solver <- match.arg(solver, c("direct", "auto", "amg", "pcg", "pcg_jacobi"))
-  resolution <- .radish_resolve_solver(s, requested_solver, length(conductance), solver_control = solver_control)
+  resolution <- .terradish_resolve_solver(s, requested_solver, length(conductance), solver_control = solver_control)
   solver <- resolution$type
   control <- .normalize_solver_control(solver, resolution$solver_control)
 
   if (solver == "direct")
   {
     Qn <- .graph_reduced_laplacian(s, conductance)
-    factorization <- .radish_resolve_direct_factorization(control, resolution$n_vertices, resolution$n_rhs)
-    signature <- .radish_direct_signature(control, factorization)
+    factorization <- .terradish_resolve_direct_factorization(control, resolution$n_vertices, resolution$n_rhs)
+    signature <- .terradish_direct_signature(control, factorization)
     can_reuse <- !is.null(solver_reuse_state) &&
       identical(solver_reuse_state$type, "direct") &&
       identical(solver_reuse_state$signature, signature)
@@ -303,7 +303,7 @@
   if (solver == "amg")
   {
     edge_pairs <- .graph_edge_pairs(s, length(conductance))
-    signature <- .radish_amg_reuse_signature(control)
+    signature <- .terradish_amg_reuse_signature(control)
     can_reuse <- isTRUE(control$reuse_preconditioner) &&
       !is.null(solver_reuse_state) &&
       identical(solver_reuse_state$type, "amg") &&
@@ -367,7 +367,7 @@
        control = control)
 }
 
-.radish_solver_solve <- function(solver_state, rhs, warm_start = NULL)
+.terradish_solver_solve <- function(solver_state, rhs, warm_start = NULL)
 {
   common_info <- list(requested_type = solver_state$requested_type,
                       auto_reason = solver_state$auto_reason,
@@ -444,7 +444,7 @@
        warm_start = out$solution)
 }
 
-.radish_algorithm_derivative_results <- function(idx, state, cores, worker_libpaths = .libPaths())
+.terradish_algorithm_derivative_results <- function(idx, state, cores, worker_libpaths = .libPaths())
 {
   splits <- split(idx, cut(idx, breaks = min(as.integer(cores), length(idx)), labels = FALSE))
   cl <- makeCluster(length(splits))
@@ -457,7 +457,7 @@
     NULL
   })
 
-  unlist(parLapply(cl, splits, .radish_algorithm_derivative_chunk, state = state), recursive = FALSE)
+  unlist(parLapply(cl, splits, .terradish_algorithm_derivative_chunk, state = state), recursive = FALSE)
 }
 
 #' Likelihood of parameterized conductance surface
@@ -469,7 +469,7 @@
 #'
 #' @param f A function of class 'conductance_model'
 #' @param g A function of class 'measurement_model'
-#' @param s An object of class 'radish_graph'
+#' @param s An object of class \code{"terradish_graph"}
 #' @param S A matrix of observed genetic distances
 #' @param theta Parameters for conductance surface (e.g. inputs to 'f')
 #' @param phi Optional warm-start values for the nuisance-parameter subproblem.
@@ -484,7 +484,9 @@
 #' @param solver Linear-system solver used for the reduced Laplacian. \code{"direct"} uses the cached sparse Cholesky factorization, \code{"auto"} conservatively chooses between the direct and AMG backends based on graph size and right-hand-side count, \code{"amg"} uses smoothed-aggregation algebraic multigrid preconditioned conjugate gradients, \code{"pcg"} uses incomplete-Cholesky preconditioned conjugate gradients, and \code{"pcg_jacobi"} keeps the older Jacobi-preconditioned prototype.
 #' @param solver_control Optional named list of solver settings. For \code{solver = "direct"}, supported entries include \code{factorization} (\code{"auto"}, \code{"simplicial_ldl"}, \code{"simplicial_ll"}, or \code{"supernodal_ll"}), \code{supernodal_min_vertices}, \code{supernodal_max_rhs}, and \code{perm}. For \code{solver = "auto"}, supported selection entries include \code{auto_direct_max_vertices}, \code{auto_amg_min_vertices}, and \code{auto_direct_max_rhs}. For \code{solver = "amg"}, supported entries include \code{tol}, \code{maxit}, \code{coarse_enough}, \code{npre}, \code{npost}, \code{sa_relax}, \code{aggr_eps_strong}, \code{estimate_spectral_radius}, \code{power_iters}, and \code{reuse_preconditioner}. For \code{solver = "pcg"} or \code{"pcg_jacobi"}, supported entries are \code{tol} and \code{maxit}.
 #' @param solver_warm_start Optional initial guess for the reduced-system solve. This is primarily useful for iterative solvers when evaluating nearby parameter values.
-#' @param solver_reuse_state Optional reusable solver state returned by a prior \code{radish_algorithm()} call. This is currently used to reuse AMG hierarchy information across nearby evaluations.
+#' @param solver_reuse_state Optional reusable solver state returned by a prior
+#'   \code{terradish_algorithm()} call. This is currently used to reuse AMG
+#'   hierarchy information across nearby evaluations.
 #'
 #' @return A list containing at a minimum:
 #'  \item{covariance}{rows/columns of the generalized inverse of the graph Laplacian for a subset of target vertices}
@@ -515,16 +517,18 @@
 #' surface <- conductance_surface(covariates, melip.coords, directions = 8)
 #' conductance_model <- loglinear_conductance(~ altitude + forestcover, surface$x)
 #'
-#' radish_algorithm(conductance_model, terradish::leastsquares,
+#' terradish_algorithm(conductance_model, terradish::leastsquares,
 #'                  surface, ifelse(melip.Fst < 0, 0, melip.Fst),
 #'                  nu = 1000, theta = c(-0.3, 0.3))
 #'
 #' @export
-radish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, objective = TRUE, gradient = TRUE, hessian = TRUE, partial = TRUE, nonnegative = TRUE, validate = FALSE, cores = 1L, solver = c("direct", "auto", "amg", "pcg", "pcg_jacobi"), solver_control = NULL, solver_warm_start = NULL, solver_reuse_state = NULL)
+terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, objective = TRUE, gradient = TRUE, hessian = TRUE, partial = TRUE, nonnegative = TRUE, validate = FALSE, cores = 1L, solver = c("direct", "auto", "amg", "pcg", "pcg_jacobi"), solver_control = NULL, solver_warm_start = NULL, solver_reuse_state = NULL)
 {
-  stopifnot(inherits(f, "radish_conductance_model"))
-  stopifnot(inherits(g, "radish_measurement_model"))
-  stopifnot(inherits(s, "radish_graph"))
+  stopifnot(inherits(f, c("terradish_conductance_model",
+                          "radish_conductance_model")))
+  stopifnot(inherits(g, c("terradish_measurement_model",
+                          "radish_measurement_model")))
+  stopifnot(inherits(s, c("terradish_graph", "radish_graph")))
 
   stopifnot(is.matrix(S)     )
   stopifnot(is.numeric(theta))
@@ -544,8 +548,8 @@ radish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, objective
   N     <- length(C$conductance)
   reduced_index <- .graph_reduced_index(s, N)
   Zn   <- .graph_rhs(s, N)
-  solver_state <- .radish_solver_setup(s, C$conductance, solver = solver, solver_control = solver_control, solver_reuse_state = solver_reuse_state)
-  solve_main <- .radish_solver_solve(solver_state, Zn, warm_start = solver_warm_start)
+  solver_state <- .terradish_solver_setup(s, C$conductance, solver = solver, solver_control = solver_control, solver_reuse_state = solver_reuse_state)
+  solve_main <- .terradish_solver_solve(solver_state, Zn, warm_start = solver_warm_start)
   G    <- solve_main$solution
   Gmat <- as.matrix(G)
   tG   <- t(Gmat)
@@ -588,7 +592,7 @@ radish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, objective
         can_parallel <- as.integer(cores) > 1L &&
           length(idx) > 1L &&
           !identical(solver_state$type, "amg") &&
-          identical(environmentName(environment(radish_algorithm)), "namespace:terradish")
+          identical(environmentName(environment(terradish_algorithm)), "namespace:terradish")
 
         if (can_parallel)
         {
@@ -604,7 +608,7 @@ radish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, objective
                                    theta = theta,
                                    partial = partial,
                                    N = N)
-          derivative_results <- .radish_algorithm_derivative_results(
+    derivative_results <- .terradish_algorithm_derivative_results(
             idx = idx,
             state = derivative_state,
             cores = cores,
@@ -625,7 +629,7 @@ radish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, objective
                                    theta = theta,
                                    partial = partial,
                                    N = N)
-          derivative_results <- .radish_algorithm_derivative_chunk(idx, derivative_state)
+    derivative_results <- .terradish_algorithm_derivative_chunk(idx, derivative_state)
         }
 
         for (res in derivative_results)
@@ -646,7 +650,7 @@ radish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, objective
   if (validate)
   {
     num_gradient <- .numderiv_grad(function(theta) 
-                                   radish_algorithm(f = f,
+                                   terradish_algorithm(f = f,
                                                     g = g, 
                                                     s = s,
                                                     S = S, 
@@ -654,7 +658,7 @@ radish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, objective
                                    theta, method = "Richardson")
 
     num_hessian  <- .numderiv_hessian(function(theta) 
-                                      radish_algorithm(f = f,
+                                      terradish_algorithm(f = f,
                                                        g = g, 
                                                       s = s,
                                                       S = S, 
@@ -666,7 +670,7 @@ radish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, objective
     num_partial_X <- NULL
 
     num_partial_S <- array(t(.numderiv_jacobian(function(S) 
-                                                radish_algorithm(f = f,
+                                                terradish_algorithm(f = f,
                                                                  g = g, 
                                                                  s = s,
                                                                  S = S, 
@@ -678,6 +682,7 @@ radish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, objective
   list (covariance    = E,
          objective     = if(!objective) NULL else loglik,
          phi           = if(!objective) NULL else phi,
+         phi_hessian   = if(!objective) NULL else subproblem$fit$hessian,
          boundary      = if(!objective) NULL else subproblem$boundary, # the solution is on the boundary (e.g. no genetic structure) so all derivatives wrt theta are 0
          fitted        = if(!objective) NULL else subproblem$fit$fitted,
          gradient      = if(!gradient)  NULL else grad * (1 - subproblem$boundary), # wrt theta
@@ -690,10 +695,10 @@ radish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, objective
          num_partial_S = if(!validate)  NULL else num_partial_S,
          solver_info   = solve_main$info,
          solver_warm_start = solve_main$warm_start,
-         solver_reuse_state = switch(
-           solver_state$type,
-           amg = list(
-             type = "amg",
+      solver_reuse_state = switch(
+            solver_state$type,
+            amg = list(
+              type = "amg",
              handle = solver_state$handle,
              signature = solver_state$signature,
              reuse_age = solver_state$reuse_age,
@@ -703,7 +708,30 @@ radish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, objective
              type = "direct",
              factor = solver_state$factor,
              signature = solver_state$signature
-           ),
-           NULL
-         ))
+            ),
+            NULL
+          ))
 }
+
+#' @rdname terradish_algorithm
+#' @param ... Arguments passed through the deprecated
+#'   \code{radish_algorithm()} compatibility wrapper to
+#'   \code{\link{terradish_algorithm}}.
+#' @export
+radish_algorithm <- function(...)
+{
+  .terradish_deprecate("radish_algorithm", "terradish_algorithm")
+  .terradish_forward_call(match.call(), "terradish_algorithm")
+}
+
+# Internal compatibility aliases retained for housekeeping-sized refactors.
+.radish_algorithm_derivative_chunk <- .terradish_algorithm_derivative_chunk
+.radish_auto_solver_defaults <- .terradish_auto_solver_defaults
+.radish_resolve_solver <- .terradish_resolve_solver
+.radish_amg_reuse_signature <- .terradish_amg_reuse_signature
+.radish_direct_control_defaults <- .terradish_direct_control_defaults
+.radish_resolve_direct_factorization <- .terradish_resolve_direct_factorization
+.radish_direct_signature <- .terradish_direct_signature
+.radish_solver_setup <- .terradish_solver_setup
+.radish_solver_solve <- .terradish_solver_solve
+.radish_algorithm_derivative_results <- .terradish_algorithm_derivative_results

@@ -172,14 +172,14 @@ wishart_simulate_experiment <- function(seed, N, P, K, nu, neval, timingOnly=FAL
   surf <- conductance_surface(covariates, coords, directions = 4, saveStack = FALSE)
 
   beta <- matrix(rnorm(K), 1, K)
-  E <- radish_distance(loglinear_conductance, surf, beta, covariance = TRUE)$covariance[,,1]
+  E <- terradish_distance(loglinear_conductance, surf, beta, covariance = TRUE)$covariance[,,1]
   S <- wishart_simulate_distance(seed=seed, nu=nu, S=E)
   S <- S/(max(S)*10)
 
   # functions
   nograd <- function(par)
   {
-    radish_algorithm(f = loglinear_conductance, g = leastsquares, s = surf, S = S, theta = c(par), 
+    terradish_algorithm(f = loglinear_conductance, g = leastsquares, s = surf, S = S, theta = c(par), 
                      gradient = FALSE,
                      hessian = FALSE,
                      partial = FALSE, 
@@ -187,7 +187,7 @@ wishart_simulate_experiment <- function(seed, N, P, K, nu, neval, timingOnly=FAL
   }
   wgrad <- function(par)
   {
-    radish_algorithm(f = loglinear_conductance, g = leastsquares, s = surf, S = S, theta = c(par), 
+    terradish_algorithm(f = loglinear_conductance, g = leastsquares, s = surf, S = S, theta = c(par), 
                      gradient = TRUE,
                      hessian = FALSE,
                      partial = FALSE, 
@@ -195,7 +195,7 @@ wishart_simulate_experiment <- function(seed, N, P, K, nu, neval, timingOnly=FAL
   }
   whess <- function(par)
   {
-    radish_algorithm(f = loglinear_conductance, g = leastsquares, s = surf, S = S, theta = c(par), 
+    terradish_algorithm(f = loglinear_conductance, g = leastsquares, s = surf, S = S, theta = c(par), 
                      gradient = TRUE,
                      hessian = TRUE,
                      partial = FALSE, 

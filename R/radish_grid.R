@@ -1,5 +1,5 @@
 # Internal worker helpers shared by serial and parallel paths.
-.radish_grid_worker <- function(idx, state)
+.terradish_grid_worker <- function(idx, state)
 {
   worker_formula <- reformulate(state$term_labels)
   conductance_model_local <- if (!is.null(state$conductance_model_factory))
@@ -35,7 +35,7 @@
   out
 }
 
-.radish_distance_worker <- function(idx, state)
+.terradish_distance_worker <- function(idx, state)
 {
   worker_formula <- reformulate(state$term_labels)
   use_namespace_workers <- isTRUE(state$use_namespace_workers)
@@ -147,8 +147,8 @@
   theta[, parameter_names, drop = FALSE]
 }
 
-.radish_grid_approximation <- function(data, S, approximation = c("none", "landmark", "coarse_raster"),
-                                       approximation_control = NULL, covariance = FALSE)
+.terradish_grid_approximation <- function(data, S, approximation = c("none", "landmark", "coarse_raster"),
+                                          approximation_control = NULL, covariance = FALSE)
 {
   approximation <- match.arg(approximation)
   if (identical(approximation, "none"))
@@ -158,7 +158,7 @@
 
   if (identical(approximation, "landmark"))
   {
-    subset <- .radish_landmark_subset(data, S, approximation_control = approximation_control)
+    subset <- .terradish_landmark_subset(data, S, approximation_control = approximation_control)
     info <- list(
       type = "landmark",
       used = isTRUE(subset$used),
@@ -201,13 +201,13 @@
        info = info)
 }
 
-.radish_grid_parallel_chunk <- function(idx, theta, term_labels, data,
-                                        conductance_model_factory_name = NULL,
-                                        conductance_model_factory = NULL,
-                                        measurement_model_name = NULL,
-                                        measurement_model = NULL,
-                                        S, nu, nonnegative, covariance,
-                                        use_namespace_workers)
+.terradish_grid_parallel_chunk <- function(idx, theta, term_labels, data,
+                                           conductance_model_factory_name = NULL,
+                                           conductance_model_factory = NULL,
+                                           measurement_model_name = NULL,
+                                           measurement_model = NULL,
+                                           S, nu, nonnegative, covariance,
+                                           use_namespace_workers)
 {
   resolve_fun <- function(fun, fun_name)
   {
@@ -225,9 +225,9 @@
   measurement_model <- resolve_fun(measurement_model,
                                    measurement_model_name)
   radish_algorithm <- if (use_namespace_workers)
-    get("radish_algorithm", envir = asNamespace("terradish"), inherits = FALSE)
+    get("terradish_algorithm", envir = asNamespace("terradish"), inherits = FALSE)
   else
-    get("radish_algorithm", mode = "function", inherits = TRUE)
+    get("terradish_algorithm", mode = "function", inherits = TRUE)
   conductance_model_local <- conductance_model_factory(formula, data$x)
   phi_start <- NULL
   out <- vector("list", length(idx))
@@ -247,7 +247,7 @@
                        nonnegative = nonnegative)
       if (!is.null(phi_start))
         alg_args$phi <- phi_start
-      obj <- do.call(radish_algorithm, alg_args)
+      obj <- do.call(terradish_algorithm, alg_args)
       phi_start <- obj$phi
       list(i = i,
            loglik = -obj$objective,
@@ -258,12 +258,12 @@
   out
 }
 
-.radish_grid_parallel_results <- function(theta, term_labels, data,
-                                          conductance_model_factory, measurement_model,
-                                          S, nu, nonnegative, covariance,
-                                          cores,
-                                          use_namespace_workers,
-                                          worker_libpaths = .libPaths())
+.terradish_grid_parallel_results <- function(theta, term_labels, data,
+                                             conductance_model_factory, measurement_model,
+                                             S, nu, nonnegative, covariance,
+                                             cores,
+                                             use_namespace_workers,
+                                             worker_libpaths = .libPaths())
 {
   idx <- seq_len(nrow(theta))
   splits <- split(idx, cut(idx, breaks = min(as.integer(cores), length(idx)), labels = FALSE))
@@ -305,7 +305,7 @@
   }
 
   unlist(parLapply(
-    cl, splits, .radish_grid_parallel_chunk,
+    cl, splits, .terradish_grid_parallel_chunk,
     theta = theta,
     term_labels = term_labels,
     data = data,
@@ -321,9 +321,9 @@
   ), recursive = FALSE)
 }
 
-.radish_grid_serial_results <- function(idx, theta, model_formula, data,
-                                        conductance_model_factory, measurement_model,
-                                        S, nu, nonnegative, covariance)
+.terradish_grid_serial_results <- function(idx, theta, model_formula, data,
+                                           conductance_model_factory, measurement_model,
+                                           S, nu, nonnegative, covariance)
 {
   conductance_model_local <- conductance_model_factory(model_formula, data$x)
   phi_start <- NULL
@@ -344,7 +344,7 @@
                        nonnegative = nonnegative)
       if (!is.null(phi_start))
         alg_args$phi <- phi_start
-      obj <- do.call(radish_algorithm, alg_args)
+      obj <- do.call(terradish_algorithm, alg_args)
       phi_start <- obj$phi
       list(i = i,
            loglik = -obj$objective,
@@ -355,11 +355,11 @@
   out
 }
 
-.radish_grid_impl <- function(theta, term_labels, data, S,
-                              conductance_model_factory, measurement_model,
-                              nu, nonnegative, covariance, cores,
-                              approximation = c("none", "landmark", "coarse_raster"),
-                              approximation_control = NULL)
+.terradish_grid_impl <- function(theta, term_labels, data, S,
+                                 conductance_model_factory, measurement_model,
+                                 nu, nonnegative, covariance, cores,
+                                 approximation = c("none", "landmark", "coarse_raster"),
+                                 approximation_control = NULL)
 {
   model_formula <- reformulate(term_labels)
   conductance_model <- conductance_model_factory(model_formula, data$x)
@@ -369,7 +369,7 @@
   stopifnot(ncol(theta) == length(default))
   theta <- .validate_theta_grid(theta, names(default))
 
-  approx <- .radish_grid_approximation(
+  approx <- .terradish_grid_approximation(
     data = data,
     S = S,
     approximation = approximation,
@@ -388,7 +388,7 @@
   idx <- seq_len(nrow(theta))
   if (as.integer(cores) <= 1L || nrow(theta) <= 1L)
   {
-    results <- .radish_grid_serial_results(
+    results <- .terradish_grid_serial_results(
       idx = idx,
       theta = theta,
       model_formula = model_formula,
@@ -404,7 +404,7 @@
   else
   {
     use_namespace_workers <- .use_namespace_workers()
-    results <- .radish_grid_parallel_results(
+    results <- .terradish_grid_parallel_results(
       theta = theta,
       term_labels = term_labels,
       data = data_eval,
@@ -441,7 +441,7 @@
              phi = phi,
              covariance = if(!covariance) NULL else cv,
              approximation = approx$info)
-  class(df) <- "radish_grid"
+  class(df) <- c("terradish_grid", "radish_grid")
   df
 }
 
@@ -453,9 +453,14 @@
 #'
 #' @param theta A matrix of dimension (grid size) x (number of parameters)
 #' @param formula A formula with the name of a matrix of observed genetic distances on the lhs, and covariates in the creation of \code{data} on the rhs
-#' @param data An object of class \code{radish_graph} (see \code{\link{conductance_surface}})
-#' @param conductance_model A function of class \code{radish_conductance_model_factory} (see \code{\link{radish_conductance_model_factory}})
-#' @param measurement_model A function of class \code{radish_measurement_model} (see \code{\link{radish_measurement_model}})
+#' @param data An object of class \code{terradish_graph} (see
+#'   \code{\link{conductance_surface}})
+#' @param conductance_model A function of class
+#'   \code{terradish_conductance_model_factory} (see
+#'   \code{\link{terradish_conductance_model_factory}})
+#' @param measurement_model A function of class
+#'   \code{terradish_measurement_model} (see
+#'   \code{\link{terradish_measurement_model}})
 #' @param nu Number of genetic markers (potentially used by \code{measurement_model})
 #' @param nonnegative Force regression-like \code{measurement_model} to have nonnegative slope?
 #' @param conductance Retained for backward compatibility. Only
@@ -470,12 +475,12 @@
 #'   an aggregated raster for safer coarse screening.
 #' @param approximation_control Optional named list controlling the landmark
 #'   or coarse-raster approximation. For \code{"landmark"}, see
-#'   \code{\link{radish}} for the supported entries. For
+#'   \code{\link{terradish}} for the supported entries. For
 #'   \code{"coarse_raster"}, supported entries include \code{factor},
 #'   \code{aggregate_fun}, and \code{directions}. Coarse-raster screening
 #'   requires that \code{data} retain its original raster stack.
 #'
-#' @return An object of class \code{radish_grid} with components
+#' @return An object of class \code{terradish_grid} with components
 #'   \code{theta}, \code{loglik}, \code{phi}, and, when requested,
 #'   \code{covariance}.
 #'
@@ -493,17 +498,17 @@
 #' names(covariates) <- c("altitude", "forestcover")
 #' surface <- conductance_surface(covariates, melip.coords, directions = 8)
 #'
-#' fit_mlpe <- radish(melip.Fst ~ altitude + forestcover, data = surface,
+#' fit_mlpe <- terradish(melip.Fst ~ altitude + forestcover, data = surface,
 #'                    terradish::loglinear_conductance, terradish::mlpe,
 #'                    control = NewtonRaphsonControl(maxit = 5, verbose = FALSE))
 #'
 #' theta <- as.matrix(expand.grid(forestcover = seq(-0.5, 0.5, length.out = 3),
 #'                                altitude = seq(-0.5, 0.5, length.out = 3)))
 #'
-#' grid <- radish_grid(theta, melip.Fst ~ forestcover + altitude, surface,
+#' grid <- terradish_grid(theta, melip.Fst ~ forestcover + altitude, surface,
 #'                     terradish::loglinear_conductance, terradish::mlpe, cores = 1)
 #'
-#' grid_coarse <- radish_grid(theta, melip.Fst ~ forestcover + altitude, surface,
+#' grid_coarse <- terradish_grid(theta, melip.Fst ~ forestcover + altitude, surface,
 #'                            terradish::loglinear_conductance, terradish::mlpe,
 #'                            cores = 1,
 #'                            approximation = "coarse_raster",
@@ -514,7 +519,7 @@
 #'
 #' @export
 
-radish_grid <- function(theta,
+terradish_grid <- function(theta,
                         formula, 
                         data,
                         conductance_model = loglinear_conductance, 
@@ -548,7 +553,7 @@ radish_grid <- function(theta,
   force(conductance_model_factory)
   force(measurement_model)
   force(nu)
-  .radish_grid_impl(
+  .terradish_grid_impl(
     theta = theta,
     term_labels = term_labels,
     data = data,
@@ -564,6 +569,16 @@ radish_grid <- function(theta,
   )
 }
 
+#' @rdname terradish_grid
+#' @param ... Arguments passed through the deprecated \code{radish_grid()}
+#'   compatibility wrapper to \code{\link{terradish_grid}}.
+#' @export
+radish_grid <- function(...)
+{
+  .terradish_deprecate("radish_grid", "terradish_grid")
+  .terradish_forward_call(match.call(), "terradish_grid")
+}
+
 #' Resistance distances from a parameterized conductance surface
 #'
 #' Calculates resistance distances associated with a parameterized conductance surface across
@@ -571,14 +586,17 @@ radish_grid <- function(theta,
 #'
 #' @param theta A matrix of dimension (grid size) x (number of parameters)
 #' @param formula A formula with the name of a matrix of observed genetic distances on the lhs, and covariates in the creation of \code{data} on the rhs
-#' @param data An object of class \code{radish_graph} (see \code{\link{conductance_surface}})
-#' @param conductance_model A function of class \code{radish_conductance_model_factory} (see \code{\link{radish_conductance_model_factory}})
+#' @param data An object of class \code{terradish_graph} (see
+#'   \code{\link{conductance_surface}})
+#' @param conductance_model A function of class
+#'   \code{terradish_conductance_model_factory} (see
+#'   \code{\link{terradish_conductance_model_factory}})
 #' @param conductance Retained for backward compatibility. Only
 #'   \code{conductance = TRUE} is currently implemented.
 #' @param covariance If \code{TRUE}, instead of a matrix of resistance distances, return the associated submatrix of the generalized inverse of graph Laplacian
 #' @param cores Number of worker processes to use. \code{1} evaluates the grid serially.
 #'
-#' @return An object of class \code{radish_grid}
+#' @return An object of class \code{terradish_grid}
 #'
 #' @examples
 #'
@@ -597,7 +615,7 @@ radish_grid <- function(theta,
 #' theta <- as.matrix(expand.grid(forestcover = seq(-0.5, 0.5, length.out = 3),
 #'                                altitude = seq(-0.5, 0.5, length.out = 3)))
 #'
-#' distances <- radish_distance(theta, ~forestcover + altitude, 
+#' distances <- terradish_distance(theta, ~forestcover + altitude, 
 #'                              surface, terradish::loglinear_conductance, cores = 1)
 #'
 #' ibd <- which(theta[,1] == 0 & theta[,2] == 0)
@@ -605,7 +623,7 @@ radish_grid <- function(theta,
 #'
 #' @export
 
-radish_distance <- function(theta,
+terradish_distance <- function(theta,
                             formula, 
                             data,
                             conductance_model = loglinear_conductance, 
@@ -652,14 +670,14 @@ radish_distance <- function(theta,
                        data = data,
                        covariance = covariance,
                        term_labels = attr(terms(formula), "term.labels"),
-                       radish_algorithm = radish_algorithm,
+                       radish_algorithm = terradish_algorithm,
                        leastsquares = leastsquares,
                        dist_from_cov = dist_from_cov)
 
   idx <- seq_len(nrow(theta))
   if (as.integer(cores) <= 1L || nrow(theta) <= 1L)
   {
-    results <- .radish_distance_worker(idx, worker_state)
+    results <- .terradish_distance_worker(idx, worker_state)
   }
   else
   {
@@ -692,8 +710,8 @@ radish_distance <- function(theta,
         NULL
       })
     }
-    worker_state$radish_algorithm <- if (use_namespace_workers) get("radish_algorithm", envir = asNamespace("terradish")) else radish_algorithm
-    results <- unlist(parLapply(cl, splits, .radish_distance_worker, state = worker_state), recursive = FALSE)
+    worker_state$radish_algorithm <- if (use_namespace_workers) get("terradish_algorithm", envir = asNamespace("terradish")) else terradish_algorithm
+    results <- unlist(parLapply(cl, splits, .terradish_distance_worker, state = worker_state), recursive = FALSE)
   }
 
   for (res in results)
@@ -706,6 +724,26 @@ radish_distance <- function(theta,
   df <- list(theta = data.frame(theta))
   if (covariance) df$covariance <- cv else df$distance <- cv
 
-  class(df) <- "radish_grid"
+  class(df) <- c("terradish_grid", "radish_grid")
   df
 }
+
+#' @rdname terradish_distance
+#' @param ... Arguments passed through the deprecated
+#'   \code{radish_distance()} compatibility wrapper to
+#'   \code{\link{terradish_distance}}.
+#' @export
+radish_distance <- function(...)
+{
+  .terradish_deprecate("radish_distance", "terradish_distance")
+  .terradish_forward_call(match.call(), "terradish_distance")
+}
+
+# Internal compatibility aliases retained for housekeeping-sized refactors.
+.radish_grid_worker <- .terradish_grid_worker
+.radish_distance_worker <- .terradish_distance_worker
+.radish_grid_approximation <- .terradish_grid_approximation
+.radish_grid_parallel_chunk <- .terradish_grid_parallel_chunk
+.radish_grid_parallel_results <- .terradish_grid_parallel_results
+.radish_grid_serial_results <- .terradish_grid_serial_results
+.radish_grid_impl <- .terradish_grid_impl

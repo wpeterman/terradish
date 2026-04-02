@@ -1,15 +1,15 @@
-test_that("radish_cv returns a cross-validation summary", {
+test_that("terradish_cv returns a cross-validation summary", {
   dat <- melip_fixture(1:12)
   melip.Fst <- dat$melip.Fst
 
   out <- suppressWarnings(
-    radish_cv(dat$coords, dat$covariates,
-              melip.Fst ~ altitude + forestcover,
-              model = "ls",
-              prop_train = 0.8,
-              seed = 1,
-              fit_full = FALSE,
-              control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+    terradish_cv(dat$coords, dat$covariates,
+                 melip.Fst ~ altitude + forestcover,
+                 model = "ls",
+                 prop_train = 0.8,
+                 seed = 1,
+                 fit_full = FALSE,
+                 control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
   )
 
   expect_true(is.list(out))
@@ -17,24 +17,53 @@ test_that("radish_cv returns a cross-validation summary", {
   expect_length(out$cv_loglik, 1L)
 })
 
-test_that("cv_model_selection and radish_parameters summarize outputs", {
+test_that("terradish_cv_replicates summarizes repeated held-out loglikelihood", {
+  dat <- melip_fixture(1:12)
+  melip.Fst <- dat$melip.Fst
+
+  out <- suppressWarnings(
+    terradish_cv_replicates(dat$coords, dat$covariates,
+                            melip.Fst ~ altitude + forestcover,
+                            model = "ls",
+                            seeds = c(1L, 2L),
+                            fit_full = FALSE,
+                            keep_fits = TRUE,
+                            control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+  )
+
+  expect_true(is.list(out))
+  expect_s3_class(out, "terradish_cv_replicates")
+  expect_named(out, c("summary", "mean_loglik", "sd_loglik", "seeds", "fits"))
+  expect_true(is.data.frame(out$summary))
+  expect_equal(nrow(out$summary), 2L)
+  expect_true(all(c("replicate", "seed", "cv_loglik") %in% names(out$summary)))
+  expect_length(out$fits, 2L)
+  expect_gt(length(capture.output(print(out))), 0)
+
+  sm <- summary(out)
+  expect_s3_class(sm, "summary.terradish_cv_replicates")
+  expect_equal(sm$replicates, 2L)
+  expect_gt(length(capture.output(print(sm))), 0)
+})
+
+test_that("cv_model_selection and terradish_parameters summarize outputs", {
   fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
   surface <- fx$surface
   melip.Fst <- fx$data$melip.Fst
 
   fit1 <- suppressWarnings(
-    radish(melip.Fst ~ altitude,
-           data = surface,
-           conductance_model = loglinear_conductance,
-           measurement_model = leastsquares,
-           control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+    terradish(melip.Fst ~ altitude,
+              data = surface,
+              conductance_model = loglinear_conductance,
+              measurement_model = leastsquares,
+              control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
   )
   fit2 <- suppressWarnings(
-    radish(melip.Fst ~ altitude + forestcover,
-           data = surface,
-           conductance_model = loglinear_conductance,
-           measurement_model = leastsquares,
-           control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+    terradish(melip.Fst ~ altitude + forestcover,
+              data = surface,
+              conductance_model = loglinear_conductance,
+              measurement_model = leastsquares,
+              control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
   )
 
   sel <- cv_model_selection(list(
@@ -47,9 +76,20 @@ test_that("cv_model_selection and radish_parameters summarize outputs", {
 
   tmp <- tempfile()
   dir.create(tmp)
-  saveRDS(fit2, file.path(tmp, "fit--ls.rds"))
+  suppressWarnings(saveRDS(fit2, file.path(tmp, "fit--ls.rds")))
   saveRDS(list(effect_size = coef(fit2)), file.path(tmp, "AllResults_list.rds"))
-  params <- radish_parameters(tmp, radish_model = "ls", save_table = FALSE)
+  results_meta <- terradish_results(tmp)
+  expect_true(is.list(results_meta))
+  expect_true("all_results" %in% names(results_meta))
+  expect_true("all_dirs" %in% names(results_meta))
+
+  params <- terradish_parameters(tmp, model = "ls", save_table = FALSE)
   expect_true(is.data.frame(params))
   expect_equal(nrow(params), length(coef(fit2)))
+
+  expect_warning(
+    legacy_params <- terradish_parameters(tmp, radish_model = "ls", save_table = FALSE),
+    "deprecated"
+  )
+  expect_equal(legacy_params$parameter, params$parameter)
 })

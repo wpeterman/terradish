@@ -120,7 +120,7 @@ true_cost_matrix <- function(surface, config)
 {
   theta <- matrix(unname(config$true_theta), nrow = 1)
   colnames(theta) <- names(config$true_theta)
-  cost <- terradish::radish_distance(
+  cost <- terradish::terradish_distance(
     theta = theta,
     formula = ~ cont1 + cont2,
     data = surface,
@@ -245,7 +245,7 @@ fit_once <- function(surface_case, solver, config)
       fit_formula <- config$formula
       started <- proc.time()[["elapsed"]]
       fit <- with_elapsed_timeout(
-        terradish::radish(
+        terradish::terradish(
           fit_formula,
           data = surface_case$surface,
           conductance_model = terradish::loglinear_conductance,

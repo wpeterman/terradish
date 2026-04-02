@@ -2,7 +2,6 @@
 % Please edit documentation in R/terradish-package.R
 \docType{package}
 \name{terradish-package}
-\alias{terradish}
 \alias{terradish-package}
 \title{terradish package}
 \description{

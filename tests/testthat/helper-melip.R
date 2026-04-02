@@ -29,11 +29,11 @@ fit_fixture <- function(keep = 1:12,
   melip.Fst <- dat$melip.Fst
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
   fit <- suppressWarnings(
-    radish(formula,
-           data = surface,
-           conductance_model = loglinear_conductance,
-           measurement_model = measurement_model,
-           ...)
+    terradish(formula,
+              data = surface,
+              conductance_model = loglinear_conductance,
+              measurement_model = measurement_model,
+              ...)
   )
 
   list(data = dat, surface = surface, fit = fit)

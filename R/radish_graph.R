@@ -72,7 +72,7 @@
 #' (e.g. fit to different stacks of rasters) can give superficially
 #' inconsistant results, as these essentially involve different sets of
 #' vertices. Thus model comparison should use models fitted to the same
-#' \code{radish_graph} object.
+#' \code{terradish_graph} object.
 #'
 #' Disconnected components are identified and removed, so that only the largest connected component in the graph is retained. The function aborts if there are focal cells that belong to a disconnected component.
 #'
@@ -82,9 +82,9 @@
 #' of the associated levels table when present; otherwise the first non-\code{ID}
 #' column is used.
 #'
-#' @seealso \code{\link{radish}}, \code{\link[terra]{rast}}
+#' @seealso \code{\link{terradish}}, \code{\link[terra]{rast}}
 #'
-#' @return An object of class \code{radish_graph}
+#' @return An object of class \code{terradish_graph}
 #'
 #' @references
 #'
@@ -222,17 +222,17 @@ conductance_surface <- function(covariates, coords, directions=4, saveStack=TRUE
               "choleski_templates" = list(simplicial_ldl = LQn),
               "choleski"     = LQn,
               "stack"        = if(saveStack) covariates else NULL)
-  class(out) <- "radish_graph"
+  class(out) <- c("terradish_graph", "radish_graph")
   out
 }
 
 #' Estimate conductance from a fitted model
 #'
 #' Returns fitted conductance values, and confidence intervals when available,
-#' for a \code{radish_graph} and fitted \code{radish} object.
+#' for a \code{terradish_graph} and fitted \code{terradish} object.
 #'
-#' @param x A \code{radish_graph} object.
-#' @param fit A fitted object returned by \code{\link{radish}}.
+#' @param x A \code{terradish_graph} object.
+#' @param fit A fitted object returned by \code{\link{terradish}}.
 #' @param quantile Confidence level used to compute conductance intervals.
 #' @param ... Additional arguments passed to methods.
 #'
@@ -253,7 +253,7 @@ conductance_surface <- function(covariates, coords, directions=4, saveStack=TRUE
 #' names(covariates) <- c("altitude", "forestcover")
 #' surface <- conductance_surface(covariates, melip.coords, directions = 8)
 #'
-#' fit <- radish(melip.Fst ~ forestcover + altitude, surface,
+#' fit <- terradish(melip.Fst ~ forestcover + altitude, surface,
 #'               loglinear_conductance, leastsquares,
 #'               control = NewtonRaphsonControl(maxit = 5))
 #'
@@ -266,12 +266,9 @@ conductance <- function(x, ...)
   UseMethod("conductance")
 }
 
-#' @rdname conductance
-#' @method conductance radish_graph
-#' @export
-conductance.radish_graph <- function(x, fit, quantile = 0.95, ...)
+.conductance_graph_impl <- function(x, fit, quantile = 0.95, ...)
 {
-  stopifnot(class(fit) == "radish")
+  stopifnot(inherits(fit, c("terradish", "radish")))
   stopifnot(!fit$fit$boundary && !is.null(fit$mle$theta))
 
   conductance <- fit$submodels$f(fit$mle$theta)
@@ -304,6 +301,22 @@ conductance.radish_graph <- function(x, fit, quantile = 0.95, ...)
     out <- cbind("est" = conductance$conductance, ci)
     out
   }
+}
+
+#' @rdname conductance
+#' @method conductance terradish_graph
+#' @export
+conductance.terradish_graph <- function(x, fit, quantile = 0.95, ...)
+{
+  .conductance_graph_impl(x = x, fit = fit, quantile = quantile, ...)
+}
+
+#' @rdname conductance
+#' @method conductance radish_graph
+#' @export
+conductance.radish_graph <- function(x, fit, quantile = 0.95, ...)
+{
+  .conductance_graph_impl(x = x, fit = fit, quantile = quantile, ...)
 }
 
 #for validation and debugging, generate a simple 1D lattice

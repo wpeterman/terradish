@@ -90,7 +90,7 @@ run_one_benchmark <- function(package_name,
         )
         
         bench <- microbenchmark::microbenchmark(
-          fit = pkg_fun(ns, "radish")(
+          fit = pkg_fun(ns, "terradish")(
             S ~ altitude * forestcover,
             data = surface,
             conductance_model = pkg_fun(ns, "loglinear_conductance"),
@@ -102,7 +102,7 @@ run_one_benchmark <- function(package_name,
           unit = "s"
         )
         
-        fit <- pkg_fun(ns, "radish")(
+        fit <- pkg_fun(ns, "terradish")(
           S ~ altitude * forestcover,
           data = surface,
           conductance_model = pkg_fun(ns, "loglinear_conductance"),
@@ -139,7 +139,7 @@ run_one_benchmark <- function(package_name,
         )
         
         bench <- microbenchmark::microbenchmark(
-          fit = pkg_fun(ns, "radish")(
+          fit = pkg_fun(ns, "terradish")(
             S ~ altitude * forestcover,
             data = surface,
             conductance_model = pkg_fun(ns, "loglinear_conductance"),
@@ -152,7 +152,7 @@ run_one_benchmark <- function(package_name,
           unit = "s"
         )
         
-        fit <- pkg_fun(ns, "radish")(
+        fit <- pkg_fun(ns, "terradish")(
           S ~ altitude * forestcover,
           data = surface,
           conductance_model = pkg_fun(ns, "loglinear_conductance"),

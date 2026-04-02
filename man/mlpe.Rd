@@ -79,7 +79,7 @@ names(covariates) <- c("altitude", "forestcover")
 surface <- conductance_surface(covariates, melip.coords, directions = 8)
 
 # inverse of graph Laplacian at null model (IBD) 
-laplacian_inv <- radish_distance(theta = matrix(0, 1, 2), 
+laplacian_inv <- terradish_distance(theta = matrix(0, 1, 2), 
                                  formula = ~forestcover + altitude,
                                  data = surface,
                                  terradish::loglinear_conductance, 
@@ -90,5 +90,5 @@ mlpe(laplacian_inv, melip.Fst, phi = c(0., 0.5, -0.1, qlogis(0.2)))
 
 }
 \seealso{
-\code{\link{radish_measurement_model}}
+\code{\link{terradish_measurement_model}}
 }

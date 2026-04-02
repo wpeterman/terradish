@@ -20,12 +20,12 @@ test_that("wishart_covariance returns the full measurement-model interface", {
   expect_equal(dim(fit$jacobian_S(diag(nrow(E)))), dim(S))
 })
 
-test_that("radish can optimize with wishart_covariance on covariance responses", {
+test_that("terradish can optimize with wishart_covariance on covariance responses", {
   dat <- melip_fixture(keep = 1:6)
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
   theta_true <- c(altitude = 0.15, forestcover = -0.2)
 
-  E_true <- radish_distance(
+  E_true <- terradish_distance(
     theta = matrix(theta_true, nrow = 1),
     formula = ~ altitude + forestcover,
     data = surface,
@@ -38,15 +38,16 @@ test_that("radish can optimize with wishart_covariance on covariance responses",
   genetic_cov <- rWishart(1, df = 40, Sigma = Sigma_true)[,,1] / 40
 
   fit <- suppressWarnings(
-    radish(genetic_cov ~ altitude + forestcover,
-           data = surface,
-           conductance_model = loglinear_conductance,
-           measurement_model = wishart_covariance,
-           nu = 40,
-           leverage = FALSE,
-           control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+    terradish(genetic_cov ~ altitude + forestcover,
+              data = surface,
+              conductance_model = loglinear_conductance,
+              measurement_model = wishart_covariance,
+              nu = 40,
+              leverage = FALSE,
+              control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
   )
 
+  expect_s3_class(fit, "terradish")
   expect_s3_class(fit, "radish")
   expect_true(is.finite(fit$loglik))
   expect_true(is.matrix(fitted(fit, type = "response")))
@@ -58,7 +59,7 @@ test_that("wishart_covariance supports leverage on full covariance responses", {
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
   theta_true <- c(0.15, -0.2)
 
-  E_true <- radish_algorithm(
+  E_true <- terradish_algorithm(
     f = loglinear_conductance(~ altitude + forestcover, surface$x),
     g = leastsquares,
     s = surface,
@@ -75,13 +76,13 @@ test_that("wishart_covariance supports leverage on full covariance responses", {
   genetic_cov <- rWishart(1, df = 40, Sigma = Sigma_true)[, , 1] / 40
 
   fit <- suppressWarnings(
-    radish(genetic_cov ~ altitude + forestcover,
-           data = surface,
-           conductance_model = loglinear_conductance,
-           measurement_model = wishart_covariance,
-           nu = 40,
-           leverage = TRUE,
-           control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+    terradish(genetic_cov ~ altitude + forestcover,
+              data = surface,
+              conductance_model = loglinear_conductance,
+              measurement_model = wishart_covariance,
+              nu = 40,
+              leverage = TRUE,
+              control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
   )
 
   expect_false(is.null(fit$leverage$S))

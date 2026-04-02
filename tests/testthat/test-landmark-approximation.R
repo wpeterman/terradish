@@ -2,7 +2,7 @@ test_that("landmark approximation subsets focal populations and rhs columns", {
   dat <- melip_fixture(1:10)
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
 
-  subset <- terradish:::.radish_landmark_subset(
+  subset <- terradish:::.terradish_landmark_subset(
     surface,
     dat$melip.Fst,
     approximation_control = list(
@@ -20,14 +20,14 @@ test_that("landmark approximation subsets focal populations and rhs columns", {
   expect_equal(ncol(subset$data$rhs), 4L)
 })
 
-test_that("radish landmark approximation refines back to the full-data fit for mlpe", {
+test_that("terradish landmark approximation refines back to the full-data fit for mlpe", {
   dat <- melip_fixture(1:8)
   melip.Fst <- dat$melip.Fst
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
   control <- NewtonRaphsonControl(maxit = 4, verbose = FALSE)
 
   fit_exact <- suppressWarnings(
-    radish(
+    terradish(
       melip.Fst ~ altitude + forestcover,
       data = surface,
       conductance_model = loglinear_conductance,
@@ -38,7 +38,7 @@ test_that("radish landmark approximation refines back to the full-data fit for m
   )
 
   fit_landmark <- suppressWarnings(
-    radish(
+    terradish(
       melip.Fst ~ altitude + forestcover,
       data = surface,
       conductance_model = loglinear_conductance,
@@ -70,7 +70,7 @@ test_that("landmark exact refinement is guarded for leastsquares", {
   control <- NewtonRaphsonControl(maxit = 4, verbose = FALSE)
 
   fit_landmark <- suppressWarnings(
-    radish(
+    terradish(
       melip.Fst ~ altitude + forestcover,
       data = surface,
       conductance_model = loglinear_conductance,

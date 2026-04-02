@@ -77,6 +77,6 @@ wishart_covariance(E, S, phi = c(0.8, log(0.2)), nu = 20)
 
 }
 \seealso{
-\code{\link{radish_measurement_model}},
+\code{\link{terradish_measurement_model}},
   \code{\link{generalized_wishart}}
 }

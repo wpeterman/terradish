@@ -32,8 +32,8 @@ transform is applied?}
 \value{
 A matrix with one row per unordered pair of focal points and one or
   more columns of endpoint-difference covariates. The returned object carries
-  class \code{"radish_pairwise_covariates"} so it can be subset and rebuilt
-  automatically inside \code{\link{radish_cv}}.
+  class \code{"terradish_pairwise_covariates"} so it can be subset and
+  rebuilt automatically inside \code{\link{terradish_cv}}.
 }
 \description{
 Construct pairwise covariates from site-level environmental values so they
@@ -60,5 +60,5 @@ head(z_env)
 
 }
 \seealso{
-\code{\link{mlpe_covariates}}, \code{\link{radish_cv}}
+\code{\link{mlpe_covariates}}, \code{\link{terradish_cv}}
 }

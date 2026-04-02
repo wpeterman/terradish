@@ -19,7 +19,7 @@ columns.}
 \item{saveStack}{If \code{TRUE}, the \code{SpatRaster} is returned with missing data masked uniformly across layers}
 }
 \value{
-An object of class \code{radish_graph}
+An object of class \code{terradish_graph}
 }
 \description{
 Given a set of spatial covariates and a set of spatial coordinates, create a
@@ -32,7 +32,7 @@ stack. Comparing models with different patterns of missing spatial data
 (e.g. fit to different stacks of rasters) can give superficially
 inconsistant results, as these essentially involve different sets of
 vertices. Thus model comparison should use models fitted to the same
-\code{radish_graph} object.
+\code{terradish_graph} object.
 
 Disconnected components are identified and removed, so that only the largest connected component in the graph is retained. The function aborts if there are focal cells that belong to a disconnected component.
 
@@ -75,5 +75,5 @@ names(covariates_cat) <- c("forestcover", "altitude")
 Pope NS. In prep. Fast gradient-based optimization of resistance surfaces.
 }
 \seealso{
-\code{\link{radish}}, \code{\link[terra]{rast}}
+\code{\link{terradish}}, \code{\link[terra]{rast}}
 }

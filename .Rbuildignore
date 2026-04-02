@@ -3,3 +3,13 @@
 ^ms$
 ^src/.*\.(dll|o)$
 ^tmp_.*\.RData$
+^CRAN-SUBMISSION$
+^cran-comments\.md$
+^\.github$
+^README\.Rmd$
+^inst/extdata/.*\.RData$
+^vignettes/build_vignettes\.R$
+^AGENTS\.Rmd$
+^AGENTS\.md$
+^src/.*\.gcno$
+^src/.*\.gcda$

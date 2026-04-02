@@ -20,10 +20,10 @@
 #'
 #' @return A matrix with one row per unordered pair of focal points and one or
 #'   more columns of endpoint-difference covariates. The returned object carries
-#'   class \code{"radish_pairwise_covariates"} so it can be subset and rebuilt
-#'   automatically inside \code{\link{radish_cv}}.
+#'   class \code{"terradish_pairwise_covariates"} so it can be subset and
+#'   rebuilt automatically inside \code{\link{terradish_cv}}.
 #'
-#' @seealso \code{\link{mlpe_covariates}}, \code{\link{radish_cv}}
+#' @seealso \code{\link{mlpe_covariates}}, \code{\link{terradish_cv}}
 #'
 #' @examples
 #' library(terra)
@@ -50,7 +50,8 @@ pairwise_endpoint_covariates <- function(x,
                                                        "euclidean", "manhattan"),
                                          scale = FALSE)
 {
-  if (inherits(x, "radish_pairwise_covariates"))
+  if (inherits(x, c("terradish_pairwise_covariates",
+                    "radish_pairwise_covariates")))
     return(x)
 
   transform <- match.arg(transform)
@@ -81,11 +82,12 @@ pairwise_endpoint_covariates <- function(x,
 #' \code{R_ij} is the resistance distance implied by the optimized conductance
 #' surface and \code{Z_ij} are fixed endpoint-difference covariates. When the
 #' model is constructed from site-level covariates or the output of
-#' \code{pairwise_endpoint_covariates()}, \code{\link{radish_cv}} can rebuild the
-#' measurement model automatically on each train/test split.
+#' \code{pairwise_endpoint_covariates()}, \code{\link{terradish_cv}} can rebuild
+#' the measurement model automatically on each train/test split.
 #'
-#' @return A function of class \code{"radish_measurement_model"} suitable for
-#'   \code{\link{radish}}, \code{\link{radish_grid}}, and \code{\link{radish_cv}}.
+#' @return A function of class \code{"terradish_measurement_model"} suitable for
+#'   \code{\link{terradish}}, \code{\link{terradish_grid}}, and
+#'   \code{\link{terradish_cv}}.
 #'
 #' @seealso \code{\link{mlpe}}, \code{\link{pairwise_endpoint_covariates}}
 #'
@@ -103,7 +105,7 @@ pairwise_endpoint_covariates <- function(x,
 #'
 #' g_joint <- mlpe_covariates(melip.altitude, melip.coords,
 #'                            transform = "absdiff", scale = TRUE)
-#' fit_joint <- radish(melip.Fst ~ altitude + forestcover, surface,
+#' fit_joint <- terradish(melip.Fst ~ altitude + forestcover, surface,
 #'                     terradish::loglinear_conductance, g_joint)
 #' summary(fit_joint)
 #'
@@ -120,7 +122,8 @@ mlpe_covariates <- function(x,
       is.na(rho_start) || rho_start <= 0 || rho_start >= 0.5)
     stop("`rho_start` must be a single number in (0, 0.5)")
 
-  pairwise_covariates <- if (inherits(x, "radish_pairwise_covariates"))
+  pairwise_covariates <- if (inherits(x, c("terradish_pairwise_covariates",
+                                           "radish_pairwise_covariates")))
     x
   else
     pairwise_endpoint_covariates(x, coords = coords, transform = transform,
@@ -336,7 +339,9 @@ mlpe_covariates <- function(x,
   attr(g, "subsetter") <- function(index)
     mlpe_covariates(.subset_pairwise_endpoint_covariates(pairwise_covariates, index),
                     rho_start = rho_start)
-  class(g) <- c("radish_measurement_model", class(g))
+  class(g) <- unique(c("terradish_measurement_model",
+                       "radish_measurement_model",
+                       class(g)))
   g
 }
 
@@ -428,13 +433,16 @@ mlpe_covariates <- function(x,
   structure(pairwise,
             site_covariates = site_covariates,
             transform = transform,
-            class = c("radish_pairwise_covariates", class(pairwise)))
+            class = unique(c("terradish_pairwise_covariates",
+                             "radish_pairwise_covariates",
+                             class(pairwise))))
 }
 
 .subset_pairwise_endpoint_covariates <- function(x, index)
 {
-  if (!inherits(x, "radish_pairwise_covariates"))
-    stop("`x` must inherit from 'radish_pairwise_covariates'")
+  if (!inherits(x, c("terradish_pairwise_covariates",
+                     "radish_pairwise_covariates")))
+    stop("`x` must inherit from 'terradish_pairwise_covariates'")
 
   site_covariates <- attr(x, "site_covariates")
   transform <- attr(x, "transform")

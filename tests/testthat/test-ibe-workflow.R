@@ -12,12 +12,13 @@ test_that("pairwise endpoint covariates can be built from raster values", {
                                  scale = TRUE)
   )
 
+  expect_s3_class(z, "terradish_pairwise_covariates")
   expect_s3_class(z, "radish_pairwise_covariates")
   expect_equal(dim(z), c(choose(length(keep), 2), 1))
   expect_equal(colnames(z), "absdiff_altitude")
 })
 
-test_that("joint IBE + IBR MLPE models fit through radish", {
+test_that("joint IBE + IBR MLPE models fit through terradish", {
   data(melip, package = "terradish")
   melip.altitude <- terra::unwrap(melip.altitude)
   melip.forestcover <- terra::unwrap(melip.forestcover)
@@ -38,23 +39,27 @@ test_that("joint IBE + IBR MLPE models fit through radish", {
                              scale = TRUE)
 
   fit <- expect_no_warning(
-    radish(melip.Fst_small ~ altitude + forestcover,
-           data = surface,
-           conductance_model = loglinear_conductance,
-           measurement_model = g_joint,
-           leverage = FALSE,
-           control = NewtonRaphsonControl(maxit = 8, verbose = FALSE))
+    terradish(melip.Fst_small ~ altitude + forestcover,
+              data = surface,
+              conductance_model = loglinear_conductance,
+              measurement_model = g_joint,
+              leverage = FALSE,
+              control = NewtonRaphsonControl(maxit = 8, verbose = FALSE))
   )
 
+  expect_s3_class(fit, "terradish")
   expect_s3_class(fit, "radish")
   expect_true(is.finite(fit$loglik))
 
   sm <- summary(fit)
+  expect_s3_class(sm, "summary.terradish")
   expect_s3_class(sm, "summary.radish")
   expect_true(any(grepl("absdiff_altitude_site", names(sm$phi))))
+  expect_true("rho" %in% rownames(sm$phi_table))
+  expect_true(all(is.finite(sm$phi_table[, "Std. Error"])))
 })
 
-test_that("radish_cv rebuilds MLPE endpoint-covariate models on splits", {
+test_that("terradish_cv rebuilds MLPE endpoint-covariate models on splits", {
   data(melip, package = "terradish")
   melip.altitude <- terra::unwrap(melip.altitude)
   melip.forestcover <- terra::unwrap(melip.forestcover)
@@ -74,17 +79,18 @@ test_that("radish_cv rebuilds MLPE endpoint-covariate models on splits", {
                              scale = TRUE)
 
   out <- expect_no_warning(
-    radish_cv(coords,
-              covariates,
-              melip.Fst_small ~ altitude + forestcover,
-              model = g_joint,
-              prop_train = 2 / 3,
-              seed = 1,
-              fit_full = FALSE,
-              control = NewtonRaphsonControl(maxit = 8, verbose = FALSE))
+    terradish_cv(coords,
+                 covariates,
+                 melip.Fst_small ~ altitude + forestcover,
+                 model = g_joint,
+                 prop_train = 2 / 3,
+                 seed = 1,
+                 fit_full = FALSE,
+                 control = NewtonRaphsonControl(maxit = 8, verbose = FALSE))
   )
 
   expect_true(is.list(out))
+  expect_s3_class(out$train_mod, "terradish")
   expect_s3_class(out$train_mod, "radish")
   expect_length(out$cv_loglik, 1L)
   expect_true(is.finite(out$cv_loglik))

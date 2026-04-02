@@ -31,8 +31,9 @@ pairwise transform is computed?}
 natural scale, constrained to \code{(0, 0.5)}.}
 }
 \value{
-A function of class \code{"radish_measurement_model"} suitable for
-  \code{\link{radish}}, \code{\link{radish_grid}}, and \code{\link{radish_cv}}.
+A function of class \code{"terradish_measurement_model"} suitable for
+  \code{\link{terradish}}, \code{\link{terradish_grid}}, and
+  \code{\link{terradish_cv}}.
 }
 \description{
 Create an MLPE measurement model whose mean structure includes both
@@ -44,8 +45,8 @@ The fitted mean structure is
 \code{R_ij} is the resistance distance implied by the optimized conductance
 surface and \code{Z_ij} are fixed endpoint-difference covariates. When the
 model is constructed from site-level covariates or the output of
-\code{pairwise_endpoint_covariates()}, \code{\link{radish_cv}} can rebuild the
-measurement model automatically on each train/test split.
+\code{pairwise_endpoint_covariates()}, \code{\link{terradish_cv}} can rebuild
+the measurement model automatically on each train/test split.
 }
 \examples{
 library(terra)
@@ -61,7 +62,7 @@ surface <- conductance_surface(covariates, melip.coords, directions = 8)
 
 g_joint <- mlpe_covariates(melip.altitude, melip.coords,
                            transform = "absdiff", scale = TRUE)
-fit_joint <- radish(melip.Fst ~ altitude + forestcover, surface,
+fit_joint <- terradish(melip.Fst ~ altitude + forestcover, surface,
                     terradish::loglinear_conductance, g_joint)
 summary(fit_joint)
 

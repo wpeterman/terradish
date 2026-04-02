@@ -22,7 +22,7 @@
 #' generalized Wishart log-likelihood for the observed squared-distance matrix
 #' \code{S} after projecting out the grand mean.
 #'
-#' @seealso \code{\link{radish_measurement_model}}
+#' @seealso \code{\link{terradish_measurement_model}}
 #'
 #' @return A list containing:
 #'  \item{covariance}{rows/columns of the generalized inverse of the graph Laplacian for a subset of target vertices}
@@ -55,7 +55,7 @@
 #' surface <- conductance_surface(covariates, melip.coords, directions = 8)
 #'
 #' # inverse of graph Laplacian at null model (IBD) 
-#' laplacian_inv <- radish_distance(theta = matrix(0, 1, 2), 
+#' laplacian_inv <- terradish_distance(theta = matrix(0, 1, 2), 
 #'                                  formula = ~forestcover + altitude,
 #'                                  data = surface,
 #'                                  terradish::loglinear_conductance, 
@@ -289,4 +289,5 @@ generalized_wishart <- function(E, S, phi, nu, gradient = TRUE, hessian = TRUE, 
        num_jacobian_E   = if(!validate) NULL else num_jacobian_E,
        num_jacobian_S   = if(!validate) NULL else num_jacobian_S)
 }
-class(generalized_wishart) <- "radish_measurement_model"
+class(generalized_wishart) <- c("terradish_measurement_model",
+                                "radish_measurement_model")

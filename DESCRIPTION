@@ -13,7 +13,7 @@ Description: Maximum likelihood estimation for parameterized conductance models
     such as spatial grids with fewer than a million cells.
 License: BSD_3_clause + file LICENSE
 Suggests: numDeriv, nloptr, adegenet, testthat (>= 3.0.0),
-    knitr, rmarkdown
+    knitr, rmarkdown, pkgload
 Imports: Rcpp (>= 1.0.4), terra, Matrix, nlme, MASS,
     parallel, methods, stats, utils
 Depends: R (>= 3.5.0)

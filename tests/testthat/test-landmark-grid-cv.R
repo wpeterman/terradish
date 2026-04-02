@@ -1,4 +1,4 @@
-test_that("radish_grid records landmark approximation metadata", {
+test_that("terradish_grid records landmark approximation metadata", {
   fx <- fit_fixture(keep = 1:8,
                     control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
   surface <- fx$surface
@@ -8,7 +8,7 @@ test_that("radish_grid records landmark approximation metadata", {
   colnames(theta) <- names(theta0)
 
   grid <- suppressWarnings(
-    radish_grid(
+    terradish_grid(
       theta = theta,
       formula = melip.Fst ~ altitude + forestcover,
       data = surface,
@@ -24,6 +24,7 @@ test_that("radish_grid records landmark approximation metadata", {
     )
   )
 
+  expect_s3_class(grid, "terradish_grid")
   expect_s3_class(grid, "radish_grid")
   expect_equal(grid$approximation$type, "landmark")
   expect_true(isTRUE(grid$approximation$used))
@@ -31,7 +32,7 @@ test_that("radish_grid records landmark approximation metadata", {
   expect_length(grid$loglik, nrow(theta))
 })
 
-test_that("radish_grid coarse-raster screening keeps the full focal set", {
+test_that("terradish_grid coarse-raster screening keeps the full focal set", {
   fx <- fit_fixture(keep = 1:12,
                     control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
   surface <- fx$surface
@@ -41,7 +42,7 @@ test_that("radish_grid coarse-raster screening keeps the full focal set", {
   colnames(theta) <- names(theta0)
 
   grid <- suppressWarnings(
-    radish_grid(
+    terradish_grid(
       theta = theta,
       formula = melip.Fst ~ altitude + forestcover,
       data = surface,
@@ -53,6 +54,7 @@ test_that("radish_grid coarse-raster screening keeps the full focal set", {
     )
   )
 
+  expect_s3_class(grid, "terradish_grid")
   expect_s3_class(grid, "radish_grid")
   expect_equal(grid$approximation$type, "coarse_raster")
   expect_true(isTRUE(grid$approximation$used))
@@ -62,7 +64,7 @@ test_that("radish_grid coarse-raster screening keeps the full focal set", {
   expect_true(all(is.finite(grid$loglik)))
 })
 
-test_that("radish_cv forwards landmark approximation to held-out grid evaluation", {
+test_that("terradish_cv forwards landmark approximation to held-out grid evaluation", {
   dat <- melip_fixture(1:16)
   melip.Fst <- dat$melip.Fst
   approximation_control <- list(
@@ -72,7 +74,7 @@ test_that("radish_cv forwards landmark approximation to held-out grid evaluation
   )
 
   out <- suppressWarnings(
-    radish_cv(
+    terradish_cv(
       dat$coords,
       dat$covariates,
       melip.Fst ~ altitude + forestcover,
@@ -97,7 +99,7 @@ test_that("radish_cv forwards landmark approximation to held-out grid evaluation
   )
 
   manual <- suppressWarnings(
-    radish_grid(
+    terradish_grid(
       theta = matrix(coef(out$train_mod), nrow = 1),
       formula = melip.Fst_test ~ altitude + forestcover,
       data = test_surface,
@@ -113,12 +115,12 @@ test_that("radish_cv forwards landmark approximation to held-out grid evaluation
   expect_equal(out$cv_loglik, manual$loglik)
 })
 
-test_that("radish_cv can use coarse-raster screening on the held-out grid only", {
+test_that("terradish_cv can use coarse-raster screening on the held-out grid only", {
   dat <- melip_fixture(1:16)
   melip.Fst <- dat$melip.Fst
 
   out <- suppressWarnings(
-    radish_cv(
+    terradish_cv(
       dat$coords,
       dat$covariates,
       melip.Fst ~ altitude + forestcover,

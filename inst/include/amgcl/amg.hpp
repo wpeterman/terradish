@@ -31,7 +31,7 @@ THE SOFTWARE.
  * \brief  An AMG preconditioner.
  */
 
-#include <iostream>
+#include <ostream>
 #include <iomanip>
 #include <list>
 #include <memory>

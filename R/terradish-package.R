@@ -14,6 +14,6 @@
 #' @importFrom stats qnorm reformulate residuals rnorm rWishart sigma simulate terms
 #' @importFrom terra adjacent cellFromXY geom is.factor levels ncell nlyr patches rast
 #' @importFrom terra unwrap values values<- xyFromCell
-#' @importFrom utils write.csv
+#' @importFrom utils modifyList write.csv
 #' @useDynLib terradish, .registration = TRUE
 "_PACKAGE"

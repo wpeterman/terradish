@@ -31,7 +31,7 @@ THE SOFTWARE.
  * \brief  Various utilities.
  */
 
-#include <iostream>
+#include <ostream>
 #include <iomanip>
 #include <iterator>
 #include <vector>
@@ -48,6 +48,8 @@ THE SOFTWARE.
 #ifndef AMGCL_NO_BOOST
 #  include <boost/property_tree/ptree.hpp>
 #endif
+
+#include <Rcpp/iostream/Rstreambuf.h>
 
 #include <amgcl/io/ios_saver.hpp>
 
@@ -79,7 +81,7 @@ namespace amgcl { extern profiler<> prof; }
 #endif
 
 #define AMGCL_DEBUG_SHOW(x)                                                    \
-    std::cout << std::setw(20) << #x << ": "                                   \
+    Rcpp::Rcout << std::setw(20) << #x << ": "                                 \
               << std::setw(15) << std::setprecision(8) << std::scientific      \
               << (x) << std::endl
 
@@ -142,7 +144,7 @@ inline void params_export_child(
 // Unknown parameter action
 #ifndef AMGCL_PARAM_UNKNOWN
 #  define AMGCL_PARAM_UNKNOWN(name)                                            \
-      std::cerr << "AMGCL WARNING: unknown parameter " << name << std::endl
+      Rcpp::Rcerr << "AMGCL WARNING: unknown parameter " << name << std::endl
 #endif
 
 inline void check_params(

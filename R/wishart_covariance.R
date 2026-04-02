@@ -27,7 +27,7 @@
 #' evaluates a Wishart negative log-likelihood for the observed covariance
 #' matrix \code{S}, treating \code{nu} as the effective number of loci.
 #'
-#' @seealso \code{\link{radish_measurement_model}},
+#' @seealso \code{\link{terradish_measurement_model}},
 #'   \code{\link{generalized_wishart}}
 #'
 #' @return A list containing:
@@ -229,4 +229,5 @@ wishart_covariance <- function(E, S, phi, nu,
        num_jacobian_E = if (!validate) NULL else num_jacobian_E,
        num_jacobian_S = if (!validate) NULL else num_jacobian_S)
 }
-class(wishart_covariance) <- "radish_measurement_model"
+class(wishart_covariance) <- c("terradish_measurement_model",
+                               "radish_measurement_model")

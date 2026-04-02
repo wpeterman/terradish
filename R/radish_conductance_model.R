@@ -35,11 +35,16 @@ assemble_model_matrix <- function(formula, spdat)
 
 #' Conductance model factories
 #'
-#' Functions that generate objects of class "radish_conductance_model", that represent mappings from spatial data (e.g. rasters) to conductance. 
+#' Functions that generate objects of class \code{"terradish_conductance_model"}
+#' that represent mappings from spatial data (e.g. rasters) to conductance.
 #'
-#' @name radish_conductance_model_factory
+#' Legacy \code{"radish_*"} class names are retained for backward
+#' compatibility.
+#'
+#' @name terradish_conductance_model_factory
+#' @aliases radish_conductance_model_factory
 #' @seealso \code{\link{linear_conductance}}, \code{\link{loglinear_conductance}}
-radish_conductance_model_factory <- NULL
+terradish_conductance_model_factory <- NULL
 
 #' Log-link conductance model
 #'
@@ -47,7 +52,8 @@ radish_conductance_model_factory <- NULL
 #' mapping from spatial covariates to conductance
 #'
 #' @param formula Model formula describing which spatial covariates to include.
-#' @param x Data frame of spatial covariates from a \code{radish_graph}.
+  #' @param x Data frame of spatial covariates from a
+  #'   \code{terradish_graph}.
 #'
 #' @details The model is of the form
 #' 
@@ -119,11 +125,13 @@ loglinear_conductance <- function(formula, x)
          d2f__dtheta_dx     = d2f__dtheta_dx)
   }
 
-  class(conductance_model) <- c("radish_conductance_model")
+  class(conductance_model) <- c("terradish_conductance_model",
+                                "radish_conductance_model")
   attr(conductance_model, "default") <- default
   conductance_model
 }
-class(loglinear_conductance) <- c("radish_conductance_model_factory")
+class(loglinear_conductance) <- c("terradish_conductance_model_factory",
+                                  "radish_conductance_model_factory")
 
 #' Identity-link conductance model
 #'
@@ -131,7 +139,7 @@ class(loglinear_conductance) <- c("radish_conductance_model_factory")
 #' mapping from spatial covariates to conductance
 #'
 #' @param formula Model formula describing which spatial covariates to include.
-#' @param x Data frame of spatial covariates from a \code{radish_graph}.
+#' @param x Data frame of spatial covariates from a \code{terradish_graph}.
 #'
 #' @details The model is of the form:
 #'
@@ -197,8 +205,10 @@ linear_conductance <- function(formula, x)
          d2f__dtheta_dx     = d2f__dtheta_dx)
   }
 
-  class(conductance_model) <- c("radish_conductance_model")
+  class(conductance_model) <- c("terradish_conductance_model",
+                                "radish_conductance_model")
   attr(conductance_model, "default") <- default
   conductance_model
 }
-class(linear_conductance) <- c("radish_conductance_model_factory")
+class(linear_conductance) <- c("terradish_conductance_model_factory",
+                               "radish_conductance_model_factory")

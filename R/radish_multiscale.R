@@ -1,4 +1,4 @@
-.validate_multiscale_covariates <- function(covariates, caller = "`radish_multiscale()`")
+.validate_multiscale_covariates <- function(covariates, caller = "`terradish_multiscale()`")
 {
   covariates <- .as_spatraster(covariates)
   is_factor_layer <- vapply(seq_len(nlyr(covariates)),
@@ -99,15 +99,15 @@
 #'   \code{\link{conductance_surface}}.
 #' @param aggregate_fun Aggregation function for continuous rasters.
 #' @param save_surfaces If \code{TRUE}, retain the intermediate
-#'   \code{radish_graph} objects.
-#' @param ... Additional arguments passed to \code{\link{radish}}.
+#'   \code{terradish_graph} objects.
+#' @param ... Additional arguments passed to \code{\link{terradish}}.
 #'
 #' @details This helper is aimed at large continuous rasters, where a good
 #' coarse-resolution starting point can reduce the amount of full-resolution
 #' optimization work. Factor-valued rasters are not currently supported in the
 #' aggregation path.
 #'
-#' @return A fitted \code{radish} object from the finest raster, with an
+#' @return A fitted \code{terradish} object from the finest raster, with an
 #' additional \code{$multiscale} component containing the per-level fits.
 #'
 #' @examples
@@ -122,7 +122,7 @@
 #'                 terra::scale(melip.forestcover))
 #' names(covariates) <- c("altitude", "forestcover")
 #'
-#' fit <- radish_multiscale(
+#' fit <- terradish_multiscale(
 #'   melip.Fst ~ altitude + forestcover,
 #'   covariates = covariates,
 #'   coords = melip.coords,
@@ -136,7 +136,7 @@
 #'
 #' @importFrom terra aggregate
 #' @export
-radish_multiscale <- function(formula,
+terradish_multiscale <- function(formula,
                               covariates,
                               coords,
                               factors = c(4L, 2L, 1L),
@@ -173,7 +173,7 @@ radish_multiscale <- function(formula,
                                           aggregate_fun = aggregate_fun)
 
     surface_i <- conductance_surface(covariates_i, coords, directions = directions)
-    fit_i <- radish(formula, data = surface_i, theta = theta_start, ...)
+    fit_i <- terradish(formula, data = surface_i, theta = theta_start, ...)
     fits[[i]] <- fit_i
     if (save_surfaces)
       surfaces[[i]] <- surface_i
@@ -188,4 +188,12 @@ radish_multiscale <- function(formula,
     surfaces = if (save_surfaces) surfaces else NULL
   )
   out
+}
+
+#' @rdname terradish_multiscale
+#' @export
+radish_multiscale <- function(...)
+{
+  .terradish_deprecate("radish_multiscale", "terradish_multiscale")
+  .terradish_forward_call(match.call(), "terradish_multiscale")
 }

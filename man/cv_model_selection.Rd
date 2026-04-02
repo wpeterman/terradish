@@ -2,27 +2,40 @@
 % Please edit documentation in R/radish_cv.R
 \name{cv_model_selection}
 \alias{cv_model_selection}
-\title{Summarize radish cross-validation models}
+\title{Summarize terradish cross-validation models}
 \usage{
-cv_model_selection(cv_list, cv_names = NULL, aic = FALSE, ...)
+cv_model_selection(
+  cv_list,
+  cv_names = NULL,
+  aic = FALSE,
+  AICc = FALSE,
+  BIC = FALSE,
+  ...
+)
 }
 \arguments{
-\item{cv_list}{A list of objects returned by \code{\link{radish_cv}}.}
+\item{cv_list}{A list of objects returned by \code{\link{terradish_cv}}.}
 
 \item{cv_names}{Optional model names. By default the right-hand side of the
 fitted training formula is used.}
 
-\item{aic}{Should an AIC table also be computed from \code{full_mod}?}
+\item{aic}{Should an information-criterion table also be computed from
+\code{full_mod}?}
+
+\item{AICc}{Should \code{aic = TRUE} use second-order Akaike's Information
+Criterion instead of AIC?}
+
+\item{BIC}{Should \code{aic = TRUE} use BIC instead of AIC?}
 
 \item{...}{Reserved for future use.}
 }
 \value{
 Either a ranked cross-validation table or a list containing the
-  cross-validation table and AIC table.
+  cross-validation table and information-criterion table.
 }
 \description{
 Creates a ranked log-likelihood table from fitted cross-validation results
-and, optionally, an AIC table from the full-data fits.
+and, optionally, an information-criterion table from the full-data fits.
 }
 \examples{
 library(terra)
@@ -39,16 +52,16 @@ covariates <- c(terra::scale(melip.altitude),
 names(covariates) <- c("altitude", "forestcover")
 surface_small <- conductance_surface(covariates, melip.coords[keep], directions = 8)
 
-fit1 <- radish(melip.Fst_small ~ altitude, surface_small,
+fit1 <- terradish(melip.Fst_small ~ altitude, surface_small,
                loglinear_conductance, leastsquares,
                control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
-fit2 <- radish(melip.Fst_small ~ altitude + forestcover, surface_small,
+fit2 <- terradish(melip.Fst_small ~ altitude + forestcover, surface_small,
                loglinear_conductance, leastsquares,
                control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
 
 cv_model_selection(list(
   list(train_mod = fit1, cv_loglik = fit1$loglik, full_mod = fit1),
   list(train_mod = fit2, cv_loglik = fit2$loglik, full_mod = fit2)
-))
+), aic = TRUE, AICc = TRUE)
 
 }

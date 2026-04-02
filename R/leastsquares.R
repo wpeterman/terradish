@@ -21,7 +21,7 @@
 #' resistance distance implied by \code{E} and \code{e_ij} are independent
 #' Gaussian errors with precision \code{exp(tau)}.
 #'
-#' @seealso \code{\link{radish_measurement_model}}
+#' @seealso \code{\link{terradish_measurement_model}}
 #'
 #' @return A list containing:
 #'  \item{covariance}{rows/columns of the generalized inverse of the graph Laplacian for a subset of target vertices}
@@ -50,7 +50,7 @@
 #' surface <- conductance_surface(covariates, melip.coords, directions = 8)
 #'
 #' # inverse of graph Laplacian at null model (IBD) 
-#' laplacian_inv <- radish_distance(theta = matrix(0, 1, 2), 
+#' laplacian_inv <- terradish_distance(theta = matrix(0, 1, 2), 
 #'                                  formula = ~forestcover + altitude,
 #'                                  data = surface,
 #'                                  terradish::loglinear_conductance, 
@@ -217,4 +217,5 @@ leastsquares <- function(E, S, phi, nu = NULL, gradient = TRUE, hessian = TRUE, 
        num_jacobian_E   = if(!validate) NULL else num_jacobian_E,
        num_jacobian_S   = if(!validate) NULL else num_jacobian_S)
 }
-class(leastsquares) <- "radish_measurement_model"
+class(leastsquares) <- c("terradish_measurement_model",
+                         "radish_measurement_model")

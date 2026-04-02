@@ -32,7 +32,9 @@ THE SOFTWARE.
  */
 
 #include <tuple>
-#include <iostream>
+#include <ostream>
+
+#include <Rcpp/iostream/Rstreambuf.h>
 
 #include <amgcl/backend/interface.hpp>
 #include <amgcl/solver/detail/default_inner_product.hpp>
@@ -156,7 +158,7 @@ class cg {
             static const coef_type one  = math::identity<coef_type>();
             static const coef_type zero = math::zero<coef_type>();
 
-            ios_saver ss(std::cout);
+            ios_saver ss(Rcpp::Rcout);
 
             scalar_type norm_rhs = norm(rhs);
             if (norm_rhs < amgcl::detail::eps<scalar_type>(1)) {
@@ -197,7 +199,7 @@ class cg {
 
                 res_norm = norm(*r);
                 if (prm.verbose && iter % 5 == 0)
-                    std::cout << iter << "\t" << std::scientific << res_norm / norm_rhs << std::endl;
+                    Rcpp::Rcout << iter << "\t" << std::scientific << res_norm / norm_rhs << std::endl;
             }
 
             return std::make_tuple(iter, res_norm / norm_rhs);

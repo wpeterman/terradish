@@ -1,6 +1,7 @@
-.radish_measurement_model <- function(model, subset = NULL)
+.terradish_measurement_model <- function(model, subset = NULL)
 {
-  if (inherits(model, "radish_measurement_model"))
+  if (inherits(model, c("terradish_measurement_model",
+                        "radish_measurement_model")))
   {
     subsetter <- attr(model, "subsetter", exact = TRUE)
     if (!is.null(subset) && is.function(subsetter))
@@ -20,9 +21,9 @@
          stop("Unknown measurement model: ", model))
 }
 
-.fit_radish_with_fallback <- function(formula, data, measurement_model, nu = NULL,
-                                      theta = NULL, cores = 1L, dots = list(),
-                                      response_matrix = NULL)
+.fit_terradish_with_fallback <- function(formula, data, measurement_model, nu = NULL,
+                                         theta = NULL, cores = 1L, dots = list(),
+                                         response_matrix = NULL)
 {
   fit_once <- function(optimizer)
   {
@@ -37,7 +38,7 @@
     if (!is.null(theta))
       args$theta <- theta
     eval_env <- list2env(list(gd_mat = response_matrix), parent = parent.frame())
-    call <- as.call(c(list(as.name("radish")), args))
+    call <- as.call(c(list(as.name("terradish")), args))
     tryCatch(eval(call, envir = eval_env), error = identity)
   }
 
@@ -45,7 +46,7 @@
   if (inherits(fit, "error"))
     fit <- fit_once("bfgs")
   if (inherits(fit, "error"))
-    stop("Could not optimize radish model: ", conditionMessage(fit), call. = FALSE)
+    stop("Could not optimize terradish model: ", conditionMessage(fit), call. = FALSE)
 
   fit
 }
@@ -122,7 +123,49 @@
   out
 }
 
-.aic_table <- function(mod_list, AICc = FALSE, BIC = FALSE, mod_names = NULL, verbose = FALSE)
+#' Rank fitted terradish models by information criterion
+#'
+#' Creates a model-selection table from fitted \code{terradish} models using
+#' AIC, AICc, or BIC.
+#'
+#' @param mod_list List of fitted \code{terradish} models.
+#' @param AICc Should second-order AIC be used instead of AIC?
+#' @param BIC Should BIC be used instead of AIC?
+#' @param mod_names Optional model names. By default the right-hand side of
+#'   each fitted formula is used.
+#' @param verbose Should the table be printed to the console?
+#'
+#' @return A data frame containing model ranks, parameter counts, information
+#'   criterion values, delta values, weights, cumulative weights, and
+#'   log-likelihoods.
+#'
+#' @examples
+#' library(terra)
+#'
+#' data(melip)
+#' melip.altitude <- terra::unwrap(melip.altitude)
+#' melip.forestcover <- terra::unwrap(melip.forestcover)
+#' melip.coords <- terra::unwrap(melip.coords)
+#'
+#' keep <- 1:12
+#' melip.Fst_small <- melip.Fst[keep, keep]
+#' covariates <- c(terra::scale(melip.altitude),
+#'                 terra::scale(melip.forestcover))
+#' names(covariates) <- c("altitude", "forestcover")
+#' surface_small <- conductance_surface(covariates, melip.coords[keep], directions = 8)
+#'
+#' fit1 <- terradish(melip.Fst_small ~ altitude, surface_small,
+#'                   loglinear_conductance, leastsquares,
+#'                   control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+#' fit2 <- terradish(melip.Fst_small ~ altitude + forestcover, surface_small,
+#'                   loglinear_conductance, leastsquares,
+#'                   control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+#'
+#' aic_table(list(fit1, fit2))
+#' aic_table(list(fit1, fit2), AICc = TRUE)
+#'
+#' @export
+aic_table <- function(mod_list, AICc = FALSE, BIC = FALSE, mod_names = NULL, verbose = FALSE)
 {
   mod_dim_keys <- vapply(mod_list,
                          function(x) paste(x$dim, collapse = "|"),
@@ -201,26 +244,84 @@
 
 .cv_model_name <- function(mod)
 {
-  if (!is.null(mod$call$formula))
-    return(paste(deparse(mod$call$formula[[3]]), collapse = ""))
-  as.character(mod$formula)[2]
+  if (inherits(mod$formula, "formula") && length(mod$formula) >= 3L)
+    return(paste(deparse(mod$formula[[3]]), collapse = ""))
+
+  call_formula <- mod$call$formula
+  if (inherits(call_formula, "formula") && length(call_formula) >= 3L)
+    return(paste(deparse(call_formula[[3]]), collapse = ""))
+  if (is.call(call_formula) && length(call_formula) >= 3L)
+    return(paste(deparse(call_formula[[3]]), collapse = ""))
+
+  "<unknown>"
 }
 
-#' Extract parameter estimates from saved radish results
+#' Inspect a saved terradish results directory
 #'
-#' Reads a saved fitted \code{radish} model from a simulation results directory
+#' Reads a terradish-style results directory and returns the discovered files
+#' and any recognized saved objects, such as \code{AllResults} metadata,
+#' covariates, focal points, or simulation effect sizes.
+#'
+#' @param Results_dir Full path to the top-level results directory.
+#'
+#' @return A named list containing the directory contents plus any recognized
+#'   saved objects recovered from the \code{AllResults} file.
+#'
+#' @details
+#' This helper is intended for downstream simulation or workflow code that
+#' needs to inspect saved terradish outputs before extracting parameter tables
+#' with \code{\link{terradish_parameters}}.
+#'
+#' @examples
+#' \dontrun{
+#' tmp <- tempfile()
+#' dir.create(tmp)
+#' saveRDS(list(effect_size = c(altitude = 0.2)),
+#'         file.path(tmp, "AllResults_list.rds"))
+#' terradish_results(tmp)
+#' }
+#'
+#' @seealso \code{\link{terradish_parameters}}
+#'
+#' @export
+terradish_results <- function(Results_dir)
+{
+  .result_dir_files(Results_dir)
+}
+
+#' Extract parameter estimates from saved terradish results
+#'
+#' Reads a saved fitted \code{terradish} model from a simulation results
+#' directory
 #' and returns a table of estimated coefficients and standard errors.
 #'
 #' @param Results_dir Full path to the top-level results directory.
-#' @param radish_model Which saved \code{radish} model to read. One of
+#' @param model Which saved \code{terradish} model to read. One of
 #'   \code{"wishart"}, \code{"generalized_wishart"}, \code{"mlpe"},
 #'   \code{"ls"}, or \code{"leastsquares"}.
+#' @param radish_model Deprecated alias for \code{model}.
 #' @param save_table Should the parameter table be written to
 #'   \code{Results_dir} as a CSV file?
 #' @param conv Optional convergence flag or vector to append to the output.
 #' @param ... Reserved for future use.
 #'
 #' @return A data frame of fitted and, when available, true effect sizes.
+#'
+#' @details
+#' This helper is intended for saved-results workflows rather than core model
+#' fitting. It assumes \code{Results_dir} contains a single fitted terradish
+#' model matching \code{model} and a single file matching \code{"AllResults"}.
+#' When present, named \code{effect_size} values from the \code{AllResults}
+#' object are aligned to the fitted coefficient names. The exported
+#' \code{\link{terradish_results}} helper can be used to inspect the recovered
+#' directory contents before extracting parameter summaries.
+#'
+#' The returned standard errors are taken from
+#' \code{sqrt(diag(summary(mod)$vcov))} when available, so they describe the
+#' conductance coefficients of the saved fitted model rather than any
+#' simulation-wide uncertainty summary.
+#'
+#' @seealso \code{\link{terradish_results}}
 #'
 #' @examples
 #' \dontrun{
@@ -231,25 +332,31 @@
 #' covariates <- c(terra::scale(melip.altitude), terra::scale(melip.forestcover))
 #' names(covariates) <- c("altitude", "forestcover")
 #' surface <- conductance_surface(covariates, melip.coords, directions = 8)
-#' fit <- radish(melip.Fst ~ altitude + forestcover, surface,
+#' fit <- terradish(melip.Fst ~ altitude + forestcover, surface,
 #'               loglinear_conductance, leastsquares)
 #'
 #' tmp <- tempfile()
 #' dir.create(tmp)
 #' saveRDS(fit, file.path(tmp, "fit--ls.rds"))
 #' saveRDS(list(effect_size = coef(fit)), file.path(tmp, "AllResults_list.rds"))
-#' radish_parameters(tmp, radish_model = "ls", save_table = FALSE)
+#' terradish_parameters(tmp, model = "ls", save_table = FALSE)
 #' }
 #'
 #' @export
-radish_parameters <- function(Results_dir,
-                              radish_model = "wishart",
-                              save_table = TRUE,
-                              conv = NULL,
-                              ...)
+terradish_parameters <- function(Results_dir,
+                                 model = "wishart",
+                                 save_table = TRUE,
+                                 conv = NULL,
+                                 radish_model,
+                                 ...)
 {
+  if (!missing(radish_model))
+  {
+    warning("`radish_model` is deprecated; use `model` instead.", call. = FALSE)
+    model <- radish_model
+  }
   params <- .result_dir_files(Results_dir)
-  model_path <- .match_radish_model_file(params$all_dirs, radish_model)
+  model_path <- .match_radish_model_file(params$all_dirs, model)
   mod <- readRDS(model_path)
 
   est_eff <- coef(mod)
@@ -275,10 +382,18 @@ radish_parameters <- function(Results_dir,
   df
 }
 
-#' Cross validation for radish models
+#' @rdname terradish_parameters
+#' @export
+radish_parameters <- function(...)
+{
+  .terradish_deprecate("radish_parameters", "terradish_parameters")
+  .terradish_forward_call(match.call(), "terradish_parameters")
+}
+
+#' Cross validation for terradish models
 #'
 #' Randomly splits focal points into training and test sets, fits a
-#' \code{radish} model on the training set, and evaluates the fitted
+#' \code{terradish} model on the training set, and evaluates the fitted
 #' coefficients on the test set.
 #'
 #' @param pts Focal point coordinates as a \code{terra::SpatVector}, matrix, or
@@ -295,9 +410,9 @@ radish_parameters <- function(Results_dir,
 #' @param fit_full Should the model also be fit to all focal points?
 #' @param directions Neighborhood definition passed to
 #'   \code{\link{conductance_surface}}.
-#' @param cores Number of worker processes to use in downstream \code{radish}
+#' @param cores Number of worker processes to use in downstream \code{terradish}
 #'   fits and grid evaluation.
-#' @param ... Additional arguments passed to \code{\link{radish}}, such as
+#' @param ... Additional arguments passed to \code{\link{terradish}}, such as
 #'   \code{control}.
 #'
 #' @return A named list containing the training fit, test-set log-likelihood,
@@ -317,7 +432,7 @@ radish_parameters <- function(Results_dir,
 #'                 terra::scale(melip.forestcover))
 #' names(covariates) <- c("altitude", "forestcover")
 #'
-#' cv_fit <- radish_cv(melip.coords[keep], covariates,
+#' cv_fit <- terradish_cv(melip.coords[keep], covariates,
 #'                     melip.Fst_small ~ altitude + forestcover,
 #'                     model = "ls",
 #'                     prop_train = 0.75,
@@ -327,7 +442,7 @@ radish_parameters <- function(Results_dir,
 #' cv_fit$cv_loglik
 #'
 #' @export
-radish_cv <- function(pts,
+terradish_cv <- function(pts,
                       covariates,
                       fmla,
                       model = "mlpe",
@@ -371,7 +486,7 @@ radish_cv <- function(pts,
     as.formula("gd_mat ~ 1")
   environment(fmla_radish) <- environment()
 
-  measurement_model_train <- .radish_measurement_model(model, subset = train_)
+  measurement_model_train <- .terradish_measurement_model(model, subset = train_)
   dots <- list(...)
   training_dots <- dots
   approximation <- if ("approximation" %in% names(dots))
@@ -389,12 +504,12 @@ radish_cv <- function(pts,
   gd_mat <- gd_mat_full[train_, train_, drop = FALSE]
   training_surface <- conductance_surface(covariates, pts[train_, , drop = FALSE],
                                           directions = directions)
-  fit <- .fit_radish_with_fallback(fmla_radish, training_surface,
-                                   measurement_model = measurement_model_train,
-                                   nu = nu,
-                                   cores = cores,
-                                   dots = training_dots,
-                                   response_matrix = gd_mat)
+  fit <- .fit_terradish_with_fallback(fmla_radish, training_surface,
+                                      measurement_model = measurement_model_train,
+                                      nu = nu,
+                                      cores = cores,
+                                      dots = training_dots,
+                                      response_matrix = gd_mat)
 
   if (length(coef(fit)) < 1L)
     stop("Training fit produced no coefficients, so cross-validation cannot continue")
@@ -402,8 +517,8 @@ radish_cv <- function(pts,
   gd_mat <- gd_mat_full[test_, test_, drop = FALSE]
   test_surface <- conductance_surface(covariates, pts[test_, , drop = FALSE],
                                       directions = directions)
-  measurement_model_test <- .radish_measurement_model(model, subset = test_)
-  ll <- radish_grid(theta = matrix(coef(fit), nrow = 1),
+  measurement_model_test <- .terradish_measurement_model(model, subset = test_)
+  ll <- terradish_grid(theta = matrix(coef(fit), nrow = 1),
                     formula = fmla_radish,
                     data = test_surface,
                     conductance_model = loglinear_conductance,
@@ -423,32 +538,245 @@ radish_cv <- function(pts,
   {
     gd_mat <- gd_mat_full
     full_surface <- conductance_surface(covariates, pts, directions = directions)
-    measurement_model_full <- .radish_measurement_model(model)
-    out$full_mod <- .fit_radish_with_fallback(fmla_radish, full_surface,
-                                              measurement_model = measurement_model_full,
-                                              nu = nu,
-                                              theta = fit$mle$theta,
-                                              cores = cores,
-                                              dots = training_dots,
-                                              response_matrix = gd_mat)
+    measurement_model_full <- .terradish_measurement_model(model)
+    out$full_mod <- .fit_terradish_with_fallback(fmla_radish, full_surface,
+                                                 measurement_model = measurement_model_full,
+                                                 nu = nu,
+                                                 theta = fit$mle$theta,
+                                                 cores = cores,
+                                                 dots = training_dots,
+                                                 response_matrix = gd_mat)
   }
 
   out
 }
 
-#' Summarize radish cross-validation models
+#' Repeated cross validation for terradish models
+#'
+#' Repeats \code{\link{terradish_cv}} across multiple random splits and
+#' summarizes held-out log-likelihood across replicates.
+#'
+#' @param pts Focal point coordinates as a \code{terra::SpatVector}, matrix, or
+#'   data frame with \code{x}/\code{y} columns.
+#' @param covariates Spatial covariates as a \code{terra::SpatRaster}.
+#' @param fmla Formula describing the model to assess. The left-hand side must
+#'   evaluate to a genetic distance matrix in the calling environment.
+#' @param model Measurement model, either as a function or one of
+#'   \code{"mlpe"}, \code{"wishart"}, or \code{"ls"}.
+#' @param nu Number of genetic markers, passed to the measurement model.
+#' @param prop_train Proportion of focal points assigned to the training set.
+#' @param n_reps Number of repeated train/test splits to evaluate.
+#' @param seeds Optional integer vector of seeds to use for each replicate. If
+#'   supplied, \code{n_reps} is inferred from \code{length(seeds)}.
+#' @param fit_full Should each replicate also fit a model to all focal points?
+#' @param keep_fits Should the per-replicate \code{terradish_cv()} outputs be
+#'   retained in the returned object?
+#' @param directions Neighborhood definition passed to
+#'   \code{\link{conductance_surface}}.
+#' @param cores Number of worker processes to use in downstream \code{terradish}
+#'   fits and grid evaluation.
+#' @param ... Additional arguments passed to \code{\link{terradish}}, such as
+#'   \code{control}.
+#'
+#' @return A list containing a per-replicate summary table, mean and standard
+#'   deviation of held-out log-likelihood, and optionally the individual
+#'   cross-validation fits.
+#'
+#' @examples
+#' library(terra)
+#'
+#' data(melip)
+#' melip.altitude <- terra::unwrap(melip.altitude)
+#' melip.forestcover <- terra::unwrap(melip.forestcover)
+#' melip.coords <- terra::unwrap(melip.coords)
+#'
+#' keep <- 1:12
+#' melip.Fst_small <- melip.Fst[keep, keep]
+#' covariates <- c(terra::scale(melip.altitude),
+#'                 terra::scale(melip.forestcover))
+#' names(covariates) <- c("altitude", "forestcover")
+#'
+#' cv_rep <- terradish_cv_replicates(melip.coords[keep], covariates,
+#'                                   melip.Fst_small ~ altitude + forestcover,
+#'                                   model = "ls",
+#'                                   n_reps = 2,
+#'                                   fit_full = FALSE,
+#'                                   control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+#' cv_rep$mean_loglik
+#'
+#' @export
+terradish_cv_replicates <- function(pts,
+                                    covariates,
+                                    fmla,
+                                    model = "mlpe",
+                                    nu = NULL,
+                                    prop_train = 0.8,
+                                    n_reps = 5L,
+                                    seeds = NULL,
+                                    fit_full = FALSE,
+                                    keep_fits = FALSE,
+                                    directions = 8,
+                                    cores = 1L,
+                                    ...)
+{
+  eval_env <- parent.frame()
+
+  if (is.null(seeds))
+  {
+    stopifnot(length(n_reps) == 1L, is.numeric(n_reps), n_reps >= 1)
+    n_reps <- as.integer(n_reps)
+    seeds <- sample.int(.Machine$integer.max, n_reps)
+  }
+  else
+  {
+    if (!is.numeric(seeds) || anyNA(seeds))
+      stop("`seeds` must be a numeric vector without missing values")
+    seeds <- as.integer(seeds)
+    n_reps <- length(seeds)
+  }
+
+  fits <- vector("list", n_reps)
+  summary_tab <- data.frame(
+    replicate = seq_len(n_reps),
+    seed = seeds,
+    cv_loglik = NA_real_
+  )
+
+  for (i in seq_len(n_reps))
+  {
+    fit_i <- eval(
+      as.call(c(
+        list(as.name("terradish_cv")),
+        list(
+          pts = pts,
+          covariates = covariates,
+          fmla = fmla,
+          model = model,
+          nu = nu,
+          prop_train = prop_train,
+          seed = seeds[i],
+          fit_full = fit_full,
+          directions = directions,
+          cores = cores
+        ),
+        list(...)
+      )),
+      envir = eval_env
+    )
+
+    summary_tab$cv_loglik[i] <- fit_i$cv_loglik
+    if (isTRUE(keep_fits))
+      fits[[i]] <- fit_i
+  }
+
+  out <- list(
+    summary = summary_tab,
+    mean_loglik = mean(summary_tab$cv_loglik),
+    sd_loglik = stats::sd(summary_tab$cv_loglik),
+    seeds = seeds
+  )
+
+  if (isTRUE(keep_fits))
+    out$fits <- fits
+
+  class(out) <- "terradish_cv_replicates"
+  out
+}
+
+#' Methods for repeated terradish cross-validation results
+#'
+#' S3 methods for working with objects returned by
+#' \code{\link{terradish_cv_replicates}}.
+#'
+#' @name terradish_cv_replicates_methods
+#' @title Methods for repeated terradish cross-validation results
+#'
+#' @param x A repeated cross-validation object returned by
+#'   \code{\link{terradish_cv_replicates}}.
+#' @param object A repeated cross-validation object returned by
+#'   \code{\link{terradish_cv_replicates}}.
+#' @param digits Number of digits to print.
+#' @param ... Additional arguments passed through to generic methods.
+#'
+#' @return
+#' \itemize{
+#'   \item \code{print()} returns its input invisibly.
+#'   \item \code{summary()} returns an object of class
+#'     \code{"summary.terradish_cv_replicates"}.
+#' }
+#'
+#' @export
+print.terradish_cv_replicates <- function(x, digits = max(3L, getOption("digits") - 3L), ...)
+{
+  cat("Repeated terradish cross-validation\n")
+  cat("Replicates:", nrow(x$summary), "\n")
+  cat("Mean held-out loglikelihood:", format(x$mean_loglik, digits = digits), "\n")
+  cat("SD held-out loglikelihood:", format(x$sd_loglik, digits = digits), "\n\n")
+  print.default(x$summary, row.names = FALSE, ...)
+  invisible(x)
+}
+
+#' @rdname terradish_cv_replicates_methods
+#' @export
+summary.terradish_cv_replicates <- function(object, ...)
+{
+  tab <- object$summary
+  out <- list(
+    replicates = nrow(tab),
+    mean_loglik = object$mean_loglik,
+    sd_loglik = object$sd_loglik,
+    min_loglik = min(tab$cv_loglik),
+    max_loglik = max(tab$cv_loglik),
+    summary = tab,
+    seeds = object$seeds
+  )
+  class(out) <- "summary.terradish_cv_replicates"
+  out
+}
+
+#' @rdname terradish_cv_replicates_methods
+#' @export
+print.summary.terradish_cv_replicates <- function(x, digits = max(3L, getOption("digits") - 3L), ...)
+{
+  cat("Repeated terradish cross-validation summary\n")
+  cat("Replicates:", x$replicates, "\n")
+  cat("Mean held-out loglikelihood:", format(x$mean_loglik, digits = digits), "\n")
+  cat("SD held-out loglikelihood:", format(x$sd_loglik, digits = digits), "\n")
+  cat("Range:", format(x$min_loglik, digits = digits), "to",
+      format(x$max_loglik, digits = digits), "\n\n")
+  print.default(x$summary, row.names = FALSE, ...)
+  invisible(x)
+}
+
+#' @rdname terradish_cv
+#' @export
+radish_cv <- function(...)
+{
+  .terradish_deprecate("radish_cv", "terradish_cv")
+  .terradish_forward_call(match.call(), "terradish_cv")
+}
+
+# Internal compatibility aliases retained for housekeeping-sized refactors.
+.radish_measurement_model <- .terradish_measurement_model
+.fit_radish_with_fallback <- .fit_terradish_with_fallback
+
+#' Summarize terradish cross-validation models
 #'
 #' Creates a ranked log-likelihood table from fitted cross-validation results
-#' and, optionally, an AIC table from the full-data fits.
+#' and, optionally, an information-criterion table from the full-data fits.
 #'
-#' @param cv_list A list of objects returned by \code{\link{radish_cv}}.
+#' @param cv_list A list of objects returned by \code{\link{terradish_cv}}.
 #' @param cv_names Optional model names. By default the right-hand side of the
 #'   fitted training formula is used.
-#' @param aic Should an AIC table also be computed from \code{full_mod}?
+#' @param aic Should an information-criterion table also be computed from
+#'   \code{full_mod}?
+#' @param AICc Should \code{aic = TRUE} use second-order Akaike's Information
+#'   Criterion instead of AIC?
+#' @param BIC Should \code{aic = TRUE} use BIC instead of AIC?
 #' @param ... Reserved for future use.
 #'
 #' @return Either a ranked cross-validation table or a list containing the
-#'   cross-validation table and AIC table.
+#'   cross-validation table and information-criterion table.
 #'
 #' @examples
 #' library(terra)
@@ -465,22 +793,24 @@ radish_cv <- function(pts,
 #' names(covariates) <- c("altitude", "forestcover")
 #' surface_small <- conductance_surface(covariates, melip.coords[keep], directions = 8)
 #'
-#' fit1 <- radish(melip.Fst_small ~ altitude, surface_small,
+#' fit1 <- terradish(melip.Fst_small ~ altitude, surface_small,
 #'                loglinear_conductance, leastsquares,
 #'                control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
-#' fit2 <- radish(melip.Fst_small ~ altitude + forestcover, surface_small,
+#' fit2 <- terradish(melip.Fst_small ~ altitude + forestcover, surface_small,
 #'                loglinear_conductance, leastsquares,
 #'                control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
 #'
 #' cv_model_selection(list(
 #'   list(train_mod = fit1, cv_loglik = fit1$loglik, full_mod = fit1),
 #'   list(train_mod = fit2, cv_loglik = fit2$loglik, full_mod = fit2)
-#' ))
+#' ), aic = TRUE, AICc = TRUE)
 #'
 #' @export
 cv_model_selection <- function(cv_list,
                                cv_names = NULL,
                                aic = FALSE,
+                               AICc = FALSE,
+                               BIC = FALSE,
                                ...)
 {
   if (is.null(cv_names))
@@ -510,5 +840,8 @@ cv_model_selection <- function(cv_list,
 
   mod_names <- vapply(mod_list, .cv_model_name, character(1))
   list(loglik_tab = cv_tab,
-       AIC_tab = .aic_table(mod_list, mod_names = mod_names))
+       AIC_tab = aic_table(mod_list,
+                           AICc = AICc,
+                           BIC = BIC,
+                           mod_names = mod_names))
 }
