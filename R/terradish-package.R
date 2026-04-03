@@ -12,7 +12,7 @@
 #' @importFrom stats AIC anova as.dist as.formula coef cov2cor delete.response dist fitted
 #' @importFrom stats logLik model.matrix pchisq plogis pnorm printCoefmat prcomp qlogis
 #' @importFrom stats qnorm reformulate residuals rnorm rWishart sigma simulate terms
-#' @importFrom terra adjacent cellFromXY geom is.factor levels ncell nlyr patches rast
+#' @importFrom terra adjacent cellFromXY geom global is.factor levels ncell nlyr patches rast
 #' @importFrom terra unwrap values values<- xyFromCell
 #' @importFrom utils modifyList write.csv
 #' @useDynLib terradish, .registration = TRUE

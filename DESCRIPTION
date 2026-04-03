@@ -18,6 +18,7 @@ Description: Maximum likelihood estimation for parameterized conductance models
 License: BSD_3_clause + file LICENSE
 Depends: R (>= 4.0.0)
 Imports:
+  graphics,
   MASS,
   Matrix,
   methods,
