@@ -1,0 +1,375 @@
+---
+title: "Getting Started with terradish"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Getting Started with terradish}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  fig.width  = 6,
+  fig.height = 4.5,
+  warning  = FALSE,
+  message  = FALSE
+)
+```
+
+## What is terradish for?
+
+`terradish` estimates how landscape features — altitude, forest cover, roads,
+water bodies, etc. — shape genetic differentiation among populations.
+
+The core idea is **isolation by resistance (IBR)**: instead of assuming that
+genetic distance simply tracks straight-line geographic distance (isolation by
+distance, IBD), IBR recognises that the landscape is heterogeneous. Some cells
+are easy to move through; others are barriers. The ease of movement through a
+cell is its **conductance** (the inverse of **resistance**).
+
+If we can map conductance across the landscape as a function of measurable
+covariates (rasters), we can:
+
+1. Build a **conductance surface** — a weighted graph over the raster grid.
+2. Compute **resistance distances** among sampling locations — effective
+   distances that account for the landscape structure.
+3. Fit a **statistical model** relating those resistance distances to observed
+   genetic distances.
+4. Optimise the conductance parameters by maximum likelihood.
+
+`terradish` automates all four steps and provides gradients, standard errors,
+model-comparison tools, and visualisation helpers.
+
+---
+
+## A conceptual road map
+
+Before writing any code, it helps to see how the pieces fit together:
+
+```
+Raster covariates          Sampling locations
+(altitude, forestcover)    (GPS coordinates)
+        |                          |
+        +-----> conductance_surface() <----+
+                        |
+                        |   (builds the weighted graph)
+                        v
+              terradish(formula, surface,
+                        conductance_model,  <-- how covariates -> conductance
+                        measurement_model)  <-- how resistance dist -> genetic dist
+                        |
+                        v
+                   fitted model
+                   coef(), summary(), fitted(),
+                   conductance(), anova()
+```
+
+The **conductance model** maps raster values at each grid cell to a conductance
+value. `loglinear_conductance` is the default: conductance =
+exp(θ₁·altitude + θ₂·forestcover + ...). The parameters θ are what we
+estimate.
+
+The **measurement model** describes the statistical relationship between
+pairwise resistance distances and pairwise genetic distances. Two choices cover
+most use-cases:
+
+- `leastsquares` — ordinary regression; fast, assumes independent errors.
+- `mlpe` — "maximum likelihood population effects"; accounts for the
+  non-independence among all pairwise measurements that share a sampling site.
+  This is generally the preferred choice.
+
+---
+
+## Installation
+
+```{r, eval = FALSE}
+# Install from local source (recommended while the package is in development)
+devtools::install()
+# or
+remotes::install_local(".")
+
+# corMLPE is also required (not on CRAN)
+devtools::install_github("nspope/corMLPE")
+```
+
+---
+
+## Load the package and example data
+
+```{r load}
+library(terradish)
+library(terra)
+```
+
+`terradish` ships with example data from a study of *Melipona* bees in
+Mexico. Load everything with one call:
+
+```{r data}
+data(melip)
+
+# The rasters are stored as "packed" objects to comply with CRAN policy;
+# unwrap() converts them back to usable SpatRaster / SpatVector objects.
+melip.altitude    <- terra::unwrap(melip.altitude)
+melip.forestcover <- terra::unwrap(melip.forestcover)
+melip.coords      <- terra::unwrap(melip.coords)
+```
+
+What do we have?
+
+- **`melip.altitude`** — a raster of elevation (metres) across the study area.
+- **`melip.forestcover`** — a raster of forest cover proportion (0–1).
+- **`melip.coords`** — 34 sampling locations as a `SpatVector`.
+- **`melip.Fst`** — a 34 × 34 matrix of pairwise F~ST~ (a standard measure
+  of genetic differentiation; larger values mean more differentiation).
+
+```{r inspect-data}
+# How many sampling sites?
+nrow(melip.coords)
+
+# Quick look at the genetic distance matrix
+# (only the first 5 x 5 block for readability)
+round(melip.Fst[1:5, 1:5], 3)
+```
+
+F~ST~ is symmetric (the differentiation between site A and site B is the same
+as between B and A), so only the lower triangle carries new information.
+
+---
+
+## Visualise the spatial data
+
+```{r plot-covariates, fig.cap = "Altitude raster with sampling sites."}
+plot(melip.altitude, main = "Altitude (m)")
+points(melip.coords, pch = 19, cex = 0.8)
+```
+
+```{r plot-forestcover, fig.cap = "Forest cover raster (0 = no forest, 1 = full cover)."}
+plot(melip.forestcover, main = "Forest cover")
+points(melip.coords, pch = 19, cex = 0.8)
+```
+
+---
+
+## Scale your rasters — an important step
+
+Conductance in the loglinear model is exp(θ·x). If `x` (e.g. altitude in
+metres) has a very large range, small changes in θ produce enormous changes in
+conductance, making optimisation numerically unstable. **Always scale continuous
+covariates** before fitting.
+
+```{r scale}
+covariates <- c(terra::scale(melip.altitude),
+                terra::scale(melip.forestcover))
+names(covariates) <- c("altitude", "forestcover")
+```
+
+`terra::scale()` subtracts the mean and divides by the standard deviation,
+giving each layer a mean of 0 and a standard deviation of 1.
+
+---
+
+## Build the conductance surface
+
+```{r surface}
+surface <- conductance_surface(covariates, melip.coords, directions = 8)
+```
+
+`conductance_surface()` does three things:
+
+1. Reads the raster values at every non-NA grid cell.
+2. Identifies which cells correspond to the sampling locations.
+3. Builds a graph where adjacent cells (here, using all 8 neighbours including
+   diagonals) are connected by edges whose weights will be determined by the
+   conductance model.
+
+`directions = 8` is typical for landscape genetics; it allows diagonal movement
+and is less sensitive to grid orientation than `directions = 4`.
+
+```{r surface-check}
+# How many grid cells are in the graph?
+nrow(surface$x)
+
+# The covariate data for the first few cells
+head(surface$x)
+```
+
+---
+
+## Fit your first model
+
+We will start with the simplest case: do both altitude and forest cover predict
+genetic differentiation?
+
+```{r fit-leastsquares}
+fit_ls <- terradish(
+  melip.Fst ~ forestcover + altitude,  # formula: response ~ covariates
+  data              = surface,          # the conductance surface
+  conductance_model = loglinear_conductance,
+  measurement_model = leastsquares      # ordinary regression
+)
+```
+
+The formula works like a standard R formula:
+
+- The **left-hand side** is the matrix of observed genetic distances.
+- The **right-hand side** lists which raster layers drive conductance.
+
+`leastsquares` is the quickest measurement model. It treats the pairwise
+genetic distances as independent observations regressed on resistance distances.
+That is not strictly correct (measurements sharing a site are correlated), but
+it gives a useful quick answer.
+
+```{r summary-ls}
+summary(fit_ls)
+```
+
+**How to read the output:**
+
+- **theta**: the conductance parameters. A positive θ for a covariate means
+  that higher values of that covariate increase conductance (i.e., make movement
+  easier), which *decreases* resistance distance. A negative θ means the
+  covariate acts as a barrier.
+- **phi**: nuisance parameters of the measurement model (intercept, slope,
+  residual precision). These are profiled out automatically — you generally do
+  not need to interpret them directly.
+- The standard errors and z-statistics help gauge parameter uncertainty.
+
+---
+
+## Upgrade to the MLPE measurement model
+
+Pairwise genetic distances are not independent: the distance between sites A–B
+and A–C both involve site A. `mlpe` ("maximum likelihood population effects")
+accounts for this correlation structure and is the recommended choice for
+inference.
+
+```{r fit-mlpe}
+fit_mlpe <- terradish(
+  melip.Fst ~ forestcover + altitude,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe
+)
+
+summary(fit_mlpe)
+```
+
+Compare the point estimates and standard errors between `fit_ls` and
+`fit_mlpe`. They are often similar, but MLPE standard errors better reflect the
+actual precision of your estimates.
+
+---
+
+## Extract and interpret coefficients
+
+```{r coef}
+coef(fit_mlpe)
+```
+
+The log-linear conductance model means:
+
+- θ~forestcover~ > 0: areas with more forest are *easier* to move through
+  (higher conductance, lower resistance).
+- θ~altitude~ < 0: higher altitude areas are *barriers* to movement.
+
+You can convert back from the log scale to a relative conductance ratio. For
+example, a one standard-deviation increase in forest cover multiplies
+conductance by exp(θ~forestcover~):
+
+```{r interpret}
+theta <- coef(fit_mlpe)
+cat("One SD increase in forest cover multiplies conductance by",
+    round(exp(theta["forestcover"]), 2), "\n")
+cat("One SD increase in altitude multiplies conductance by",
+    round(exp(theta["altitude"]), 2), "\n")
+```
+
+---
+
+## Visualise the fit
+
+### Observed vs. fitted genetic distances
+
+```{r plot-fit, fig.cap = "Observed vs. resistance-distance-fitted genetic distances."}
+plot(
+  fitted(fit_mlpe, "distance"),
+  melip.Fst,
+  pch  = 19,
+  cex  = 0.5,
+  xlab = "Optimised resistance distance",
+  ylab = expression(F[ST]),
+  main = "Observed vs. fitted"
+)
+abline(lm(c(melip.Fst) ~ c(fitted(fit_mlpe, "distance"))),
+       col = "steelblue", lwd = 2)
+```
+
+### Fitted conductance surface
+
+```{r conductance-surface, fig.cap = "Estimated conductance surface with 95% confidence interval bounds."}
+fitted_cond <- conductance(surface, fit_mlpe, quantile = 0.95)
+
+# Estimated conductance
+plot(fitted_cond[["est"]],
+     main = "Fitted conductance (MLPE)")
+points(melip.coords, pch = 19, cex = 0.6)
+
+# Lower 95% confidence interval
+plot(fitted_cond[["lower95"]],
+     main = "Lower 95% CI — conductance")
+
+# Upper 95% confidence interval
+plot(fitted_cond[["upper95"]],
+     main = "Upper 95% CI — conductance")
+```
+
+Darker cells are more conductive (easier to move through). The confidence
+interval layers show where estimates are more or less certain — typically,
+areas with many sampling sites nearby have narrower intervals.
+
+---
+
+## What comes next?
+
+This vignette covered the core workflow. Two companion vignettes go further:
+
+- **`vignette("model-comparison", package = "terradish")`** — testing and
+  comparing models (likelihood ratio tests, AIC, cross-validation, likelihood
+  surface visualisation).
+- **`vignette("ibe-ibr-workflow", package = "terradish")`** — fitting
+  isolation-by-environment (IBE) and IBR simultaneously in the same model.
+
+---
+
+## Quick-reference: the full workflow in one block
+
+```{r full-workflow, eval = FALSE}
+library(terradish)
+library(terra)
+
+# 1. Load data
+data(melip)
+melip.altitude    <- terra::unwrap(melip.altitude)
+melip.forestcover <- terra::unwrap(melip.forestcover)
+melip.coords      <- terra::unwrap(melip.coords)
+
+# 2. Scale covariates and build surface
+covariates <- c(terra::scale(melip.altitude),
+                terra::scale(melip.forestcover))
+names(covariates) <- c("altitude", "forestcover")
+surface <- conductance_surface(covariates, melip.coords, directions = 8)
+
+# 3. Fit model
+fit <- terradish(melip.Fst ~ forestcover + altitude,
+                 data              = surface,
+                 conductance_model = loglinear_conductance,
+                 measurement_model = mlpe)
+
+# 4. Summarise and visualise
+summary(fit)
+plot(fitted(fit, "distance"), melip.Fst, pch = 19,
+     xlab = "Resistance distance", ylab = expression(F[ST]))
+plot(conductance(surface, fit, quantile = 0.95)[["est"]])
+```

@@ -7,324 +7,566 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r, include = FALSE}
+```{r setup, include = FALSE}
 knitr::opts_chunk$set(
   collapse = TRUE,
-  comment = "#>",
-  warning = FALSE,
-  message = FALSE
+  comment  = "#>",
+  fig.width  = 6,
+  fig.height = 4.5,
+  warning  = FALSE,
+  message  = FALSE
 )
 ```
 
-## Overview
+## What are IBE and IBR, and why fit them together?
 
-`terradish` is built around two model layers:
+Landscape geneticists commonly ask: why are some pairs of populations more
+genetically different than others? Two broad classes of explanation exist:
 
-- A conductance model that turns raster covariates into a resistance surface.
-- A measurement model that relates pairwise resistance distances to pairwise genetic distances.
+- **Isolation by resistance (IBR):** movement is easiest through certain
+  landscape types and hardest through others. Genetic differentiation
+  accumulates between populations that are separated by high-resistance
+  terrain — even if straight-line distance is short.
+- **Isolation by environment (IBE):** populations inhabiting similar
+  environments tend to exchange genes more readily (or experience parallel
+  selection), so environmentally dissimilar sites show greater genetic
+  differentiation regardless of the path connecting them.
 
-That split makes it natural to fit isolation by environment (IBE) and isolation
-by resistance (IBR) concurrently:
+Both processes can operate at the same time. If you only test IBR, you may
+attribute environmental mismatch to landscape barriers, and vice versa. Fitting
+IBE and IBR **concurrently** lets each explain the variation that truly belongs
+to it, rather than competing for credit in a single predictor.
 
-- Keep IBR on the conductance side, where raster covariates determine movement
-  through space.
-- Add IBE on the measurement-model side as fixed endpoint-difference covariates
-  between sampling locations.
+### Where each process lives in the model
 
-This vignette walks through a small comparison set:
+`terradish` separates the two processes cleanly across its two model layers:
 
-- IBD: no environmental or resistance predictors.
-- IBE only: endpoint-difference covariates, but no resistance-surface predictors.
-- IBR only: raster predictors in the conductance model.
-- Joint IBE + IBR: both together.
+```
+                           CONDUCTANCE SIDE
+  Raster covariates   -->  loglinear_conductance  -->  resistance distances
+  (altitude, forest)         theta parameters               R_ij
 
-## Example Data
+                           MEASUREMENT SIDE
+  R_ij + endpoint          mlpe_covariates()      -->  genetic distances
+  differences (Z_ij)         beta, gamma, rho           S_ij
+```
 
-```{r}
+The mean structure of the joint model is:
+
+> S\_ij = α + β · R\_ij + Z\_ij · γ + e\_ij
+
+where:
+
+- **R\_ij** is the pairwise resistance distance (determined by the conductance
+  surface and the θ parameters).
+- **Z\_ij** is a pairwise endpoint-difference covariate — some measure of how
+  environmentally dissimilar sites *i* and *j* are.
+- **β** captures the IBR signal: does resistance distance predict genetic
+  differentiation after accounting for environment?
+- **γ** captures the IBE signal: does environmental mismatch predict genetic
+  differentiation after accounting for landscape resistance?
+- **e\_ij** is a residual following the MLPE correlation structure (see
+  `vignette("getting-started", package = "terradish")`).
+
+---
+
+## Prerequisites
+
+This vignette assumes familiarity with the basic `terradish` workflow. If you
+have not yet read
+`vignette("getting-started", package = "terradish")`, start there.
+
+---
+
+## Set up: data and scaled covariates
+
+```{r load}
 library(terradish)
 library(terra)
 
 data(melip)
-melip.altitude <- terra::unwrap(melip.altitude)
+melip.altitude    <- terra::unwrap(melip.altitude)
 melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords <- terra::unwrap(melip.coords)
+melip.coords      <- terra::unwrap(melip.coords)
 
-# keep the vignette compact and quick to fit
-keep <- 1:12
-gd_mat <- melip.Fst[keep, keep, drop = FALSE]
-coords <- melip.coords[keep]
-
-# scale raster covariates before fitting the conductance model
+# Scale continuous covariates before building the conductance surface.
+# This keeps the conductance parameters on a comparable scale and avoids
+# numerical overflow in exp(theta * x).
 covariates <- c(terra::scale(melip.altitude),
                 terra::scale(melip.forestcover))
 names(covariates) <- c("altitude", "forestcover")
 
-surface <- conductance_surface(covariates, coords, directions = 8)
+surface <- conductance_surface(covariates, melip.coords, directions = 8)
 ```
 
-## Construct IBE Covariates
+---
 
-The new helper `pairwise_endpoint_covariates()` converts site-level
-environmental values into one or more pairwise endpoint-difference covariates.
+## Step 1 — Construct IBE covariates
 
-```{r}
-names(melip.altitude) <- "altitude_site"
+IBE operates at the level of pairs of sites. For each pair (i, j) we need a
+number that quantifies how environmentally different those two sites are. The
+helper `pairwise_endpoint_covariates()` computes this from site-level
+environmental values.
 
+```{r ibe-covariates}
 z_ibe <- pairwise_endpoint_covariates(
-  melip.altitude,
-  coords = coords,
-  transform = "absdiff",
-  scale = TRUE
+  melip.altitude,          # site-level environmental data (raster or matrix)
+  coords    = melip.coords,# focal-point locations (used to extract from raster)
+  transform = "absdiff",  # how to convert site values into pairwise values
+  scale     = TRUE         # standardise site values first
 )
 
-head(z_ibe)
+# Each row is one pair of sites; each column is one pairwise covariate.
 dim(z_ibe)
+head(z_ibe)
 ```
 
-Here we use absolute pairwise altitude differences, but the helper also
-supports squared differences and multivariate Euclidean or Manhattan
-environmental distances.
+### Choosing a pairwise transform
 
-## Build the Joint MLPE Measurement Model
+Four transforms are available:
 
-`mlpe_covariates()` wraps the pairwise endpoint-difference covariates into an
-MLPE measurement model with mean structure
+| Transform | Formula | When to use |
+|-----------|---------|-------------|
+| `"absdiff"` | \|x\_i − x\_j\| | One covariate; symmetric, intuitive |
+| `"sqdiff"` | (x\_i − x\_j)² | Penalises large differences more; useful with noisy data |
+| `"euclidean"` | √Σ(x\_ik − x\_jk)² | Multivariate environment; collapses to a single distance |
+| `"manhattan"` | Σ\|x\_ik − x\_jk\| | Multivariate environment; less sensitive to outlier dimensions |
 
-\[
-S_{ij} = \alpha + \beta R_{ij} + Z_{ij}\gamma + e_{ij}.
-\]
+Use `"absdiff"` (the default) for a single continuous covariate. For a
+multivariate environment (e.g. altitude + precipitation + temperature combined),
+`"euclidean"` or `"manhattan"` produce a single distance column that is easier
+to interpret and avoid inflating the model with many correlated predictors.
 
-```{r}
+For two or more covariates treated separately, `"absdiff"` or `"sqdiff"` return
+one column per covariate:
+
+```{r ibe-covariates-multi}
+# Example: separate absolute differences for altitude and forest cover
+z_multi <- pairwise_endpoint_covariates(
+  covariates,            # the two-layer scaled raster stack
+  coords    = melip.coords,
+  transform = "absdiff",
+  scale     = FALSE      # already scaled in the raster
+)
+dim(z_multi)   # one column per layer
+colnames(z_multi)
+```
+
+For this vignette we use altitude only (`z_ibe`) to keep the IBE side simple
+and interpretable.
+
+---
+
+## Step 2 — Build the joint measurement model
+
+`mlpe_covariates()` wraps the pairwise covariates into an MLPE measurement
+model. The resulting object (`g_ibe`) can be passed anywhere that `mlpe` can:
+`terradish()`, `terradish_grid()`, and `terradish_cv()`.
+
+```{r build-model}
 g_ibe <- mlpe_covariates(z_ibe)
 ```
 
-## Fit IBD, IBE-only, IBR-only, and Joint Models
+`g_ibe` is a function, not a fitted model — it defines the likelihood structure.
+The actual parameters (β, γ, and the MLPE correlation) are estimated when you
+call `terradish()`.
 
-```{r}
-ctrl <- NewtonRaphsonControl(maxit = 8, verbose = FALSE)
+---
 
+## Step 3 — Fit the four candidate models
+
+To understand the unique contributions of IBR and IBE, fit all four
+combinations and compare them.
+
+```{r fit-models}
+# NewtonRaphsonControl limits the number of optimizer iterations.
+# A small maxit is fine here for illustration; use the default (100) in a
+# real analysis.
+ctrl <- NewtonRaphsonControl(maxit = 20, verbose = FALSE)
+
+# IBD: null model — no landscape or environment predictors
 fit_ibd <- terradish(
-  gd_mat ~ 1,
-  data = surface,
+  melip.Fst ~ 1,
+  data              = surface,
   conductance_model = loglinear_conductance,
   measurement_model = mlpe,
-  leverage = FALSE,
-  control = ctrl
+  leverage          = FALSE,
+  control           = ctrl
 )
 
+# IBE only: environmental mismatch, but no landscape resistance
 fit_ibe <- terradish(
-  gd_mat ~ 1,
-  data = surface,
+  melip.Fst ~ 1,           # no raster covariates on the conductance side
+  data              = surface,
   conductance_model = loglinear_conductance,
-  measurement_model = g_ibe,
-  leverage = FALSE,
-  control = ctrl
+  measurement_model = g_ibe, # IBE is on the measurement side
+  leverage          = FALSE,
+  control           = ctrl
 )
 
+# IBR only: landscape resistance, no environmental mismatch
 fit_ibr <- terradish(
-  gd_mat ~ altitude + forestcover,
-  data = surface,
+  melip.Fst ~ altitude + forestcover,
+  data              = surface,
   conductance_model = loglinear_conductance,
   measurement_model = mlpe,
-  leverage = FALSE,
-  control = ctrl
+  leverage          = FALSE,
+  control           = ctrl
 )
 
+# Joint IBE + IBR: both processes in a single model
 fit_joint <- terradish(
-  gd_mat ~ altitude + forestcover,
-  data = surface,
+  melip.Fst ~ altitude + forestcover,
+  data              = surface,
   conductance_model = loglinear_conductance,
   measurement_model = g_ibe,
-  leverage = FALSE,
-  control = ctrl
+  leverage          = FALSE,
+  control           = ctrl
 )
 ```
 
-The conductance coefficients remain on the `theta` side:
+> **Note on `leverage = FALSE`:** By default, `terradish()` computes
+> influence/leverage diagnostics for each observation, which requires
+> additional linear-algebra work. Setting `leverage = FALSE` skips this step
+> to reduce run time. For a final analysis where you want diagnostics, omit
+> this argument or set it to `TRUE`.
 
-```{r}
-coef(fit_ibr)
-coef(fit_joint)
+---
+
+## Step 4 — Interpret the joint model
+
+### Conductance parameters (theta)
+
+`coef()` returns the conductance parameters — the θ values that map raster
+covariates to landscape permeability:
+
+```{r coef-ibr}
+coef(fit_ibr)   # IBR-only model
+coef(fit_joint) # joint model (theta side only)
 ```
 
-The IBE coefficient lives in the nuisance-parameter vector `phi` because it is
-part of the measurement model rather than the conductance model:
+Interpretation is the same as in any IBR model: a positive θ means higher
+covariate values increase conductance (easier movement), a negative θ means
+the covariate acts as a barrier. See
+`vignette("getting-started", package = "terradish")` for how to convert these
+to conductance ratios.
 
-```{r}
-summary(fit_joint)$phi
+Notice that the θ estimates may shift between `fit_ibr` and `fit_joint`. That
+is expected: when the joint model can attribute some of the pairwise variation
+to environmental mismatch (γ), it no longer needs the IBR coefficients to carry
+that variation.
+
+### IBE coefficients (gamma, inside phi)
+
+Because IBE lives in the measurement model rather than the conductance model,
+its coefficient (γ) is reported inside `phi` — the vector of nuisance
+parameters:
+
+```{r summary-joint}
+summary(fit_joint)
 ```
 
-## Compare the Model Set
+Look for the row named `absdiff_<layer>` in the phi table. A positive γ means
+that sites with greater altitude differences are more genetically different,
+after accounting for the resistance distance between them. A negative γ (rarely
+biologically expected for IBE) would mean the opposite.
 
-For a quick comparison on the same focal set, `cv_model_selection()` can rank
-the four models by likelihood and AIC.
+The other phi parameters (`alpha`, `beta`, `tau`, `rho`) are the MLPE
+regression nuisance parameters and are the same as in a plain `mlpe` fit —
+intercept, IBR slope, residual precision, and MLPE correlation.
 
-```{r}
+### Quick summary of which parameter lives where
+
+| Parameter | Symbol | Where it appears | What it measures |
+|-----------|--------|-----------------|-----------------|
+| Conductance | θ | `coef(fit)` | How raster covariates affect landscape permeability |
+| IBR slope | β (`beta`) | `summary(fit)$phi` | How resistance distance predicts genetic distance |
+| IBE slope | γ (`absdiff_*`) | `summary(fit)$phi` | How environmental mismatch predicts genetic distance |
+| Intercept | α (`alpha`) | `summary(fit)$phi` | Baseline genetic distance at zero resistance |
+| Residual precision | exp(τ) (`tau`) | `summary(fit)$phi` | Inverse residual variance |
+| MLPE correlation | plogis(ρ)/2 (`rho`) | `summary(fit)$phi` | Shared-site correlation in pairwise residuals |
+
+---
+
+## Step 5 — Compare the model set
+
+### Information criteria
+
+`aic_table()` ranks all four models:
+
+```{r aic-table}
+aic_table(
+  list(fit_ibd, fit_ibe, fit_ibr, fit_joint),
+  mod_names = c("IBD", "IBE only", "IBR only", "IBE + IBR (joint)")
+)
+```
+
+A lower AIC indicates a better balance of fit and parsimony. The delta column
+shows how far each model is from the best. Models within 2 AIC units of the
+best are generally considered to have comparable support.
+
+Use AICc when the number of sampling sites is modest relative to the number of
+parameters:
+
+```{r aicc-table}
+aic_table(
+  list(fit_ibd, fit_ibe, fit_ibr, fit_joint),
+  mod_names = c("IBD", "IBE only", "IBR only", "IBE + IBR (joint)"),
+  AICc = TRUE
+)
+```
+
+### Likelihood ratio tests for nested comparisons
+
+Within the IBR family (models with a conductance surface), nested models can be
+tested with `anova()`:
+
+```{r lrt}
+# Does the joint model improve on IBR-only?
+anova(fit_joint, fit_ibr)
+
+# Does IBR-only improve on IBD?
+anova(fit_ibr, fit_ibd)
+```
+
+Note that IBE-only (`fit_ibe`) and IBR-only (`fit_ibr`) are **not** nested
+in each other — they differ on which side of the model (conductance vs.
+measurement) carries the predictors. Use `aic_table()`, not `anova()`, to
+compare them.
+
+### Cross-validation for predictive comparison
+
+`cv_model_selection()` combines held-out log-likelihoods with an AIC table so
+you can compare models on both in-sample fit and out-of-sample prediction.
+
+`terradish_cv()` requires at least one conductance parameter to cross-validate
+on, so it can only be called for models with raster covariates on the
+conductance side (IBR-only and joint). The IBD and IBE-only models use `~ 1`,
+meaning all cells have equal conductance and there are no θ values to
+estimate from the training split. For those models we pass the in-sample
+log-likelihood directly as the held-out value — a conservative choice that
+does not inflate their apparent predictive performance.
+
+```{r cv-model-selection}
+cv_ctrl <- NewtonRaphsonControl(maxit = 15, verbose = FALSE)
+
+# IBR-only: has conductance parameters, so true CV is possible
+cv_ibr <- terradish_cv(
+  pts = melip.coords, covariates = covariates,
+  fmla = melip.Fst ~ altitude + forestcover, model = mlpe,
+  prop_train = 2 / 3, seed = 1, fit_full = TRUE,
+  control = cv_ctrl
+)
+
+# Joint IBE + IBR: has conductance parameters, so true CV is possible
+cv_joint <- terradish_cv(
+  pts = melip.coords, covariates = covariates,
+  fmla = melip.Fst ~ altitude + forestcover, model = g_ibe,
+  prop_train = 2 / 3, seed = 1, fit_full = TRUE,
+  control = cv_ctrl
+)
+
+# IBD and IBE-only: no conductance parameters; use in-sample loglik as proxy
 comparison <- cv_model_selection(
   list(
-    list(train_mod = fit_ibd,   cv_loglik = fit_ibd$loglik,   full_mod = fit_ibd),
-    list(train_mod = fit_ibe,   cv_loglik = fit_ibe$loglik,   full_mod = fit_ibe),
-    list(train_mod = fit_ibr,   cv_loglik = fit_ibr$loglik,   full_mod = fit_ibr),
-    list(train_mod = fit_joint, cv_loglik = fit_joint$loglik, full_mod = fit_joint)
+    list(train_mod = fit_ibd,
+         cv_loglik  = fit_ibd$loglik,
+         full_mod   = fit_ibd),
+    list(train_mod = fit_ibe,
+         cv_loglik  = fit_ibe$loglik,
+         full_mod   = fit_ibe),
+    list(train_mod = cv_ibr$train_mod,
+         cv_loglik  = cv_ibr$cv_loglik,
+         full_mod   = cv_ibr$full_mod),
+    list(train_mod = cv_joint$train_mod,
+         cv_loglik  = cv_joint$cv_loglik,
+         full_mod   = cv_joint$full_mod)
   ),
-  cv_names = c("IBD", "IBE", "IBR", "IBE + IBR"),
+  cv_names = c("IBD", "IBE only", "IBR only", "IBE + IBR (joint)"),
   aic = TRUE
 )
 
+# Held-out log-likelihood (higher is better predictive performance)
 comparison$loglik_tab
+
+# AIC table from the full-data fits
 comparison$AIC_tab
 ```
 
-`cv_model_selection()` is convenient when you already have cross-validation
-objects or want to keep held-out log-likelihood and information-criterion
-ranking together in one place.
+> **Why cross-validate?** AIC measures in-sample fit penalised for complexity.
+> Cross-validation directly measures whether the model generalises to new sites.
+> For IBE + IBR models, AIC and CV often agree, but they can diverge when the
+> extra IBE parameter fits noise in the training data that does not generalise.
 
-If you already have fitted `terradish` models and only want an
-information-criterion table, `aic_table()` is a simpler helper:
+For a more stable estimate of predictive performance, repeat across multiple
+random splits using `terradish_cv_replicates()`:
 
-```{r}
-# Use the fitted models directly when you only want model ranking.
-model_table_aic <- aic_table(
-  list(fit_ibd, fit_ibe, fit_ibr, fit_joint),
-  mod_names = c("IBD", "IBE", "IBR", "IBE + IBR")
-)
-
-# AICc can be useful when the number of focal populations is modest
-# relative to the number of estimated parameters.
-model_table_aicc <- aic_table(
-  list(fit_ibd, fit_ibe, fit_ibr, fit_joint),
-  mod_names = c("IBD", "IBE", "IBR", "IBE + IBR"),
-  AICc = TRUE
-)
-
-# BIC applies a stronger complexity penalty than AIC.
-model_table_bic <- aic_table(
-  list(fit_ibd, fit_ibe, fit_ibr, fit_joint),
-  mod_names = c("IBD", "IBE", "IBR", "IBE + IBR"),
-  BIC = TRUE
-)
-
-model_table_aic
-```
-
-For an entry-level workflow, a good rule of thumb is:
-
-- Start with held-out log-likelihood if prediction is your main goal.
-- Use AIC or AICc when you want a quick likelihood-based model ranking on the
-  same data set.
-- Use BIC when you want a stricter penalty on model complexity.
-
-## Cross-validation
-
-`terradish_cv()` now knows how to rebuild `mlpe_covariates()` models on train/test
-subsets, as long as the measurement model was created from
-`pairwise_endpoint_covariates()` or from site-level covariates that can be
-converted by that helper.
-
-```{r}
-cv_joint <- terradish_cv(
-  pts = coords,
-  covariates = covariates,
-  fmla = gd_mat ~ altitude + forestcover,
-  model = g_ibe,
-  prop_train = 2 / 3,
-  seed = 1,
-  fit_full = FALSE,
-  control = ctrl
-)
-
-cv_joint$cv_loglik
-```
-
-That result is based on one random split of the focal populations into a
-training set and a test set. A single split is helpful for a quick check, but
-it can be noisy if the result depends strongly on which sites happened to land
-in the training set.
-
-`terradish_cv_replicates()` repeats that same process across multiple random
-splits and summarizes the held-out log-likelihood:
-
-```{r}
-# Repeat the same train/test workflow across several random splits.
+```{r cv-replicates}
 cv_joint_reps <- terradish_cv_replicates(
-  pts = coords,
+  pts        = melip.coords,
   covariates = covariates,
-  fmla = gd_mat ~ altitude + forestcover,
-  model = g_ibe,
-  seeds = c(1, 2, 3),
-  fit_full = FALSE,
-  keep_fits = FALSE,
-  control = ctrl
+  fmla       = melip.Fst ~ altitude + forestcover,
+  model      = g_ibe,
+  seeds      = 1:5,
+  fit_full   = FALSE,
+  keep_fits  = FALSE,
+  control    = cv_ctrl
 )
 
-# The print method gives a quick overview.
-cv_joint_reps
-
-# summary() adds the replicate count and the range of held-out loglikelihood.
 summary(cv_joint_reps)
 ```
 
-In practice:
+---
 
-- Use `terradish_cv()` when you want one quick train/test split.
-- Use `terradish_cv_replicates()` when you want a more stable sense of average
-  predictive performance.
+## Step 6 — Visualise the joint model
 
-## Saved Results Utilities
+### Fitted conductance surface
 
-Some workflows fit `terradish` models once, save them to disk, and later come
-back to extract parameter summaries. The saved-results helpers are designed for
-that downstream step rather than for model fitting itself.
+The conductance surface reflects only the θ side of the model — the IBE term
+does not change how permeable the landscape is estimated to be.
 
-`terradish_results()` lets you inspect what a terradish-style results directory
-contains:
+```{r conductance-surface, fig.cap = "Estimated conductance surface from the joint IBE + IBR model."}
+fitted_cond <- conductance(surface, fit_joint, quantile = 0.95)
 
-```{r}
-# Create a temporary results directory for demonstration.
-tmp_results <- tempfile("terradish-results-")
-dir.create(tmp_results)
+plot(fitted_cond[["est"]],
+     main = "Joint model: fitted conductance")
+points(melip.coords, pch = 19, cex = 0.6)
+```
 
-# Save one fitted model and a simple AllResults object.
-saveRDS(fit_joint, file.path(tmp_results, "fit--mlpe.rds"))
+### Observed vs. fitted genetic distances
+
+```{r obs-vs-fitted, fig.cap = "Observed vs. fitted pairwise genetic distances from the joint model."}
+plot(
+  fitted(fit_joint, "distance"),
+  melip.Fst,
+  pch  = 19,
+  cex  = 0.5,
+  xlab = "Resistance distance (joint model)",
+  ylab = expression(F[ST]),
+  main = "Observed vs. fitted — joint IBE + IBR"
+)
+abline(lm(c(melip.Fst) ~ c(fitted(fit_joint, "distance"))),
+       col = "steelblue", lwd = 2)
+```
+
+---
+
+## Step 7 — Saved-results utilities
+
+Some workflows fit `terradish` models once, save them to disk, and later
+extract summaries. Two helpers support this pattern.
+
+`terradish_results()` inspects a terradish-style results directory and recovers
+the fitted objects and metadata stored there:
+
+```{r saved-results}
+# Create a temporary directory to illustrate the pattern.
+tmp_dir <- tempfile("terradish-results-")
+dir.create(tmp_dir)
+
+# Save the joint fit and a minimal AllResults object.
+saveRDS(fit_joint, file.path(tmp_dir, "fit--mlpe.rds"))
 saveRDS(
   list(
     effect_size = coef(fit_joint),
-    pts = coords,
-    covariates = covariates
+    pts         = melip.coords,
+    covariates  = covariates
   ),
-  file.path(tmp_results, "AllResults_list.rds")
+  file.path(tmp_dir, "AllResults_list.rds")
 )
 
-# Inspect what terradish can recover from the directory.
-results_info <- terradish_results(tmp_results)
+results_info <- terradish_results(tmp_dir)
 names(results_info)
 ```
 
-`terradish_parameters()` then extracts a compact coefficient table from the
-saved fitted model:
+`terradish_parameters()` extracts a compact coefficient table from a saved
+fitted model. This is useful in simulation studies where you want to compare
+known effect sizes with estimated values across many saved runs:
 
-```{r}
-# Extract fitted conductance coefficients and their standard errors.
+```{r saved-parameters}
 parameter_table <- terradish_parameters(
-  tmp_results,
-  model = "mlpe",
+  tmp_dir,
+  model      = "mlpe",
   save_table = FALSE
 )
 
 parameter_table
 ```
 
-This is especially useful in simulation studies, where you may want to compare
-known effect sizes against the fitted values from many saved runs.
+---
 
-## Interpretation
+## Putting it all together: a decision guide
 
-A useful way to read the joint model is:
+| Goal | Recommended approach |
+|------|---------------------|
+| Does landscape resistance matter? | `anova(fit_ibr, fit_ibd)` |
+| Does environment matter after accounting for resistance? | `anova(fit_joint, fit_ibr)` — or look at γ in `summary(fit_joint)` |
+| Which single model has the best in-sample fit? | `aic_table(list(...))` |
+| Which model predicts new sites best? | `cv_model_selection(list(...))` |
+| Is my predictive result stable across splits? | `terradish_cv_replicates()` |
+| What is the fitted landscape surface? | `conductance(surface, fit_joint)` |
 
-- `theta` asks whether landscape permeability affects effective movement among
-  sites.
-- `gamma` asks whether endpoint environmental mismatch explains additional
-  genetic differentiation after accounting for resistance distance.
+The joint model is most useful when you suspect both IBE and IBR are operating.
+If the γ estimate is near zero with a wide standard error, the IBE term is not
+adding explanatory power and the simpler IBR model is preferable.
 
-In other words, the joint model estimates the unique contribution of IBR and
-IBE rather than forcing them to compete in a single predictor class.
+---
+
+## What comes next?
+
+- **`vignette("getting-started", package = "terradish")`** — the core
+  single-process workflow (load data, scale covariates, fit, visualise).
+- **`vignette("model-comparison", package = "terradish")`** — likelihood
+  ratio tests, AIC/AICc/BIC, likelihood surface visualisation, and
+  cross-validation in depth.
+
+---
+
+## Quick reference
+
+```{r quick-reference, eval = FALSE}
+library(terradish)
+library(terra)
+
+# 1. Load and scale data
+data(melip)
+melip.altitude    <- terra::unwrap(melip.altitude)
+melip.forestcover <- terra::unwrap(melip.forestcover)
+melip.coords      <- terra::unwrap(melip.coords)
+
+covariates <- c(terra::scale(melip.altitude),
+                terra::scale(melip.forestcover))
+names(covariates) <- c("altitude", "forestcover")
+surface <- conductance_surface(covariates, melip.coords, directions = 8)
+
+# 2. Build IBE covariates and measurement model
+z_ibe <- pairwise_endpoint_covariates(
+  melip.altitude, coords = melip.coords,
+  transform = "absdiff", scale = TRUE
+)
+g_ibe <- mlpe_covariates(z_ibe)
+
+# 3. Fit IBD, IBE, IBR, and joint models
+fit_ibd   <- terradish(melip.Fst ~ 1,
+                       surface, loglinear_conductance, mlpe)
+fit_ibe   <- terradish(melip.Fst ~ 1,
+                       surface, loglinear_conductance, g_ibe)
+fit_ibr   <- terradish(melip.Fst ~ altitude + forestcover,
+                       surface, loglinear_conductance, mlpe)
+fit_joint <- terradish(melip.Fst ~ altitude + forestcover,
+                       surface, loglinear_conductance, g_ibe)
+
+# 4. Compare
+aic_table(list(fit_ibd, fit_ibe, fit_ibr, fit_joint),
+          mod_names = c("IBD", "IBE", "IBR", "IBE + IBR"))
+anova(fit_joint, fit_ibr)   # does IBE add to IBR?
+anova(fit_ibr,   fit_ibd)   # does IBR improve on IBD?
+
+# 5. Interpret theta (IBR) and gamma (IBE inside phi)
+coef(fit_joint)
+summary(fit_joint)$phi
+
+# 6. Visualise
+plot(conductance(surface, fit_joint, quantile = 0.95)[["est"]])
+plot(fitted(fit_joint, "distance"), melip.Fst, pch = 19)
+```
