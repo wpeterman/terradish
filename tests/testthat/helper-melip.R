@@ -11,9 +11,9 @@ melip_fixture <- function(keep = NULL)
     melip.coords <- melip.coords[keep]
   }
 
-  covariates <- c(terra::scale(melip.altitude),
-                  terra::scale(melip.forestcover))
+  covariates <- c(melip.altitude, melip.forestcover)
   names(covariates) <- c("altitude", "forestcover")
+  covariates <- scale_covariates(covariates)
 
   list(melip.Fst = melip.Fst,
        covariates = covariates,

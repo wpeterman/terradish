@@ -49,6 +49,79 @@ scale_to_0_1 <- function(x)
   (x - rng[1]) / diff(rng)
 }
 
+#' Scale raster covariates and retain original scale metadata
+#'
+#' Transforms each layer of a \code{SpatRaster} and stores the original-scale
+#' offset and divisor as a \code{"terradish_scale"} attribute. If this
+#' transformed raster is used to build a \code{\link{conductance_surface}},
+#' \code{plot(type = "marginal")} can automatically back-transform x-axes to
+#' the original covariate units.
+#'
+#' @param covariates A \code{SpatRaster} or \code{PackedSpatRaster} whose layers
+#'   should be scaled.
+#' @param method Scaling method. \code{"zscore"} centers each layer by its
+#'   non-missing mean and divides by its non-missing standard deviation.
+#'   \code{"minmax"} rescales each layer to \code{[0, 1]} using its
+#'   non-missing minimum and range.
+#' @param center Should each layer be centered before scaling when
+#'   \code{method = "zscore"}?
+#' @param scale Should each layer be divided by its standard deviation when
+#'   \code{method = "zscore"}?
+#'
+#' @return A \code{SpatRaster} with transformed values and a
+#'   \code{"terradish_scale"} attribute containing per-layer centers and
+#'   scales.
+#'
+#' @examples
+#' library(terra)
+#' r <- c(terra::rast(nrows = 2, ncols = 2, vals = c(1, 2, 3, NA)),
+#'        terra::rast(nrows = 2, ncols = 2, vals = c(2, 5, 4, NA)))
+#' names(r) <- c("altitude", "forestcover")
+#' scaled_r <- scale_covariates(r)
+#' attr(scaled_r, "terradish_scale")
+#'
+#' @export
+scale_covariates <- function(covariates,
+                             method = c("zscore", "minmax"),
+                             center = TRUE,
+                             scale = TRUE)
+{
+  covariates <- .as_spatraster(covariates)
+  method <- match.arg(method)
+  stats <- lapply(seq_len(nlyr(covariates)), function(i) {
+    vals <- values(covariates[[i]], dataframe = FALSE)[, 1]
+    vals <- vals[is.finite(vals)]
+
+    if (method == "minmax")
+    {
+      center_i <- min(vals)
+      scale_i <- diff(range(vals))
+      if (!is.finite(scale_i) || scale_i == 0)
+        scale_i <- 1
+    }
+    else
+    {
+      center_i <- if (isTRUE(center)) mean(vals) else 0
+      scale_i <- if (isTRUE(scale)) stats::sd(vals) else 1
+      if (!is.finite(scale_i) || scale_i == 0)
+        scale_i <- 1
+    }
+
+    c(center = center_i, scale = scale_i)
+  })
+  names(stats) <- names(covariates)
+
+  vals <- values(covariates, dataframe = FALSE)
+  for (nm in names(stats))
+  {
+    vals[, nm] <- (vals[, nm] - stats[[nm]][["center"]]) /
+      stats[[nm]][["scale"]]
+  }
+  values(covariates) <- vals
+  attr(covariates, "terradish_scale") <- stats
+  covariates
+}
+
 #' Extract the lower triangle of a matrix
 #'
 #' Returns the lower-triangular entries of a square matrix as a vector.

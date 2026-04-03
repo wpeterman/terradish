@@ -7,7 +7,7 @@
 \usage{
 \method{plot}{terradish}(
   x,
-  type = c("fit", "surface", "marginal"),
+  type = c("fit", "surface", "marginal", "marginal_response"),
   data = NULL,
   covariates = NULL,
   conductance_model = loglinear_conductance,
@@ -21,21 +21,24 @@
 \arguments{
 \item{x}{A fitted \code{terradish} object.}
 
-\item{type}{One of \code{"fit"}, \code{"surface"}, or \code{"marginal"}.}
+\item{type}{One of \code{"fit"}, \code{"surface"}, \code{"marginal"}, or
+\code{"marginal_response"}.}
 
 \item{data}{The \code{terradish_graph} used when fitting \code{x}. Required
-for \code{type = "surface"} and \code{type = "marginal"}.}
+for \code{type = "surface"}, \code{type = "marginal"}, and
+\code{type = "marginal_response"}.}
 
 \item{covariates}{Optional \code{SpatRaster} of covariates on their
 \strong{original (unscaled)} scale. When supplied for
 \code{type = "marginal"}, the x-axis of each panel is back-transformed to
-the original units using the mean and standard deviation of each layer.
+the original units using the corresponding per-layer offset and divisor.
 Layer names must match the covariate names used in the model formula.}
 
 \item{conductance_model}{The conductance model factory used when fitting
 \code{x} — e.g. \code{\link{loglinear_conductance}} (default) or
-\code{\link{linear_conductance}}. Required for \code{type = "marginal"}
-because a fresh model must be built at the evaluation points.}
+\code{\link{linear_conductance}}. Required for
+\code{type = "marginal"} and \code{type = "marginal_response"} because a
+fresh model must be built at the evaluation points.}
 
 \item{quantile}{Confidence level for interval bands. Default \code{0.95}.}
 
@@ -49,13 +52,14 @@ types.}
 \value{
 Invisibly:
 \itemize{
-  \item \code{"fit"}: a \code{data.frame} with columns \code{observed} and
-    \code{fitted} (lower-triangle values only).
-  \item \code{"surface"}: the \code{SpatRaster} returned by
-    \code{\link{conductance}}.
-  \item \code{"marginal"}: a named list of \code{data.frame}s, one per
-    continuous covariate, with columns \code{x}, \code{est}, \code{lower},
-    and \code{upper}.
+  \item \code{"fit"}: a \code{ggplot} object with observed-vs-fitted
+    pairwise distances.
+  \item \code{"surface"}: a \code{ggplot} object with faceted conductance
+    estimate and interval maps.
+  \item \code{"marginal"}: a \code{ggplot} object with faceted marginal
+    conductance effects and pointwise confidence bands.
+  \item \code{"marginal_response"}: a \code{ggplot} object with faceted
+    response-scale marginal effects and predictive bands.
 }
 }
 \description{
@@ -65,8 +69,14 @@ Three plot types for objects returned by \code{\link{terradish}}:
   \item{\code{"surface"}}{Fitted conductance surface with asymptotic confidence
     interval bounds, displayed in three side-by-side panels.}
   \item{\code{"marginal"}}{Marginal effect of each raster covariate on
-    conductance, varying one covariate at a time while holding all others at
-    their mean, with a 95\% confidence band via the delta method.}
+    conductance, varying one covariate at a time while averaging over the
+    observed values of all other model covariates, with a 95\% pointwise
+    confidence band via the delta method.}
+  \item{\code{"marginal_response"}}{Approximate response-scale marginal
+    effects obtained by mapping the marginal conductance curve through the
+    fitted measurement-model mean and adding predictive bands that combine
+    \code{theta} uncertainty, conditional \code{phi} uncertainty, and the
+    residual variance implied by \code{tau}.}
 }
 }
 \examples{
@@ -78,9 +88,9 @@ melip.forestcover <- terra::unwrap(melip.forestcover)
 melip.coords      <- terra::unwrap(melip.coords)
 
 # Build surface with scaled covariates
-covariates_scaled <- c(terra::scale(melip.altitude),
-                       terra::scale(melip.forestcover))
+covariates_scaled <- c(melip.altitude, melip.forestcover)
 names(covariates_scaled) <- c("altitude", "forestcover")
+covariates_scaled <- scale_covariates(covariates_scaled)
 surface <- conductance_surface(covariates_scaled, melip.coords, directions = 8)
 
 fit <- terradish(melip.Fst ~ altitude + forestcover, surface,
@@ -93,9 +103,10 @@ plot(fit, type = "fit")
 plot(fit, type = "surface", data = surface)
 
 # Marginal effect plots on the original covariate scale
-covariates_orig <- c(melip.altitude, melip.forestcover)
-names(covariates_orig) <- c("altitude", "forestcover")
-plot(fit, type = "marginal", data = surface, covariates = covariates_orig)
+plot(fit, type = "marginal", data = surface)
+
+# Approximate response-scale marginal effects with predictive bands
+plot(fit, type = "marginal_response", data = surface)
 }
 
 }

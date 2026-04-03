@@ -164,13 +164,17 @@ conductance, making optimisation numerically unstable. **Always scale continuous
 covariates** before fitting.
 
 ```{r scale}
-covariates <- c(terra::scale(melip.altitude),
-                terra::scale(melip.forestcover))
+covariates <- c(melip.altitude, melip.forestcover)
 names(covariates) <- c("altitude", "forestcover")
+covariates <- scale_covariates(covariates)
 ```
 
-`terra::scale()` subtracts the mean and divides by the standard deviation,
-giving each layer a mean of 0 and a standard deviation of 1.
+By default, `scale_covariates()` subtracts each layer's mean and divides by its
+standard deviation, giving every continuous covariate a mean of 0 and a
+standard deviation of 1. It also stores the original-scale center and scale for
+each layer, which lets `plot(fit, type = "marginal", data = surface)` and
+`plot(fit, type = "marginal_response", data = surface)` label x-axes in the
+original units automatically.
 
 ---
 
@@ -360,9 +364,10 @@ melip.forestcover <- terra::unwrap(melip.forestcover)
 melip.coords      <- terra::unwrap(melip.coords)
 
 # 2. Scale covariates and build surface
-covariates <- c(terra::scale(melip.altitude),
-                terra::scale(melip.forestcover))
-names(covariates) <- c("altitude", "forestcover")
+covariates <- c(melip.forestcover, melip.altitude)
+names(covariates) <- c("forestcover", "altitude")
+covariates <- scale_covariates(covariates)
+
 surface <- conductance_surface(covariates, melip.coords, directions = 8)
 
 # 3. Fit model
@@ -371,8 +376,15 @@ fit <- terradish(melip.Fst ~ forestcover + altitude,
                  conductance_model = loglinear_conductance,
                  measurement_model = mlpe)
 
+fitted_cond <- conductance(surface, fit, quantile = 0.95)
+
+
 # 4. Summarise and visualise
 summary(fit)
+plot(fit)
+plot(fit, type = 'marginal', data = surface)
+plot(fitted_cond)
+
 plot(fitted(fit, "distance"), melip.Fst, pch = 19,
      xlab = "Resistance distance", ylab = expression(F[ST]))
 plot(conductance(surface, fit, quantile = 0.95)[["est"]])

@@ -18,6 +18,19 @@ test_that("utility helpers behave as expected", {
   out <- scale_to_0_1(r)
   expect_true(inherits(out, "SpatRaster"))
   expect_equal(as.vector(terra::values(out)), c(0, 0.5, 1, NA))
+
+  covs <- c(r, 2 * r + 1)
+  names(covs) <- c("a", "b")
+  scaled_covs <- scale_covariates(covs)
+  expect_true(inherits(scaled_covs, "SpatRaster"))
+  expect_equal(names(attr(scaled_covs, "terradish_scale")), c("a", "b"))
+  expect_equal(attr(scaled_covs, "terradish_scale")$a[["center"]], 3)
+  expect_equal(attr(scaled_covs, "terradish_scale")$a[["scale"]], 2)
+
+  ranged_covs <- scale_covariates(covs, method = "minmax")
+  expect_equal(as.vector(terra::values(ranged_covs[[1]])), c(0, 0.5, 1, NA))
+  expect_equal(attr(ranged_covs, "terradish_scale")$a[["center"]], 1)
+  expect_equal(attr(ranged_covs, "terradish_scale")$a[["scale"]], 4)
 })
 
 test_that("pca_dist works when adegenet is available", {
