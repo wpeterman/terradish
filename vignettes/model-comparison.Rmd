@@ -1,0 +1,421 @@
+---
+title: "Model Comparison and Selection in terradish"
+output: rmarkdown::html_vignette
+vignette: >
+  %\VignetteIndexEntry{Model Comparison and Selection in terradish}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  fig.width  = 6,
+  fig.height = 4.5,
+  warning  = FALSE,
+  message  = FALSE
+)
+```
+
+## Overview
+
+Once you can fit a `terradish` model (see
+`vignette("getting-started", package = "terradish")`), the natural next
+questions are:
+
+1. Does forest cover *actually* drive genetic structure, or could that result be
+   noise? (**hypothesis testing**)
+2. Is a model with both altitude and forest cover better than one with only
+   altitude? (**model selection**)
+3. How well does the model predict genetic structure at sites not used for
+   fitting? (**cross-validation**)
+
+This vignette walks through all three.
+
+---
+
+## Set up: data and baseline model
+
+```{r load-and-fit}
+library(terradish)
+library(terra)
+
+data(melip)
+melip.altitude    <- terra::unwrap(melip.altitude)
+melip.forestcover <- terra::unwrap(melip.forestcover)
+melip.coords      <- terra::unwrap(melip.coords)
+
+covariates <- c(terra::scale(melip.altitude),
+                terra::scale(melip.forestcover))
+names(covariates) <- c("altitude", "forestcover")
+
+surface <- conductance_surface(covariates, melip.coords, directions = 8)
+
+# Full model: both covariates
+fit_full <- terradish(
+  melip.Fst ~ forestcover + altitude,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe
+)
+```
+
+---
+
+## Hypothesis testing with likelihood ratio tests
+
+A **likelihood ratio test (LRT)** asks: does adding a covariate significantly
+improve the model fit? The test statistic is:
+
+> 2 × (log-likelihood of larger model − log-likelihood of smaller model)
+
+Under the null hypothesis that the extra parameter does not help, this statistic
+follows a χ² distribution with degrees of freedom equal to the number of extra
+parameters.
+
+`terradish` provides `anova()` for this:
+
+```{r lrt}
+# Reduced model: only altitude, no forest cover
+fit_altitude_only <- terradish(
+  melip.Fst ~ altitude,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe
+)
+
+anova(fit_full, fit_altitude_only)
+```
+
+A small p-value (< 0.05) means that removing forest cover significantly
+worsens the fit — evidence that forest cover is an important predictor of
+landscape permeability.
+
+### Testing against the null model of isolation by distance (IBD)
+
+The formula `~ 1` fits a null conductance surface where all cells have equal
+conductance. Resistance distance then equals graph distance (weighted only by
+geography, not landscape features). This is the IBD baseline:
+
+```{r ibd-test}
+fit_ibd <- terradish(
+  melip.Fst ~ 1,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe
+)
+
+# Is the full model significantly better than pure IBD?
+anova(fit_full, fit_ibd)
+```
+
+### Testing for an interaction
+
+An interaction term asks whether the effect of altitude on conductance depends
+on forest cover (or vice versa):
+
+```{r interaction-test}
+fit_interaction <- terradish(
+  melip.Fst ~ forestcover * altitude,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe
+)
+
+# Is the interaction term worth keeping?
+anova(fit_full, fit_interaction)
+```
+
+> **Tip:** Always compare nested models (smaller vs. larger). The model with
+> fewer parameters must be a special case of the model with more parameters.
+> `anova()` will warn you if this is not satisfied.
+
+---
+
+## Information criteria: AIC, AICc, and BIC
+
+Likelihood ratio tests require nested models. When comparing non-nested models
+(e.g. altitude-only vs. forest-cover-only), use an information criterion
+instead.
+
+```{r fit-all-candidates}
+fit_fc_only <- terradish(
+  melip.Fst ~ forestcover,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe
+)
+```
+
+`aic_table()` ranks any set of fitted `terradish` models:
+
+```{r aic-table}
+aic_table(
+  list(fit_ibd, fit_altitude_only, fit_fc_only, fit_full, fit_interaction),
+  mod_names = c("IBD", "Altitude only", "Forestcover only",
+                "Full (A + FC)", "Interaction (A × FC)")
+)
+```
+
+**How to read the table:**
+
+- **logLik** — larger is better (less negative = higher likelihood).
+- **df** — number of estimated parameters; more complex models have higher df.
+- **AIC** — balances fit and complexity. Smaller is better.
+- **delta** — difference from the best model's AIC. Values < 2 indicate
+  roughly equivalent support.
+
+### When to use AICc
+
+AIC can over-fit when the number of observations (here, the number of unique
+pairwise genetic distances) is small relative to the number of parameters.
+AICc adds a second-order correction:
+
+```{r aicc-table}
+aic_table(
+  list(fit_ibd, fit_altitude_only, fit_fc_only, fit_full, fit_interaction),
+  mod_names = c("IBD", "Altitude only", "Forestcover only",
+                "Full", "Interaction"),
+  AICc = TRUE
+)
+```
+
+As a rule of thumb, prefer AICc over AIC when the effective sample size
+(number of independent pairwise observations) is less than about 40 times the
+number of parameters.
+
+### BIC for stricter parsimony
+
+BIC penalises complexity more heavily than AIC and tends to favour simpler
+models:
+
+```{r bic-table}
+aic_table(
+  list(fit_ibd, fit_altitude_only, fit_fc_only, fit_full, fit_interaction),
+  mod_names = c("IBD", "Altitude only", "Forestcover only",
+                "Full", "Interaction"),
+  BIC = TRUE
+)
+```
+
+---
+
+## Visualising the likelihood surface
+
+When a model has only one or two conductance parameters, it is informative to
+map how the log-likelihood changes across parameter space. This reveals:
+
+- How sharp (or flat) the optimum is.
+- Whether there are multiple local optima.
+- Whether the estimates are well-determined or poorly constrained.
+
+`terradish_grid()` evaluates the model at every point on a parameter grid:
+
+```{r likelihood-grid, cache = TRUE}
+# Define a 21 x 21 grid of (forestcover, altitude) combinations
+theta_grid <- as.matrix(
+  expand.grid(
+    forestcover = seq(-1, 1, length.out = 21),
+    altitude    = seq(-1, 1, length.out = 21)
+  )
+)
+
+grid_result <- terradish_grid(
+  theta     = theta_grid,
+  formula   = melip.Fst ~ forestcover + altitude,
+  data      = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe
+)
+```
+
+Plot the result as a heat map with contours:
+
+```{r plot-likelihood-surface, fig.cap = "Log-likelihood surface. Red dot marks the MLE."}
+# Build a data frame for plotting
+grid_df <- data.frame(
+  forestcover = theta_grid[, "forestcover"],
+  altitude    = theta_grid[, "altitude"],
+  loglik      = grid_result$loglik
+)
+
+# Base-R image plot (no ggplot2 dependency)
+loglik_mat <- matrix(
+  grid_df$loglik,
+  nrow = length(unique(grid_df$forestcover)),
+  ncol = length(unique(grid_df$altitude))
+)
+
+image(
+  x    = sort(unique(grid_df$forestcover)),
+  y    = sort(unique(grid_df$altitude)),
+  z    = loglik_mat,
+  xlab = expression(theta[forestcover]),
+  ylab = expression(theta[altitude]),
+  main = "Log-likelihood surface",
+  col  = hcl.colors(64, "Blues", rev = TRUE)
+)
+contour(
+  x    = sort(unique(grid_df$forestcover)),
+  y    = sort(unique(grid_df$altitude)),
+  z    = loglik_mat,
+  add  = TRUE
+)
+points(coef(fit_full)["forestcover"],
+       coef(fit_full)["altitude"],
+       pch = 19, col = "red", cex = 1.5)
+legend("topright", legend = "MLE", pch = 19, col = "red", bty = "n")
+```
+
+A well-behaved likelihood surface has a single, sharp peak at the MLE. A flat
+or elongated surface signals that the parameters are poorly identified —
+often because the covariates are highly correlated or the signal-to-noise ratio
+in the genetic data is low.
+
+---
+
+## Confidence intervals on the conductance surface
+
+`conductance()` computes the fitted conductance at each grid cell along with
+asymptotic confidence interval bounds, propagating uncertainty in θ through the
+log-linear model:
+
+```{r ci-conductance, fig.cap = "Fitted conductance with 95% confidence bounds."}
+fitted_cond <- conductance(surface, fit_full, quantile = 0.95)
+
+# Set a common colour scale across the three panels
+clim <- range(
+  terra::values(fitted_cond[["lower95"]]),
+  terra::values(fitted_cond[["upper95"]]),
+  na.rm = TRUE
+)
+
+plot(fitted_cond[["est"]],
+     range = clim,
+     main  = "Fitted conductance (point estimate)")
+plot(fitted_cond[["lower95"]],
+     range = clim,
+     main  = "Lower 95% CI")
+plot(fitted_cond[["upper95"]],
+     range = clim,
+     main  = "Upper 95% CI")
+```
+
+Wide intervals in a region mean that the available genetic data provide little
+constraint on conductance there — either because few sampling sites are nearby
+or because the genetic signal is weak.
+
+---
+
+## Cross-validation
+
+Information criteria measure in-sample fit. Cross-validation measures
+**out-of-sample** predictive ability, which is often a more honest indicator of
+whether a model will generalise to new data.
+
+`terradish_cv()` randomly partitions the focal sampling sites into a training
+set and a test set, fits the model on the training set, and evaluates the
+held-out log-likelihood on the test set:
+
+```{r cv-single}
+cv_result <- terradish_cv(
+  pts       = melip.coords,
+  covariates = covariates,
+  fmla      = melip.Fst ~ forestcover + altitude,
+  model     = mlpe,
+  prop_train = 2 / 3,   # use 2/3 of sites for training
+  seed      = 42,
+  fit_full  = FALSE     # skip re-fitting on the full data (saves time)
+)
+
+cat("Held-out log-likelihood:", round(cv_result$cv_loglik, 2), "\n")
+```
+
+A single split can be noisy — it may depend heavily on which sites happened to
+land in the training set. `terradish_cv_replicates()` repeats the process
+across many random splits:
+
+```{r cv-replicates}
+cv_reps <- terradish_cv_replicates(
+  pts        = melip.coords,
+  covariates = covariates,
+  fmla       = melip.Fst ~ forestcover + altitude,
+  model      = mlpe,
+  seeds      = 1:5,    # five random splits
+  fit_full   = FALSE,
+  keep_fits  = FALSE
+)
+
+print(cv_reps)
+summary(cv_reps)
+```
+
+### Cross-validation for model selection
+
+To compare models using held-out log-likelihood, fit each candidate with
+`terradish_cv()` or `terradish_cv_replicates()` and then pass the results to
+`cv_model_selection()`:
+
+```{r cv-selection}
+# For speed, use a reduced control with fewer Newton iterations
+ctrl <- NewtonRaphsonControl(maxit = 10, verbose = FALSE)
+
+cv_ibd <- terradish_cv(
+  pts = melip.coords, covariates = covariates,
+  fmla = melip.Fst ~ 1, model = mlpe,
+  prop_train = 2 / 3, seed = 42, fit_full = TRUE, control = ctrl
+)
+
+cv_full <- terradish_cv(
+  pts = melip.coords, covariates = covariates,
+  fmla = melip.Fst ~ forestcover + altitude, model = mlpe,
+  prop_train = 2 / 3, seed = 42, fit_full = TRUE, control = ctrl
+)
+
+cv_comparison <- cv_model_selection(
+  list(
+    list(train_mod = cv_ibd$train_mod,
+         cv_loglik = cv_ibd$cv_loglik,
+         full_mod  = cv_ibd$full_mod),
+    list(train_mod = cv_full$train_mod,
+         cv_loglik = cv_full$cv_loglik,
+         full_mod  = cv_full$full_mod)
+  ),
+  cv_names = c("IBD", "Full (altitude + forestcover)"),
+  aic = TRUE
+)
+
+cv_comparison$loglik_tab
+cv_comparison$AIC_tab
+```
+
+---
+
+## Combining the evidence
+
+A complete analysis typically uses all three approaches together:
+
+| Tool | Answers | When to use |
+|------|---------|-------------|
+| `anova()` | Is covariate X significant? | Nested model comparisons |
+| `aic_table()` | Which model is best overall? | Any set of models on the same surface |
+| `terradish_cv()` / `cv_model_selection()` | Which model predicts new sites best? | Predictive rather than explanatory goals |
+
+When `anova()` gives a small p-value *and* AIC selects the same model *and*
+cross-validation confirms it has better held-out log-likelihood, you have strong
+evidence that the included covariates genuinely predict landscape permeability.
+
+---
+
+## Summary of key functions
+
+| Function | Purpose |
+|----------|---------|
+| `anova(fit1, fit2)` | Likelihood ratio test between two nested models |
+| `aic_table(list(...))` | Rank models by AIC, AICc, or BIC |
+| `terradish_grid()` | Evaluate log-likelihood on a parameter grid |
+| `conductance()` | Fitted conductance with confidence intervals |
+| `terradish_cv()` | Single train/test split cross-validation |
+| `terradish_cv_replicates()` | Repeated cross-validation across random splits |
+| `cv_model_selection()` | Combine CV log-likelihoods with an AIC table |
