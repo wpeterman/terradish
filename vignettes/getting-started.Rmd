@@ -1,6 +1,10 @@
 ---
 title: "Getting Started with terradish"
-output: rmarkdown::html_vignette
+author: "Bill Peterman"
+output: 
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
 vignette: >
   %\VignetteIndexEntry{Getting Started with terradish}
   %\VignetteEngine{knitr::rmarkdown}

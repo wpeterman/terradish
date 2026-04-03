@@ -1,6 +1,10 @@
 ---
 title: "Model Comparison and Selection in terradish"
-output: rmarkdown::html_vignette
+author: "Bill Peterman"
+output: 
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
 vignette: >
   %\VignetteIndexEntry{Model Comparison and Selection in terradish}
   %\VignetteEngine{knitr::rmarkdown}
@@ -187,7 +191,7 @@ number of parameters.
 
 ### BIC for stricter parsimony
 
-BIC penalises complexity more heavily than AIC and tends to favour simpler
+BIC penalizes complexity more heavily than AIC and tends to favor simpler
 models:
 
 ```{r bic-table}
@@ -201,7 +205,7 @@ aic_table(
 
 ---
 
-## Visualising the likelihood surface
+## Visualizing the likelihood surface
 
 When a model has only one or two conductance parameters, it is informative to
 map how the log-likelihood changes across parameter space. This reveals:

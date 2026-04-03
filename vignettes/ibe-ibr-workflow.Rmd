@@ -1,6 +1,10 @@
 ---
 title: "Concurrent IBE and IBR in terradish"
-output: rmarkdown::html_vignette
+author: "Bill Peterman"
+output: 
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
 vignette: >
   %\VignetteIndexEntry{Concurrent IBE and IBR in terradish}
   %\VignetteEngine{knitr::rmarkdown}
@@ -53,19 +57,19 @@ to it, rather than competing for credit in a single predictor.
 
 The mean structure of the joint model is:
 
-> S\_ij = α + β · R\_ij + Z\_ij · γ + e\_ij
+$$S_{ij} = α + β · R_{ij} + Z_{ij} · γ + e_{ij}$$
 
 where:
 
-- **R\_ij** is the pairwise resistance distance (determined by the conductance
+- $R_{ij}$ is the pairwise resistance distance (determined by the conductance
   surface and the θ parameters).
-- **Z\_ij** is a pairwise endpoint-difference covariate — some measure of how
+- $Z_{ij}$ is a pairwise endpoint-difference covariate — some measure of how
   environmentally dissimilar sites *i* and *j* are.
-- **β** captures the IBR signal: does resistance distance predict genetic
+- $β$ captures the IBR signal: does resistance distance predict genetic
   differentiation after accounting for environment?
 - **γ** captures the IBE signal: does environmental mismatch predict genetic
   differentiation after accounting for landscape resistance?
-- **e\_ij** is a residual following the MLPE correlation structure (see
+- $e_{ij}$ is a residual following the MLPE correlation structure (see
   `vignette("getting-started", package = "terradish")`).
 
 ---
