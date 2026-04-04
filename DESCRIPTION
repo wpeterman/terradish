@@ -1,7 +1,7 @@
 Package: terradish
 Type: Package
 Title: Fast Gradient-Based Optimization of Resistance Surfaces
-Version: 0.0.8
+Version: 0.0.9
 Date: 2026-04-04
 Authors@R: c(
   person(

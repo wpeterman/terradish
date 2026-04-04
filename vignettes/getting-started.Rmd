@@ -24,27 +24,27 @@ knitr::opts_chunk$set(
 
 ## What is terradish for?
 
-`terradish` estimates how landscape features — altitude, forest cover, roads,
-water bodies, etc. — shape genetic differentiation among populations.
+`terradish` estimates how landscape features (altitude, forest cover, roads,
+water bodies, etc.) shape genetic differentiation among populations.
 
 The core idea is **isolation by resistance (IBR)**: instead of assuming that
 genetic distance simply tracks straight-line geographic distance (isolation by
-distance, IBD), IBR recognises that the landscape is heterogeneous. Some cells
+distance, IBD), IBR recognizes that the landscape is heterogeneous. Some cells
 are easy to move through; others are barriers. The ease of movement through a
 cell is its **conductance** (the inverse of **resistance**).
 
 If we can map conductance across the landscape as a function of measurable
 covariates (rasters), we can:
 
-1. Build a **conductance surface** — a weighted graph over the raster grid.
-2. Compute **resistance distances** among sampling locations — effective
-   distances that account for the landscape structure.
+1. Build a **conductance surface**: a weighted graph over the raster grid.
+2. Compute **resistance distances** among sampling locations. These are
+   effective distances that account for the landscape structure.
 3. Fit a **statistical model** relating those resistance distances to observed
    genetic distances.
-4. Optimise the conductance parameters by maximum likelihood.
+4. Optimize the conductance parameters by maximum likelihood.
 
 `terradish` automates all four steps and provides gradients, standard errors,
-model-comparison tools, and visualisation helpers.
+model-comparison tools, and visualization helpers.
 
 ---
 
@@ -79,8 +79,8 @@ The **measurement model** describes the statistical relationship between
 pairwise resistance distances and pairwise genetic distances. Two choices cover
 most use-cases:
 
-- `leastsquares` — ordinary regression; fast, assumes independent errors.
-- `mlpe` — "maximum likelihood population effects"; accounts for the
+- `leastsquares`: ordinary regression; fast, assumes independent errors.
+- `mlpe`: "maximum likelihood population effects"; accounts for the
   non-independence among all pairwise measurements that share a sampling site.
   This is generally the preferred choice.
 
@@ -122,10 +122,10 @@ melip.coords      <- terra::unwrap(melip.coords)
 
 What do we have?
 
-- **`melip.altitude`** — a raster of elevation (metres) across the study area.
-- **`melip.forestcover`** — a raster of forest cover proportion (0–1).
-- **`melip.coords`** — 34 sampling locations as a `SpatVector`.
-- **`melip.Fst`** — a 34 × 34 matrix of pairwise F~ST~ (a standard measure
+- **`melip.altitude`**: a raster of elevation (meters) across the study area.
+- **`melip.forestcover`**: a raster of forest cover proportion (0–1).
+- **`melip.coords`**: 34 sampling locations as a `SpatVector`.
+- **`melip.Fst`**: a 34 × 34 matrix of pairwise F~ST~ (a standard measure
   of genetic differentiation; larger values mean more differentiation).
 
 ```{r inspect-data}
@@ -142,7 +142,7 @@ as between B and A), so only the lower triangle carries new information.
 
 ---
 
-## Visualise the spatial data
+## Visualize the spatial data
 
 ```{r plot-covariates, fig.cap = "Altitude raster with sampling sites."}
 plot(melip.altitude, main = "Altitude (m)")
@@ -156,11 +156,11 @@ points(melip.coords, pch = 19, cex = 0.8)
 
 ---
 
-## Scale your rasters — an important step
+## Scale your rasters: an important step
 
 Conductance in the loglinear model is exp(θ·x). If `x` (e.g. altitude in
-metres) has a very large range, small changes in θ produce enormous changes in
-conductance, making optimisation numerically unstable. **Always scale continuous
+meters) has a very large range, small changes in θ produce enormous changes in
+conductance, making optimization numerically unstable. **Always scale continuous
 covariates** before fitting.
 
 ```{r scale}
@@ -172,9 +172,8 @@ covariates <- scale_covariates(covariates)
 By default, `scale_covariates()` subtracts each layer's mean and divides by its
 standard deviation, giving every continuous covariate a mean of 0 and a
 standard deviation of 1. It also stores the original-scale center and scale for
-each layer, which lets `plot(fit, type = "marginal", data = surface)` and
-`plot(fit, type = "marginal_response", data = surface)` label x-axes in the
-original units automatically.
+each layer, which lets `plot(fit, type = "marginal", data = surface)` label
+x-axes in the original units automatically.
 
 ---
 
@@ -188,7 +187,7 @@ surface <- conductance_surface(covariates, melip.coords, directions = 8)
 
 1. Reads the raster values at every non-NA grid cell.
 2. Identifies which cells correspond to the sampling locations.
-3. Builds a graph where adjacent cells (here, using all 8 neighbours including
+3. Builds a graph where adjacent cells (here, using all 8 neighbors including
    diagonals) are connected by edges whose weights will be determined by the
    conductance model.
 
@@ -240,8 +239,8 @@ summary(fit_ls)
   easier), which *decreases* resistance distance. A negative θ means the
   covariate acts as a barrier.
 - **phi**: nuisance parameters of the measurement model (intercept, slope,
-  residual precision). These are profiled out automatically — you generally do
-  not need to interpret them directly.
+  residual precision). These are profiled out automatically and you generally
+  do not need to interpret them directly.
 - The standard errors and z-statistics help gauge parameter uncertainty.
 
 ---
@@ -296,46 +295,46 @@ cat("One SD increase in altitude multiplies conductance by",
 
 ---
 
-## Visualise the fit
+## Visualize the fit
 
 ### Observed vs. fitted genetic distances
 
+The `plot()` S3 method with `type = "fit"` produces an observed-vs-fitted
+scatter plot with a least-squares regression line:
+
 ```{r plot-fit, fig.cap = "Observed vs. resistance-distance-fitted genetic distances."}
-plot(
-  fitted(fit_mlpe, "distance"),
-  melip.Fst,
-  pch  = 19,
-  cex  = 0.5,
-  xlab = "Optimised resistance distance",
-  ylab = expression(F[ST]),
-  main = "Observed vs. fitted"
-)
-abline(lm(c(melip.Fst) ~ c(fitted(fit_mlpe, "distance"))),
-       col = "steelblue", lwd = 2)
+plot(fit_mlpe, type = "fit")
 ```
 
 ### Fitted conductance surface
 
+`type = "surface"` renders the point-estimate conductance surface alongside its
+lower and upper confidence interval bounds in a single three-panel figure. All
+panels share the same color scale so relative differences are easy to read:
+
 ```{r conductance-surface, fig.cap = "Estimated conductance surface with 95% confidence interval bounds."}
-fitted_cond <- conductance(surface, fit_mlpe, quantile = 0.95)
-
-# Estimated conductance
-plot(fitted_cond[["est"]],
-     main = "Fitted conductance (MLPE)")
-points(melip.coords, pch = 19, cex = 0.6)
-
-# Lower 95% confidence interval
-plot(fitted_cond[["lower95"]],
-     main = "Lower 95% CI — conductance")
-
-# Upper 95% confidence interval
-plot(fitted_cond[["upper95"]],
-     main = "Upper 95% CI — conductance")
+plot(fit_mlpe, type = "surface", data = surface)
 ```
 
-Darker cells are more conductive (easier to move through). The confidence
-interval layers show where estimates are more or less certain — typically,
-areas with many sampling sites nearby have narrower intervals.
+Brighter cells are more conductive (easier to move through). Panels where the
+lower and upper bounds are close together indicate regions where the available
+genetic data tightly constrain conductance, typically near sampling sites.
+
+### Marginal effects of each covariate on conductance
+
+`type = "marginal"` sweeps each covariate across its observed range while
+averaging over all other covariates. The ribbon shows a 95% pointwise
+confidence band derived from the delta method. Because we used
+`scale_covariates()`, the x-axes are automatically back-transformed to the
+original units (meters of elevation, proportion forest cover):
+
+```{r marginal-effects, fig.cap = "Marginal effect of each covariate on conductance with 95% CI."}
+plot(fit_mlpe, type = "marginal", data = surface)
+```
+
+A rising curve means higher covariate values increase conductance (the
+landscape is more permeable there); a declining curve indicates a barrier
+effect.
 
 ---
 
@@ -345,7 +344,7 @@ This vignette covered the core workflow. Two companion vignettes go further:
 
 - **`vignette("model-comparison", package = "terradish")`** — testing and
   comparing models (likelihood ratio tests, AIC, cross-validation, likelihood
-  surface visualisation).
+  surface visualization).
 - **`vignette("ibe-ibr-workflow", package = "terradish")`** — fitting
   isolation-by-environment (IBE) and IBR simultaneously in the same model.
 
@@ -376,16 +375,10 @@ fit <- terradish(melip.Fst ~ forestcover + altitude,
                  conductance_model = loglinear_conductance,
                  measurement_model = mlpe)
 
-fitted_cond <- conductance(surface, fit, quantile = 0.95)
-
-
-# 4. Summarise and visualise
+# 4. Summarize and visualize
 summary(fit)
-plot(fit)
-plot(fit, type = 'marginal', data = surface)
-plot(fitted_cond)
 
-plot(fitted(fit, "distance"), melip.Fst, pch = 19,
-     xlab = "Resistance distance", ylab = expression(F[ST]))
-plot(conductance(surface, fit, quantile = 0.95)[["est"]])
+plot(fit, type = "fit")                       # observed vs. fitted scatter
+plot(fit, type = "surface", data = surface)   # conductance map + 95% CI panels
+plot(fit, type = "marginal", data = surface)  # marginal covariate effects
 ```

@@ -6,4 +6,6 @@ src/*.o
 src/*.so
 src/*.dll
 .claude/
+cache/
+figure/
 vignettes/*_cache/

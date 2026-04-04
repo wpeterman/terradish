@@ -50,9 +50,9 @@ melip.altitude    <- terra::unwrap(melip.altitude)
 melip.forestcover <- terra::unwrap(melip.forestcover)
 melip.coords      <- terra::unwrap(melip.coords)
 
-covariates <- c(terra::scale(melip.altitude),
-                terra::scale(melip.forestcover))
+covariates <- c(melip.altitude, melip.forestcover)
 names(covariates) <- c("altitude", "forestcover")
+covariates <- scale_covariates(covariates)
 
 surface <- conductance_surface(covariates, melip.coords, directions = 8)
 
@@ -93,7 +93,7 @@ anova(fit_full, fit_altitude_only)
 ```
 
 A small p-value (< 0.05) means that removing forest cover significantly
-worsens the fit — evidence that forest cover is an important predictor of
+worsens the fit, which is evidence that forest cover is an important predictor of
 landscape permeability.
 
 ### Testing against the null model of isolation by distance (IBD)
@@ -164,10 +164,10 @@ aic_table(
 
 **How to read the table:**
 
-- **logLik** — larger is better (less negative = higher likelihood).
-- **df** — number of estimated parameters; more complex models have higher df.
-- **AIC** — balances fit and complexity. Smaller is better.
-- **delta** — difference from the best model's AIC. Values < 2 indicate
+- **logLik**: larger is better (less negative = higher likelihood).
+- **df**: number of estimated parameters; more complex models have higher df.
+- **AIC**: balances fit and complexity. Smaller is better.
+- **delta**: difference from the best model's AIC. Values < 2 indicate
   roughly equivalent support.
 
 ### When to use AICc
@@ -273,42 +273,44 @@ legend("topright", legend = "MLE", pch = 19, col = "red", bty = "n")
 ```
 
 A well-behaved likelihood surface has a single, sharp peak at the MLE. A flat
-or elongated surface signals that the parameters are poorly identified —
-often because the covariates are highly correlated or the signal-to-noise ratio
+or elongated surface signals that the parameters are poorly identified, often
+because the covariates are highly correlated or the signal-to-noise ratio
 in the genetic data is low.
 
 ---
 
 ## Confidence intervals on the conductance surface
 
-`conductance()` computes the fitted conductance at each grid cell along with
-asymptotic confidence interval bounds, propagating uncertainty in θ through the
-log-linear model:
+`plot(fit, type = "surface", data = surface)` renders the fitted conductance
+alongside its asymptotic lower and upper confidence interval bounds in a
+single three-panel figure. Uncertainty in θ is propagated through the
+log-linear model via the delta method, and all panels share the same color
+scale:
 
 ```{r ci-conductance, fig.cap = "Fitted conductance with 95% confidence bounds."}
-fitted_cond <- conductance(surface, fit_full, quantile = 0.95)
-
-# Set a common colour scale across the three panels
-clim <- range(
-  terra::values(fitted_cond[["lower95"]]),
-  terra::values(fitted_cond[["upper95"]]),
-  na.rm = TRUE
-)
-
-plot(fitted_cond[["est"]],
-     range = clim,
-     main  = "Fitted conductance (point estimate)")
-plot(fitted_cond[["lower95"]],
-     range = clim,
-     main  = "Lower 95% CI")
-plot(fitted_cond[["upper95"]],
-     range = clim,
-     main  = "Upper 95% CI")
+plot(fit_full, type = "surface", data = surface)
 ```
 
 Wide intervals in a region mean that the available genetic data provide little
-constraint on conductance there — either because few sampling sites are nearby
+constraint on conductance there, either because few sampling sites are nearby
 or because the genetic signal is weak.
+
+## Marginal effects on conductance
+
+`plot(fit, type = "marginal", data = surface)` sweeps each covariate across
+its observed range while averaging over all other covariates. The shaded ribbon
+is a 95% pointwise confidence band from the delta method. Because we used
+`scale_covariates()` to prepare the rasters, x-axes are automatically
+back-transformed to the original measurement units:
+
+```{r marginal-conductance, fig.cap = "Marginal effect of each covariate on conductance."}
+plot(fit_full, type = "marginal", data = surface)
+```
+
+A rising curve means higher covariate values increase conductance (more
+permeable landscape); a declining curve indicates a barrier effect. Flat or
+wide-interval curves suggest that covariate adds little constraint beyond the
+other predictors already in the model.
 
 ---
 
@@ -316,7 +318,7 @@ or because the genetic signal is weak.
 
 Information criteria measure in-sample fit. Cross-validation measures
 **out-of-sample** predictive ability, which is often a more honest indicator of
-whether a model will generalise to new data.
+whether a model will generalize to new data.
 
 `terradish_cv()` randomly partitions the focal sampling sites into a training
 set and a test set, fits the model on the training set, and evaluates the
@@ -336,7 +338,7 @@ cv_result <- terradish_cv(
 cat("Held-out log-likelihood:", round(cv_result$cv_loglik, 2), "\n")
 ```
 
-A single split can be noisy — it may depend heavily on which sites happened to
+A single split can be noisy; it may depend heavily on which sites happened to
 land in the training set. `terradish_cv_replicates()` repeats the process
 across many random splits:
 
@@ -359,15 +361,22 @@ summary(cv_reps)
 
 To compare models using held-out log-likelihood, fit each candidate with
 `terradish_cv()` or `terradish_cv_replicates()` and then pass the results to
-`cv_model_selection()`:
+`cv_model_selection()`. In this example, we compare a one-covariate model to
+the two-covariate model. A pure intercept-only MLPE model (`~ 1`) can fit on
+the full data but still collapse to a no-coefficient boundary on some training
+splits, which makes it a fragile teaching example for cross-validation.
 
 ```{r cv-selection}
 # For speed, use a reduced control with fewer Newton iterations
 ctrl <- NewtonRaphsonControl(maxit = 10, verbose = FALSE)
 
-cv_ibd <- terradish_cv(
-  pts = melip.coords, covariates = covariates,
-  fmla = melip.Fst ~ 1, model = mlpe,
+# Subset the raster stack for the simpler model so the example stays quiet
+# and only uses the covariate that appears in the formula.
+forestcover_only <- covariates[["forestcover"]]
+
+cv_forestcover <- terradish_cv(
+  pts = melip.coords, covariates = forestcover_only,
+  fmla = melip.Fst ~ forestcover, model = mlpe,
   prop_train = 2 / 3, seed = 42, fit_full = TRUE, control = ctrl
 )
 
@@ -379,14 +388,14 @@ cv_full <- terradish_cv(
 
 cv_comparison <- cv_model_selection(
   list(
-    list(train_mod = cv_ibd$train_mod,
-         cv_loglik = cv_ibd$cv_loglik,
-         full_mod  = cv_ibd$full_mod),
+    list(train_mod = cv_forestcover$train_mod,
+         cv_loglik = cv_forestcover$cv_loglik,
+         full_mod  = cv_forestcover$full_mod),
     list(train_mod = cv_full$train_mod,
          cv_loglik = cv_full$cv_loglik,
          full_mod  = cv_full$full_mod)
   ),
-  cv_names = c("IBD", "Full (altitude + forestcover)"),
+  cv_names = c("Forest cover only", "Full (altitude + forestcover)"),
   aic = TRUE
 )
 

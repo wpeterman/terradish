@@ -29,8 +29,8 @@ genetically different than others? Two broad classes of explanation exist:
 
 - **Isolation by resistance (IBR):** movement is easiest through certain
   landscape types and hardest through others. Genetic differentiation
-  accumulates between populations that are separated by high-resistance
-  terrain — even if straight-line distance is short.
+  accumulates between populations separated by high-resistance terrain,
+  even when straight-line distance is short.
 - **Isolation by environment (IBE):** populations inhabiting similar
   environments tend to exchange genes more readily (or experience parallel
   selection), so environmentally dissimilar sites show greater genetic
@@ -63,8 +63,8 @@ where:
 
 - $R_{ij}$ is the pairwise resistance distance (determined by the conductance
   surface and the θ parameters).
-- $Z_{ij}$ is a pairwise endpoint-difference covariate — some measure of how
-  environmentally dissimilar sites *i* and *j* are.
+- $Z_{ij}$ is a pairwise endpoint-difference covariate (some measure of how
+  environmentally dissimilar sites *i* and *j* are).
 - $β$ captures the IBR signal: does resistance distance predict genetic
   differentiation after accounting for environment?
 - **γ** captures the IBE signal: does environmental mismatch predict genetic
@@ -96,9 +96,9 @@ melip.coords      <- terra::unwrap(melip.coords)
 # Scale continuous covariates before building the conductance surface.
 # This keeps the conductance parameters on a comparable scale and avoids
 # numerical overflow in exp(theta * x).
-covariates <- c(terra::scale(melip.altitude),
-                terra::scale(melip.forestcover))
+covariates <- c(melip.altitude, melip.forestcover)
 names(covariates) <- c("altitude", "forestcover")
+covariates <- scale_covariates(covariates)
 
 surface <- conductance_surface(covariates, melip.coords, directions = 8)
 ```
@@ -117,7 +117,7 @@ z_ibe <- pairwise_endpoint_covariates(
   melip.altitude,          # site-level environmental data (raster or matrix)
   coords    = melip.coords,# focal-point locations (used to extract from raster)
   transform = "absdiff",  # how to convert site values into pairwise values
-  scale     = TRUE         # standardise site values first
+  scale     = TRUE         # standardize site values first
 )
 
 # Each row is one pair of sites; each column is one pairwise covariate.
@@ -132,7 +132,7 @@ Four transforms are available:
 | Transform | Formula | When to use |
 |-----------|---------|-------------|
 | `"absdiff"` | \|x\_i − x\_j\| | One covariate; symmetric, intuitive |
-| `"sqdiff"` | (x\_i − x\_j)² | Penalises large differences more; useful with noisy data |
+| `"sqdiff"` | (x\_i − x\_j)² | Penalizes large differences more; useful with noisy data |
 | `"euclidean"` | √Σ(x\_ik − x\_jk)² | Multivariate environment; collapses to a single distance |
 | `"manhattan"` | Σ\|x\_ik − x\_jk\| | Multivariate environment; less sensitive to outlier dimensions |
 
@@ -171,7 +171,7 @@ model. The resulting object (`g_ibe`) can be passed anywhere that `mlpe` can:
 g_ibe <- mlpe_covariates(z_ibe)
 ```
 
-`g_ibe` is a function, not a fitted model — it defines the likelihood structure.
+`g_ibe` is a function, not a fitted model; it defines the likelihood structure.
 The actual parameters (β, γ, and the MLPE correlation) are estimated when you
 call `terradish()`.
 
@@ -188,7 +188,7 @@ combinations and compare them.
 # real analysis.
 ctrl <- NewtonRaphsonControl(maxit = 20, verbose = FALSE)
 
-# IBD: null model — no landscape or environment predictors
+# IBD: null model, no landscape or environment predictors
 fit_ibd <- terradish(
   melip.Fst ~ 1,
   data              = surface,
@@ -241,8 +241,8 @@ fit_joint <- terradish(
 
 ### Conductance parameters (theta)
 
-`coef()` returns the conductance parameters — the θ values that map raster
-covariates to landscape permeability:
+`coef()` returns the conductance parameters (the θ values that map raster
+covariates to landscape permeability):
 
 ```{r coef-ibr}
 coef(fit_ibr)   # IBR-only model
@@ -263,7 +263,7 @@ that variation.
 ### IBE coefficients (gamma, inside phi)
 
 Because IBE lives in the measurement model rather than the conductance model,
-its coefficient (γ) is reported inside `phi` — the vector of nuisance
+its coefficient (γ) is reported inside `phi`, the vector of nuisance
 parameters:
 
 ```{r summary-joint}
@@ -276,7 +276,7 @@ after accounting for the resistance distance between them. A negative γ (rarely
 biologically expected for IBE) would mean the opposite.
 
 The other phi parameters (`alpha`, `beta`, `tau`, `rho`) are the MLPE
-regression nuisance parameters and are the same as in a plain `mlpe` fit —
+regression nuisance parameters and are the same as in a plain `mlpe` fit:
 intercept, IBR slope, residual precision, and MLPE correlation.
 
 ### Quick summary of which parameter lives where
@@ -334,7 +334,7 @@ anova(fit_ibr, fit_ibd)
 ```
 
 Note that IBE-only (`fit_ibe`) and IBR-only (`fit_ibr`) are **not** nested
-in each other — they differ on which side of the model (conductance vs.
+in each other; they differ on which side of the model (conductance vs.
 measurement) carries the predictors. Use `aic_table()`, not `anova()`, to
 compare them.
 
@@ -348,7 +348,7 @@ on, so it can only be called for models with raster covariates on the
 conductance side (IBR-only and joint). The IBD and IBE-only models use `~ 1`,
 meaning all cells have equal conductance and there are no θ values to
 estimate from the training split. For those models we pass the in-sample
-log-likelihood directly as the held-out value — a conservative choice that
+log-likelihood directly as the held-out value, a conservative choice that
 does not inflate their apparent predictive performance.
 
 ```{r cv-model-selection}
@@ -397,10 +397,10 @@ comparison$loglik_tab
 comparison$AIC_tab
 ```
 
-> **Why cross-validate?** AIC measures in-sample fit penalised for complexity.
-> Cross-validation directly measures whether the model generalises to new sites.
+> **Why cross-validate?** AIC measures in-sample fit penalized for complexity.
+> Cross-validation directly measures whether the model generalizes to new sites.
 > For IBE + IBR models, AIC and CV often agree, but they can diverge when the
-> extra IBE parameter fits noise in the training data that does not generalise.
+> extra IBE parameter fits noise in the training data that does not generalize.
 
 For a more stable estimate of predictive performance, repeat across multiple
 random splits using `terradish_cv_replicates()`:
@@ -422,35 +422,45 @@ summary(cv_joint_reps)
 
 ---
 
-## Step 6 — Visualise the joint model
-
-### Fitted conductance surface
-
-The conductance surface reflects only the θ side of the model — the IBE term
-does not change how permeable the landscape is estimated to be.
-
-```{r conductance-surface, fig.cap = "Estimated conductance surface from the joint IBE + IBR model."}
-fitted_cond <- conductance(surface, fit_joint, quantile = 0.95)
-
-plot(fitted_cond[["est"]],
-     main = "Joint model: fitted conductance")
-points(melip.coords, pch = 19, cex = 0.6)
-```
+## Step 6 — Visualize the joint model
 
 ### Observed vs. fitted genetic distances
 
+`plot(fit, type = "fit")` shows the pairwise genetic distances against the
+resistance distances implied by the fitted model, with a least-squares
+regression line:
+
 ```{r obs-vs-fitted, fig.cap = "Observed vs. fitted pairwise genetic distances from the joint model."}
-plot(
-  fitted(fit_joint, "distance"),
-  melip.Fst,
-  pch  = 19,
-  cex  = 0.5,
-  xlab = "Resistance distance (joint model)",
-  ylab = expression(F[ST]),
-  main = "Observed vs. fitted — joint IBE + IBR"
-)
-abline(lm(c(melip.Fst) ~ c(fitted(fit_joint, "distance"))),
-       col = "steelblue", lwd = 2)
+plot(fit_joint, type = "fit")
+```
+
+### Fitted conductance surface
+
+The conductance surface reflects only the θ side of the model; the IBE term
+does not change how permeable the landscape is estimated to be.
+`plot(fit, type = "surface", data = surface)` shows the point estimate and
+95% confidence interval bounds in a single three-panel figure:
+
+```{r conductance-surface, fig.cap = "Estimated conductance surface from the joint IBE + IBR model."}
+plot(fit_joint, type = "surface", data = surface)
+```
+
+### Marginal effects of landscape covariates
+
+`plot(fit, type = "marginal", data = surface)` illustrates how each raster
+covariate influences conductance after accounting for the other terms in the
+model. Because we used `scale_covariates()`, x-axes are back-transformed to
+the original units automatically:
+
+```{r marginal-joint, fig.cap = "Marginal conductance effects for the joint IBE + IBR model."}
+plot(fit_joint, type = "marginal", data = surface)
+```
+
+Compare these curves to those from the IBR-only model to see whether adding
+the IBE term changes the estimated landscape permeability:
+
+```{r marginal-ibr, fig.cap = "Marginal conductance effects for the IBR-only model."}
+plot(fit_ibr, type = "marginal", data = surface)
 ```
 
 ---
@@ -504,7 +514,7 @@ parameter_table
 | Goal | Recommended approach |
 |------|---------------------|
 | Does landscape resistance matter? | `anova(fit_ibr, fit_ibd)` |
-| Does environment matter after accounting for resistance? | `anova(fit_joint, fit_ibr)` — or look at γ in `summary(fit_joint)` |
+| Does environment matter after accounting for resistance? | `anova(fit_joint, fit_ibr)`, or inspect γ in `summary(fit_joint)` |
 | Which single model has the best in-sample fit? | `aic_table(list(...))` |
 | Which model predicts new sites best? | `cv_model_selection(list(...))` |
 | Is my predictive result stable across splits? | `terradish_cv_replicates()` |
@@ -519,9 +529,9 @@ adding explanatory power and the simpler IBR model is preferable.
 ## What comes next?
 
 - **`vignette("getting-started", package = "terradish")`** — the core
-  single-process workflow (load data, scale covariates, fit, visualise).
+  single-process workflow (load data, scale covariates, fit, visualize).
 - **`vignette("model-comparison", package = "terradish")`** — likelihood
-  ratio tests, AIC/AICc/BIC, likelihood surface visualisation, and
+  ratio tests, AIC/AICc/BIC, likelihood surface visualization, and
   cross-validation in depth.
 
 ---
@@ -538,9 +548,9 @@ melip.altitude    <- terra::unwrap(melip.altitude)
 melip.forestcover <- terra::unwrap(melip.forestcover)
 melip.coords      <- terra::unwrap(melip.coords)
 
-covariates <- c(terra::scale(melip.altitude),
-                terra::scale(melip.forestcover))
+covariates <- c(melip.altitude, melip.forestcover)
 names(covariates) <- c("altitude", "forestcover")
+covariates <- scale_covariates(covariates)
 surface <- conductance_surface(covariates, melip.coords, directions = 8)
 
 # 2. Build IBE covariates and measurement model
@@ -570,7 +580,8 @@ anova(fit_ibr,   fit_ibd)   # does IBR improve on IBD?
 coef(fit_joint)
 summary(fit_joint)$phi
 
-# 6. Visualise
-plot(conductance(surface, fit_joint, quantile = 0.95)[["est"]])
-plot(fitted(fit_joint, "distance"), melip.Fst, pch = 19)
+# 6. Visualize
+plot(fit_joint, type = "fit")                       # observed vs. fitted
+plot(fit_joint, type = "surface", data = surface)   # conductance map + CI panels
+plot(fit_joint, type = "marginal", data = surface)  # marginal covariate effects
 ```
