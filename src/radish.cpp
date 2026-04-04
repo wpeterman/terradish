@@ -416,3 +416,100 @@ arma::sp_mat backpropagate_conductance_to_laplacian (const arma::vec& dgrad__ddl
 
   return arma::trimatu(dgrad__ddl_dQn);
 }
+
+// [[Rcpp::export]]
+arma::mat laplacian_derivative_matrix_product(const arma::vec& dgrad__ddl_dC,
+                                              const arma::umat& tadj,
+                                              const arma::mat& G)
+{
+  if (tadj.n_rows != 2)
+    Rcpp::stop("[laplacian_derivative_matrix_product] tadj.n_rows != 2");
+
+  const unsigned N = dgrad__ddl_dC.n_elem - 1;
+  if (G.n_rows != N)
+    Rcpp::stop("[laplacian_derivative_matrix_product] G has incompatible number of rows");
+
+  arma::mat dgrad__ddl_dQnG(N, G.n_cols, arma::fill::zeros);
+
+  for (unsigned edge = 0; edge < tadj.n_cols; ++edge)
+  {
+    const unsigned j = tadj.at(0, edge);
+    const unsigned i = tadj.at(1, edge);
+
+    if (i <= j)
+      continue;
+    else if (i > N)
+      Rcpp::stop("[laplacian_derivative_matrix_product] vertex out of bounds");
+
+    const double dij = dgrad__ddl_dC.at(i) + dgrad__ddl_dC.at(j);
+    if (i == N)
+    {
+      dgrad__ddl_dQnG.row(j) += dij * G.row(j);
+    }
+    else
+    {
+      dgrad__ddl_dQnG.row(j) += dij * (G.row(j) - G.row(i));
+      dgrad__ddl_dQnG.row(i) += dij * (G.row(i) - G.row(j));
+    }
+  }
+
+  return dgrad__ddl_dQnG;
+}
+
+// [[Rcpp::export]]
+arma::mat graph_rhs_matrix_product(const arma::uvec& demes,
+                                   const int n_vertices,
+                                   const arma::mat& X)
+{
+  if (n_vertices < 2)
+    Rcpp::stop("[graph_rhs_matrix_product] need at least two vertices");
+  if (X.n_rows != demes.n_elem)
+    Rcpp::stop("[graph_rhs_matrix_product] X has incompatible number of rows");
+
+  const arma::uword N = static_cast<arma::uword>(n_vertices);
+  const arma::uword Nred = N - 1;
+
+  arma::rowvec baseline = -arma::sum(X, 0) / static_cast<double>(N);
+  arma::mat out(Nred, X.n_cols, arma::fill::zeros);
+  out.each_row() = baseline;
+
+  for (arma::uword j = 0; j < demes.n_elem; ++j)
+  {
+    const arma::uword deme = demes.at(j);
+    if (deme < 1 || deme > N)
+      Rcpp::stop("[graph_rhs_matrix_product] deme index out of bounds");
+    if (deme < N)
+      out.row(deme - 1) += X.row(j);
+  }
+
+  return out;
+}
+
+// [[Rcpp::export]]
+arma::mat graph_rhs_crossprod(const arma::uvec& demes,
+                              const int n_vertices,
+                              const arma::mat& X)
+{
+  if (n_vertices < 2)
+    Rcpp::stop("[graph_rhs_crossprod] need at least two vertices");
+
+  const arma::uword N = static_cast<arma::uword>(n_vertices);
+  const arma::uword Nred = N - 1;
+  if (X.n_rows != Nred)
+    Rcpp::stop("[graph_rhs_crossprod] X has incompatible number of rows");
+
+  arma::rowvec baseline = -arma::sum(X, 0) / static_cast<double>(N);
+  arma::mat out(demes.n_elem, X.n_cols, arma::fill::zeros);
+  out.each_row() = baseline;
+
+  for (arma::uword j = 0; j < demes.n_elem; ++j)
+  {
+    const arma::uword deme = demes.at(j);
+    if (deme < 1 || deme > N)
+      Rcpp::stop("[graph_rhs_crossprod] deme index out of bounds");
+    if (deme < N)
+      out.row(j) += X.row(deme - 1);
+  }
+
+  return out;
+}

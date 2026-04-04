@@ -33,3 +33,15 @@ backpropagate_conductance_to_laplacian <- function(dgrad__ddl_dC, tadj) {
     .Call(`_terradish_backpropagate_conductance_to_laplacian`, dgrad__ddl_dC, tadj)
 }
 
+laplacian_derivative_matrix_product <- function(dgrad__ddl_dC, tadj, G) {
+    .Call(`_terradish_laplacian_derivative_matrix_product`, dgrad__ddl_dC, tadj, G)
+}
+
+graph_rhs_matrix_product <- function(demes, n_vertices, X) {
+    .Call(`_terradish_graph_rhs_matrix_product`, demes, n_vertices, X)
+}
+
+graph_rhs_crossprod <- function(demes, n_vertices, X) {
+    .Call(`_terradish_graph_rhs_crossprod`, demes, n_vertices, X)
+}
+

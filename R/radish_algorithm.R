@@ -10,13 +10,20 @@
   {
     k <- idx[m]
     dgrad__ddl_dC <- state$C$df__dtheta(k)
-    dgrad__ddl_dQn <- forceSymmetric(backpropagate_conductance_to_laplacian(dgrad__ddl_dC, state$s$adj))
-    dgrad__ddl_dQnG <- dgrad__ddl_dQn %*% state$G
+    dgrad__ddl_dQnG <- laplacian_derivative_matrix_product(
+      dgrad__ddl_dC,
+      state$s$adj,
+      state$G
+    )
     dgrad__ddl_dE <- -state$tG %*% dgrad__ddl_dQnG
     dgrad__dE <- state$subproblem$jacobian_E(dgrad__ddl_dE)
 
     chunk_state[[m]] <- list(k = k, dgrad__ddl_dE = dgrad__ddl_dE)
-    rhs_blocks[[m]] <- state$Zn %*% dgrad__dE - 2 * dgrad__ddl_dQnG %*% state$dl_dE
+    rhs_blocks[[m]] <- graph_rhs_matrix_product(
+      state$s$demes,
+      state$N,
+      dgrad__dE
+    ) - 2 * dgrad__ddl_dQnG %*% state$dl_dE
   }
 
   rhs_block <- if (length(rhs_blocks) == 1L) rhs_blocks[[1]] else do.call(cbind, rhs_blocks)
@@ -30,9 +37,9 @@
     dgrad__dQnG <- t(solved_block[, cols, drop = FALSE])
     dgrad__dC <- backpropagate_laplacian_to_conductance(dgrad__dQnG, state$tG, state$s$adj)
 
-    hess_row <- numeric(length(state$theta))
+    hess_row <- c(crossprod(state$df__dtheta_matrix, c(dgrad__dC)))
     for (l in seq_along(state$theta))
-      hess_row[l] <- c(dgrad__dC) %*% state$C$df__dtheta(l) +
+      hess_row[l] <- hess_row[l] +
         c(state$dl_dC) %*% state$C$d2f__dtheta_dtheta(k, l)
 
     partial_X_k <- NULL
@@ -95,6 +102,18 @@
     rhs[idx] <- rhs[idx] + 1
   }
   rhs
+}
+
+.conductance_df_dtheta_matrix <- function(C, theta)
+{
+  if (!is.null(C$df__dtheta_matrix))
+    return(as.matrix(C$df__dtheta_matrix))
+
+  vapply(
+    seq_along(theta),
+    function(k) c(C$df__dtheta(k)),
+    numeric(length(C$conductance))
+  )
 }
 
 .graph_reduced_laplacian <- function(s, conductance)
@@ -446,7 +465,8 @@
 
 .terradish_algorithm_derivative_results <- function(idx, state, cores, worker_libpaths = .libPaths())
 {
-  splits <- split(idx, cut(idx, breaks = min(as.integer(cores), length(idx)), labels = FALSE))
+  n_workers <- min(as.integer(cores), length(idx))
+  splits <- split(idx, cut(idx, breaks = n_workers, labels = FALSE))
   cl <- makeCluster(length(splits))
   on.exit(stopCluster(cl), add = TRUE)
 
@@ -541,6 +561,7 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
 
   # conductance
   C <- f(theta)
+  df__dtheta_matrix <- .conductance_df_dtheta_matrix(C, theta)
 
   # Form the Laplacian. "adj" is assumed to contain at a minimum
   # the upper triangular part of the Laplacian (e.g. all edges [i,j]
@@ -553,7 +574,7 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
   G    <- solve_main$solution
   Gmat <- as.matrix(G)
   tG   <- t(Gmat)
-  E    <- crossprod(Zn, G)
+  E    <- graph_rhs_crossprod(s$demes, N, Gmat)
 
   if (objective || gradient || hessian)
   {
@@ -577,8 +598,7 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
       dl_dE    <- subproblem$gradient 
       dl_dQnG  <- dl_dE %*% tG
       dl_dC    <- backpropagate_laplacian_to_conductance(dl_dQnG, tG, s$adj)
-      for(k in 1:length(theta))
-        grad[k] <- c(dl_dC) %*% C$df__dtheta(k)
+      grad <- c(crossprod(df__dtheta_matrix, c(dl_dC)))
 
       # hessian and mixed partial derivative calculations
       if (hessian || partial)
@@ -598,17 +618,18 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
         {
           derivative_state <- list(C = C,
                                    s = s,
-                                   G = G,
+                                   G = Gmat,
                                    tG = tG,
                                    Zn = Zn,
                                    solver_state = solver_state,
+                                   df__dtheta_matrix = df__dtheta_matrix,
                                    subproblem = subproblem,
                                    dl_dE = dl_dE,
                                    dl_dC = dl_dC,
                                    theta = theta,
                                    partial = partial,
                                    N = N)
-    derivative_results <- .terradish_algorithm_derivative_results(
+          derivative_results <- .terradish_algorithm_derivative_results(
             idx = idx,
             state = derivative_state,
             cores = cores,
@@ -619,10 +640,11 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
         {
           derivative_state <- list(C = C,
                                    s = s,
-                                   G = G,
+                                   G = Gmat,
                                    tG = tG,
                                    Zn = Zn,
                                    solver_state = solver_state,
+                                   df__dtheta_matrix = df__dtheta_matrix,
                                    subproblem = subproblem,
                                    dl_dE = dl_dE,
                                    dl_dC = dl_dC,

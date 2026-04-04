@@ -88,10 +88,11 @@ loglinear_conductance <- function(formula, x)
     conductance        <- as.vector(exp(x %*% theta))
 
     stopifnot(all(conductance > 0))
+    df__dtheta_matrix  <- conductance * x
 
     # first- and second-order derivatives
     df__dx             <- function(k)    conductance * theta[k]
-    df__dtheta         <- function(k)    conductance * x[,k]
+    df__dtheta         <- function(k)    df__dtheta_matrix[, k]
     d2f__dtheta_dtheta <- function(k, l) conductance * x[,k] * x[,l]
     d2f__dtheta_dx     <- function(k, l) conductance * ((k==l) + x[,k] * theta[l])
 
@@ -121,6 +122,7 @@ loglinear_conductance <- function(formula, x)
          confint            = confint,
          df__dx             = df__dx,
          df__dtheta         = df__dtheta,
+         df__dtheta_matrix  = df__dtheta_matrix,
          d2f__dtheta_dtheta = d2f__dtheta_dtheta, 
          d2f__dtheta_dx     = d2f__dtheta_dx)
   }
@@ -176,6 +178,7 @@ linear_conductance <- function(formula, x)
     stopifnot(all(conductance > 0))
 
     ones <- matrix(1, nrow(x), 1)
+    df__dtheta_matrix <- x
 
     # asymptotic confidence intervals
     confint <- function(theta, vcov, quantile = 0.95, scale = c("conductance", "linpred"))
@@ -193,7 +196,7 @@ linear_conductance <- function(formula, x)
 
     # first- and second-order derivatives
     df__dx             <- function(k)    ones * theta[k]
-    df__dtheta         <- function(k)    x[,k]
+    df__dtheta         <- function(k)    df__dtheta_matrix[, k]
     d2f__dtheta_dtheta <- function(k, l) 0. * ones
     d2f__dtheta_dx     <- function(k, l) (k==l) * ones
 
@@ -201,6 +204,7 @@ linear_conductance <- function(formula, x)
          confint            = confint,
          df__dx             = df__dx,
          df__dtheta         = df__dtheta,
+         df__dtheta_matrix  = df__dtheta_matrix,
          d2f__dtheta_dtheta = d2f__dtheta_dtheta, 
          d2f__dtheta_dx     = d2f__dtheta_dx)
   }

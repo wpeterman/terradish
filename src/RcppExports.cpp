@@ -130,6 +130,45 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// laplacian_derivative_matrix_product
+arma::mat laplacian_derivative_matrix_product(const arma::vec& dgrad__ddl_dC, const arma::umat& tadj, const arma::mat& G);
+RcppExport SEXP _terradish_laplacian_derivative_matrix_product(SEXP dgrad__ddl_dCSEXP, SEXP tadjSEXP, SEXP GSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::vec& >::type dgrad__ddl_dC(dgrad__ddl_dCSEXP);
+    Rcpp::traits::input_parameter< const arma::umat& >::type tadj(tadjSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type G(GSEXP);
+    rcpp_result_gen = Rcpp::wrap(laplacian_derivative_matrix_product(dgrad__ddl_dC, tadj, G));
+    return rcpp_result_gen;
+END_RCPP
+}
+// graph_rhs_matrix_product
+arma::mat graph_rhs_matrix_product(const arma::uvec& demes, const int n_vertices, const arma::mat& X);
+RcppExport SEXP _terradish_graph_rhs_matrix_product(SEXP demesSEXP, SEXP n_verticesSEXP, SEXP XSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::uvec& >::type demes(demesSEXP);
+    Rcpp::traits::input_parameter< const int >::type n_vertices(n_verticesSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type X(XSEXP);
+    rcpp_result_gen = Rcpp::wrap(graph_rhs_matrix_product(demes, n_vertices, X));
+    return rcpp_result_gen;
+END_RCPP
+}
+// graph_rhs_crossprod
+arma::mat graph_rhs_crossprod(const arma::uvec& demes, const int n_vertices, const arma::mat& X);
+RcppExport SEXP _terradish_graph_rhs_crossprod(SEXP demesSEXP, SEXP n_verticesSEXP, SEXP XSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::uvec& >::type demes(demesSEXP);
+    Rcpp::traits::input_parameter< const int >::type n_vertices(n_verticesSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type X(XSEXP);
+    rcpp_result_gen = Rcpp::wrap(graph_rhs_crossprod(demes, n_vertices, X));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_terradish_amg_reduced_laplacian_create", (DL_FUNC) &_terradish_amg_reduced_laplacian_create, 11},
@@ -140,6 +179,9 @@ static const R_CallMethodDef CallEntries[] = {
     {"_terradish_pcg_reduced_laplacian", (DL_FUNC) &_terradish_pcg_reduced_laplacian, 6},
     {"_terradish_backpropagate_laplacian_to_conductance", (DL_FUNC) &_terradish_backpropagate_laplacian_to_conductance, 3},
     {"_terradish_backpropagate_conductance_to_laplacian", (DL_FUNC) &_terradish_backpropagate_conductance_to_laplacian, 2},
+    {"_terradish_laplacian_derivative_matrix_product", (DL_FUNC) &_terradish_laplacian_derivative_matrix_product, 3},
+    {"_terradish_graph_rhs_matrix_product", (DL_FUNC) &_terradish_graph_rhs_matrix_product, 3},
+    {"_terradish_graph_rhs_crossprod", (DL_FUNC) &_terradish_graph_rhs_crossprod, 3},
     {NULL, NULL, 0}
 };
 

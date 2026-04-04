@@ -42,6 +42,57 @@ test_that("AMG solver matches direct solver on melip subproblem", {
   expect_equal(fit_direct$hessian, fit_amg$hessian, tolerance = 1e-4)
 })
 
+test_that("compiled Laplacian derivative products match sparse Matrix products", {
+  dat <- melip_fixture(1:8)
+  surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
+  model <- loglinear_conductance(~ altitude + forestcover, surface$x)
+  C <- model(c(altitude = -0.2, forestcover = 0.3))
+  dconductance <- C$df__dtheta(1L)
+
+  solver_state <- terradish:::.terradish_solver_setup(
+    surface,
+    C$conductance,
+    solver = "direct"
+  )
+  G <- as.matrix(terradish:::.terradish_solver_solve(
+    solver_state,
+    surface$rhs
+  )$solution)
+
+  dQn_sparse <- Matrix::forceSymmetric(
+    backpropagate_conductance_to_laplacian(dconductance, surface$adj)
+  )
+  dQnG_sparse <- as.matrix(dQn_sparse %*% G)
+  dQnG_compiled <- laplacian_derivative_matrix_product(
+    dconductance,
+    surface$adj,
+    G
+  )
+
+  expect_equal(dQnG_compiled, dQnG_sparse, tolerance = 1e-12)
+})
+
+test_that("compiled reduced-RHS products match explicit matrix multiplication", {
+  dat <- melip_fixture(1:8)
+  surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
+  n_vertices <- nrow(surface$x)
+  Zn <- terradish:::.graph_rhs(surface, n_vertices)
+
+  left_input <- matrix(rnorm(ncol(Zn) * 5L), nrow = ncol(Zn), ncol = 5L)
+  expect_equal(
+    graph_rhs_matrix_product(surface$demes, n_vertices, left_input),
+    as.matrix(Zn %*% left_input),
+    tolerance = 1e-12
+  )
+
+  right_input <- matrix(rnorm(nrow(Zn) * 4L), nrow = nrow(Zn), ncol = 4L)
+  expect_equal(
+    graph_rhs_crossprod(surface$demes, n_vertices, right_input),
+    as.matrix(crossprod(Zn, right_input)),
+    tolerance = 1e-12
+  )
+})
+
 test_that("adaptive AMG schedule stages early and final tolerances", {
   early <- terradish:::.terradish_solver_control_for_phase(
     solver = "amg",
