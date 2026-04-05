@@ -97,9 +97,13 @@ BoxConstrainedNewton <- function(par, fn, lower = rep(-Inf, length(par)), upper 
 
     gradient     <- fit$gradient
     gradient_box <- zero_bounded_variables(gradient, par, lower, upper, eps)
-    ehess        <- eigen(fit$hessian)
+    # Numerical Hessians can drift slightly away from exact symmetry on larger
+    # problems. Symmetrizing keeps the Newton step real-valued and avoids
+    # complex eigendecompositions in the line search.
+    hessian_sym  <- (fit$hessian + t(fit$hessian)) / 2
+    ehess        <- eigen(hessian_sym, symmetric = TRUE)
     ehess$values <- abs(ehess$values)
-    ehess$values <- ifelse(ehess$values < max(abs(fit$hessian)) * etol, 1, ehess$values)
+    ehess$values <- ifelse(ehess$values < max(abs(hessian_sym)) * etol, 1, ehess$values)
     ihess        <- ehess$vectors %*% solve(diag(ehess$values, nrow=length(par))) %*% t(ehess$vectors)
     desc         <- gap_step_bounded_variables(-ihess %*% gradient_box, par, gradient, lower, upper, eps)
     phi0         <- fit$objective

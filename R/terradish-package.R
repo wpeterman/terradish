@@ -14,6 +14,8 @@
 #' @importFrom stats qnorm reformulate residuals rnorm rWishart sigma simulate terms
 #' @importFrom terra adjacent cellFromXY geom global is.factor levels ncell nlyr patches rast
 #' @importFrom terra unwrap values values<- xyFromCell
-#' @importFrom utils modifyList write.csv
+#' @importFrom utils globalVariables modifyList write.csv
 #' @useDynLib terradish, .registration = TRUE
 "_PACKAGE"
+
+utils::globalVariables(c("est", "observed", "upper", "x", "y"))

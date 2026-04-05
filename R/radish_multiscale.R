@@ -25,7 +25,8 @@
   defaults <- list(
     factor = 2L,
     aggregate_fun = mean,
-    directions = if (!is.null(data$directions)) data$directions else 8L
+    directions = if (!is.null(data$directions)) data$directions else 8L,
+    exact_refine = TRUE
   )
   control <- modifyList(defaults, control)
   control$factor <- as.integer(control$factor)[1]

@@ -14,3 +14,4 @@
 ^src/.*\.gcno$
 ^src/.*\.gcda$
 ^\.claude$
+^vignettes/.*_cache$

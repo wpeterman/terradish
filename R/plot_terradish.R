@@ -193,7 +193,7 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
     geom_raster() +
     facet_wrap(~panel, nrow = 1) +
     coord_equal(expand = FALSE) +
-    scale_fill_gradientn(colours = terrain.colors(100), limits = clim,
+    scale_fill_gradientn(colours = grDevices::terrain.colors(100), limits = clim,
                          name = "Conductance") +
     labs(x = NULL, y = NULL) +
     theme_bw() +

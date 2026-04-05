@@ -191,7 +191,7 @@ test_that("direct factorization chooser switches to supernodal only for large gr
   )
 
   expect_equal(
-    terradish:::.terradish_resolve_direct_factorization(default_control, n_vertices = 250000L, n_rhs = 25L),
+    terradish:::.terradish_resolve_direct_factorization(default_control, n_vertices = 62500L, n_rhs = 25L),
     "supernodal_ll"
   )
 })

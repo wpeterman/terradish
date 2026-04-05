@@ -228,6 +228,15 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
   BoxConstrainedBFGS(theta, optfn, control = control)
 }
 
+.resolve_terradish_optimizer <- function(optimizer, n_theta)
+{
+  if (identical(optimizer, "auto") && as.integer(n_theta) > 3L)
+    return("bfgs")
+  if (identical(optimizer, "auto"))
+    return("newton")
+  optimizer
+}
+
 #' Optimize a parameterized conductance surface
 #'
 #' Uses maximum likelihood to fit a parameterized conductance surface to genetic data,
@@ -250,7 +259,12 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' @param nonnegative Force regression-like \code{measurement_model} to have nonnegative slope?
 #' @param conductance Retained for backward compatibility. Only
 #'   \code{conductance = TRUE} is currently implemented.
-#' @param optimizer The optimization algorithm to use: \code{newton} uses the exact Hessian, with computational cost that grows linearly with the number of parameters; while \code{bfgs} uses an approximation with much reduced cost (but slower overall convergence)
+#' @param optimizer The optimization algorithm to use: \code{newton} uses the
+#'   exact Hessian, with computational cost that grows linearly with the number
+#'   of parameters; \code{bfgs} uses an approximate Hessian with cheaper
+#'   iterations but often more steps; and \code{auto} selects \code{bfgs} when
+#'   there are more than three conductance parameters and \code{newton}
+#'   otherwise.
 #' @param control A list containing options for the optimization routine (see \code{\link{NewtonRaphsonControl}} for list)
 #' @param validate Numerical validation of leverage via package \code{numDeriv} (very slow, use for debugging small examples)
 #' @param cores Number of worker processes to use for Hessian and leverage calculations. \code{1} evaluates serially.
@@ -266,9 +280,28 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   \code{tol_early}, \code{tol_mid}, \code{tol_final}, \code{maxit_early},
 #'   \code{maxit_mid}, \code{maxit_final}, and \code{warmup_evals}. AMG controls
 #'   also support \code{reuse_preconditioner} to reuse multigrid hierarchy
-#'   information across nearby optimization steps when possible.
-#' @param approximation Exploratory approximation used during optimization. \code{"none"} uses the full focal set throughout. \code{"landmark"} optimizes first on a space-filling subset of focal populations and then refines on the full likelihood when supported by the measurement model.
-#' @param approximation_control Optional named list controlling the landmark approximation. Supported entries include \code{n_landmarks}, \code{fraction}, \code{min_landmarks}, \code{max_landmarks}, \code{method} (\code{"spacefill"}, \code{"random"}, or \code{"sequential"}), \code{seed}, and \code{exact_refine}. The final reported fit is still evaluated on the full data. For \code{measurement_model = leastsquares}, landmark exact-refinement is guarded and the approximation stage is skipped.
+#'   information across nearby optimization steps when possible. Direct
+#'   supernodal factorizations can benefit from a threaded BLAS, but those
+#'   thread counts are controlled by the external R/BLAS build rather than by
+#'   \code{terradish()} itself.
+#' @param approximation Exploratory approximation used during optimization.
+#'   \code{"none"} uses the full focal set throughout. \code{"landmark"}
+#'   optimizes first on a space-filling subset of focal populations and then
+#'   refines on the full likelihood when supported by the measurement model.
+#'   \code{"coarse_raster"} optimizes first on an aggregated raster and then
+#'   optionally refines on the full-resolution graph.
+#' @param approximation_control Optional named list controlling the landmark or
+#'   coarse-raster approximation. Landmark entries include
+#'   \code{n_landmarks}, \code{fraction}, \code{min_landmarks},
+#'   \code{max_landmarks}, \code{method} (\code{"spacefill"},
+#'   \code{"random"}, or \code{"sequential"}), \code{seed}, and
+#'   \code{exact_refine}. For \code{approximation = "coarse_raster"},
+#'   supported entries include \code{factor}, \code{aggregate_fun},
+#'   \code{directions}, and \code{exact_refine}; this path requires
+#'   \code{conductance_surface(..., saveStack = TRUE)}. The final reported fit
+#'   is still evaluated on the full data. For
+#'   \code{measurement_model = leastsquares}, landmark exact-refinement is
+#'   guarded and the approximation stage is skipped.
 #'
 #' @details By "parameterized conductance surface", what is meant is a model
 #' where the per-vertex conductance (and thus resistance distance) is a function of
@@ -307,8 +340,9 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' values of \code{theta} (and associated conductance) that result in
 #' resistance distances that are closest to the observed genetic distances,
 #' according to some measure of fit (like least squares). The optimization is
-#' done via Newton's method (default; requires computation of Hessian) or via the BFGS
-#' algorithm (requires gradient only) if argument \code{optimizer = "bfgs"}. 
+#' done via Newton's method (default; requires computation of Hessian), via the
+#' BFGS algorithm (requires gradient only) if \code{optimizer = "bfgs"}, or via
+#' a simple parameter-count heuristic if \code{optimizer = "auto"}.
 #'
 #' For an explanation of how categorical spatial covariates are handled, see
 #' \code{details} of \code{\link{conductance_surface}} and the examples below.
@@ -400,13 +434,13 @@ terradish <- function(formula,
                    leverage = TRUE, 
                    nonnegative = TRUE, 
                    conductance = TRUE, 
-                   optimizer = c("newton", "bfgs"), 
+                   optimizer = c("newton", "bfgs", "auto"), 
                    control = NewtonRaphsonControl(verbose = TRUE, ctol = 1e-6, ftol = 1e-6), 
                    validate = FALSE,
                    cores = 1L,
                    solver = c("direct", "auto", "amg", "pcg", "pcg_jacobi"),
                    solver_control = NULL,
-                   approximation = c("none", "landmark"),
+                   approximation = c("none", "landmark", "coarse_raster"),
                    approximation_control = NULL)
 {
   stopifnot(inherits(formula, "formula"))
@@ -433,7 +467,8 @@ terradish <- function(formula,
 
   # "conductance_model" (a factory) is then responsible for parsing formula,
   # constructing design matrix, and returning actual "conductance_model"
-  conductance_model <- conductance_model(formula, data$x)
+  conductance_model_factory <- conductance_model
+  conductance_model <- conductance_model_factory(formula, data$x)
 
   # initialize theta
   default <- attr(conductance_model, "default")
@@ -443,9 +478,13 @@ terradish <- function(formula,
     stopifnot(length(theta) == length(default))
   names(theta) <- names(default)
 
-  optimizer <- match.arg(optimizer)
+  optimizer <- .resolve_terradish_optimizer(match.arg(optimizer), length(theta))
   fcalls    <- new("FunctionCall", count = 0L)
-  make_optfn <- function(eval_data, eval_S, phi_state, solver_state)
+  make_optfn <- function(eval_data,
+                         eval_S,
+                         phi_state,
+                         solver_state,
+                         eval_conductance_model = conductance_model)
   {
     function(par, gradient, hessian)
     {
@@ -456,7 +495,7 @@ terradish <- function(formula,
         eval_count = fcalls$count,
         final = FALSE
       )
-      fit <- terradish_algorithm(f = conductance_model,
+      fit <- terradish_algorithm(f = eval_conductance_model,
                               g = measurement_model,
                               s = eval_data,
                               S = eval_S,
@@ -485,6 +524,7 @@ terradish <- function(formula,
   {
     measurement_model_name <- .terradish_measurement_model_name(measurement_model)
     landmark_problem <- NULL
+    coarse_problem <- NULL
     if (identical(approximation, "landmark"))
     {
       landmark_problem <- .terradish_landmark_subset(data, S, approximation_control = approximation_control)
@@ -506,6 +546,29 @@ terradish <- function(formula,
         )
         landmark_problem <- NULL
       }
+    }
+    else if (identical(approximation, "coarse_raster"))
+    {
+      coarse_problem <- .coarse_raster_surface(
+        data,
+        approximation_control = approximation_control
+      )
+      approximation_info <- list(
+        type = "coarse_raster",
+        used = isTRUE(coarse_problem$used),
+        stage = if (isTRUE(coarse_problem$used))
+          "optimization_only"
+        else
+          "skipped_factor_1",
+        factor = coarse_problem$control$factor,
+        directions = coarse_problem$control$directions,
+        full_vertices = coarse_problem$full_vertices,
+        coarse_vertices = coarse_problem$coarse_vertices,
+        full_focal = nrow(S),
+        duplicate_demes = coarse_problem$duplicate_demes,
+        unique_demes = coarse_problem$unique_demes,
+        exact_refine = isTRUE(coarse_problem$control$exact_refine)
+      )
     }
 
     iters <- 0L
@@ -547,6 +610,34 @@ terradish <- function(formula,
 
       exact_phi_state$value <- approx_phi_state$value
       exact_solver_state$reuse_state <- approx_solver_state$reuse_state
+    }
+    else if (!is.null(coarse_problem) && isTRUE(coarse_problem$used))
+    {
+      coarse_conductance_model <- conductance_model_factory(formula,
+                                                            coarse_problem$surface$x)
+      approx_phi_state <- new.env(parent = emptyenv())
+      approx_phi_state$value <- NULL
+      approx_solver_state <- new.env(parent = emptyenv())
+      approx_solver_state$warm_start <- NULL
+      approx_solver_state$reuse_state <- NULL
+
+      approx_problem <- .run_terradish_optimizer(
+        theta = theta,
+        optfn = make_optfn(coarse_problem$surface,
+                           S,
+                           approx_phi_state,
+                           approx_solver_state,
+                           eval_conductance_model = coarse_conductance_model),
+        optimizer = optimizer,
+        control = control
+      )
+      iters <- iters + approx_problem$iters
+      theta <- c(approx_problem$par)
+      names(theta) <- names(default)
+
+      # The coarse graph has a different dimension, so only transfer the
+      # nuisance-parameter warm start to the exact full-resolution stage.
+      exact_phi_state$value <- approx_phi_state$value
     }
 
     if (!isTRUE(approximation_info$used) || isTRUE(approximation_info$exact_refine))
@@ -784,7 +875,7 @@ print.summary.radish <- function(x, digits = max(3L, getOption("digits") - 3L), 
   cat("Call:   ", paste(deparse(x$call), sep = "\n", collapse = "\n"), "\n\n", sep = "")
   cat("Loglikelihood:", x$loglik, paste0("(", x$df), "degrees freedom)\nAIC:", x$aic, "\n\n")
   cat("Number of function calls:", x$fcalls, "\n")
-  cat("Number of Newton-Raphson steps:", x$iters, "\n")
+  cat("Number of optimization steps:", x$iters, "\n")
   cat("Norm of gradient at MLE:", x$gradnorm, "\n\n")
   if (length(x$phi))
   {
