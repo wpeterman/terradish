@@ -430,7 +430,7 @@ summary(cv_joint_reps)
 resistance distances implied by the fitted model, with a least-squares
 regression line:
 
-```{r obs-vs-fitted, fig.cap = "Observed vs. fitted pairwise genetic distances from the joint model."}
+```{r obs-vs-fitted, fig.cap = "***Observed vs. fitted pairwise genetic distances from the joint model.***"}
 plot(fit_joint, type = "fit")
 ```
 
@@ -441,7 +441,7 @@ does not change how permeable the landscape is estimated to be.
 `plot(fit, type = "surface", data = surface)` shows the point estimate and
 95% confidence interval bounds in a single three-panel figure:
 
-```{r conductance-surface, fig.cap = "Estimated conductance surface from the joint IBE + IBR model."}
+```{r conductance-surface, fig.cap = "***Estimated conductance surface from the joint IBE + IBR model.***"}
 plot(fit_joint, type = "surface", data = surface)
 ```
 
@@ -452,14 +452,14 @@ covariate influences conductance after accounting for the other terms in the
 model. Because we used `scale_covariates()`, x-axes are back-transformed to
 the original units automatically:
 
-```{r marginal-joint, fig.cap = "Marginal conductance effects for the joint IBE + IBR model."}
+```{r marginal-joint, fig.cap = "***Marginal conductance effects for the joint IBE + IBR model.***"}
 plot(fit_joint, type = "marginal", data = surface)
 ```
 
 Compare these curves to those from the IBR-only model to see whether adding
 the IBE term changes the estimated landscape permeability:
 
-```{r marginal-ibr, fig.cap = "Marginal conductance effects for the IBR-only model."}
+```{r marginal-ibr, fig.cap = "***Marginal conductance effects for the IBR-only model.***"}
 plot(fit_ibr, type = "marginal", data = surface)
 ```
 

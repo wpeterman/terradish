@@ -20,22 +20,61 @@ test_that("wishart_covariance returns the full measurement-model interface", {
   expect_equal(dim(fit$jacobian_S(diag(nrow(E)))), dim(S))
 })
 
+test_that("simulate_covariance_response is reproducible and returns Wishart inputs", {
+  dat <- melip_fixture(keep = 1:6)
+  surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
+  theta_true <- c(altitude = 0.15, forestcover = -0.2)
+
+  sim1 <- simulate_covariance_response(
+    theta = theta_true,
+    formula = ~ altitude + forestcover,
+    data = surface,
+    conductance_model = loglinear_conductance,
+    tau = 0.7,
+    sigma = 0.15,
+    nu = 40,
+    nsim = 2,
+    seed = 1
+  )
+
+  sim2 <- simulate_covariance_response(
+    theta = theta_true,
+    formula = ~ altitude + forestcover,
+    data = surface,
+    conductance_model = loglinear_conductance,
+    tau = 0.7,
+    sigma = 0.15,
+    nu = 40,
+    nsim = 2,
+    seed = 1
+  )
+
+  expect_equal(dim(sim1$covariance), c(6, 6, 2))
+  expect_equal(sim1$covariance, sim2$covariance)
+  expect_equal(dim(sim1$Sigma), c(6, 6))
+  expect_equal(dim(sim1$E), c(6, 6))
+  expect_true(isSymmetric(sim1$Sigma))
+  expect_true(isSymmetric(sim1$E))
+  expect_equal(unname(sim1$theta), matrix(unname(theta_true), nrow = 1))
+  expect_equal(colnames(sim1$theta), names(theta_true))
+})
+
 test_that("terradish can optimize with wishart_covariance on covariance responses", {
   dat <- melip_fixture(keep = 1:6)
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
   theta_true <- c(altitude = 0.15, forestcover = -0.2)
 
-  E_true <- terradish_distance(
-    theta = matrix(theta_true, nrow = 1),
+  sim <- simulate_covariance_response(
+    theta = theta_true,
     formula = ~ altitude + forestcover,
     data = surface,
     conductance_model = loglinear_conductance,
-    covariance = TRUE
-  )$covariance[, , 1]
-
-  Sigma_true <- 0.7 * E_true + 0.15 * diag(nrow(E_true))
-  set.seed(1)
-  genetic_cov <- rWishart(1, df = 40, Sigma = Sigma_true)[,,1] / 40
+    tau = 0.7,
+    sigma = 0.15,
+    nu = 40,
+    seed = 1
+  )
+  genetic_cov <- sim$covariance
 
   fit <- suppressWarnings(
     terradish(genetic_cov ~ altitude + forestcover,
@@ -59,21 +98,17 @@ test_that("wishart_covariance supports leverage on full covariance responses", {
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
   theta_true <- c(0.15, -0.2)
 
-  E_true <- terradish_algorithm(
-    f = loglinear_conductance(~ altitude + forestcover, surface$x),
-    g = leastsquares,
-    s = surface,
-    S = diag(length(surface$demes)),
+  sim <- simulate_covariance_response(
     theta = theta_true,
-    objective = FALSE,
-    gradient = FALSE,
-    hessian = FALSE,
-    partial = FALSE
-  )$covariance
-
-  Sigma_true <- 0.7 * as.matrix(E_true) + 0.15 * diag(nrow(E_true))
-  set.seed(2)
-  genetic_cov <- rWishart(1, df = 40, Sigma = Sigma_true)[, , 1] / 40
+    formula = ~ altitude + forestcover,
+    data = surface,
+    conductance_model = loglinear_conductance,
+    tau = 0.7,
+    sigma = 0.15,
+    nu = 40,
+    seed = 2
+  )
+  genetic_cov <- sim$covariance
 
   fit <- suppressWarnings(
     terradish(genetic_cov ~ altitude + forestcover,

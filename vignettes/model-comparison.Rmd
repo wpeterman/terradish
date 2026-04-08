@@ -236,7 +236,7 @@ grid_result <- terradish_grid(
 
 Plot the result as a heat map with contours:
 
-```{r plot-likelihood-surface, fig.cap = "Log-likelihood surface. Red dot marks the MLE."}
+```{r plot-likelihood-surface, fig.cap = "***Log-likelihood surface. Red dot marks the MLE.***"}
 # Build a data frame for plotting
 grid_df <- data.frame(
   forestcover = theta_grid[, "forestcover"],
@@ -287,7 +287,7 @@ single three-panel figure. Uncertainty in θ is propagated through the
 log-linear model via the delta method, and all panels share the same color
 scale:
 
-```{r ci-conductance, fig.cap = "Fitted conductance with 95% confidence bounds."}
+```{r ci-conductance, fig.cap = "***Fitted conductance with 95% confidence bounds.***"}
 plot(fit_full, type = "surface", data = surface)
 ```
 
@@ -303,7 +303,7 @@ is a 95% pointwise confidence band from the delta method. Because we used
 `scale_covariates()` to prepare the rasters, x-axes are automatically
 back-transformed to the original measurement units:
 
-```{r marginal-conductance, fig.cap = "Marginal effect of each covariate on conductance."}
+```{r marginal-conductance, fig.cap = "***Marginal effect of each covariate on conductance.***"}
 plot(fit_full, type = "marginal", data = surface)
 ```
 

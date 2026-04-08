@@ -144,14 +144,14 @@ as between B and A), so only the lower triangle carries new information.
 
 ## Visualize the spatial data
 
-```{r plot-covariates, fig.cap = "Altitude raster with sampling sites."}
+```{r plot-covariates, fig.cap = "***Altitude raster with sampling sites.***"}
 plot(melip.altitude, main = "Altitude (m)")
-points(melip.coords, pch = 19, cex = 0.8)
+points(melip.coords, pch = 19, cex = 0.8, col = 'red')
 ```
 
-```{r plot-forestcover, fig.cap = "Forest cover raster (0 = no forest, 1 = full cover)."}
+```{r plot-forestcover, fig.cap = "***Forest cover raster (0 = no forest, 1 = full cover).***"}
 plot(melip.forestcover, main = "Forest cover")
-points(melip.coords, pch = 19, cex = 0.8)
+points(melip.coords, pch = 19, cex = 0.8, col = 'red')
 ```
 
 ---
@@ -269,6 +269,72 @@ actual precision of your estimates.
 
 ---
 
+## Choosing a measurement model
+
+`terradish` provides four measurement models. The right choice depends on
+the form of your genetic data and how you want to handle the non-independence
+of pairwise observations.
+
+| Model | Input `S` | Requires `nu` | Correlation structure |
+|---|---|---|---|
+| `leastsquares` | distance matrix | no | none (independent errors) |
+| `mlpe` | distance matrix | no | MLPE shared-site correction |
+| `generalized_wishart` | distance matrix | yes | Wishart (McCullagh 2009) |
+| `wishart_covariance` | **covariance** matrix | yes | Wishart |
+
+`leastsquares` is the fastest and simplest. It is a reasonable first pass but
+underestimates standard errors because it ignores the shared-site correlation.
+
+`mlpe` corrects for the non-independence that arises because every pair (A–B)
+and (A–C) both involve site A. It is the default recommendation for
+distance-matrix data when the number of genetic markers is not recorded.
+
+`generalized_wishart` models the observed distance matrix as arising from a
+generalized Wishart distribution (McCullagh 2009, Peterson et al. 2019). It
+requires `nu`, the number of genetic markers used to compute `S`, and is the
+principled choice when that count is available. Like `mlpe` it accepts a
+pairwise distance matrix (e.g. F~ST~).
+
+`wishart_covariance` is the Wishart analogue for data supplied as a
+**covariance** matrix (e.g. from `cov_from_biallelic()`) rather than a
+distance matrix. It also requires `nu`.
+
+### Fitting with `generalized_wishart`
+
+```{r fit-wishart}
+# nu is the number of genetic markers used to calculate melip.Fst.
+# 8 in the original data set
+fit_gw <- terradish(
+  melip.Fst ~ forestcover + altitude,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = generalized_wishart,
+  nu                = 8
+)
+
+summary(fit_gw)
+```
+
+The nuisance parameters for `generalized_wishart` are `tau` (the scaling of
+the resistance-distance covariance) and `sigma` (a log-scale identity
+component that absorbs sampling noise not explained by landscape resistance).
+A `tau` estimate near zero indicates no detectable resistance-distance signal.
+
+You can compare models fitted with different measurement models using
+`aic_table()`. Note that AIC is only meaningful across measurement models when
+the response data `S` is identical and the likelihoods are on the same scale —
+all three models here use the same `melip.Fst` distance matrix, so the
+comparison is valid.
+
+```{r compare-measurement-models}
+aic_table(
+  list(fit_ls, fit_mlpe, fit_gw),
+  mod_names = c("leastsquares", "mlpe", "generalized_wishart")
+)
+```
+
+---
+
 ## Extract and interpret coefficients
 
 ```{r coef}
@@ -302,7 +368,7 @@ cat("One SD increase in altitude multiplies conductance by",
 The `plot()` S3 method with `type = "fit"` produces an observed-vs-fitted
 scatter plot with a least-squares regression line:
 
-```{r plot-fit, fig.cap = "Observed vs. resistance-distance-fitted genetic distances."}
+```{r plot-fit, fig.cap = "***Observed vs. resistance-distance-fitted genetic distances.***"}
 plot(fit_mlpe, type = "fit")
 ```
 
@@ -312,7 +378,7 @@ plot(fit_mlpe, type = "fit")
 lower and upper confidence interval bounds in a single three-panel figure. All
 panels share the same color scale so relative differences are easy to read:
 
-```{r conductance-surface, fig.cap = "Estimated conductance surface with 95% confidence interval bounds."}
+```{r conductance-surface, fig.cap = "***Estimated conductance surface with 95% confidence interval bounds.***"}
 plot(fit_mlpe, type = "surface", data = surface)
 ```
 
@@ -320,21 +386,66 @@ Brighter cells are more conductive (easier to move through). Panels where the
 lower and upper bounds are close together indicate regions where the available
 genetic data tightly constrain conductance, typically near sampling sites.
 
-### Marginal effects of each covariate on conductance
+### Marginal effects of each covariate on predicted genetic distance (default)
 
-`type = "marginal"` sweeps each covariate across its observed range while
-averaging over all other covariates. The ribbon shows a 95% pointwise
-confidence band derived from the delta method. Because we used
-`scale_covariates()`, the x-axes are automatically back-transformed to the
-original units (meters of elevation, proportion forest cover):
+The default plot (`type = "marginal_response"`) shows how each raster
+covariate influences the **predicted genetic distance** — the response
+variable itself — rather than the intermediate conductance scale. Because
+genetic distance is what you measured and what the model ultimately explains,
+this is usually the most directly interpretable view.
 
-```{r marginal-effects, fig.cap = "Marginal effect of each covariate on conductance with 95% CI."}
+```{r marginal-effects, fig.cap = "***Marginal effect of each covariate on predicted genetic distance with predictive bands.***"}
+plot(fit_mlpe, data = surface)
+```
+
+**How to read these plots**
+
+Each panel sweeps one covariate across its observed range while all other
+covariates are kept at their *observed* values at every grid cell (not at a
+single mean value). The curve is therefore a weighted average over the actual
+landscape, which matters most when the effects of different covariates
+interact.
+
+The **central curve** is the expected genetic distance at the given covariate
+value, marginalised over the rest of the landscape.
+
+The **shaded predictive band** combines three sources of uncertainty:
+
+1. *Theta (conductance parameter) uncertainty* — imprecision in the estimated
+   conductance parameters θ, propagated through the resistance-distance
+   calculation via the delta method.
+2. *Phi (measurement-model parameter) uncertainty* — imprecision in the
+   nuisance parameters (intercept α, IBR slope β, residual precision τ, and
+   MLPE correlation ρ), again via the delta method.
+3. *Residual variation* — the irreducible scatter in pairwise genetic
+   distances around the fitted mean, estimated from τ.
+
+A **rising curve** (genetic distance increases with the covariate) means that
+higher covariate values make the landscape *less permeable*, increasing
+resistance distance and hence genetic differentiation. A **declining curve**
+means the covariate promotes connectivity.
+
+> **Note:** Quadratic terms (`I(x^2)`) and interactions (`x * z`) in the
+> formula are handled automatically. For an interaction, each panel holds the
+> other covariate at its observed values across all grid cells, so the curve
+> represents the average effect of the focal covariate over the joint
+> distribution of the landscape.
+
+### Marginal effects on the conductance scale
+
+If you prefer to see the effect on the underlying conductance surface (without
+residual variation in the band, and on the conductance rather than genetic
+distance scale), use `type = "marginal"`:
+
+```{r marginal-conductance, fig.cap = "***Marginal effect of each covariate on conductance with 95% CI.***"}
 plot(fit_mlpe, type = "marginal", data = surface)
 ```
 
-A rising curve means higher covariate values increase conductance (the
-landscape is more permeable there); a declining curve indicates a barrier
-effect.
+Here the band is a **confidence interval** (delta-method, 95% pointwise) on
+the mean conductance, not a predictive interval — it reflects only parameter
+uncertainty in θ, not residual variation. A rising curve means higher
+covariate values increase conductance (easier movement); a declining curve
+indicates a barrier effect.
 
 ---
 
@@ -369,16 +480,28 @@ covariates <- scale_covariates(covariates)
 
 surface <- conductance_surface(covariates, melip.coords, directions = 8)
 
-# 3. Fit model
+# 3. Fit model — choose a measurement model:
+#   leastsquares      : fast, independent errors (distance matrix)
+#   mlpe              : shared-site correlation correction (distance matrix)
+#   generalized_wishart: Wishart model, requires nu (distance matrix)
+#   wishart_covariance : Wishart model, requires nu (covariance matrix)
 fit <- terradish(melip.Fst ~ forestcover + altitude,
                  data              = surface,
                  conductance_model = loglinear_conductance,
                  measurement_model = mlpe)
 
+# generalized_wishart example (set nu to your actual marker count):
+fit_gw <- terradish(melip.Fst ~ forestcover + altitude,
+                    data              = surface,
+                    conductance_model = loglinear_conductance,
+                    measurement_model = generalized_wishart,
+                    nu                = 1000)
+
 # 4. Summarize and visualize
 summary(fit)
 
-plot(fit, type = "fit")                       # observed vs. fitted scatter
-plot(fit, type = "surface", data = surface)   # conductance map + 95% CI panels
-plot(fit, type = "marginal", data = surface)  # marginal covariate effects
+plot(fit, type = "fit")                                # observed vs. fitted scatter
+plot(fit, type = "surface", data = surface)            # conductance map + 95% CI panels
+plot(fit, data = surface)                              # marginal effects on genetic distance (default)
+plot(fit, type = "marginal", data = surface)           # marginal effects on conductance scale
 ```

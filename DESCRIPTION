@@ -1,8 +1,8 @@
 Package: terradish
 Type: Package
 Title: Fast Gradient-Based Optimization of Resistance Surfaces
-Version: 0.0.10
-Date: 2026-04-04
+Version: 0.0.11
+Date: 2026-04-08
 Authors@R: c(
   person(
     given = c("Nathaniel", "S."),
@@ -32,6 +32,7 @@ LinkingTo: Rcpp, RcppArmadillo, RcppEigen
 Suggests:
   adegenet,
   knitr,
+  multiScaleR,
   nloptr,
   numDeriv,
   pkgload,

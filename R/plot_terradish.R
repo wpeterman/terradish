@@ -17,8 +17,8 @@
 #' }
 #'
 #' @param x A fitted \code{terradish} object.
-#' @param type One of \code{"fit"}, \code{"surface"}, \code{"marginal"}, or
-#'   \code{"marginal_response"}.
+#' @param type One of \code{"marginal_response"} (default), \code{"fit"},
+#'   \code{"surface"}, or \code{"marginal"}.
 #' @param data The \code{terradish_graph} used when fitting \code{x}. Required
 #'   for \code{type = "surface"}, \code{type = "marginal"}, and
 #'   \code{type = "marginal_response"}.
@@ -34,7 +34,9 @@
 #'   fresh model must be built at the evaluation points.
 #' @param quantile Confidence level for interval bands. Default \code{0.95}.
 #' @param n Number of evaluation points for each marginal effect curve.
-#'   Default \code{200}.
+#'   Defaults to \code{100} for \code{"marginal_response"} (each point
+#'   requires a full Laplacian solve) and \code{200} for \code{"marginal"}.
+#'   Supply an explicit integer to override.
 #' @param ... Additional graphical parameters forwarded to
 #'   \code{\link[graphics]{plot}} (for \code{"fit"}) or ignored for the other
 #'   types.
@@ -93,25 +95,27 @@
 #' @importFrom terra global values
 #' @export
 plot.terradish <- function(x,
-                            type = c("fit", "surface", "marginal",
-                                     "marginal_response"),
+                            type = c("marginal_response", "fit", "surface",
+                                     "marginal"),
                             data = NULL,
                             covariates = NULL,
                             conductance_model = loglinear_conductance,
                             quantile = 0.95,
-                            n = 200L,
+                            n = NULL,
                             ...)
 {
   type <- match.arg(type)
+  n <- as.integer(if (is.null(n))
+    if (identical(type, "marginal_response")) 100L else 200L
+  else
+    n)
   switch(type,
     fit      = .plot_terradish_fit(x, ...),
     surface  = .plot_terradish_surface(x, data, quantile),
     marginal = .plot_terradish_marginal(x, data, covariates,
-                                        conductance_model, quantile,
-                                        as.integer(n)),
+                                        conductance_model, quantile, n),
     marginal_response = .plot_terradish_marginal(x, data, covariates,
-                                                conductance_model, quantile,
-                                                as.integer(n),
+                                                conductance_model, quantile, n,
                                                 response_scale = TRUE)
   )
 }
@@ -367,54 +371,90 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
 .marginal_response_summary <- function(formula, x_data, x_seq, covariate,
                                        conductance_model_factory, theta,
                                        vcov_theta, response_components,
-                                       quantile)
+                                       quantile, graph_data)
 {
-  z <- qnorm((1 + quantile) / 2)
+  z       <- qnorm((1 + quantile) / 2)
+  N       <- nrow(x_data)
+  n_focal <- length(graph_data$demes)
   estimates <- lower <- upper <- numeric(length(x_seq))
+
+  # Analytical weight matrix for d(mean_R_ij)/d(E_kl).
+  # mean_R = (2 / (n*(n-1))) * sum_{i<j} (E_ii + E_jj - 2*E_ij), so:
+  #   d(mean_R)/d(E_ii)  =  2/n        (each diagonal enters n-1 pairs)
+  #   d(mean_R)/d(E_ij)  = -4/(n*(n-1))  (each off-diagonal enters one pair)
+  W      <- matrix(-4 / (n_focal * (n_focal - 1L)), n_focal, n_focal)
+  diag(W) <- 2 / n_focal
+
+  # Pre-compute the fixed RHS matrix (does not change with conductance).
+  Zn <- .graph_rhs(graph_data, N)
+
+  # Reuse the Cholesky symbolic factorization across evaluation points:
+  # only the numeric values change between iterations, not the sparsity pattern.
+  solver_reuse_state <- NULL
 
   for (i in seq_along(x_seq))
   {
-    eval_data <- x_data
+    # Set the focal covariate to x_seq[i] across all raster cells; keep all
+    # other covariates at their observed values.  Append the original rows so
+    # that model.matrix stays full-rank for I()-wrapped or interacted terms.
+    eval_data        <- x_data
     eval_data[[covariate]] <- x_seq[i]
-    eval_data <- rbind(eval_data, x_data)
+    eval_data        <- rbind(eval_data, x_data)
+    keep             <- seq_len(N)
 
-    cond_fn <- conductance_model_factory(formula, eval_data)
+    cond_fn   <- conductance_model_factory(formula, eval_data)
     cond_vals <- cond_fn(theta)
-    keep <- seq_len(nrow(x_data))
 
-    if (identical(conductance_model_factory, loglinear_conductance))
-    {
-      eta <- log(cond_vals$conductance[keep])
-      conductance_hat <- exp(mean(eta))
-      grad_logc <- vapply(seq_along(theta),
-                          function(k) mean(cond_vals$df__dtheta(k)[keep] /
-                                             cond_vals$conductance[keep]),
-                          numeric(1))
-      grad_r_theta <- -grad_logc / max(conductance_hat, .Machine$double.eps)
-    }
-    else
-    {
-      conductance_hat <- mean(cond_vals$conductance[keep])
-      grad_c_theta <- vapply(seq_along(theta),
-                             function(k) mean(cond_vals$df__dtheta(k)[keep]),
-                             numeric(1))
-      grad_r_theta <- -grad_c_theta /
-        max(conductance_hat, .Machine$double.eps)^2
-    }
+    conductance    <- cond_vals$conductance[keep]
+    df__dtheta_mat <- .conductance_df_dtheta_matrix(cond_vals, theta)[keep, , drop = FALSE]
 
-    resistance_hat <- 1 / max(conductance_hat, .Machine$double.eps)
+    # Solve the reduced Laplacian for the current conductance surface,
+    # reusing the symbolic Cholesky factorization from the previous iteration.
+    solver_state <- .terradish_solver_setup(
+      graph_data, conductance,
+      solver             = "direct",
+      solver_reuse_state = solver_reuse_state
+    )
+    solve_result <- .terradish_solver_solve(solver_state, Zn)
+    G  <- as.matrix(solve_result$solution)   # (N-1) x n_focal
+    tG <- t(G)                               # n_focal x (N-1)
+
+    # Carry the Cholesky factor forward: update() reuses the symbolic
+    # factorization so only the numeric refactorization is repeated.
+    solver_reuse_state <- list(
+      type      = "direct",
+      factor    = solver_state$factor,
+      signature = solver_state$signature
+    )
+
+    # Genuine effective resistance distances among focal populations.
+    E_eval <- graph_rhs_crossprod(graph_data$demes, N, G)  # n_focal x n_focal
+    R_eval <- dist_from_cov(as.matrix(E_eval))             # n_focal x n_focal
+    mean_R <- mean(R_eval[lower.tri(R_eval)])
+
+    # Fitted response on the observed genetic-distance scale.
     estimates[i] <- response_components$offset +
-      response_components$beta * resistance_hat
+      response_components$beta * mean_R
 
-    grad_phi <- response_components$grad_template
-    grad_phi["beta"] <- grad_phi["beta"] + resistance_hat
+    # Gradient of mean_R w.r.t. theta via the adjoint (backpropagation) method.
+    # This mirrors exactly what terradish_algorithm does for dl/d(theta), but
+    # substituting W (the gradient of mean_R w.r.t. E) in place of the
+    # measurement-model gradient dl/dE — no additional Laplacian solves needed.
+    W_dQnG <- W %*% tG
+    dl_dC  <- backpropagate_laplacian_to_conductance(W_dQnG, tG, graph_data$adj)
+    grad_mean_R_theta <- c(crossprod(df__dtheta_mat, c(dl_dC)))
+
+    # Delta-method variance: theta uncertainty propagated through beta * mean_R,
+    # plus phi (intercept/slope/precision) uncertainty, plus residual variance.
+    grad_phi         <- response_components$grad_template
+    grad_phi["beta"] <- grad_phi["beta"] + mean_R
 
     var_theta <- response_components$beta^2 *
-      max(drop(t(grad_r_theta) %*% vcov_theta %*% grad_r_theta), 0)
-    var_phi <- max(drop(t(grad_phi) %*% response_components$vcov_phi %*%
-                          grad_phi), 0)
-    pred_se <- sqrt(var_theta + var_phi +
-                    max(response_components$residual_var, 0))
+      max(drop(t(grad_mean_R_theta) %*% vcov_theta %*% grad_mean_R_theta), 0)
+    var_phi   <- max(drop(t(grad_phi) %*% response_components$vcov_phi %*%
+                            grad_phi), 0)
+    pred_se   <- sqrt(var_theta + var_phi +
+                      max(response_components$residual_var, 0))
 
     lower[i] <- estimates[i] - z * pred_se
     upper[i] <- estimates[i] + z * pred_se
@@ -499,7 +539,8 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
         theta = theta,
         vcov_theta = vcov_theta,
         response_components = response_components,
-        quantile = quantile
+        quantile = quantile,
+        graph_data = data
       )
     else
       .marginal_effect_summary(

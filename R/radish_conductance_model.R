@@ -3,11 +3,14 @@ assemble_model_matrix <- function(formula, spdat)
   stopifnot(inherits(formula, "formula"))
   stopifnot(is.data.frame(spdat))
 
-  # check if formula is consistant with data, remove response, add intercept
+  # check if formula is consistent with data, remove response, add intercept
   formula_covariates <- attr(delete.response(terms(formula)), "factors")
   if (length(formula_covariates) > 0)
   {
-    stopifnot(rownames(formula_covariates) %in% colnames(spdat))
+    # Use all.vars() so that in-line transformations such as I(x^2) or
+    # interactions x:z do not appear as required column names — only the
+    # underlying raw variables need to be present in the data frame.
+    stopifnot(all.vars(formula) %in% colnames(spdat))
     formula <- reformulate(colnames(formula_covariates))
 
     # if any layers are not in formula, remove them

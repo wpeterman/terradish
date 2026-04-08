@@ -141,6 +141,130 @@ dist_from_biallelic <- function(Y, N)
   dist_from_cov(cov_from_biallelic(Y, N))
 }
 
+#' Simulate covariance responses from a conductance surface
+#'
+#' Simulates one or more covariance response matrices from a known
+#' conductance-resistance relationship, using the same Wishart covariance model
+#' fitted by \code{\link{wishart_covariance}}.
+#'
+#' @param theta Conductance parameters. May be supplied as a numeric vector or
+#'   a one-row matrix. If unnamed, values are matched in the order implied by
+#'   \code{formula}.
+#' @param formula Model formula specifying the conductance covariates. The left
+#'   hand side, if supplied, is ignored.
+#' @param data A \code{\link{conductance_surface}} object.
+#' @param conductance_model Conductance-model factory, such as
+#'   \code{\link{loglinear_conductance}}.
+#' @param tau Nonnegative scaling applied to the conductance-implied covariance
+#'   matrix.
+#' @param sigma Nonnegative nugget variance added to the diagonal.
+#' @param nu Effective number of loci (Wishart degrees of freedom).
+#' @param nsim Number of covariance matrices to simulate.
+#' @param seed Optional random seed.
+#' @param cores Number of cores passed to \code{\link{terradish_distance}}.
+#'
+#' @details
+#' The helper first computes the conductance-implied covariance matrix
+#' \code{E(theta)} from the supplied resistance surface. It then forms
+#' \code{Sigma = tau * E(theta) + sigma * I} and simulates
+#' \code{S ~ Wishart(nu, Sigma) / nu}. This makes the returned covariance
+#' matrices directly compatible with \code{\link{wishart_covariance}}.
+#'
+#' @return A list containing:
+#' \item{covariance}{A covariance matrix if \code{nsim = 1}, otherwise a
+#'   three-dimensional array of simulated covariance matrices.}
+#' \item{Sigma}{The covariance matrix used as the Wishart scale matrix after
+#'   applying \code{tau} and \code{sigma}.}
+#' \item{E}{The conductance-implied covariance matrix returned by
+#'   \code{\link{terradish_distance}(covariance = TRUE)}.}
+#' \item{theta}{The validated conductance parameter matrix used for simulation.}
+#' \item{tau}{The supplied \code{tau}.}
+#' \item{sigma}{The supplied \code{sigma}.}
+#' \item{nu}{The supplied \code{nu}.}
+#'
+#' @examples
+#' r1 <- terra::rast(nrows = 2, ncols = 2, vals = c(1, 2, 3, 4))
+#' r2 <- terra::rast(nrows = 2, ncols = 2, vals = c(4, 3, 2, 1))
+#' covariates <- c(r1, r2)
+#' names(covariates) <- c("x1", "x2")
+#' pts <- terra::vect(matrix(c(0.25, 0.25,
+#'                            1.75, 1.75), ncol = 2, byrow = TRUE),
+#'                    type = "points")
+#' surface <- conductance_surface(covariates, pts, directions = 4)
+#' sim <- simulate_covariance_response(
+#'   theta = c(x1 = 0.3, x2 = -0.2),
+#'   formula = ~ x1 + x2,
+#'   data = surface,
+#'   tau = 0.8,
+#'   sigma = 0.2,
+#'   nu = 20,
+#'   seed = 1
+#' )
+#' sim$covariance
+#'
+#' @export
+simulate_covariance_response <- function(theta,
+                                         formula,
+                                         data,
+                                         conductance_model = loglinear_conductance,
+                                         tau = 1,
+                                         sigma = 0,
+                                         nu,
+                                         nsim = 1,
+                                         seed = NULL,
+                                         cores = 1L)
+{
+  stopifnot(inherits(data, c("terradish_graph", "radish_graph")))
+  stopifnot(is.numeric(tau), length(tau) == 1L, is.finite(tau), tau >= 0)
+  stopifnot(is.numeric(sigma), length(sigma) == 1L, is.finite(sigma), sigma >= 0)
+  stopifnot(is.numeric(nu), length(nu) == 1L, is.finite(nu), nu > 0)
+  stopifnot(is.numeric(nsim), length(nsim) == 1L, nsim >= 1)
+  stopifnot(length(cores) == 1L, is.numeric(cores), cores >= 1)
+
+  terms_obj <- terms(formula)
+  if (!length(attr(terms_obj, "term.labels")))
+    stop("`formula` must include at least one conductance covariate.", call. = FALSE)
+  model_formula <- reformulate(attr(terms_obj, "term.labels"))
+
+  conductance_model_obj <- conductance_model(model_formula, data$x)
+  default <- attr(conductance_model_obj, "default")
+
+  if (is.null(dim(theta)))
+    theta <- matrix(theta, nrow = 1L)
+  stopifnot(is.matrix(theta))
+  stopifnot(nrow(theta) == 1L)
+  stopifnot(ncol(theta) == length(default))
+  theta <- .validate_theta_grid(theta, names(default))
+
+  if (!is.null(seed))
+    set.seed(seed)
+
+  E <- terradish_distance(
+    theta = theta,
+    formula = model_formula,
+    data = data,
+    conductance_model = conductance_model,
+    conductance = TRUE,
+    covariance = TRUE,
+    cores = as.integer(cores)
+  )$covariance[, , 1]
+
+  Sigma <- tau * E + sigma * diag(nrow(E))
+  covariance <- array(NA_real_, dim = c(nrow(E), ncol(E), as.integer(nsim)))
+  for (i in seq_len(as.integer(nsim)))
+    covariance[, , i] <- stats::rWishart(1, df = as.integer(nu), Sigma = Sigma)[, , 1] / as.integer(nu)
+
+  list(
+    covariance = if (as.integer(nsim) == 1L) covariance[, , 1] else covariance,
+    Sigma = Sigma,
+    E = E,
+    theta = theta,
+    tau = tau,
+    sigma = sigma,
+    nu = as.integer(nu)
+  )
+}
+
 # Internal simulation helper for benchmarking generalized Wishart fits.
 wishart_simulate_distance <- function(seed, S, nu)
 {

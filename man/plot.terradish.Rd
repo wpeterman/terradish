@@ -7,12 +7,12 @@
 \usage{
 \method{plot}{terradish}(
   x,
-  type = c("fit", "surface", "marginal", "marginal_response"),
+  type = c("marginal_response", "fit", "surface", "marginal"),
   data = NULL,
   covariates = NULL,
   conductance_model = loglinear_conductance,
   quantile = 0.95,
-  n = 200L,
+  n = NULL,
   ...
 )
 
@@ -21,8 +21,8 @@
 \arguments{
 \item{x}{A fitted \code{terradish} object.}
 
-\item{type}{One of \code{"fit"}, \code{"surface"}, \code{"marginal"}, or
-\code{"marginal_response"}.}
+\item{type}{One of \code{"marginal_response"} (default), \code{"fit"},
+\code{"surface"}, or \code{"marginal"}.}
 
 \item{data}{The \code{terradish_graph} used when fitting \code{x}. Required
 for \code{type = "surface"}, \code{type = "marginal"}, and
@@ -43,7 +43,9 @@ fresh model must be built at the evaluation points.}
 \item{quantile}{Confidence level for interval bands. Default \code{0.95}.}
 
 \item{n}{Number of evaluation points for each marginal effect curve.
-Default \code{200}.}
+Defaults to \code{100} for \code{"marginal_response"} (each point
+requires a full Laplacian solve) and \code{200} for \code{"marginal"}.
+Supply an explicit integer to override.}
 
 \item{...}{Additional graphical parameters forwarded to
 \code{\link[graphics]{plot}} (for \code{"fit"}) or ignored for the other
