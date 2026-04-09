@@ -367,7 +367,7 @@ terradish_scale_optim <- function(formula,
   {
     if (is.null(lower) || is.null(upper))
       stop("Supply `scale_grid`, or both `lower` and `upper`, for grid search")
-    scale_grid <- setNames(
+    scale_grid <- stats::setNames(
       lapply(seq_along(scale_names), function(i)
         seq(lower[[i]], upper[[i]], length.out = grid_points)),
       scale_names

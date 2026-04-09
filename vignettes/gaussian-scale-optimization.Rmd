@@ -1,0 +1,356 @@
+---
+title: "Joint Gaussian Scale Optimization in terradish"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Joint Gaussian Scale Optimization in terradish}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment = "#>",
+  fig.width = 6,
+  fig.height = 4.5,
+  warning = FALSE,
+  message = FALSE
+)
+```
+
+## Why optimize sigma inside the model?
+
+The original `radish` workflow for scale of effect usually worked in two steps:
+
+1. Smooth each raster at several candidate scales.
+2. Fit a resistance model to each smoothed raster surface and compare the fits.
+
+That approach is still useful, but it treats scale as an **outer** tuning
+parameter. The new native Gaussian conductance system in `terradish` moves the
+scale parameter into the conductance model itself, so the optimizer can update:
+
+- the conductance coefficient(s), and
+- the smoothing scale(s)
+
+in the same likelihood calculation.
+
+This vignette shows the current implementation of that idea using
+`gaussian_smoothed_loglinear_conductance()`.
+
+## What sigma means here
+
+For a raster covariate `x`, the Gaussian scale-aware model first smooths the
+raster with a Gaussian kernel and then uses the smoothed values in the usual
+log-linear conductance model.
+
+Conceptually:
+
+$$C_i = \exp(\beta \cdot x_{i,\sigma})$$
+
+where:
+
+- $x_{i,\sigma}$ is the Gaussian-smoothed raster value at cell *i*
+- $\beta$ is the conductance coefficient
+- $\sigma$ controls how broad the smoothing kernel is
+
+Small `sigma` means a very local scale of effect. Large `sigma` means the
+covariate is averaged over a broader neighborhood.
+
+### Are there limits on sigma?
+
+Yes. `terradish` now estimates `sigma` directly on its natural distance scale
+and fits it within explicit lower and upper bounds.
+
+By default, those bounds are data-derived:
+
+- the lower bound is half of the mean raster cell width
+- the upper bound is the diagonal length of the retained raster extent
+
+You can override those defaults with `sigma_lower =` and `sigma_upper =` when
+you create the conductance model.
+
+## Worked example
+
+We will fit a small staged example using the `melip` data. To keep the vignette
+fast and stable, we will:
+
+- use only eight sampling sites
+- start with one raster covariate (`forestcover`)
+- use `mlpe` as the measurement model, because the response matrix contains
+  non-independent pairwise genetic distances
+
+This is enough to show the practical workflow without making the vignette slow.
+The main goal here is not to maximize model complexity. Instead, we will use
+the staged workflow that is usually safest for real data:
+
+1. fit a one-raster Gaussian scale model
+2. compare it to a standard fixed-raster model
+3. only then add a second raster and inspect whether the fitted scales still
+   behave sensibly
+
+```{r load}
+library(terradish)
+library(terra)
+
+data(melip)
+melip.forestcover <- terra::unwrap(melip.forestcover)
+melip.altitude <- terra::unwrap(melip.altitude)
+melip.coords <- terra::unwrap(melip.coords)
+
+keep <- 1:8
+melip.Fst <- melip.Fst[keep, keep, drop = FALSE]
+coords <- melip.coords[keep]
+```
+
+### Step 1 — Build a conductance surface with the original raster
+
+Unlike the standard fixed-raster workflow, we do **not** pre-scale the raster
+with `scale_covariates()` here. The Gaussian conductance model smooths the raw
+raster first, then standardizes the active-cell values internally at each
+parameter evaluation.
+
+```{r surface}
+covariates <- melip.forestcover
+names(covariates) <- "forestcover"
+
+surface <- conductance_surface(
+  covariates,
+  coords,
+  directions = 8,
+  saveStack = TRUE
+)
+```
+
+Two details matter here:
+
+- `saveStack = TRUE` is required, because the Gaussian conductance model needs
+  the retained raster stack as its smoothing domain.
+- We are fitting the scale of effect for the raster itself, so the original
+  raster values need to be available.
+
+### Step 2 — Create the Gaussian scale-aware conductance model
+
+```{r gaussian-model}
+gaussian_model <- gaussian_smoothed_loglinear_conductance(surface)
+```
+
+This conductance model will estimate two parameters:
+
+- `forestcover`: the conductance coefficient
+- `sigma.forestcover`: the Gaussian smoothing scale on the natural distance scale
+
+The same mechanism also supports interactions and polynomial terms after
+smoothing, but it is usually better to start with the simplest one-raster model
+you can justify.
+
+### Step 3 — Fit the one-raster Gaussian scale model
+
+`optimizer = "auto"` currently resolves to BFGS for this conductance model.
+That is intentional: the native Gaussian scale path supports analytic
+gradients, and BFGS is the stable first optimizer for the joint
+`beta + sigma` parameter vector.
+
+```{r fit}
+fit_gaussian <- terradish(
+  melip.Fst ~ forestcover,
+  data = surface,
+  conductance_model = gaussian_model,
+  measurement_model = mlpe,
+  optimizer = "auto",
+  leverage = FALSE,
+  control = NewtonRaphsonControl(maxit = 12, verbose = FALSE)
+)
+
+fit_gaussian
+```
+
+### Step 4 — Inspect the fitted one-raster scale
+
+```{r coef}
+coef(fit_gaussian)
+```
+
+The conductance coefficient tells us whether smoothed forest cover is
+associated with higher or lower conductance. The scale parameter is already on
+its natural scale, so we can summarize it directly:
+
+```{r sigma}
+coef(fit_gaussian)[["sigma.forestcover"]]
+```
+
+`gaussian_scale_summary()` converts the fitted sigma values into:
+
+- the native raster distance scale
+- raster cell widths
+- one-dimensional Gaussian half-widths
+- two-dimensional radial extents that contain a chosen amount of kernel mass
+
+```{r sigma-summary}
+gaussian_scale_summary(fit_gaussian)
+```
+
+That table is often the quickest way to interpret the scale of effect. For
+example, `radial_95` is the radius that contains approximately 95% of the
+Gaussian kernel mass, while `sigma_cells_x` and `sigma_cells_y` show how broad
+the effect is relative to the raster resolution.
+
+### Step 5 — Compare against a standard fixed-raster fit
+
+The scale-aware fit is easiest to interpret when it is compared directly to the
+same model without an estimated `sigma`.
+
+```{r fixed-fit}
+fit_fixed <- terradish(
+  melip.Fst ~ forestcover,
+  data = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe,
+  optimizer = "auto",
+  leverage = FALSE,
+  control = NewtonRaphsonControl(maxit = 12, verbose = FALSE)
+)
+
+fit_fixed
+```
+
+```{r compare-table}
+data.frame(
+  model = c("Gaussian scale-aware", "Fixed raster"),
+  logLik = c(fit_gaussian$loglik, fit_fixed$loglik),
+  AIC = c(fit_gaussian$aic, fit_fixed$aic)
+)
+```
+
+At this stage, the main question is not simply "which AIC is smaller?" A more
+useful question is:
+
+- does `sigma.forestcover` stay away from the bounds?
+- does the fitted scale look biologically plausible relative to the raster
+  resolution?
+- is the scale-aware fit at least competitive with the simpler fixed-raster
+  version?
+
+If the answer is yes, then adding another raster is more defensible.
+
+### Step 6 — Summarize the one-raster fit
+
+```{r summary}
+summary(fit_gaussian)
+```
+
+For this conductance model, the coefficient table includes both:
+
+- the conductance coefficient, and
+- `sigma`
+
+So the scale parameter is treated just like any other model parameter in the
+joint optimization.
+
+### Step 7 — Recover the fitted conductance surface
+
+Once the model is fitted, the usual conductance helper still works.
+
+```{r conductance}
+fitted_conductance <- conductance(surface, fit_gaussian)
+fitted_conductance
+```
+
+And we can plot the fitted conductance layer directly:
+
+```{r conductance-plot}
+plot(fitted_conductance[[1]], main = "Fitted conductance")
+points(coords, pch = 19, col = "red")
+```
+
+## Stage 2 — Add a second raster only after sigma looks sensible
+
+Once the one-raster scale parameter looks stable enough to trust, we can add a
+second raster and inspect whether the scale estimates remain interpretable.
+
+```{r surface-two}
+covariates_two <- c(melip.altitude, melip.forestcover)
+names(covariates_two) <- c("altitude", "forestcover")
+
+surface_two <- conductance_surface(
+  covariates_two,
+  coords,
+  directions = 8,
+  saveStack = TRUE
+)
+```
+
+```{r fit-two}
+fit_gaussian_two <- terradish(
+  melip.Fst ~ forestcover + altitude + I(altitude^2),
+  data = surface_two,
+  conductance_model = gaussian_smoothed_loglinear_conductance(surface_two),
+  measurement_model = mlpe,
+  optimizer = "auto",
+  leverage = FALSE,
+  control = NewtonRaphsonControl(maxit = 12, verbose = FALSE)
+)
+
+fit_gaussian_two
+```
+
+```{r sigma-two}
+gaussian_scale_summary(fit_gaussian_two)
+```
+
+This is exactly the point where the staged workflow helps. If one or more
+sigma estimates now collapse to the lower bound, or drift toward the upper
+bound, that is useful information. It suggests one of several things:
+
+- the added raster may not need smoothing at all
+- the data may not support estimating multiple scales simultaneously
+- the smaller one-raster scale was not as stable as it first appeared
+
+That does **not** mean the model failed. It means the scale parameters are
+telling you that the data may prefer a simpler spatial structure.
+
+In the small `melip` subset used here, that is exactly the kind of pattern to
+watch for: the one-raster `forestcover` scale can be inspected on its own
+before adding `altitude`. After `altitude` is added, one or both fitted scale
+parameters may move toward the lower bound, which is a cue to
+proceed cautiously rather than immediately adding more landscape terms.
+
+## Important current limitations
+
+This first version is intentionally focused. Right now it supports:
+
+- additive formulas made of raw numeric raster names
+- interactions among numeric raster names
+- polynomial/arithmetic terms such as `I(forestcover^2)`
+- one Gaussian scale parameter per selected raster
+- joint optimization through analytic gradients and BFGS
+
+It does **not yet** support:
+
+- factor-valued raster layers
+- marginal-effect plotting for the Gaussian scale-aware conductance model
+- leverage / `partial_X` diagnostics
+- coarse-raster approximation for this conductance model
+
+Those are natural next extensions, but the current implementation is already
+enough to fit scale and conductance concurrently in one call.
+
+## Where to go next
+
+If this workflow looks reasonable for your data, the next practical steps are:
+
+1. Fit a small one-raster model first and inspect `sigma`.
+2. Compare it to a standard fixed-raster `loglinear_conductance` fit.
+3. Add additional rasters only after the one-raster scale parameter behaves
+   sensibly.
+4. Treat boundary-hitting sigma estimates as a model-selection signal, not just
+   an optimization nuisance.
+5. Reproject rasters before making ecological distance interpretations, because
+   longitude/latitude rasters report sigma in degrees.
+
+That staged approach makes it easier to tell whether the data are truly
+identifying a landscape scale of effect, rather than letting multiple scale
+parameters compete in an over-complex first model.

@@ -183,12 +183,13 @@ dist_from_biallelic <- function(Y, N)
 #' \item{nu}{The supplied \code{nu}.}
 #'
 #' @examples
-#' r1 <- terra::rast(nrows = 2, ncols = 2, vals = c(1, 2, 3, 4))
-#' r2 <- terra::rast(nrows = 2, ncols = 2, vals = c(4, 3, 2, 1))
+#' r1 <- terra::rast(nrows = 3, ncols = 3, vals = 1:9)
+#' r2 <- terra::rast(nrows = 3, ncols = 3, vals = c(9, 1, 4, 3, 8, 2, 5, 7, 6))
 #' covariates <- c(r1, r2)
 #' names(covariates) <- c("x1", "x2")
-#' pts <- terra::vect(matrix(c(0.25, 0.25,
-#'                            1.75, 1.75), ncol = 2, byrow = TRUE),
+#' pts <- terra::vect(matrix(c(0.5, 0.5,
+#'                            1.5, 1.5,
+#'                            2.5, 2.5), ncol = 2, byrow = TRUE),
 #'                    type = "points")
 #' surface <- conductance_surface(covariates, pts, directions = 4)
 #' sim <- simulate_covariance_response(
@@ -196,7 +197,7 @@ dist_from_biallelic <- function(Y, N)
 #'   formula = ~ x1 + x2,
 #'   data = surface,
 #'   tau = 0.8,
-#'   sigma = 0.2,
+#'   sigma = 0.5,
 #'   nu = 20,
 #'   seed = 1
 #' )

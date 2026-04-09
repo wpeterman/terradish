@@ -221,15 +221,62 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
   )
 }
 
-.run_terradish_optimizer <- function(theta, optfn, optimizer, control)
+.conductance_model_bounds <- function(conductance_model)
 {
-  if (optimizer == "newton")
-    return(BoxConstrainedNewton(theta, optfn, control = control))
-  BoxConstrainedBFGS(theta, optfn, control = control)
+  default <- attr(conductance_model, "default", exact = TRUE)
+  if (is.null(default))
+    stop("Conductance model does not define default parameters", call. = FALSE)
+
+  lower <- attr(conductance_model, "lower", exact = TRUE)
+  upper <- attr(conductance_model, "upper", exact = TRUE)
+
+  if (is.null(lower))
+    lower <- rep(-Inf, length(default))
+  if (is.null(upper))
+    upper <- rep(Inf, length(default))
+
+  lower <- c(lower)
+  upper <- c(upper)
+  if (length(lower) != length(default) || length(upper) != length(default))
+    stop("Conductance-model bounds must have the same length as the default parameter vector",
+         call. = FALSE)
+
+  names(lower) <- names(default)
+  names(upper) <- names(default)
+  list(lower = lower, upper = upper)
 }
 
-.resolve_terradish_optimizer <- function(optimizer, n_theta)
+.run_terradish_optimizer <- function(theta, optfn, optimizer, control,
+                                     lower = rep(-Inf, length(theta)),
+                                     upper = rep(Inf, length(theta)))
 {
+  if (optimizer == "newton")
+    return(BoxConstrainedNewton(theta, optfn,
+                                lower = lower,
+                                upper = upper,
+                                control = control))
+  BoxConstrainedBFGS(theta, optfn,
+                     lower = lower,
+                     upper = upper,
+                     control = control)
+}
+
+.conductance_model_factory_attr <- function(model, attr_name, default = NULL)
+{
+  out <- attr(model, attr_name, exact = TRUE)
+  if (is.null(out))
+    default
+  else
+    out
+}
+
+.resolve_terradish_optimizer <- function(optimizer, n_theta,
+                                         conductance_model_factory = NULL)
+{
+  preferred <- .conductance_model_factory_attr(conductance_model_factory,
+                                               "preferred_optimizer")
+  if (identical(optimizer, "auto") && !is.null(preferred))
+    return(preferred)
   if (identical(optimizer, "auto") && as.integer(n_theta) > 3L)
     return("bfgs")
   if (identical(optimizer, "auto"))
@@ -468,17 +515,36 @@ terradish <- function(formula,
   # "conductance_model" (a factory) is then responsible for parsing formula,
   # constructing design matrix, and returning actual "conductance_model"
   conductance_model_factory <- conductance_model
+  if (identical(approximation, "coarse_raster") &&
+      isTRUE(.conductance_model_factory_attr(conductance_model_factory,
+                                             "requires_fixed_graph", FALSE)))
+    stop("`approximation = \"coarse_raster\"` is not currently supported for this conductance model")
   conductance_model <- conductance_model_factory(formula, data$x)
+  conductance_supports_partial <- !identical(
+    attr(conductance_model, "supports_partial", exact = TRUE),
+    FALSE
+  )
 
   # initialize theta
   default <- attr(conductance_model, "default")
+  bounds <- .conductance_model_bounds(conductance_model)
   if (is.null(theta))
     theta <- default
   else
     stopifnot(length(theta) == length(default))
   names(theta) <- names(default)
+  if (any(theta < bounds$lower | theta > bounds$upper))
+    stop("Starting values in `theta` must lie within the conductance-model bounds",
+         call. = FALSE)
 
-  optimizer <- .resolve_terradish_optimizer(match.arg(optimizer), length(theta))
+  optimizer <- .resolve_terradish_optimizer(match.arg(optimizer), length(theta),
+                                           conductance_model_factory = conductance_model_factory)
+  if (isTRUE(leverage) && !conductance_supports_partial)
+  {
+    warning("Leverage diagnostics are not available for this conductance model; skipping `partial_X` calculations.",
+            call. = FALSE)
+    leverage <- FALSE
+  }
   fcalls    <- new("FunctionCall", count = 0L)
   make_optfn <- function(eval_data,
                          eval_S,
@@ -602,7 +668,9 @@ terradish <- function(formula,
         theta = theta,
         optfn = make_optfn(landmark_problem$data, landmark_problem$S, approx_phi_state, approx_solver_state),
         optimizer = optimizer,
-        control = control
+        control = control,
+        lower = bounds$lower,
+        upper = bounds$upper
       )
       iters <- iters + approx_problem$iters
       theta <- c(approx_problem$par)
@@ -615,6 +683,7 @@ terradish <- function(formula,
     {
       coarse_conductance_model <- conductance_model_factory(formula,
                                                             coarse_problem$surface$x)
+      coarse_bounds <- .conductance_model_bounds(coarse_conductance_model)
       approx_phi_state <- new.env(parent = emptyenv())
       approx_phi_state$value <- NULL
       approx_solver_state <- new.env(parent = emptyenv())
@@ -629,7 +698,9 @@ terradish <- function(formula,
                            approx_solver_state,
                            eval_conductance_model = coarse_conductance_model),
         optimizer = optimizer,
-        control = control
+        control = control,
+        lower = coarse_bounds$lower,
+        upper = coarse_bounds$upper
       )
       iters <- iters + approx_problem$iters
       theta <- c(approx_problem$par)
@@ -646,7 +717,9 @@ terradish <- function(formula,
         theta = theta,
         optfn = make_optfn(data, S, exact_phi_state, exact_solver_state),
         optimizer = optimizer,
-        control = control
+        control = control,
+        lower = bounds$lower,
+        upper = bounds$upper
       )
       iters <- iters + exact_problem$iters
       theta <- c(exact_problem$par)

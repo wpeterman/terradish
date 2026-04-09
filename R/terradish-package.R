@@ -9,7 +9,7 @@
 #' @importFrom methods new setRefClass
 #' @importFrom nlme gls
 #' @importFrom parallel clusterEvalQ clusterExport makeCluster parLapply stopCluster
-#' @importFrom stats AIC anova as.dist as.formula coef cov2cor delete.response dist fitted
+#' @importFrom stats AIC D anova as.dist as.formula coef cov2cor delete.response dist fitted
 #' @importFrom stats logLik model.matrix pchisq plogis pnorm printCoefmat prcomp qlogis
 #' @importFrom stats qnorm reformulate residuals rnorm rWishart sigma simulate terms
 #' @importFrom terra adjacent cellFromXY geom global is.factor levels ncell nlyr patches rast

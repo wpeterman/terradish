@@ -485,6 +485,10 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
     stop("`conductance_model` must be a conductance model factory ",
          "(e.g. loglinear_conductance).",
          call. = FALSE)
+  if (isTRUE(attr(conductance_model_factory, "requires_fixed_graph", exact = TRUE)))
+    stop("Marginal-effect plots are not yet implemented for conductance models ",
+         "that require the original raster graph during evaluation.",
+         call. = FALSE)
 
   theta     <- coef(fit)
   formula   <- fit$formula
