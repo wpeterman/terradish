@@ -36,7 +36,9 @@ and Gaussian-kernel interpretation summaries for a fitted model produced with
 }
 \details{
 The returned table always reports \code{sigma} on the raster's native map
-scale and in raster cell widths. For each probability \code{p},
+scale and in raster cell widths. When sigma conversion is enabled during
+fitting, the table also reports the internal optimization scale and its
+conversion factor back to map units. For each probability \code{p},
 \code{axis_*} gives the one-dimensional half-width
 \eqn{qnorm((1 + p) / 2) * sigma}, while \code{radial_*} gives the isotropic
 two-dimensional radius \eqn{sigma * sqrt(-2 * log(1 - p))} containing

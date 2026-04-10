@@ -161,6 +161,27 @@
   list(lower = lower, upper = upper)
 }
 
+.gaussian_scale_conversion <- function(surface, scale_vars,
+                                       sigma_conversion = c("cell", "map"),
+                                       sigma_conversion_factor = NULL)
+{
+  sigma_conversion <- match.arg(sigma_conversion)
+  if (!length(scale_vars))
+    return(stats::setNames(numeric(), character()))
+
+  if (!is.null(sigma_conversion_factor))
+    return(.coerce_gaussian_scale_bound(sigma_conversion_factor, scale_vars,
+                                        1, "sigma_conversion_factor"))
+
+  stack <- .as_spatraster(surface$stack)
+  values <- vapply(scale_vars, function(nm) {
+    if (identical(sigma_conversion, "map"))
+      return(1)
+    mean(abs(terra::res(stack[[nm]])))
+  }, numeric(1))
+  stats::setNames(values, scale_vars)
+}
+
 .fft_pad_matrix <- function(x, nrow_pad, ncol_pad)
 {
   out <- matrix(0, nrow_pad, ncol_pad)
@@ -324,7 +345,8 @@
 }
 
 .gaussian_scale_conductance_default <- function(beta_names, scale_vars,
-                                                sigma_bounds, surface)
+                                                sigma_bounds, sigma_conversion,
+                                                surface)
 {
   sigma_names <- paste0("sigma.", scale_vars)
   out <- rep(0, length(beta_names) + length(scale_vars))
@@ -336,10 +358,272 @@
       pmax(mean(abs(terra::res(surface$stack[[1]]))), sigma_bounds$lower),
       sigma_bounds$upper
     )
-    out[sigma_names] <- start_sigma
+    out[sigma_names] <- start_sigma / sigma_conversion[scale_vars]
   }
 
   out
+}
+
+.gaussian_scale_external_scale <- function(beta_names, scale_vars, sigma_conversion)
+{
+  out <- rep(1, length(beta_names) + length(scale_vars))
+  names(out) <- c(beta_names, paste0("sigma.", scale_vars))
+  if (length(scale_vars))
+    out[paste0("sigma.", scale_vars)] <- sigma_conversion[scale_vars]
+  out
+}
+
+.gaussian_scale_plot_label <- function(var, scaled, scale_meta)
+{
+  has_original_scale <- !is.null(scale_meta) && var %in% names(scale_meta)
+  if (scaled && has_original_scale)
+    return(paste0(var, " (smoothed original scale)"))
+  if (scaled)
+    return(paste0(var, " (smoothed scale)"))
+  if (has_original_scale)
+    return(paste0(var, " (original scale)"))
+  paste0(var, " (scaled)")
+}
+
+.gaussian_scale_plot_mapping <- function(values, var, scaled, scale_meta)
+{
+  has_original_scale <- !is.null(scale_meta) && var %in% names(scale_meta)
+  if (!has_original_scale)
+    return(list(values = values,
+                intercept = 0,
+                slope = 1,
+                label = .gaussian_scale_plot_label(var, scaled, scale_meta)))
+
+  center <- unname(scale_meta[[var]][["center"]])
+  scale <- unname(scale_meta[[var]][["scale"]])
+  list(values = center + scale * values,
+       intercept = center,
+       slope = scale,
+       label = .gaussian_scale_plot_label(var, scaled, scale_meta))
+}
+
+.gaussian_scale_build_base_state <- function(theta, plot_context)
+{
+  vars <- plot_context$vars
+  chosen_scale_vars <- plot_context$scale_vars
+  sigma_names <- plot_context$sigma_names
+  sigma_conversion <- plot_context$sigma_conversion
+  layer_preps <- plot_context$layer_preps
+  standardize <- isTRUE(plot_context$standardize)
+  scale_meta <- plot_context$scale_meta
+
+  sigma_internal <- theta[sigma_names]
+  sigma_map <- if (length(chosen_scale_vars))
+    stats::setNames(
+      unname(sigma_internal) * unname(sigma_conversion[chosen_scale_vars]),
+      chosen_scale_vars
+    )
+  else
+    stats::setNames(numeric(), character())
+
+  base_model <- stats::setNames(vector("list", length(vars)), vars)
+  base_original <- stats::setNames(vector("list", length(vars)), vars)
+  base_deriv <- stats::setNames(vector("list", length(vars)), vars)
+  base_second <- stats::setNames(vector("list", length(vars)), vars)
+  back_transform <- stats::setNames(vector("list", length(vars)), vars)
+
+  for (nm in vars)
+  {
+    zeros <- rep(0, length(layer_preps[[nm]]$raw_active))
+    if (nm %in% chosen_scale_vars)
+    {
+      layer_raw <- .gaussian_scale_layer_values(
+        prep = layer_preps[[nm]],
+        sigma = sigma_map[[nm]],
+        standardize = FALSE
+      )
+      raw_value <- layer_raw$value
+      deriv_raw <- layer_raw$deriv * sigma_conversion[[nm]]
+      second_raw <- layer_raw$second * sigma_conversion[[nm]]^2
+    }
+    else
+    {
+      raw_value <- layer_preps[[nm]]$raw_active
+      deriv_raw <- zeros
+      second_raw <- zeros
+    }
+
+    plot_map <- .gaussian_scale_plot_mapping(raw_value, nm,
+                                             scaled = nm %in% chosen_scale_vars,
+                                             scale_meta = scale_meta)
+    base_original[[nm]] <- plot_map$values
+
+    if (standardize)
+    {
+      scaled_value <- .gaussian_scale_standardize(raw_value, deriv_raw, second_raw)
+      center <- mean(raw_value[is.finite(raw_value)])
+      scale <- stats::sd(raw_value[is.finite(raw_value)])
+      if (!is.finite(scale) || scale <= 0)
+        scale <- 1
+
+      base_model[[nm]] <- scaled_value$value
+      base_deriv[[nm]] <- scaled_value$deriv
+      base_second[[nm]] <- scaled_value$second
+      back_transform[[nm]] <- list(
+        intercept = plot_map$intercept + plot_map$slope * center,
+        slope = plot_map$slope * scale,
+        label = plot_map$label,
+        rug = plot_map$values
+      )
+    }
+    else
+    {
+      base_model[[nm]] <- raw_value
+      base_deriv[[nm]] <- deriv_raw
+      base_second[[nm]] <- second_raw
+      back_transform[[nm]] <- list(
+        intercept = plot_map$intercept,
+        slope = plot_map$slope,
+        label = plot_map$label,
+        rug = plot_map$values
+      )
+    }
+  }
+
+  list(
+    model = as.data.frame(base_model, stringsAsFactors = FALSE),
+    original = as.data.frame(base_original, stringsAsFactors = FALSE),
+    deriv = base_deriv,
+    second = base_second,
+    back_transform = back_transform
+  )
+}
+
+.gaussian_scale_design_matrix <- function(base_data, term_specs)
+{
+  eval_env <- .gaussian_scale_eval_environment(as.list(base_data))
+  X <- matrix(0, nrow = nrow(base_data), ncol = length(term_specs))
+  colnames(X) <- vapply(term_specs, `[[`, character(1), "label")
+  for (col in seq_along(term_specs))
+    X[, col] <- .gaussian_scale_eval_expression(term_specs[[col]]$expr, eval_env)
+  X
+}
+
+.gaussian_scale_marginal_data <- function(theta, vcov, quantile, n,
+                                          plot_context,
+                                          response_components = NULL,
+                                          graph_data = NULL)
+{
+  theta <- c(theta)
+  vcov <- as.matrix(vcov)
+  if (is.null(rownames(vcov)) || is.null(colnames(vcov)))
+    dimnames(vcov) <- list(names(theta), names(theta))
+  beta_names <- plot_context$beta_names
+  beta <- theta[beta_names]
+  vcov_beta <- vcov[beta_names, beta_names, drop = FALSE]
+  base_state <- .gaussian_scale_build_base_state(theta, plot_context)
+  term_specs <- plot_context$spec$term_specs
+  z <- qnorm((1 + quantile) / 2)
+
+  if (!is.null(response_components))
+  {
+    if (is.null(graph_data))
+      stop("`graph_data` is required for Gaussian response-scale marginal plots",
+           call. = FALSE)
+    N <- nrow(base_state$model)
+    n_focal <- length(graph_data$demes)
+    W <- matrix(-4 / (n_focal * (n_focal - 1L)), n_focal, n_focal)
+    diag(W) <- 2 / n_focal
+    Zn <- .graph_rhs(graph_data, N)
+  }
+
+  curves <- vector("list", length(plot_context$vars))
+  rugs <- vector("list", length(plot_context$vars))
+  names(curves) <- names(rugs) <- plot_context$vars
+
+  for (nm in plot_context$vars)
+  {
+    x_range <- range(base_state$model[[nm]])
+    x_seq <- seq(x_range[1], x_range[2], length.out = as.integer(n))
+    estimates <- lower <- upper <- numeric(length(x_seq))
+    solver_reuse_state <- NULL
+
+    for (i in seq_along(x_seq))
+    {
+      eval_data <- base_state$model
+      eval_data[[nm]] <- x_seq[i]
+      X <- .gaussian_scale_design_matrix(eval_data, term_specs)
+      eta <- as.vector(X %*% beta)
+
+      if (is.null(response_components))
+      {
+        eta_hat <- mean(eta)
+        grad_beta <- colMeans(X)
+        se_i <- sqrt(max(drop(t(grad_beta) %*% vcov_beta %*% grad_beta), 0))
+
+        estimates[i] <- exp(eta_hat)
+        lower[i] <- exp(eta_hat - z * se_i)
+        upper[i] <- exp(eta_hat + z * se_i)
+      }
+      else
+      {
+        conductance <- exp(eta)
+        df__dbeta_mat <- conductance * X
+
+        solver_state <- .terradish_solver_setup(
+          graph_data, conductance,
+          solver = "direct",
+          solver_reuse_state = solver_reuse_state
+        )
+        solve_result <- .terradish_solver_solve(solver_state, Zn)
+        G <- as.matrix(solve_result$solution)
+        tG <- t(G)
+        solver_reuse_state <- list(
+          type = "direct",
+          factor = solver_state$factor,
+          signature = solver_state$signature
+        )
+
+        E_eval <- graph_rhs_crossprod(graph_data$demes, N, G)
+        R_eval <- dist_from_cov(as.matrix(E_eval))
+        mean_R <- mean(R_eval[lower.tri(R_eval)])
+        estimates[i] <- response_components$offset +
+          response_components$beta * mean_R
+
+        W_dQnG <- W %*% tG
+        dl_dC <- backpropagate_laplacian_to_conductance(W_dQnG, tG, graph_data$adj)
+        grad_mean_R_beta <- c(crossprod(df__dbeta_mat, c(dl_dC)))
+        grad_phi <- response_components$grad_template
+        grad_phi["beta"] <- grad_phi["beta"] + mean_R
+
+        var_theta <- response_components$beta^2 *
+          max(drop(t(grad_mean_R_beta) %*% vcov_beta %*% grad_mean_R_beta), 0)
+        var_phi <- max(drop(t(grad_phi) %*% response_components$vcov_phi %*%
+                              grad_phi), 0)
+        pred_se <- sqrt(var_theta + var_phi +
+                          max(response_components$residual_var, 0))
+
+        lower[i] <- estimates[i] - z * pred_se
+        upper[i] <- estimates[i] + z * pred_se
+      }
+    }
+
+    bt <- base_state$back_transform[[nm]]
+    curves[[nm]] <- data.frame(
+      covariate = bt$label,
+      x = bt$intercept + bt$slope * x_seq,
+      est = estimates,
+      lower = pmin(lower, upper),
+      upper = pmax(lower, upper)
+    )
+    rugs[[nm]] <- data.frame(covariate = bt$label, x = bt$rug)
+  }
+
+  curve_data <- do.call(rbind, curves)
+  rug_data <- do.call(rbind, rugs)
+  curve_data$covariate <- factor(
+    curve_data$covariate,
+    levels = vapply(curves, function(z) z$covariate[1], character(1))
+  )
+  rug_data$covariate <- factor(rug_data$covariate,
+                               levels = levels(curve_data$covariate))
+
+  list(curve_data = curve_data, rug_data = rug_data)
 }
 
 .gaussian_scale_eval_environment <- function(values)
@@ -378,6 +662,15 @@
 #'   different bounds by raster name. When omitted, \code{sigma_lower} defaults
 #'   to half of the mean raster cell width and \code{sigma_upper} defaults to
 #'   the diagonal length of the retained raster extent.
+#' @param sigma_conversion Internal scaling applied during optimization.
+#'   \code{"cell"} (default) rescales each sigma parameter by the mean cell
+#'   width of its raster layer so optimization happens in approximate cell
+#'   units, while reported coefficients are converted back to map units.
+#'   \code{"map"} leaves the optimization on the native map-unit scale.
+#' @param sigma_conversion_factor Optional positive scalar or named vector used
+#'   to override the default sigma conversion factors. This is most useful when
+#'   you want optimization to happen in user-defined distance units while still
+#'   reporting fitted sigma values in map units.
 #'
 #' @details
 #' This is a scale-aware extension of \code{\link{loglinear_conductance}}.
@@ -388,15 +681,23 @@
 #' evaluated with an FFT-based normalized convolution over the retained raster
 #' stack from \code{surface}. Using a fixed full-grid kernel keeps the sigma
 #' derivatives smooth during optimization.
+#' Internally, the sigma parameters may be optimized on a converted scale
+#' (for example, approximate cell widths) and are then converted back to map
+#' units before they are returned to users.
 #'
 #' The current implementation supports numeric raster formulas built from raw
 #' raster names, interactions, and polynomial/arithmetic terms that can be
 #' differentiated analytically by \code{\link[stats:D]{D}} after smoothing the base
-#' raster layers. Factor-valued raster layers are still rejected.
+#' raster layers. Factor-valued raster layers are rejected because Gaussian
+#' smoothing is only defined here for numeric rasters; use an unscaled fixed
+#' conductance model if you need categorical raster predictors.
 #'
 #' For this conductance model, \code{\link{terradish}} prefers
 #' \code{optimizer = "bfgs"} when \code{optimizer = "auto"}, and leverage /
-#' \code{partial_X} calculations are currently disabled.
+#' \code{partial_X} calculations are currently disabled because the current
+#' leverage machinery assumes a one-to-one mapping between fitted conductance
+#' parameters and design-matrix covariates, which does not hold once separate
+#' Gaussian \code{sigma} parameters are introduced.
 #'
 #' @return A function of class \code{terradish_conductance_model_factory} that
 #'   can be supplied as the \code{conductance_model=} argument to
@@ -418,7 +719,8 @@
 #' gaussian_model <- gaussian_smoothed_loglinear_conductance(
 #'   surface,
 #'   sigma_lower = 100,
-#'   sigma_upper = 5000
+#'   sigma_upper = 5000,
+#'   sigma_conversion = "cell"
 #' )
 #' fit <- terradish(melip.Fst ~ altitude * forestcover + I(altitude^2),
 #'                  data = surface,
@@ -432,12 +734,15 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
                                                     scale_vars = NULL,
                                                     standardize = TRUE,
                                                     sigma_lower = NULL,
-                                                    sigma_upper = NULL)
+                                                    sigma_upper = NULL,
+                                                    sigma_conversion = c("cell", "map"),
+                                                    sigma_conversion_factor = NULL)
 {
   stopifnot(inherits(surface, c("terradish_graph", "radish_graph")))
   if (is.null(surface$stack))
     stop("`surface` must retain its raster stack; use `conductance_surface(..., saveStack = TRUE)`",
          call. = FALSE)
+  sigma_conversion <- match.arg(sigma_conversion)
 
   stack <- .as_spatraster(surface$stack)
   active_cells <- terra::cellFromXY(stack[[1]], surface$vertex_coordinates)
@@ -454,8 +759,9 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
            "marginal-effect prediction grids and coarse-raster approximations are not yet supported",
            call. = FALSE)
 
-    if (any(vapply(vars, function(nm) is.factor(stack[[nm]]), logical(1))))
-      stop("Gaussian scale-aware conductance currently supports numeric raster layers only",
+    if (any(vapply(vars, function(nm) is.factor(x[[nm]]), logical(1))))
+      stop("Factor-valued raster layers are not supported by `gaussian_smoothed_loglinear_conductance()`. ",
+           "Use numeric rasters only, or fit categorical rasters with an unscaled fixed conductance model.",
            call. = FALSE)
 
     layer_preps <- lapply(vars, function(nm)
@@ -470,11 +776,23 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
       sigma_lower = sigma_lower,
       sigma_upper = sigma_upper
     )
+    sigma_conversion_values <- .gaussian_scale_conversion(
+      surface = surface,
+      scale_vars = chosen_scale_vars,
+      sigma_conversion = sigma_conversion,
+      sigma_conversion_factor = sigma_conversion_factor
+    )
     default <- .gaussian_scale_conductance_default(
       beta_names = beta_names,
       scale_vars = chosen_scale_vars,
       sigma_bounds = sigma_bounds,
+      sigma_conversion = sigma_conversion_values,
       surface = surface
+    )
+    parameter_scale <- .gaussian_scale_external_scale(
+      beta_names = beta_names,
+      scale_vars = chosen_scale_vars,
+      sigma_conversion = sigma_conversion_values
     )
 
     lower <- rep(-Inf, length(default))
@@ -482,8 +800,8 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
     names(lower) <- names(upper) <- names(default)
     if (length(chosen_scale_vars))
     {
-      lower[sigma_names] <- sigma_bounds$lower[chosen_scale_vars]
-      upper[sigma_names] <- sigma_bounds$upper[chosen_scale_vars]
+      lower[sigma_names] <- sigma_bounds$lower[chosen_scale_vars] / sigma_conversion_values[chosen_scale_vars]
+      upper[sigma_names] <- sigma_bounds$upper[chosen_scale_vars] / sigma_conversion_values[chosen_scale_vars]
     }
 
     conductance_model <- function(theta)
@@ -493,7 +811,11 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
       names(theta) <- names(default)
 
       beta <- theta[beta_names]
-      sigma <- theta[sigma_names]
+      sigma_internal <- theta[sigma_names]
+      sigma_map <- stats::setNames(
+        unname(sigma_internal) * unname(sigma_conversion_values[chosen_scale_vars]),
+        chosen_scale_vars
+      )
 
       base_value <- stats::setNames(vector("list", length(vars)), vars)
       base_deriv <- stats::setNames(vector("list", length(vars)), vars)
@@ -505,12 +827,12 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
         {
           scaled <- .gaussian_scale_layer_values(
             prep = layer_preps[[nm]],
-            sigma = sigma[[paste0("sigma.", nm)]],
+            sigma = sigma_map[[nm]],
             standardize = standardize
           )
           base_value[[nm]] <- scaled$value
-          base_deriv[[nm]] <- scaled$deriv
-          base_second[[nm]] <- scaled$second
+          base_deriv[[nm]] <- scaled$deriv * sigma_conversion_values[[nm]]
+          base_second[[nm]] <- scaled$second * sigma_conversion_values[[nm]]^2
         }
         else
         {
@@ -650,14 +972,28 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
     attr(conductance_model, "default") <- default
     attr(conductance_model, "lower") <- lower
     attr(conductance_model, "upper") <- upper
+    attr(conductance_model, "parameter_scale") <- parameter_scale
     attr(conductance_model, "supports_partial") <- FALSE
     attr(conductance_model, "link") <- "log"
     attr(conductance_model, "scale_vars") <- chosen_scale_vars
     attr(conductance_model, "gaussian_scale") <- TRUE
+    attr(conductance_model, "gaussian_scale_plot_context") <- list(
+      spec = spec,
+      vars = vars,
+      beta_names = beta_names,
+      sigma_names = sigma_names,
+      scale_vars = chosen_scale_vars,
+      layer_preps = layer_preps,
+      sigma_conversion = sigma_conversion_values,
+      standardize = standardize,
+      scale_meta = attr(stack, "terradish_scale", exact = TRUE)
+    )
     attr(conductance_model, "gaussian_scale_info") <- list(
       scale_vars = chosen_scale_vars,
-      lower = lower[sigma_names],
-      upper = upper[sigma_names],
+      lower = sigma_bounds$lower[chosen_scale_vars],
+      upper = sigma_bounds$upper[chosen_scale_vars],
+      conversion = sigma_conversion_values[chosen_scale_vars],
+      conversion_mode = sigma_conversion,
       resolution = abs(terra::res(stack[[1]])),
       extent_diagonal = .gaussian_scale_extent_diagonal(stack),
       is_lonlat = terra::is.lonlat(stack),
@@ -696,7 +1032,9 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
 #'
 #' @details
 #' The returned table always reports \code{sigma} on the raster's native map
-#' scale and in raster cell widths. For each probability \code{p},
+#' scale and in raster cell widths. When sigma conversion is enabled during
+#' fitting, the table also reports the internal optimization scale and its
+#' conversion factor back to map units. For each probability \code{p},
 #' \code{axis_*} gives the one-dimensional half-width
 #' \eqn{qnorm((1 + p) / 2) * sigma}, while \code{radial_*} gives the isotropic
 #' two-dimensional radius \eqn{sigma * sqrt(-2 * log(1 - p))} containing
@@ -766,6 +1104,9 @@ gaussian_scale_summary <- function(object,
     sigma = unname(sigma),
     sigma_lower = unname(info$lower[sigma_names]),
     sigma_upper = unname(info$upper[sigma_names]),
+    sigma_internal = unname(sigma / info$conversion[info$scale_vars]),
+    sigma_conversion = unname(info$conversion[info$scale_vars]),
+    sigma_conversion_mode = rep(info$conversion_mode, length(sigma_names)),
     native_unit = rep(if (isTRUE(info$is_lonlat)) "degrees" else "map_units",
                       length(sigma_names)),
     sigma_cells_x = unname(sigma / info$resolution[1]),

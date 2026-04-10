@@ -246,6 +246,113 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
   list(lower = lower, upper = upper)
 }
 
+.conductance_model_parameter_scale <- function(conductance_model)
+{
+  default <- attr(conductance_model, "default", exact = TRUE)
+  if (is.null(default))
+    stop("Conductance model does not define default parameters", call. = FALSE)
+
+  scale <- attr(conductance_model, "parameter_scale", exact = TRUE)
+  if (is.null(scale))
+    scale <- rep(1, length(default))
+
+  scale <- c(scale)
+  if (length(scale) != length(default))
+    stop("Conductance-model parameter scales must match the parameter vector length",
+         call. = FALSE)
+  names(scale) <- names(default)
+  scale
+}
+
+.conductance_model_to_internal <- function(theta, conductance_model)
+{
+  theta <- c(theta)
+  scale <- .conductance_model_parameter_scale(conductance_model)
+  names(theta) <- names(scale)
+  theta / scale
+}
+
+.conductance_model_to_external <- function(theta, conductance_model)
+{
+  theta <- c(theta)
+  scale <- .conductance_model_parameter_scale(conductance_model)
+  names(theta) <- names(scale)
+  theta * scale
+}
+
+.conductance_model_gradient_to_external <- function(gradient, conductance_model)
+{
+  gradient <- c(gradient)
+  scale <- .conductance_model_parameter_scale(conductance_model)
+  names(gradient) <- names(scale)
+  gradient / scale
+}
+
+.conductance_model_hessian_to_external <- function(hessian, conductance_model)
+{
+  scale <- .conductance_model_parameter_scale(conductance_model)
+  sweep(sweep(hessian, 1, scale, "/"), 2, scale, "/")
+}
+
+.conductance_model_vcov_to_internal <- function(vcov, conductance_model)
+{
+  scale <- .conductance_model_parameter_scale(conductance_model)
+  sweep(sweep(vcov, 1, scale, "/"), 2, scale, "/")
+}
+
+.externalize_conductance_model <- function(conductance_model)
+{
+  parameter_scale <- .conductance_model_parameter_scale(conductance_model)
+
+  external_model <- function(theta)
+  {
+    theta_internal <- c(theta) / parameter_scale
+    names(theta_internal) <- names(parameter_scale)
+    out <- conductance_model(theta_internal)
+
+    out$df__dtheta <- function(k)
+      conductance_model(theta_internal)$df__dtheta(k) / parameter_scale[k]
+    out$df__dtheta_matrix <- sweep(out$df__dtheta_matrix, 2, parameter_scale, "/")
+    out$d2f__dtheta_dtheta <- function(k, l)
+      conductance_model(theta_internal)$d2f__dtheta_dtheta(k, l) /
+      (parameter_scale[k] * parameter_scale[l])
+
+    confint_internal <- out$confint
+    out$confint <- function(theta, vcov, quantile = 0.95,
+                            scale = c("conductance", "linpred"))
+    {
+      scale_arg <- match.arg(scale)
+      theta_internal_local <- c(theta) / parameter_scale
+      names(theta_internal_local) <- names(parameter_scale)
+      vcov_internal <- .conductance_model_vcov_to_internal(vcov, conductance_model)
+      confint_internal(theta_internal_local, vcov_internal,
+                       quantile = quantile, scale = scale_arg)
+    }
+
+    out
+  }
+
+  class(external_model) <- class(conductance_model)
+  attrs <- attributes(conductance_model)
+  if (!is.null(attr(conductance_model, "default", exact = TRUE)))
+    attrs$default <- .conductance_model_to_external(attr(conductance_model, "default", exact = TRUE),
+                                                    conductance_model)
+  if (!is.null(attr(conductance_model, "lower", exact = TRUE)))
+    attrs$lower <- .conductance_model_to_external(attr(conductance_model, "lower", exact = TRUE),
+                                                  conductance_model)
+  if (!is.null(attr(conductance_model, "upper", exact = TRUE)))
+    attrs$upper <- .conductance_model_to_external(attr(conductance_model, "upper", exact = TRUE),
+                                                  conductance_model)
+  for (nm in names(attrs))
+    attr(external_model, nm) <- attrs[[nm]]
+
+  info <- attr(external_model, "gaussian_scale_info", exact = TRUE)
+  if (!is.null(info))
+    attr(external_model, "gaussian_scale_info") <- info
+
+  external_model
+}
+
 .run_terradish_optimizer <- function(theta, optfn, optimizer, control,
                                      lower = rep(-Inf, length(theta)),
                                      upper = rep(Inf, length(theta)))
@@ -520,6 +627,7 @@ terradish <- function(formula,
                                              "requires_fixed_graph", FALSE)))
     stop("`approximation = \"coarse_raster\"` is not currently supported for this conductance model")
   conductance_model <- conductance_model_factory(formula, data$x)
+  conductance_model_user <- .externalize_conductance_model(conductance_model)
   conductance_supports_partial <- !identical(
     attr(conductance_model, "supports_partial", exact = TRUE),
     FALSE
@@ -531,8 +639,11 @@ terradish <- function(formula,
   if (is.null(theta))
     theta <- default
   else
+  {
     stopifnot(length(theta) == length(default))
-  names(theta) <- names(default)
+    names(theta) <- names(.conductance_model_parameter_scale(conductance_model))
+    theta <- .conductance_model_to_internal(theta, conductance_model)
+  }
   if (any(theta < bounds$lower | theta > bounds$upper))
     stop("Starting values in `theta` must lie within the conductance-model bounds",
          call. = FALSE)
@@ -541,8 +652,12 @@ terradish <- function(formula,
                                            conductance_model_factory = conductance_model_factory)
   if (isTRUE(leverage) && !conductance_supports_partial)
   {
-    warning("Leverage diagnostics are not available for this conductance model; skipping `partial_X` calculations.",
-            call. = FALSE)
+    if (isTRUE(attr(conductance_model, "gaussian_scale", exact = TRUE)))
+      warning("Leverage diagnostics are not available for Gaussian scale-aware conductance because `partial_X` currently assumes a one-to-one mapping between conductance parameters and design-matrix covariates; models with separate sigma parameters do not satisfy that contract.",
+              call. = FALSE)
+    else
+      warning("Leverage diagnostics are not available for this conductance model; skipping `partial_X` calculations.",
+              call. = FALSE)
     leverage <- FALSE
   }
   fcalls    <- new("FunctionCall", count = 0L)
@@ -754,6 +869,11 @@ terradish <- function(formula,
   fit$solver_reuse_state <- NULL
 
   fit$response <- S
+  fit$gradient_internal <- fit$gradient
+  fit$hessian_internal <- fit$hessian
+  fit$gradient <- .conductance_model_gradient_to_external(fit$gradient, conductance_model)
+  fit$hessian <- .conductance_model_hessian_to_external(fit$hessian, conductance_model)
+  theta_external <- .conductance_model_to_external(theta, conductance_model)
 
   if (fit$boundary)
     warning("Optimum for subproblem is on boundary (e.g. no spatial genetic structure): cannot optimize theta.\nTry different starting values.")
@@ -764,12 +884,12 @@ terradish <- function(formula,
   if (leverage)
   {
     ihess      <- .safe_hessian_inverse(fit$hessian)
-    leverage_S <- -matrix(fit$partial_S, length(S), length(theta)) %*% ihess
-    leverage_S <- array(leverage_S, dim = c(nrow(S), ncol(S), length(theta)))
-    for (k in seq_along(theta))
+    leverage_S <- -matrix(fit$partial_S, length(S), length(theta_external)) %*% ihess
+    leverage_S <- array(leverage_S, dim = c(nrow(S), ncol(S), length(theta_external)))
+    for (k in seq_along(theta_external))
       leverage_S[, , k] <- (leverage_S[, , k] + t(leverage_S[, , k])) / 2
     leverage_X <- array(NA, dim = dim(fit$partial_X))
-    for (k in 1:length(theta))
+    for (k in 1:length(theta_external))
       leverage_X[,,k] <- -fit$partial_X[,,k] %*% ihess
   }
   num_leverage_S <- NULL
@@ -791,15 +911,19 @@ terradish <- function(formula,
                                  "edge"     = ncol(data$adj)),
               cost           = c("newton_steps"   = iters,
                                  "function_calls" = fcalls$count + 1),
-              submodels      = list("f" = conductance_model,
+              submodels      = list("f" = conductance_model_user,
+                                    "f_internal" = conductance_model,
                                     "g" = measurement_model),
               fit            = fit,
               loglik         = -fit$objective,
-              df             = (!no_coef)*length(theta) + length(fit$phi),
-              aic            = 2*fit$objective + 2*(!no_coef)*length(theta) + 2*length(fit$phi),
-              mle            = list("theta"    = if(no_coef) NULL else theta,
+              df             = (!no_coef)*length(theta_external) + length(fit$phi),
+              aic            = 2*fit$objective + 2*(!no_coef)*length(theta_external) + 2*length(fit$phi),
+              mle            = list("theta"    = if(no_coef) NULL else theta_external,
+                                    "theta_internal" = if(no_coef) NULL else theta,
                                     "gradient" = if(no_coef) NULL else -fit$gradient,
-                                    "hessian"  = if(no_coef) NULL else -fit$hessian),
+                                    "gradient_internal" = if(no_coef) NULL else -fit$gradient_internal,
+                                    "hessian"  = if(no_coef) NULL else -fit$hessian,
+                                    "hessian_internal" = if(no_coef) NULL else -fit$hessian_internal),
               approximation  = approximation_info,
               leverage       = list("S" = if(!leverage) NULL else leverage_S,
                                     "X" = if(!leverage) NULL else leverage_X,

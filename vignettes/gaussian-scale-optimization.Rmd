@@ -73,6 +73,19 @@ By default, those bounds are data-derived:
 You can override those defaults with `sigma_lower =` and `sigma_upper =` when
 you create the conductance model.
 
+Internally, the optimizer now works on a converted sigma scale by default,
+using approximate cell-width units. The fitted coefficients and summaries are
+still reported back in map units for users, so the conversion helps the
+optimization without changing the interpretation target.
+
+Two practical caveats are worth keeping in mind:
+
+- factor-valued raster layers are rejected for this Gaussian conductance model
+  rather than being treated as scaleable predictors
+- leverage / `partial_X` diagnostics are still unavailable, because the current
+  diagnostic machinery assumes a one-to-one match between conductance
+  parameters and design-matrix covariates
+
 ## Worked example
 
 We will fit a small staged example using the `melip` data. To keep the vignette
@@ -185,6 +198,7 @@ coef(fit_gaussian)[["sigma.forestcover"]]
 `gaussian_scale_summary()` converts the fitted sigma values into:
 
 - the native raster distance scale
+- the internal optimization scale and its conversion factor
 - raster cell widths
 - one-dimensional Gaussian half-widths
 - two-dimensional radial extents that contain a chosen amount of kernel mass
@@ -197,6 +211,34 @@ That table is often the quickest way to interpret the scale of effect. For
 example, `radial_95` is the radius that contains approximately 95% of the
 Gaussian kernel mass, while `sigma_cells_x` and `sigma_cells_y` show how broad
 the effect is relative to the raster resolution.
+
+You can also visualize the fitted kernel directly. The `sigma` plot shows the
+Gaussian weight curve over distance for each fitted scale parameter, with a
+vertical dashed line at the fitted effective distance containing 90% of the
+one-dimensional kernel mass and a shaded uncertainty band for that distance.
+Each panel is also annotated with:
+
+- the fitted `sigma`
+- the fitted effective 90% distance
+- the corresponding confidence interval bounds
+
+```{r sigma-plot}
+plot(fit_gaussian, type = "sigma")
+```
+
+If you already know how to convert your map units into a more interpretable
+distance scale, you can relabel the plot directly. For example, if one map
+unit corresponds to one metre, then multiplying by `0.001` reports distances
+in kilometres:
+
+```{r sigma-plot-km}
+plot(
+  fit_gaussian,
+  type = "sigma",
+  distance_per_map_unit = 0.001,
+  distance_unit = "km"
+)
+```
 
 ### Step 5 — Compare against a standard fixed-raster fit
 
@@ -285,7 +327,7 @@ surface_two <- conductance_surface(
 
 ```{r fit-two}
 fit_gaussian_two <- terradish(
-  melip.Fst ~ forestcover + altitude + I(altitude^2),
+  melip.Fst ~ forestcover + altitude,
   data = surface_two,
   conductance_model = gaussian_smoothed_loglinear_conductance(surface_two),
   measurement_model = mlpe,
@@ -331,12 +373,12 @@ This first version is intentionally focused. Right now it supports:
 It does **not yet** support:
 
 - factor-valued raster layers
-- marginal-effect plotting for the Gaussian scale-aware conductance model
 - leverage / `partial_X` diagnostics
 - coarse-raster approximation for this conductance model
 
-Those are natural next extensions, but the current implementation is already
-enough to fit scale and conductance concurrently in one call.
+It does now support conditional-on-sigma marginal-effect plotting, so you can
+inspect conductance and response-scale curves after fitting, but the leverage
+machinery is still intentionally disabled.
 
 ## Where to go next
 

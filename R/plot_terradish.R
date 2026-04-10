@@ -8,17 +8,26 @@
 #'   \item{\code{"marginal"}}{Marginal effect of each raster covariate on
 #'     conductance, varying one covariate at a time while averaging over the
 #'     observed values of all other model covariates, with a 95\% pointwise
-#'     confidence band via the delta method.}
+#'     confidence band via the delta method. For Gaussian scale-aware
+#'     conductance models, these curves are conditional on the fitted
+#'     \code{sigma} values and are shown on the smoothed covariate scale.}
 #'   \item{\code{"marginal_response"}}{Approximate response-scale marginal
 #'     effects obtained by mapping the marginal conductance curve through the
 #'     fitted measurement-model mean and adding predictive bands that combine
 #'     \code{theta} uncertainty, conditional \code{phi} uncertainty, and the
-#'     residual variance implied by \code{tau}.}
+#'     residual variance implied by \code{tau}. For Gaussian scale-aware
+#'     conductance models, the predictive bands are likewise conditional on the
+#'     fitted \code{sigma} values.}
+#'   \item{\code{"sigma"}}{For Gaussian scale-aware conductance models, plots
+#'     the fitted Gaussian kernel against distance for each \code{sigma} term,
+#'     with a dashed line at the fitted effective distance containing 90\% of
+#'     the one-dimensional kernel mass and a shaded interval from the Wald
+#'     confidence interval of that effective distance.}
 #' }
 #'
 #' @param x A fitted \code{terradish} object.
 #' @param type One of \code{"marginal_response"} (default), \code{"fit"},
-#'   \code{"surface"}, or \code{"marginal"}.
+#'   \code{"surface"}, \code{"marginal"}, or \code{"sigma"}.
 #' @param data The \code{terradish_graph} used when fitting \code{x}. Required
 #'   for \code{type = "surface"}, \code{type = "marginal"}, and
 #'   \code{type = "marginal_response"}.
@@ -27,11 +36,16 @@
 #'   \code{type = "marginal"}, the x-axis of each panel is back-transformed to
 #'   the original units using the corresponding per-layer offset and divisor.
 #'   Layer names must match the covariate names used in the model formula.
-#' @param conductance_model The conductance model factory used when fitting
-#'   \code{x} — e.g. \code{\link{loglinear_conductance}} (default) or
-#'   \code{\link{linear_conductance}}. Required for
-#'   \code{type = "marginal"} and \code{type = "marginal_response"} because a
-#'   fresh model must be built at the evaluation points.
+#' @param conductance_model Optional conductance model factory used when fitting
+#'   \code{x}. When omitted, \code{plot()} first tries to reuse the fitted
+#'   conductance model stored in \code{x}; if that is unavailable, it falls back
+#'   to \code{\link{loglinear_conductance}}. Gaussian scale-aware fits reuse the
+#'   fitted conductance model automatically.
+#' @param distance_per_map_unit Optional positive scalar used by
+#'   \code{type = "sigma"} to convert map units into a user-facing distance
+#'   unit such as kilometres.
+#' @param distance_unit Optional label used with
+#'   \code{distance_per_map_unit} for \code{type = "sigma"}.
 #' @param quantile Confidence level for interval bands. Default \code{0.95}.
 #' @param n Number of evaluation points for each marginal effect curve.
 #'   Defaults to \code{100} for \code{"marginal_response"} (each point
@@ -51,6 +65,8 @@
 #'     conductance effects and pointwise confidence bands.
 #'   \item \code{"marginal_response"}: a \code{ggplot} object with faceted
 #'     response-scale marginal effects and predictive bands.
+#'   \item \code{"sigma"}: a \code{ggplot} object with faceted Gaussian kernel
+#'     weight curves and fitted effective distances for each scale parameter.
 #' }
 #'
 #' @seealso \code{\link{terradish}}, \code{\link{conductance}},
@@ -84,27 +100,34 @@
 #'
 #' # Approximate response-scale marginal effects with predictive bands
 #' plot(fit, type = "marginal_response", data = surface)
+#'
+#' # For Gaussian scale-aware fits, visualize the fitted sigma kernels
+#' # plot(fit_gaussian, type = "sigma")
 #' }
 #'
 #' @name plot.terradish
 #' @method plot terradish
 #' @importFrom ggplot2 aes coord_equal element_blank facet_wrap geom_abline
-#'   geom_line geom_point geom_raster geom_ribbon geom_rug ggplot labs
-#'   scale_fill_gradientn scale_y_continuous theme theme_bw
+#'   geom_line geom_point geom_raster geom_rect geom_ribbon geom_rug geom_text
+#'   geom_vline ggplot labs scale_fill_gradientn scale_y_continuous theme
+#'   theme_bw
 #' @importFrom stats lm
 #' @importFrom terra global values
 #' @export
 plot.terradish <- function(x,
                             type = c("marginal_response", "fit", "surface",
-                                     "marginal"),
+                                     "marginal", "sigma"),
                             data = NULL,
                             covariates = NULL,
-                            conductance_model = loglinear_conductance,
+                            conductance_model = NULL,
+                            distance_per_map_unit = NULL,
+                            distance_unit = NULL,
                             quantile = 0.95,
                             n = NULL,
                             ...)
 {
   type <- match.arg(type)
+  conductance_model <- .resolve_plot_conductance_model(x, conductance_model)
   n <- as.integer(if (is.null(n))
     if (identical(type, "marginal_response")) 100L else 200L
   else
@@ -112,6 +135,9 @@ plot.terradish <- function(x,
   switch(type,
     fit      = .plot_terradish_fit(x, ...),
     surface  = .plot_terradish_surface(x, data, quantile),
+    sigma    = .plot_terradish_sigma(x, quantile, n,
+                                     distance_per_map_unit = distance_per_map_unit,
+                                     distance_unit = distance_unit),
     marginal = .plot_terradish_marginal(x, data, covariates,
                                         conductance_model, quantile, n),
     marginal_response = .plot_terradish_marginal(x, data, covariates,
@@ -124,6 +150,115 @@ plot.terradish <- function(x,
 #' @method plot radish
 #' @export
 plot.radish <- function(x, ...) plot.terradish(x, ...)
+
+.resolve_plot_conductance_model <- function(fit, conductance_model)
+{
+  if (!is.null(conductance_model))
+    return(conductance_model)
+
+  fitted_model <- fit$submodels$f_internal
+  if (inherits(fitted_model,
+               c("terradish_conductance_model", "radish_conductance_model")) &&
+      isTRUE(attr(fitted_model, "gaussian_scale", exact = TRUE)))
+    return(fitted_model)
+
+  loglinear_conductance
+}
+
+.plot_terradish_sigma <- function(fit, quantile, n,
+                                  distance_per_map_unit = NULL,
+                                  distance_unit = NULL)
+{
+  info <- attr(fit$submodels$f, "gaussian_scale_info", exact = TRUE)
+  if (is.null(info))
+    stop('plot(type = "sigma") is only available for Gaussian scale-aware conductance models.',
+         call. = FALSE)
+
+  sigma_table <- suppressWarnings(
+    gaussian_scale_summary(
+      fit,
+      distance_per_map_unit = distance_per_map_unit,
+      distance_unit = distance_unit
+    )
+  )
+  sigma_names <- paste0("sigma.", sigma_table$covariate)
+  vcov_theta <- .safe_hessian_inverse(fit$fit$hessian)
+  if (is.null(rownames(vcov_theta)) || is.null(colnames(vcov_theta)))
+    dimnames(vcov_theta) <- list(names(coef(fit)), names(coef(fit)))
+
+  sigma_se <- sqrt(pmax(diag(vcov_theta)[sigma_names], 0))
+  z_ci <- qnorm((1 + quantile) / 2)
+  sigma_lower <- pmax(sigma_table$sigma - z_ci * sigma_se, 0)
+  sigma_upper <- sigma_table$sigma + z_ci * sigma_se
+
+  kernel_mass <- 0.9
+  z_mass <- qnorm((1 + kernel_mass) / 2)
+  distance_scale <- if (is.null(distance_per_map_unit)) 1 else distance_per_map_unit
+  distance_label <- if (is.null(distance_unit)) "map units" else distance_unit
+  sigma_plot <- sigma_table$sigma * distance_scale
+  sigma_lower_plot <- sigma_lower * distance_scale
+  sigma_upper_plot <- sigma_upper * distance_scale
+  effective_distance <- z_mass * sigma_plot
+  effective_lower <- z_mass * sigma_lower_plot
+  effective_upper <- z_mass * sigma_upper_plot
+
+  axis_95_plot <- sigma_table$axis_95 * distance_scale
+  x_max <- pmax(effective_upper * 1.25, sigma_plot * 4, axis_95_plot)
+  x_max[!is.finite(x_max) | x_max <= 0] <- pmax(sigma_plot, 1)
+
+  curve_data <- do.call(rbind, lapply(seq_len(nrow(sigma_table)), function(i) {
+    x_seq <- seq(0, x_max[i], length.out = as.integer(n))
+    data.frame(
+      covariate = sigma_table$covariate[i],
+      distance = x_seq,
+      weight = stats::dnorm(x_seq, mean = 0, sd = sigma_plot[i])
+    )
+  }))
+
+  summary_data <- data.frame(
+    covariate = sigma_table$covariate,
+    distance = effective_distance,
+    distance_lower = effective_lower,
+    distance_upper = effective_upper,
+    sigma = sigma_plot,
+    sigma_lower = sigma_lower_plot,
+    sigma_upper = sigma_upper_plot,
+    stringsAsFactors = FALSE
+  )
+
+  panel_ymax <- tapply(curve_data$weight, curve_data$covariate, max)
+  summary_data$ymax <- unname(panel_ymax[as.character(summary_data$covariate)])
+  summary_data$label_y <- summary_data$ymax * 0.98
+  summary_data$label <- sprintf(
+    "sigma = %.2f %s\neffective 90%% = %.2f %s\n%.0f%% CI: [%.2f, %.2f] %s",
+    summary_data$sigma, distance_label,
+    summary_data$distance, distance_label,
+    round(quantile * 100),
+    summary_data$distance_lower, summary_data$distance_upper,
+    distance_label
+  )
+
+  curve_data$covariate <- factor(curve_data$covariate, levels = sigma_table$covariate)
+  summary_data$covariate <- factor(summary_data$covariate, levels = sigma_table$covariate)
+
+  ggplot(curve_data, aes(x = distance, y = weight)) +
+    geom_rect(data = summary_data,
+              aes(xmin = distance_lower, xmax = distance_upper,
+                  ymin = -Inf, ymax = Inf),
+              inherit.aes = FALSE, fill = "grey80", alpha = 0.5) +
+    geom_line(linewidth = 0.7, colour = "black") +
+    geom_vline(data = summary_data, aes(xintercept = distance),
+               inherit.aes = FALSE, colour = "#d95f02",
+               linewidth = 0.6, linetype = "dashed") +
+    geom_text(data = summary_data,
+              aes(x = Inf, y = label_y, label = label),
+              inherit.aes = FALSE, hjust = 1.02, vjust = 1,
+              size = 3) +
+    facet_wrap(~covariate, scales = "free_x", ncol = 1) +
+    labs(x = paste0("Distance (", distance_label, ")"), y = "Weight") +
+    theme_bw() +
+    theme(panel.grid = element_blank())
+}
 
 
 # ---- internal helpers -------------------------------------------------------
@@ -478,6 +613,45 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
     stop("Cannot plot marginal effects: no conductance parameters estimated ",
          "(IBD or boundary model).",
          call. = FALSE)
+
+  gaussian_plot_context <- attr(fit$submodels$f_internal,
+                                "gaussian_scale_plot_context",
+                                exact = TRUE)
+  if (!is.null(gaussian_plot_context))
+  {
+    response_components <- if (isTRUE(response_scale))
+      .marginal_response_components(fit)
+    else
+      NULL
+
+    marginal_data <- .gaussian_scale_marginal_data(
+      theta = fit$mle$theta_internal,
+      vcov = .safe_hessian_inverse(fit$fit$hessian_internal),
+      quantile = quantile,
+      n = n,
+      plot_context = gaussian_plot_context,
+      response_components = response_components,
+      graph_data = if (isTRUE(response_scale)) data else NULL
+    )
+
+    return(
+      ggplot(marginal_data$curve_data, aes(x = x, y = est)) +
+        geom_ribbon(aes(ymin = lower, ymax = upper),
+                    fill = "grey80", alpha = 0.5) +
+        geom_line(linewidth = 0.6, colour = "black") +
+        geom_rug(data = marginal_data$rug_data, aes(x = x), inherit.aes = FALSE,
+                 sides = "b", linewidth = 0.3) +
+        facet_wrap(~covariate, scales = "free_x",
+                   ncol = min(length(levels(marginal_data$curve_data$covariate)), 3L)) +
+        scale_y_continuous(name = if (isTRUE(response_scale))
+          "Predicted genetic distance"
+        else
+          "Conductance") +
+        labs(x = NULL) +
+        theme_bw() +
+        theme(panel.grid = element_blank())
+    )
+  }
 
   if (!inherits(conductance_model_factory,
                 c("terradish_conductance_model_factory",

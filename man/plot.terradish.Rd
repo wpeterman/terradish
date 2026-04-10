@@ -7,10 +7,12 @@
 \usage{
 \method{plot}{terradish}(
   x,
-  type = c("marginal_response", "fit", "surface", "marginal"),
+  type = c("marginal_response", "fit", "surface", "marginal", "sigma"),
   data = NULL,
   covariates = NULL,
-  conductance_model = loglinear_conductance,
+  conductance_model = NULL,
+  distance_per_map_unit = NULL,
+  distance_unit = NULL,
   quantile = 0.95,
   n = NULL,
   ...
@@ -22,7 +24,7 @@
 \item{x}{A fitted \code{terradish} object.}
 
 \item{type}{One of \code{"marginal_response"} (default), \code{"fit"},
-\code{"surface"}, or \code{"marginal"}.}
+\code{"surface"}, \code{"marginal"}, or \code{"sigma"}.}
 
 \item{data}{The \code{terradish_graph} used when fitting \code{x}. Required
 for \code{type = "surface"}, \code{type = "marginal"}, and
@@ -34,11 +36,18 @@ for \code{type = "surface"}, \code{type = "marginal"}, and
 the original units using the corresponding per-layer offset and divisor.
 Layer names must match the covariate names used in the model formula.}
 
-\item{conductance_model}{The conductance model factory used when fitting
-\code{x} — e.g. \code{\link{loglinear_conductance}} (default) or
-\code{\link{linear_conductance}}. Required for
-\code{type = "marginal"} and \code{type = "marginal_response"} because a
-fresh model must be built at the evaluation points.}
+\item{conductance_model}{Optional conductance model factory used when fitting
+\code{x}. When omitted, \code{plot()} first tries to reuse the fitted
+conductance model stored in \code{x}; if that is unavailable, it falls back
+to \code{\link{loglinear_conductance}}. Gaussian scale-aware fits reuse the
+fitted conductance model automatically.}
+
+\item{distance_per_map_unit}{Optional positive scalar used by
+\code{type = "sigma"} to convert map units into a user-facing distance
+unit such as kilometres.}
+
+\item{distance_unit}{Optional label used with
+\code{distance_per_map_unit} for \code{type = "sigma"}.}
 
 \item{quantile}{Confidence level for interval bands. Default \code{0.95}.}
 
@@ -62,6 +71,8 @@ Invisibly:
     conductance effects and pointwise confidence bands.
   \item \code{"marginal_response"}: a \code{ggplot} object with faceted
     response-scale marginal effects and predictive bands.
+  \item \code{"sigma"}: a \code{ggplot} object with faceted Gaussian kernel
+    weight curves and fitted effective distances for each scale parameter.
 }
 }
 \description{
@@ -73,12 +84,21 @@ Three plot types for objects returned by \code{\link{terradish}}:
   \item{\code{"marginal"}}{Marginal effect of each raster covariate on
     conductance, varying one covariate at a time while averaging over the
     observed values of all other model covariates, with a 95\% pointwise
-    confidence band via the delta method.}
+    confidence band via the delta method. For Gaussian scale-aware
+    conductance models, these curves are conditional on the fitted
+    \code{sigma} values and are shown on the smoothed covariate scale.}
   \item{\code{"marginal_response"}}{Approximate response-scale marginal
     effects obtained by mapping the marginal conductance curve through the
     fitted measurement-model mean and adding predictive bands that combine
     \code{theta} uncertainty, conditional \code{phi} uncertainty, and the
-    residual variance implied by \code{tau}.}
+    residual variance implied by \code{tau}. For Gaussian scale-aware
+    conductance models, the predictive bands are likewise conditional on the
+    fitted \code{sigma} values.}
+  \item{\code{"sigma"}}{For Gaussian scale-aware conductance models, plots
+    the fitted Gaussian kernel against distance for each \code{sigma} term,
+    with a dashed line at the fitted effective distance containing 90\% of
+    the one-dimensional kernel mass and a shaded interval from the Wald
+    confidence interval of that effective distance.}
 }
 }
 \examples{
@@ -109,6 +129,9 @@ plot(fit, type = "marginal", data = surface)
 
 # Approximate response-scale marginal effects with predictive bands
 plot(fit, type = "marginal_response", data = surface)
+
+# For Gaussian scale-aware fits, visualize the fitted sigma kernels
+# plot(fit_gaussian, type = "sigma")
 }
 
 }

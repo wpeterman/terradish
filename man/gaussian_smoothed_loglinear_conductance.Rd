@@ -9,7 +9,9 @@ gaussian_smoothed_loglinear_conductance(
   scale_vars = NULL,
   standardize = TRUE,
   sigma_lower = NULL,
-  sigma_upper = NULL
+  sigma_upper = NULL,
+  sigma_conversion = c("cell", "map"),
+  sigma_conversion_factor = NULL
 )
 }
 \arguments{
@@ -30,6 +32,17 @@ are recycled across all scaled rasters; named vectors may be used to set
 different bounds by raster name. When omitted, \code{sigma_lower} defaults
 to half of the mean raster cell width and \code{sigma_upper} defaults to
 the diagonal length of the retained raster extent.}
+
+\item{sigma_conversion}{Internal scaling applied during optimization.
+\code{"cell"} (default) rescales each sigma parameter by the mean cell
+width of its raster layer so optimization happens in approximate cell
+units, while reported coefficients are converted back to map units.
+\code{"map"} leaves the optimization on the native map-unit scale.}
+
+\item{sigma_conversion_factor}{Optional positive scalar or named vector used
+to override the default sigma conversion factors. This is most useful when
+you want optimization to happen in user-defined distance units while still
+reporting fitted sigma values in map units.}
 }
 \value{
 A function of class \code{terradish_conductance_model_factory} that
@@ -50,15 +63,23 @@ parameter for each scaled raster layer. The spatial kernel is Gaussian and is
 evaluated with an FFT-based normalized convolution over the retained raster
 stack from \code{surface}. Using a fixed full-grid kernel keeps the sigma
 derivatives smooth during optimization.
+Internally, the sigma parameters may be optimized on a converted scale
+(for example, approximate cell widths) and are then converted back to map
+units before they are returned to users.
 
 The current implementation supports numeric raster formulas built from raw
 raster names, interactions, and polynomial/arithmetic terms that can be
 differentiated analytically by \code{\link[stats:D]{D}} after smoothing the base
-raster layers. Factor-valued raster layers are still rejected.
+raster layers. Factor-valued raster layers are rejected because Gaussian
+smoothing is only defined here for numeric rasters; use an unscaled fixed
+conductance model if you need categorical raster predictors.
 
 For this conductance model, \code{\link{terradish}} prefers
 \code{optimizer = "bfgs"} when \code{optimizer = "auto"}, and leverage /
-\code{partial_X} calculations are currently disabled.
+\code{partial_X} calculations are currently disabled because the current
+leverage machinery assumes a one-to-one mapping between fitted conductance
+parameters and design-matrix covariates, which does not hold once separate
+Gaussian \code{sigma} parameters are introduced.
 }
 \examples{
 \dontrun{
@@ -76,7 +97,8 @@ surface <- conductance_surface(covariates, melip.coords, directions = 8,
 gaussian_model <- gaussian_smoothed_loglinear_conductance(
   surface,
   sigma_lower = 100,
-  sigma_upper = 5000
+  sigma_upper = 5000,
+  sigma_conversion = "cell"
 )
 fit <- terradish(melip.Fst ~ altitude * forestcover + I(altitude^2),
                  data = surface,
