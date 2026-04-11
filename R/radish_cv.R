@@ -672,7 +672,7 @@ terradish_cv_replicates <- function(pts,
   out <- list(
     summary = summary_tab,
     mean_loglik = mean(summary_tab$cv_loglik),
-    sd_loglik = stats::sd(summary_tab$cv_loglik),
+    sd_loglik = sd(summary_tab$cv_loglik),
     seeds = seeds
   )
 

@@ -102,7 +102,7 @@ scale_covariates <- function(covariates,
     else
     {
       center_i <- if (isTRUE(center)) mean(vals) else 0
-      scale_i <- if (isTRUE(scale)) stats::sd(vals) else 1
+      scale_i <- if (isTRUE(scale)) sd(vals) else 1
       if (!is.finite(scale_i) || scale_i == 0)
         scale_i <- 1
     }

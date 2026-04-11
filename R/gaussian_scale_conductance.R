@@ -26,8 +26,8 @@
 {
   expr <- .gaussian_scale_formula_expression(label)
 
-  first <- stats::setNames(vector("list", length(raw_vars)), raw_vars)
-  second <- stats::setNames(vector("list", length(raw_vars)), raw_vars)
+  first <- setNames(vector("list", length(raw_vars)), raw_vars)
+  second <- setNames(vector("list", length(raw_vars)), raw_vars)
 
   for (v in raw_vars)
   {
@@ -39,7 +39,7 @@
              "` could not be constructed analytically.",
              call. = FALSE)
     )
-    second[[v]] <- stats::setNames(vector("list", length(raw_vars)), raw_vars)
+    second[[v]] <- setNames(vector("list", length(raw_vars)), raw_vars)
   }
 
   for (v in raw_vars)
@@ -97,10 +97,10 @@
 .coerce_gaussian_scale_bound <- function(x, scale_vars, default, arg_name)
 {
   if (!length(scale_vars))
-    return(stats::setNames(numeric(), character()))
+    return(setNames(numeric(), character()))
 
   if (is.null(x))
-    return(stats::setNames(rep(default, length(scale_vars)), scale_vars))
+    return(setNames(rep(default, length(scale_vars)), scale_vars))
 
   x <- c(x)
   if (is.null(names(x)))
@@ -128,7 +128,7 @@
 
 .gaussian_scale_extent_diagonal <- function(stack)
 {
-  ext <- terra::ext(stack)
+  ext <- ext(stack)
   width <- ext$xmax - ext$xmin
   height <- ext$ymax - ext$ymin
   sqrt(width^2 + height^2)
@@ -139,11 +139,11 @@
                                          sigma_upper = NULL)
 {
   if (!length(scale_vars))
-    return(list(lower = stats::setNames(numeric(), character()),
-                upper = stats::setNames(numeric(), character())))
+    return(list(lower = setNames(numeric(), character()),
+                upper = setNames(numeric(), character())))
 
   stack <- .as_spatraster(surface$stack)
-  mean_res <- mean(abs(terra::res(stack[[1]])))
+  mean_res <- mean(abs(res(stack[[1]])))
   extent_diag <- .gaussian_scale_extent_diagonal(stack)
 
   lower_default <- mean_res / 2
@@ -167,7 +167,7 @@
 {
   sigma_conversion <- match.arg(sigma_conversion)
   if (!length(scale_vars))
-    return(stats::setNames(numeric(), character()))
+    return(setNames(numeric(), character()))
 
   if (!is.null(sigma_conversion_factor))
     return(.coerce_gaussian_scale_bound(sigma_conversion_factor, scale_vars,
@@ -177,9 +177,9 @@
   values <- vapply(scale_vars, function(nm) {
     if (identical(sigma_conversion, "map"))
       return(1)
-    mean(abs(terra::res(stack[[nm]])))
+    mean(abs(res(stack[[nm]])))
   }, numeric(1))
-  stats::setNames(values, scale_vars)
+  setNames(values, scale_vars)
 }
 
 .fft_pad_matrix <- function(x, nrow_pad, ncol_pad)
@@ -191,14 +191,14 @@
 
 .fft_convolution_crop <- function(fft_x, fft_k, prep)
 {
-  conv_full <- Re(stats::fft(fft_x * fft_k, inverse = TRUE)) /
+  conv_full <- Re(fft(fft_x * fft_k, inverse = TRUE)) /
     (prep$nrow_pad * prep$ncol_pad)
   conv_full[prep$i1:prep$i2, prep$j1:prep$j2, drop = FALSE]
 }
 
 .gaussian_scale_prepare_layer <- function(layer, rowcol)
 {
-  mat <- terra::as.matrix(layer, wide = TRUE)
+  mat <- as.matrix(layer, wide = TRUE)
   mask <- is.finite(mat)
   values0 <- mat
   values0[!mask] <- 0
@@ -209,8 +209,8 @@
   ncol_pad <- nc + nc - 1L
   center_row <- ceiling(nr / 2)
   center_col <- ceiling(nc / 2)
-  y_res <- abs(terra::res(layer)[2])
-  x_res <- abs(terra::res(layer)[1])
+  y_res <- abs(res(layer)[2])
+  x_res <- abs(res(layer)[1])
 
   row_offset <- (seq_len(nr) - center_row) * y_res
   col_offset <- (seq_len(nc) - center_col) * x_res
@@ -228,8 +228,8 @@
     dist2 = dist2,
     rowcol = rowcol,
     na_mask = !mask,
-    value_fft = stats::fft(.fft_pad_matrix(values0, nrow_pad, ncol_pad)),
-    mask_fft = stats::fft(.fft_pad_matrix(mask * 1, nrow_pad, ncol_pad)),
+    value_fft = fft(.fft_pad_matrix(values0, nrow_pad, ncol_pad)),
+    mask_fft = fft(.fft_pad_matrix(mask * 1, nrow_pad, ncol_pad)),
     raw_active = mat[cbind(rowcol[, 1], rowcol[, 2])]
   )
 }
@@ -243,9 +243,9 @@
   d2kernel <- kernel * (ratio^2 - 3 * ratio) / sigma2
 
   list(
-    kernel_fft = stats::fft(.fft_pad_matrix(kernel, prep$nrow_pad, prep$ncol_pad)),
-    dkernel_fft = stats::fft(.fft_pad_matrix(dkernel, prep$nrow_pad, prep$ncol_pad)),
-    d2kernel_fft = stats::fft(.fft_pad_matrix(d2kernel, prep$nrow_pad, prep$ncol_pad))
+    kernel_fft = fft(.fft_pad_matrix(kernel, prep$nrow_pad, prep$ncol_pad)),
+    dkernel_fft = fft(.fft_pad_matrix(dkernel, prep$nrow_pad, prep$ncol_pad)),
+    d2kernel_fft = fft(.fft_pad_matrix(d2kernel, prep$nrow_pad, prep$ncol_pad))
   )
 }
 
@@ -355,7 +355,7 @@
   if (length(scale_vars))
   {
     start_sigma <- pmin(
-      pmax(mean(abs(terra::res(surface$stack[[1]]))), sigma_bounds$lower),
+      pmax(mean(abs(res(surface$stack[[1]]))), sigma_bounds$lower),
       sigma_bounds$upper
     )
     out[sigma_names] <- start_sigma / sigma_conversion[scale_vars]
@@ -414,18 +414,18 @@
 
   sigma_internal <- theta[sigma_names]
   sigma_map <- if (length(chosen_scale_vars))
-    stats::setNames(
+    setNames(
       unname(sigma_internal) * unname(sigma_conversion[chosen_scale_vars]),
       chosen_scale_vars
     )
   else
-    stats::setNames(numeric(), character())
+    setNames(numeric(), character())
 
-  base_model <- stats::setNames(vector("list", length(vars)), vars)
-  base_original <- stats::setNames(vector("list", length(vars)), vars)
-  base_deriv <- stats::setNames(vector("list", length(vars)), vars)
-  base_second <- stats::setNames(vector("list", length(vars)), vars)
-  back_transform <- stats::setNames(vector("list", length(vars)), vars)
+  base_model <- setNames(vector("list", length(vars)), vars)
+  base_original <- setNames(vector("list", length(vars)), vars)
+  base_deriv <- setNames(vector("list", length(vars)), vars)
+  base_second <- setNames(vector("list", length(vars)), vars)
+  back_transform <- setNames(vector("list", length(vars)), vars)
 
   for (nm in vars)
   {
@@ -457,7 +457,7 @@
     {
       scaled_value <- .gaussian_scale_standardize(raw_value, deriv_raw, second_raw)
       center <- mean(raw_value[is.finite(raw_value)])
-      scale <- stats::sd(raw_value[is.finite(raw_value)])
+      scale <- sd(raw_value[is.finite(raw_value)])
       if (!is.finite(scale) || scale <= 0)
         scale <- 1
 
@@ -745,8 +745,8 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
   sigma_conversion <- match.arg(sigma_conversion)
 
   stack <- .as_spatraster(surface$stack)
-  active_cells <- terra::cellFromXY(stack[[1]], surface$vertex_coordinates)
-  rowcol <- terra::rowColFromCell(stack[[1]], active_cells)
+  active_cells <- cellFromXY(stack[[1]], surface$vertex_coordinates)
+  rowcol <- rowColFromCell(stack[[1]], active_cells)
 
   factory <- function(formula, x)
   {
@@ -812,14 +812,14 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
 
       beta <- theta[beta_names]
       sigma_internal <- theta[sigma_names]
-      sigma_map <- stats::setNames(
+      sigma_map <- setNames(
         unname(sigma_internal) * unname(sigma_conversion_values[chosen_scale_vars]),
         chosen_scale_vars
       )
 
-      base_value <- stats::setNames(vector("list", length(vars)), vars)
-      base_deriv <- stats::setNames(vector("list", length(vars)), vars)
-      base_second <- stats::setNames(vector("list", length(vars)), vars)
+      base_value <- setNames(vector("list", length(vars)), vars)
+      base_deriv <- setNames(vector("list", length(vars)), vars)
+      base_second <- setNames(vector("list", length(vars)), vars)
 
       for (nm in vars)
       {
@@ -857,13 +857,13 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
       X <- matrix(0, nrow = n, ncol = p)
       colnames(X) <- beta_names
 
-      dX <- stats::setNames(vector("list", q), chosen_scale_vars)
-      d2X <- stats::setNames(vector("list", q), chosen_scale_vars)
+      dX <- setNames(vector("list", q), chosen_scale_vars)
+      d2X <- setNames(vector("list", q), chosen_scale_vars)
       for (j in chosen_scale_vars)
       {
         dX[[j]] <- matrix(0, nrow = n, ncol = p)
         colnames(dX[[j]]) <- beta_names
-        d2X[[j]] <- stats::setNames(vector("list", q), chosen_scale_vars)
+        d2X[[j]] <- setNames(vector("list", q), chosen_scale_vars)
         for (k in chosen_scale_vars)
         {
           d2X[[j]][[k]] <- matrix(0, nrow = n, ncol = p)
@@ -994,9 +994,9 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
       upper = sigma_bounds$upper[chosen_scale_vars],
       conversion = sigma_conversion_values[chosen_scale_vars],
       conversion_mode = sigma_conversion,
-      resolution = abs(terra::res(stack[[1]])),
+      resolution = abs(res(stack[[1]])),
       extent_diagonal = .gaussian_scale_extent_diagonal(stack),
-      is_lonlat = terra::is.lonlat(stack),
+      is_lonlat = is.lonlat(stack),
       standardize = standardize
     )
     conductance_model
@@ -1117,7 +1117,7 @@ gaussian_scale_summary <- function(object,
   for (prob in probabilities)
   {
     label <- .gaussian_scale_probability_label(prob)
-    out[[paste0("axis_", label)]] <- stats::qnorm((1 + prob) / 2) * out$sigma
+    out[[paste0("axis_", label)]] <- qnorm((1 + prob) / 2) * out$sigma
     out[[paste0("radial_", label)]] <- sqrt(-2 * log(1 - prob)) * out$sigma
   }
 

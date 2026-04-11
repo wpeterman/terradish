@@ -253,7 +253,7 @@ simulate_covariance_response <- function(theta,
   Sigma <- tau * E + sigma * diag(nrow(E))
   covariance <- array(NA_real_, dim = c(nrow(E), ncol(E), as.integer(nsim)))
   for (i in seq_len(as.integer(nsim)))
-    covariance[, , i] <- stats::rWishart(1, df = as.integer(nu), Sigma = Sigma)[, , 1] / as.integer(nu)
+    covariance[, , i] <- rWishart(1, df = as.integer(nu), Sigma = Sigma)[, , 1] / as.integer(nu)
 
   list(
     covariance = if (as.integer(nsim) == 1L) covariance[, , 1] else covariance,

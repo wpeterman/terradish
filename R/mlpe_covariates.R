@@ -355,7 +355,7 @@ mlpe_covariates <- function(x,
     if (is.null(coords))
       stop("`coords` must be supplied when `x` is a raster")
     pts <- .coords_matrix(coords, x)
-    vals <- terra::extract(x, pts)
+    vals <- extract(x, pts)
     if ("ID" %in% colnames(vals))
       vals <- vals[, colnames(vals) != "ID", drop = FALSE]
     as.matrix(vals)
@@ -382,7 +382,7 @@ mlpe_covariates <- function(x,
     colnames(site_covariates) <- paste0("var", seq_len(ncol(site_covariates)))
 
   if (isTRUE(scale))
-    site_covariates <- base::scale(site_covariates)
+  site_covariates <- scale(site_covariates)
 
   as.matrix(site_covariates)
 }
@@ -475,5 +475,5 @@ mlpe_covariates <- function(x,
     coef_start <- c(coef0[1], 0, coef0[-1])
   }
 
-  stats::setNames(coef_start, colnames(X))
+  setNames(coef_start, colnames(X))
 }

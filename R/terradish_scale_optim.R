@@ -37,10 +37,6 @@
   if (!is.null(scale_fun))
     return(list(fun = scale_fun, args = scale_args, source = "user"))
 
-  if (!requireNamespace("multiScaleR", quietly = TRUE))
-    stop("Install package `multiScaleR` or supply a custom `scale_fun`.",
-         call. = FALSE)
-
   kernel <- scale_args$kernel
   if (is.null(kernel))
     kernel <- "gaussian"
@@ -48,22 +44,22 @@
 
   list(
     fun = function(r, scale, kernel = "gaussian", ...)
-      multiScaleR::kernel_scale.raster(r, sigma = scale, kernel = kernel, ...),
+      kernel_scale.raster(r, sigma = scale, kernel = kernel, ...),
     args = c(list(kernel = kernel), scale_args),
-    source = "multiScaleR::kernel_scale.raster"
+    source = "kernel_scale.raster"
   )
 }
 
 .scale_covariate_stack <- function(covariates, scales, scale_fun, scale_args = NULL)
 {
   covariates <- .as_spatraster(covariates)
-  stopifnot(length(scales) == terra::nlyr(covariates))
+  stopifnot(length(scales) == nlyr(covariates))
 
-  scaled <- lapply(seq_len(terra::nlyr(covariates)), function(i)
+  scaled <- lapply(seq_len(nlyr(covariates)), function(i)
   {
     out <- do.call(scale_fun, c(list(covariates[[i]], scale = scales[[i]]), scale_args))
     out <- .as_spatraster(out)
-    if (terra::nlyr(out) != 1L)
+  if (nlyr(out) != 1L)
       stop("`scale_fun` must return a single-layer SpatRaster for each input layer")
     out
   })
@@ -82,16 +78,16 @@
   if (is.null(xy))
     stop("Surface does not retain `vertex_coordinates`, so covariates cannot be updated in place")
 
-  cells <- terra::cellFromXY(covariates[[1]], xy)
+  cells <- cellFromXY(covariates[[1]], xy)
   if (anyNA(cells))
     stop("Scaled raster no longer matches the original graph extent")
 
-  spdat <- terra::values(covariates, dataframe = FALSE)
+  spdat <- values(covariates, dataframe = FALSE)
   x <- spdat[cells, , drop = FALSE]
   if (anyNA(x))
     stop("Scaled raster changed the missing-data pattern on active graph cells")
 
-  is_factor <- vapply(seq_len(terra::nlyr(covariates)),
+  is_factor <- vapply(seq_len(nlyr(covariates)),
                       function(i) is.factor(covariates[[i]]),
                       logical(1))
   x <- as.data.frame(x)
@@ -367,7 +363,7 @@ terradish_scale_optim <- function(formula,
   {
     if (is.null(lower) || is.null(upper))
       stop("Supply `scale_grid`, or both `lower` and `upper`, for grid search")
-    scale_grid <- stats::setNames(
+  scale_grid <- setNames(
       lapply(seq_along(scale_names), function(i)
         seq(lower[[i]], upper[[i]], length.out = grid_points)),
       scale_names
@@ -453,7 +449,7 @@ terradish_scale_optim <- function(formula,
       {
         fn_j <- function(x)
           evaluate_candidate(replace(current, j, x))$score
-        opt_j <- stats::optimize(fn_j,
+        opt_j <- optimize(fn_j,
                                  interval = c(lower[[j]], upper[[j]]))
         current[[j]] <- opt_j$minimum
       }

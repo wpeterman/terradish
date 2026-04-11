@@ -13,12 +13,12 @@ vignette: >
 
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment = "#>",
-  fig.width = 6,
+  collapse  = TRUE,
+  comment   = "#>",
+  fig.width  = 6,
   fig.height = 4.5,
-  warning = FALSE,
-  message = FALSE
+  warning   = FALSE,
+  message   = FALSE
 )
 ```
 
@@ -40,6 +40,8 @@ in the same likelihood calculation.
 
 This vignette shows the current implementation of that idea using
 `gaussian_smoothed_loglinear_conductance()`.
+
+---
 
 ## What sigma means here
 
@@ -81,10 +83,12 @@ optimization without changing the interpretation target.
 Two practical caveats are worth keeping in mind:
 
 - factor-valued raster layers are rejected for this Gaussian conductance model
-  rather than being treated as scaleable predictors
+  rather than being treated as scalable predictors
 - leverage / `partial_X` diagnostics are still unavailable, because the current
   diagnostic machinery assumes a one-to-one match between conductance
   parameters and design-matrix covariates
+
+---
 
 ## Worked example
 
@@ -222,7 +226,7 @@ Each panel is also annotated with:
 - the fitted effective 90% distance
 - the corresponding confidence interval bounds
 
-```{r sigma-plot}
+```{r sigma-plot, fig.cap = "***Fitted Gaussian kernel with uncertainty band. The dashed line marks the distance containing 90% of the one-dimensional kernel mass.***"}
 plot(fit_gaussian, type = "sigma")
 ```
 
@@ -231,7 +235,7 @@ distance scale, you can relabel the plot directly. For example, if one map
 unit corresponds to one metre, then multiplying by `0.001` reports distances
 in kilometres:
 
-```{r sigma-plot-km}
+```{r sigma-plot-km, fig.cap = "***Fitted Gaussian kernel with x-axis relabelled in kilometres.***"}
 plot(
   fit_gaussian,
   type = "sigma",
@@ -303,10 +307,12 @@ fitted_conductance
 
 And we can plot the fitted conductance layer directly:
 
-```{r conductance-plot}
+```{r conductance-plot, fig.cap = "***Fitted conductance surface from the Gaussian scale-aware model, with sampling sites shown in red.***"}
 plot(fitted_conductance[[1]], main = "Fitted conductance")
 points(coords, pch = 19, col = "red")
 ```
+
+---
 
 ## Stage 2 — Add a second raster only after sigma looks sensible
 
@@ -360,6 +366,8 @@ before adding `altitude`. After `altitude` is added, one or both fitted scale
 parameters may move toward the lower bound, which is a cue to
 proceed cautiously rather than immediately adding more landscape terms.
 
+---
+
 ## Important current limitations
 
 This first version is intentionally focused. Right now it supports:
@@ -380,9 +388,11 @@ It does now support conditional-on-sigma marginal-effect plotting, so you can
 inspect conductance and response-scale curves after fitting, but the leverage
 machinery is still intentionally disabled.
 
-## Where to go next
+---
 
-If this workflow looks reasonable for your data, the next practical steps are:
+## Where to go with your analysis
+
+If this workflow looks reasonable for your data, practical steps are:
 
 1. Fit a small one-raster model first and inspect `sigma`.
 2. Compare it to a standard fixed-raster `loglinear_conductance` fit.
@@ -393,6 +403,20 @@ If this workflow looks reasonable for your data, the next practical steps are:
 5. Reproject rasters before making ecological distance interpretations, because
    longitude/latitude rasters report sigma in degrees.
 
-That staged approach makes it easier to tell whether the data are truly
+This staged approach makes it easier to tell whether the data are truly
 identifying a landscape scale of effect, rather than letting multiple scale
 parameters compete in an over-complex first model.
+
+---
+
+## Companion vignettes
+
+- **`vignette("getting-started", package = "terradish")`** — the core
+  `terradish` workflow: scaling covariates, building a conductance surface,
+  fitting and interpreting models, and the four plot types.
+- **`vignette("model-comparison", package = "terradish")`** — likelihood ratio
+  tests, AIC/AICc/BIC tables, likelihood surface visualization, and
+  cross-validation.
+- **`vignette("ibe-ibr-workflow", package = "terradish")`** — fitting isolation
+  by environment (IBE) and isolation by resistance (IBR) simultaneously in the
+  same model.

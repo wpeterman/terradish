@@ -180,7 +180,7 @@ conductance_surface <- function(covariates, coords, directions=4, saveStack=TRUE
 
   # figure out which raster layers are factors
   is_factor <- vapply(seq_len(nlyr(covariates)),
-                      function(i) isTRUE(terra::is.factor(covariates[[i]])),
+    function(i) isTRUE(is.factor(covariates[[i]])),
                       logical(1))
   spdat <- as.data.frame(spdat)
   if (any(is_factor))

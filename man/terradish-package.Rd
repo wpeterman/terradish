@@ -8,11 +8,11 @@
 Gradient-based optimization of conductance and resistance surfaces.
 }
 \author{
-\strong{Maintainer}: Nathaniel S. Pope \email{nspope@utexas.edu}
+\strong{Maintainer}: Bill Peterman \email{peterman.73@osu.edu}
 
 Authors:
 \itemize{
-  \item Bill Peterman
+  \item Nathaniel S. Pope \email{nspope@utexas.edu}
 }
 
 }

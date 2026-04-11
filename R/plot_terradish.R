@@ -211,7 +211,7 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
     data.frame(
       covariate = sigma_table$covariate[i],
       distance = x_seq,
-      weight = stats::dnorm(x_seq, mean = 0, sd = sigma_plot[i])
+      weight = dnorm(x_seq, mean = 0, sd = sigma_plot[i])
     )
   }))
 
@@ -311,9 +311,9 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
   lower_nm <- paste0("lower", q_pct)
   upper_nm <- paste0("upper", q_pct)
 
-  # shared colour range across all three panels
-  clim <- range(terra::values(cond[[lower_nm]]),
-                terra::values(cond[[upper_nm]]),
+  # shared color range across all three panels
+  clim <- range(values(cond[[lower_nm]]),
+                values(cond[[upper_nm]]),
                 na.rm = TRUE)
 
   panel_names <- c("Fitted conductance",
@@ -332,7 +332,7 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
     geom_raster() +
     facet_wrap(~panel, nrow = 1) +
     coord_equal(expand = FALSE) +
-    scale_fill_gradientn(colours = grDevices::terrain.colors(100), limits = clim,
+    scale_fill_gradientn(colours = terrain.colors(100), limits = clim,
                          name = "Conductance") +
     labs(x = NULL, y = NULL) +
     theme_bw() +
@@ -379,12 +379,12 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
     if (!is.null(data_stack) &&
         inherits(data_stack, "SpatRaster") &&
         nm %in% names(data_stack) &&
-        terra::ncell(data_stack[[nm]]) == terra::ncell(covariates[[nm]]))
+        ncell(data_stack[[nm]]) == ncell(covariates[[nm]]))
     {
-      scaled_values <- terra::values(data_stack[[nm]], dataframe = FALSE)[, 1]
-      original_values <- terra::values(covariates[[nm]], dataframe = FALSE)[, 1]
+      scaled_values <- values(data_stack[[nm]], dataframe = FALSE)[, 1]
+      original_values <- values(covariates[[nm]], dataframe = FALSE)[, 1]
       keep <- is.finite(scaled_values) & is.finite(original_values)
-      if (sum(keep) >= 2L && stats::sd(scaled_values[keep]) > 0)
+      if (sum(keep) >= 2L && sd(scaled_values[keep]) > 0)
       {
         map_fit <- lm(original_values[keep] ~ scaled_values[keep])
         return(list(intercept = unname(coef(map_fit)[1]),
@@ -395,8 +395,8 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
       }
     }
 
-    bt_mean <- terra::global(covariates[[nm]], "mean", na.rm = TRUE)[[1]]
-    bt_sd <- terra::global(covariates[[nm]], "sd", na.rm = TRUE)[[1]]
+    bt_mean <- global(covariates[[nm]], "mean", na.rm = TRUE)[[1]]
+    bt_sd <- global(covariates[[nm]], "sd", na.rm = TRUE)[[1]]
     list(intercept = bt_mean,
          slope = bt_sd,
          label = paste0(nm, " (original scale)"),

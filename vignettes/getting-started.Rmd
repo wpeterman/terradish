@@ -322,7 +322,7 @@ A `tau` estimate near zero indicates no detectable resistance-distance signal.
 
 You can compare models fitted with different measurement models using
 `aic_table()`. Note that AIC is only meaningful across measurement models when
-the response data `S` is identical and the likelihoods are on the same scale —
+the response data `S` is identical and the likelihoods are on the same scale;
 all three models here use the same `melip.Fst` distance matrix, so the
 comparison is valid.
 
@@ -389,8 +389,8 @@ genetic data tightly constrain conductance, typically near sampling sites.
 ### Marginal effects of each covariate on predicted genetic distance (default)
 
 The default plot (`type = "marginal_response"`) shows how each raster
-covariate influences the **predicted genetic distance** — the response
-variable itself — rather than the intermediate conductance scale. Because
+covariate influences the **predicted genetic distance** (the response
+variable itself) rather than the intermediate conductance scale. Because
 genetic distance is what you measured and what the model ultimately explains,
 this is usually the most directly interpretable view.
 
@@ -407,17 +407,17 @@ landscape, which matters most when the effects of different covariates
 interact.
 
 The **central curve** is the expected genetic distance at the given covariate
-value, marginalised over the rest of the landscape.
+value, marginalized over the rest of the landscape.
 
 The **shaded predictive band** combines three sources of uncertainty:
 
-1. *Theta (conductance parameter) uncertainty* — imprecision in the estimated
+1. *Theta (conductance parameter) uncertainty*: imprecision in the estimated
    conductance parameters θ, propagated through the resistance-distance
    calculation via the delta method.
-2. *Phi (measurement-model parameter) uncertainty* — imprecision in the
+2. *Phi (measurement-model parameter) uncertainty*: imprecision in the
    nuisance parameters (intercept α, IBR slope β, residual precision τ, and
    MLPE correlation ρ), again via the delta method.
-3. *Residual variation* — the irreducible scatter in pairwise genetic
+3. *Residual variation*: the irreducible scatter in pairwise genetic
    distances around the fitted mean, estimated from τ.
 
 A **rising curve** (genetic distance increases with the covariate) means that
@@ -442,7 +442,7 @@ plot(fit_mlpe, type = "marginal", data = surface)
 ```
 
 Here the band is a **confidence interval** (delta-method, 95% pointwise) on
-the mean conductance, not a predictive interval — it reflects only parameter
+the mean conductance, not a predictive interval; it reflects only parameter
 uncertainty in θ, not residual variation. A rising curve means higher
 covariate values increase conductance (easier movement); a declining curve
 indicates a barrier effect.
