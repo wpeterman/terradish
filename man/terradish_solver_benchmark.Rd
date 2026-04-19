@@ -8,6 +8,7 @@ terradish_solver_benchmark(
   data,
   conductance = NULL,
   factorization = c("simplicial_ldl", "simplicial_ll", "supernodal_ll"),
+  solve_backend = "matrix",
   n_replicates = 1L,
   perm = TRUE
 )
@@ -22,13 +23,21 @@ graph vertex. Defaults to constant conductance.}
 values are \code{"simplicial_ldl"}, \code{"simplicial_ll"}, and
 \code{"supernodal_ll"}.}
 
+\item{solve_backend}{Direct-solver RHS solve backend to compare.
+\code{"matrix"} uses Matrix's standard \code{solve()} method. The
+experimental \code{"cholmod_cpp"} backend calls Matrix's CHOLMOD C API
+directly from compiled code after the factorization has been built. The
+experimental \code{"cholmod_cpp_cached"} backend also keeps the CHOLMOD
+factorization/update state inside a compiled external pointer.}
+
 \item{n_replicates}{Number of times to repeat each setting.}
 
 \item{perm}{Should CHOLMOD use a fill-reducing permutation?}
 }
 \value{
 A data frame with one row per benchmark replicate and columns for
-  graph size, factorization mode, setup time, solve time, and total time.
+  graph size, factorization mode, solve backend, setup time, solve time, and
+  total time.
 }
 \description{
 Times the linear-system setup and solve used internally by
@@ -43,7 +52,11 @@ Gaussian smoothing update. Use it to learn whether \code{"simplicial_ldl"},
 \code{"simplicial_ll"}, or \code{"supernodal_ll"} is fastest on a particular
 machine and graph size, then pass the preferred choice through
 \code{solver_control = list(factorization = "...")} in \code{\link{terradish}}
-when using the direct solver.
+when using the direct solver. Use \code{solve_backend} to evaluate whether
+either experimental C++ CHOLMOD path is faster for the right-hand-side count
+used by the graph. The cached backend is most informative when compared
+inside a full optimization, where nearby evaluations can reuse the same
+symbolic analysis.
 
 Very small rasters can give noisy timings because setup and R overhead are a
 large fraction of elapsed time. The comparison is most informative on graphs

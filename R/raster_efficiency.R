@@ -33,13 +33,17 @@
 #'
 #' @examples
 #' library(terra)
-#' r <- terra::rast(nrows = 20, ncols = 20, vals = 1:400)
-#' pts <- matrix(c(4.5, 4.5, 6.5, 6.5), ncol = 2, byrow = TRUE)
+#' r <- terra::rast(nrows = 20, ncols = 20, vals = 1:400,
+#'                  xmin = 0, xmax = 20, ymin = 0, ymax = 20)
+#' pts <- matrix(c(4.5, 4.5,
+#'                 6.5, 6.5,
+#'                 7.5, 5.5),
+#'               ncol = 2, byrow = TRUE)
 #' cropped <- crop_to_focal_buffer(r, pts, buffer = 2)
 #' cropped
 #'
 #' # The same crop can be applied automatically while building the graph.
-#' surface <- conductance_surface(r, pts, crop_buffer = 2)
+#' surface <- conductance_surface(r, pts, directions = 4, crop_buffer = 2)
 #' surface$dim
 #'
 #' @export

@@ -22,6 +22,12 @@ HagerZhangControl <- function(delta = 0.1, sigma = 0.9, alphamax = Inf, rho = 5.
   list(delta=delta, sigma=sigma, alphamax=alphamax, rho=rho, epsilon=epsilon, gamma=gamma, linesearchmax = linesearchmax, psi3 = psi3, c = c, verbose = verbose)
 
 
+.terradish_line_search_cache_key <- function(alpha)
+{
+  paste(formatC(as.numeric(alpha), digits = 17, format = "fg"), collapse = ",")
+}
+
+
 # Line search algorithm from Hager & Zhang ???
 # Adapted from LineSearch.jl
 setRefClass("HagerZhangStorage", fields=list(alphas="numeric", values="numeric", slopes="numeric"))

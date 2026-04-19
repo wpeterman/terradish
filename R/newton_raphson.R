@@ -109,12 +109,20 @@ BoxConstrainedNewton <- function(par, fn, lower = rep(-Inf, length(par)), upper 
     phi0         <- fit$objective
     dphi0        <- c(t(desc) %*% gradient_box)
 
+    line_cache <- new.env(parent = emptyenv())
     dphi_fn <- function(alpha) 
     {
+      cache_key <- .terradish_line_search_cache_key(alpha)
+      cached <- line_cache[[cache_key]]
+      if (!is.null(cached))
+        return(cached)
+
       tryCatch({
         phi <- fn(project(par + alpha*desc, lower, upper), gradient = TRUE, hessian = FALSE)
         grb <- zero_bounded_variables(phi$gradient, par + alpha*desc, lower, upper, eps)
-        list(objective = phi$objective, gradient = c(t(desc) %*% grb))
+        value <- list(objective = phi$objective, gradient = c(t(desc) %*% grb))
+        line_cache[[cache_key]] <- value
+        value
       }, error = function(e) {
         BoxConstrainedNewtonNaN()
       })

@@ -203,6 +203,7 @@
 {
   list(
     factorization = "auto",
+    solve_backend = "matrix",
     supernodal_min_vertices = 50000L,
     supernodal_max_rhs = 64L,
     perm = TRUE
@@ -224,11 +225,18 @@
   "simplicial_ldl"
 }
 
-.terradish_direct_signature <- function(control, factorization)
+.terradish_resolve_direct_solve_backend <- function(control)
+{
+  solve_backend <- if (is.null(control$solve_backend)) "matrix" else control$solve_backend
+  match.arg(solve_backend, c("matrix", "cholmod_cpp", "cholmod_cpp_cached"))
+}
+
+.terradish_direct_signature <- function(control, factorization, solve_backend)
 {
   list(
     factorization = factorization,
-    perm = isTRUE(control$perm)
+    perm = isTRUE(control$perm),
+    solve_backend = solve_backend
   )
 }
 
@@ -287,10 +295,47 @@
   {
     Qn <- .graph_reduced_laplacian(s, conductance)
     factorization <- .terradish_resolve_direct_factorization(control, resolution$n_vertices, resolution$n_rhs)
-    signature <- .terradish_direct_signature(control, factorization)
+    solve_backend <- .terradish_resolve_direct_solve_backend(control)
+    signature <- .terradish_direct_signature(control, factorization, solve_backend)
+
+    if (identical(solve_backend, "cholmod_cpp_cached"))
+    {
+      can_reuse <- !is.null(solver_reuse_state) &&
+        identical(solver_reuse_state$type, "direct") &&
+        identical(solver_reuse_state$signature, signature) &&
+        !is.null(solver_reuse_state$handle)
+
+      setup_start <- proc.time()[["elapsed"]]
+      handle <- if (can_reuse)
+      {
+        cholmod_direct_update(solver_reuse_state$handle, Qn)
+        solver_reuse_state$handle
+      }
+      else
+      {
+        cholmod_direct_create(Qn, factorization, isTRUE(control$perm))
+      }
+      setup_time <- proc.time()[["elapsed"]] - setup_start
+
+      return(list(type = "direct",
+                  requested_type = resolution$requested_type,
+                  auto_reason = resolution$reason,
+                  n_vertices = resolution$n_vertices,
+                  n_rhs = resolution$n_rhs,
+                  factor = NULL,
+                  handle = handle,
+                  factorization = factorization,
+                  solve_backend = solve_backend,
+                  signature = signature,
+                  reused_factor_template = can_reuse,
+                  setup_time = setup_time,
+                  control = control))
+    }
+
     can_reuse <- !is.null(solver_reuse_state) &&
       identical(solver_reuse_state$type, "direct") &&
-      identical(solver_reuse_state$signature, signature)
+      identical(solver_reuse_state$signature, signature) &&
+      !is.null(solver_reuse_state$factor)
     template <- if (can_reuse) solver_reuse_state$factor else .choleski_template(s, factorization)
 
     setup_start <- proc.time()[["elapsed"]]
@@ -313,6 +358,7 @@
                 n_rhs = resolution$n_rhs,
                 factor = factor,
                 factorization = factorization,
+                solve_backend = solve_backend,
                 signature = signature,
                 reused_factor_template = can_reuse,
                 setup_time = setup_time,
@@ -395,12 +441,34 @@
 
   if (solver_state$type == "direct")
   {
-    solve_start <- proc.time()[["elapsed"]]
-    solution <- solve(solver_state$factor, rhs)
-    solve_time <- proc.time()[["elapsed"]] - solve_start
+    solve_backend <- if (is.null(solver_state$solve_backend))
+      "matrix"
+    else
+      solver_state$solve_backend
+
+    if (identical(solve_backend, "cholmod_cpp_cached"))
+    {
+      out <- cholmod_direct_solve(solver_state$handle, as.matrix(rhs))
+      solution <- out$solution
+      solve_time <- out$solve_time
+    }
+    else if (identical(solve_backend, "cholmod_cpp"))
+    {
+      out <- cholmod_factor_solve(solver_state$factor, as.matrix(rhs))
+      solution <- out$solution
+      solve_time <- out$solve_time
+    }
+    else
+    {
+      solve_start <- proc.time()[["elapsed"]]
+      solution <- solve(solver_state$factor, rhs)
+      solve_time <- proc.time()[["elapsed"]] - solve_start
+    }
+
     return(list(solution = solution,
                 info = c(list(type = "direct",
                               factorization = solver_state$factorization,
+                              solve_backend = solve_backend,
                               reused_factor_template = isTRUE(solver_state$reused_factor_template),
                               setup_time = solver_state$setup_time,
                               solve_time = solve_time),
@@ -502,14 +570,15 @@
 #' @param validate Numerical validation via 'numDeriv' (very slow, use for debugging small examples)
 #' @param cores Number of worker processes to use for per-parameter derivative calculations. \code{1} evaluates serially.
 #' @param solver Linear-system solver used for the reduced Laplacian. \code{"direct"} uses the cached sparse Cholesky factorization, \code{"auto"} conservatively chooses between the direct and AMG backends based on graph size and right-hand-side count, \code{"amg"} uses smoothed-aggregation algebraic multigrid preconditioned conjugate gradients, \code{"pcg"} uses incomplete-Cholesky preconditioned conjugate gradients, and \code{"pcg_jacobi"} keeps the older Jacobi-preconditioned prototype.
-#' @param solver_control Optional named list of solver settings. For \code{solver = "direct"}, supported entries include \code{factorization} (\code{"auto"}, \code{"simplicial_ldl"}, \code{"simplicial_ll"}, or \code{"supernodal_ll"}), \code{supernodal_min_vertices}, \code{supernodal_max_rhs}, and \code{perm}. For \code{solver = "auto"}, supported selection entries include \code{auto_direct_max_vertices}, \code{auto_amg_min_vertices}, and \code{auto_direct_max_rhs}. For \code{solver = "amg"}, supported entries include \code{tol}, \code{maxit}, \code{coarse_enough}, \code{npre}, \code{npost}, \code{sa_relax}, \code{aggr_eps_strong}, \code{estimate_spectral_radius}, \code{power_iters}, and \code{reuse_preconditioner}. For \code{solver = "pcg"} or \code{"pcg_jacobi"}, supported entries are \code{tol} and \code{maxit}.
+#' @param solver_control Optional named list of solver settings. For \code{solver = "direct"}, supported entries include \code{factorization} (\code{"auto"}, \code{"simplicial_ldl"}, \code{"simplicial_ll"}, or \code{"supernodal_ll"}), \code{solve_backend} (\code{"matrix"} or the experimental \code{"cholmod_cpp"} and \code{"cholmod_cpp_cached"} backends), \code{supernodal_min_vertices}, \code{supernodal_max_rhs}, and \code{perm}. For \code{solver = "auto"}, supported selection entries include \code{auto_direct_max_vertices}, \code{auto_amg_min_vertices}, and \code{auto_direct_max_rhs}. For \code{solver = "amg"}, supported entries include \code{tol}, \code{maxit}, \code{coarse_enough}, \code{npre}, \code{npost}, \code{sa_relax}, \code{aggr_eps_strong}, \code{estimate_spectral_radius}, \code{power_iters}, and \code{reuse_preconditioner}. For \code{solver = "pcg"} or \code{"pcg_jacobi"}, supported entries are \code{tol} and \code{maxit}.
 #'   Direct supernodal factorizations can benefit from a threaded BLAS, but the
 #'   relevant thread counts are controlled by the external R/BLAS build rather
 #'   than by \code{terradish_algorithm()}.
 #' @param solver_warm_start Optional initial guess for the reduced-system solve. This is primarily useful for iterative solvers when evaluating nearby parameter values.
 #' @param solver_reuse_state Optional reusable solver state returned by a prior
-#'   \code{terradish_algorithm()} call. This is currently used to reuse AMG
-#'   hierarchy information across nearby evaluations.
+#'   \code{terradish_algorithm()} call. This is used to reuse AMG hierarchy
+#'   information or compatible direct CHOLMOD factorization state across nearby
+#'   evaluations.
 #'
 #' @return A list containing at a minimum:
 #'  \item{covariance}{rows/columns of the generalized inverse of the graph Laplacian for a subset of target vertices}
@@ -729,11 +798,22 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
              reuse_age = solver_state$reuse_age,
              n_vertices = solver_state$n_vertices
            ),
-           direct = list(
-             type = "direct",
-             factor = solver_state$factor,
-             signature = solver_state$signature
-            ),
+           direct = if (identical(solver_state$solve_backend, "cholmod_cpp_cached"))
+           {
+             list(
+               type = "direct",
+               handle = solver_state$handle,
+               signature = solver_state$signature
+             )
+           }
+           else
+           {
+             list(
+               type = "direct",
+               factor = solver_state$factor,
+               signature = solver_state$signature
+             )
+           },
             NULL
           ))
 }

@@ -52,10 +52,17 @@ BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = 
   convergence <- 0
   initialized <- 0
   par <- as.matrix(par)
+  fit_from_line_search <- NULL
 
   for (i in 1:maxit)
   {
-    fit   <- fn(par, gradient = TRUE, hessian = FALSE)
+    if (is.null(fit_from_line_search))
+      fit <- fn(par, gradient = TRUE, hessian = FALSE)
+    else
+    {
+      fit <- fit_from_line_search
+      fit_from_line_search <- NULL
+    }
     delta <- if (i > 1) abs(oldfit$objective - fit$objective) else 0
 
     if (verbose)
@@ -104,12 +111,20 @@ BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = 
     phi0  <- fit$objective
     dphi0 <- c(t(desc) %*% gradient_box)
 
+    line_cache <- new.env(parent = emptyenv())
     dphi_fn <- function(alpha) 
     {
+      cache_key <- .terradish_line_search_cache_key(alpha)
+      cached <- line_cache[[cache_key]]
+      if (!is.null(cached))
+        return(cached$value)
+
       tryCatch({
         phi <- fn(project(par + alpha*desc, lower, upper), gradient = TRUE, hessian = FALSE)
         grb <- zero_bounded_variables(phi$gradient, par + alpha*desc, lower, upper, eps)
-        list(objective = phi$objective, gradient = c(t(desc) %*% grb))
+        value <- list(objective = phi$objective, gradient = c(t(desc) %*% grb))
+        line_cache[[cache_key]] <- list(value = value, fit = phi)
+        value
       }, error = function(e) {
         # Return a non-finite sentinel so the line search backtracks.
         BFGSNaN()
@@ -122,6 +137,8 @@ BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = 
       cat("Switched to backtracking\n")
       Backtracking(dphi_fn, phi0, dphi0)
     })
+    accepted <- line_cache[[.terradish_line_search_cache_key(alpha)]]
+    fit_from_line_search <- if (is.null(accepted)) NULL else accepted$fit
     par <- project(par + alpha*desc, lower, upper)
 
     oldfit <- fit

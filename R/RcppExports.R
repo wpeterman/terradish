@@ -13,6 +13,22 @@ amg_reduced_laplacian_rebuild <- function(solver_ptr, conductance, edge_pairs) {
     .Call(`_terradish_amg_reduced_laplacian_rebuild`, solver_ptr, conductance, edge_pairs)
 }
 
+cholmod_factor_solve <- function(factor, rhs) {
+    .Call(`_terradish_cholmod_factor_solve`, factor, rhs)
+}
+
+cholmod_direct_create <- function(matrix, factorization = "simplicial_ldl", perm = TRUE) {
+    .Call(`_terradish_cholmod_direct_create`, matrix, factorization, perm)
+}
+
+cholmod_direct_update <- function(solver_ptr, matrix) {
+    .Call(`_terradish_cholmod_direct_update`, solver_ptr, matrix)
+}
+
+cholmod_direct_solve <- function(solver_ptr, rhs) {
+    .Call(`_terradish_cholmod_direct_solve`, solver_ptr, rhs)
+}
+
 assemble_reduced_laplacian <- function(conductance, edge_pairs) {
     .Call(`_terradish_assemble_reduced_laplacian`, conductance, edge_pairs)
 }

@@ -334,6 +334,103 @@ test_that("direct solver reports factorization mode and can reuse templates", {
   expect_equal(fit_super$solver_info$factorization, "supernodal_ll")
 })
 
+test_that("experimental C++ CHOLMOD solve backends match Matrix solve", {
+  dat <- melip_fixture(1:8)
+  surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
+  model <- loglinear_conductance(~ altitude + forestcover, surface$x)
+  C <- model(c(altitude = -0.3, forestcover = 0.3))
+  rhs <- terradish:::.graph_rhs(surface, length(C$conductance))
+
+  matrix_state <- terradish:::.terradish_solver_setup(
+    surface,
+    C$conductance,
+    solver = "direct",
+    solver_control = list(
+      factorization = "simplicial_ldl",
+      solve_backend = "matrix"
+    )
+  )
+  for (backend in c("cholmod_cpp", "cholmod_cpp_cached"))
+  {
+    cpp_state <- terradish:::.terradish_solver_setup(
+      surface,
+      C$conductance,
+      solver = "direct",
+      solver_control = list(
+        factorization = "simplicial_ldl",
+        solve_backend = backend
+      )
+    )
+
+    matrix_solve <- terradish:::.terradish_solver_solve(matrix_state, rhs)
+    cpp_solve <- terradish:::.terradish_solver_solve(cpp_state, rhs)
+
+    expect_equal(cpp_solve$info$type, "direct")
+    expect_equal(cpp_solve$info$solve_backend, backend)
+    expect_equal(
+      as.matrix(cpp_solve$solution),
+      as.matrix(matrix_solve$solution),
+      tolerance = 1e-10
+    )
+  }
+})
+
+test_that("cached C++ CHOLMOD backend reuses factorization state", {
+  dat <- melip_fixture(1:8)
+  surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
+  model <- loglinear_conductance(~ altitude + forestcover, surface$x)
+  C1 <- model(c(altitude = -0.3, forestcover = 0.3))
+  C2 <- model(c(altitude = -0.25, forestcover = 0.35))
+  rhs <- terradish:::.graph_rhs(surface, length(C1$conductance))
+
+  cached_state1 <- terradish:::.terradish_solver_setup(
+    surface,
+    C1$conductance,
+    solver = "direct",
+    solver_control = list(
+      factorization = "simplicial_ldl",
+      solve_backend = "cholmod_cpp_cached"
+    )
+  )
+
+  cached_state2 <- terradish:::.terradish_solver_setup(
+    surface,
+    C2$conductance,
+    solver = "direct",
+    solver_control = list(
+      factorization = "simplicial_ldl",
+      solve_backend = "cholmod_cpp_cached"
+    ),
+    solver_reuse_state = list(
+      type = "direct",
+      handle = cached_state1$handle,
+      signature = cached_state1$signature
+    )
+  )
+
+  matrix_state2 <- terradish:::.terradish_solver_setup(
+    surface,
+    C2$conductance,
+    solver = "direct",
+    solver_control = list(
+      factorization = "simplicial_ldl",
+      solve_backend = "matrix"
+    )
+  )
+
+  cached_solve2 <- terradish:::.terradish_solver_solve(cached_state2, rhs)
+  matrix_solve2 <- terradish:::.terradish_solver_solve(matrix_state2, rhs)
+
+  expect_false(is.null(cached_state1$handle))
+  expect_true(isTRUE(cached_state2$reused_factor_template))
+  expect_equal(cached_solve2$info$solve_backend, "cholmod_cpp_cached")
+  expect_equal(
+    as.matrix(cached_solve2$solution),
+    as.matrix(matrix_solve2$solution),
+    tolerance = 1e-10
+  )
+})
+
 test_that("AMG hierarchy reuse is threaded across nearby evaluations", {
   dat <- melip_fixture(1:10)
   melip.Fst <- dat$melip.Fst
@@ -399,7 +496,17 @@ test_that("terradish_solver_benchmark reports direct solver timings", {
   expect_s3_class(bench, "data.frame")
   expect_equal(nrow(bench), 2L)
   expect_true(all(c("solver", "factorization", "setup_time",
-                    "solve_time", "total_time") %in% names(bench)))
+                    "solve_backend", "solve_time", "total_time") %in% names(bench)))
   expect_true(all(bench$solver == "direct"))
+  expect_true(all(bench$solve_backend == "matrix"))
   expect_true(all(bench$total_time >= 0))
+
+  backend_bench <- terradish_solver_benchmark(
+    fx$surface,
+    factorization = "simplicial_ldl",
+    solve_backend = c("matrix", "cholmod_cpp", "cholmod_cpp_cached"),
+    n_replicates = 1
+  )
+  expect_equal(nrow(backend_bench), 3L)
+  expect_setequal(backend_bench$solve_backend, c("matrix", "cholmod_cpp", "cholmod_cpp_cached"))
 })

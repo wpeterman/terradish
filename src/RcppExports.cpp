@@ -61,6 +61,55 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// cholmod_factor_solve
+Rcpp::List cholmod_factor_solve(SEXP factor, const arma::mat& rhs);
+RcppExport SEXP _terradish_cholmod_factor_solve(SEXP factorSEXP, SEXP rhsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type factor(factorSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type rhs(rhsSEXP);
+    rcpp_result_gen = Rcpp::wrap(cholmod_factor_solve(factor, rhs));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cholmod_direct_create
+SEXP cholmod_direct_create(SEXP matrix, const std::string& factorization, const bool perm);
+RcppExport SEXP _terradish_cholmod_direct_create(SEXP matrixSEXP, SEXP factorizationSEXP, SEXP permSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type matrix(matrixSEXP);
+    Rcpp::traits::input_parameter< const std::string& >::type factorization(factorizationSEXP);
+    Rcpp::traits::input_parameter< const bool >::type perm(permSEXP);
+    rcpp_result_gen = Rcpp::wrap(cholmod_direct_create(matrix, factorization, perm));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cholmod_direct_update
+Rcpp::List cholmod_direct_update(SEXP solver_ptr, SEXP matrix);
+RcppExport SEXP _terradish_cholmod_direct_update(SEXP solver_ptrSEXP, SEXP matrixSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type solver_ptr(solver_ptrSEXP);
+    Rcpp::traits::input_parameter< SEXP >::type matrix(matrixSEXP);
+    rcpp_result_gen = Rcpp::wrap(cholmod_direct_update(solver_ptr, matrix));
+    return rcpp_result_gen;
+END_RCPP
+}
+// cholmod_direct_solve
+Rcpp::List cholmod_direct_solve(SEXP solver_ptr, const arma::mat& rhs);
+RcppExport SEXP _terradish_cholmod_direct_solve(SEXP solver_ptrSEXP, SEXP rhsSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< SEXP >::type solver_ptr(solver_ptrSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type rhs(rhsSEXP);
+    rcpp_result_gen = Rcpp::wrap(cholmod_direct_solve(solver_ptr, rhs));
+    return rcpp_result_gen;
+END_RCPP
+}
 // assemble_reduced_laplacian
 arma::sp_mat assemble_reduced_laplacian(const arma::vec& conductance, const arma::umat& edge_pairs);
 RcppExport SEXP _terradish_assemble_reduced_laplacian(SEXP conductanceSEXP, SEXP edge_pairsSEXP) {
@@ -174,6 +223,10 @@ static const R_CallMethodDef CallEntries[] = {
     {"_terradish_amg_reduced_laplacian_create", (DL_FUNC) &_terradish_amg_reduced_laplacian_create, 11},
     {"_terradish_amg_reduced_laplacian_solve", (DL_FUNC) &_terradish_amg_reduced_laplacian_solve, 5},
     {"_terradish_amg_reduced_laplacian_rebuild", (DL_FUNC) &_terradish_amg_reduced_laplacian_rebuild, 3},
+    {"_terradish_cholmod_factor_solve", (DL_FUNC) &_terradish_cholmod_factor_solve, 2},
+    {"_terradish_cholmod_direct_create", (DL_FUNC) &_terradish_cholmod_direct_create, 3},
+    {"_terradish_cholmod_direct_update", (DL_FUNC) &_terradish_cholmod_direct_update, 2},
+    {"_terradish_cholmod_direct_solve", (DL_FUNC) &_terradish_cholmod_direct_solve, 2},
     {"_terradish_assemble_reduced_laplacian", (DL_FUNC) &_terradish_assemble_reduced_laplacian, 2},
     {"_terradish_pcg_reduced_laplacian_ic", (DL_FUNC) &_terradish_pcg_reduced_laplacian_ic, 6},
     {"_terradish_pcg_reduced_laplacian", (DL_FUNC) &_terradish_pcg_reduced_laplacian, 6},

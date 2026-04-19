@@ -426,8 +426,11 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' @param solver_control Optional named list of solver settings passed to
 #'   \code{\link{terradish_algorithm}}. For \code{solver = "direct"}, supported
 #'   entries include \code{factorization}, \code{supernodal_min_vertices},
-#'   \code{supernodal_max_rhs}, and \code{perm}. For \code{solver = "auto"},
-#'   supported selection entries include \code{auto_direct_max_vertices},
+#'   \code{supernodal_max_rhs}, \code{perm}, and \code{solve_backend}; the
+#'   latter can be \code{"matrix"} or the experimental \code{"cholmod_cpp"} and
+#'   \code{"cholmod_cpp_cached"} backends.
+#'   For \code{solver = "auto"}, supported selection entries include
+#'   \code{auto_direct_max_vertices},
 #'   \code{auto_amg_min_vertices}, and \code{auto_direct_max_rhs}. For
 #'   \code{solver = "amg"} or \code{"auto"}, \code{terradish()} also
 #'   understands an adaptive schedule with entries such as \code{adaptive},
