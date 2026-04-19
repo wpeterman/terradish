@@ -656,6 +656,9 @@
 #'   raster variables present in the model formula.
 #' @param standardize Should each smoothed layer be centered and scaled across
 #'   the active graph cells at every parameter evaluation? Default \code{TRUE}.
+#'   This is separate from \code{\link{scale_covariates}}: the raw raster is
+#'   smoothed first, then the smoothed active-cell values are standardized
+#'   internally.
 #' @param sigma_lower,sigma_upper Optional lower and upper bounds for the
 #'   Gaussian scale parameters on their natural distance scale. Scalar values
 #'   are recycled across all scaled rasters; named vectors may be used to set
@@ -679,11 +682,23 @@
 #' contains both conductance coefficients and one natural-scale \code{sigma}
 #' parameter for each scaled raster layer. The spatial kernel is Gaussian and is
 #' evaluated with an FFT-based normalized convolution over the retained raster
-#' stack from \code{surface}. Using a fixed full-grid kernel keeps the sigma
-#' derivatives smooth during optimization.
+#' stack from \code{surface}. The smoothing domain is fixed within each graph
+#' evaluation, which keeps the sigma derivatives smooth during optimization.
+#' When \code{\link{terradish}} is run with
+#' \code{approximation = "coarse_raster"}, the smoother is rebuilt on each
+#' coarse graph while preserving the full-resolution sigma bounds and
+#' conversion so coarse-stage starts remain interpretable in map units.
 #' Internally, the sigma parameters may be optimized on a converted scale
 #' (for example, approximate cell widths) and are then converted back to map
 #' units before they are returned to users.
+#'
+#' Unlike the standard fixed-raster workflow, users generally should not call
+#' \code{\link{scale_covariates}} before fitting this model. The original raster
+#' values are needed so the Gaussian convolution can be applied at each proposed
+#' \code{sigma}. If \code{standardize = TRUE}, the smoothed raster values are
+#' centered and scaled after smoothing, which keeps conductance coefficients on
+#' a stable scale while still allowing \code{sigma} to be interpreted in map
+#' units.
 #'
 #' The current implementation supports numeric raster formulas built from raw
 #' raster names, interactions, and polynomial/arithmetic terms that can be
@@ -707,26 +722,44 @@
 #' \dontrun{
 #' library(terra)
 #' data(melip)
-#' melip.altitude <- terra::unwrap(melip.altitude)
 #' melip.forestcover <- terra::unwrap(melip.forestcover)
 #' melip.coords <- terra::unwrap(melip.coords)
 #'
-#' covariates <- c(melip.altitude, melip.forestcover)
-#' names(covariates) <- c("altitude", "forestcover")
-#' surface <- conductance_surface(covariates, melip.coords, directions = 8,
-#'                                saveStack = TRUE)
-#'
-#' gaussian_model <- gaussian_smoothed_loglinear_conductance(
-#'   surface,
-#'   sigma_lower = 100,
-#'   sigma_upper = 5000,
-#'   sigma_conversion = "cell"
+#' # Use the raw raster here. The Gaussian model smooths first and then
+#' # standardizes internally.
+#' names(melip.forestcover) <- "forestcover"
+#' surface <- conductance_surface(
+#'   melip.forestcover,
+#'   melip.coords,
+#'   directions = 8,
+#'   saveStack = TRUE
 #' )
-#' fit <- terradish(melip.Fst ~ altitude * forestcover + I(altitude^2),
-#'                  data = surface,
-#'                  conductance_model = gaussian_model,
-#'                  measurement_model = mlpe,
-#'                  optimizer = "bfgs")
+#'
+#' gaussian_model <- gaussian_smoothed_loglinear_conductance(surface)
+#' fit <- terradish(
+#'   melip.Fst ~ forestcover,
+#'   data = surface,
+#'   conductance_model = gaussian_model,
+#'   measurement_model = mlpe,
+#'   optimizer = "auto",
+#'   leverage = FALSE
+#' )
+#'
+#' gaussian_scale_summary(fit)
+#' plot(fit, type = "sigma")
+#'
+#' # Optional coarse-raster warm start for larger rasters. With exact_refine =
+#' # TRUE, the reported fit is refined on the original graph.
+#' fit_coarse <- terradish(
+#'   melip.Fst ~ forestcover,
+#'   data = surface,
+#'   conductance_model = gaussian_model,
+#'   measurement_model = mlpe,
+#'   approximation = "coarse_raster",
+#'   approximation_control = list(factor = c(4, 2), exact_refine = TRUE),
+#'   optimizer = "auto",
+#'   leverage = FALSE
+#' )
 #' }
 #'
 #' @export
@@ -755,8 +788,9 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
     chosen_scale_vars <- .validate_gaussian_scale_vars(scale_vars, vars)
 
     if (nrow(x) != nrow(surface$x))
-      stop("Gaussian scale-aware conductance currently requires the original graph design matrix; ",
-           "marginal-effect prediction grids and coarse-raster approximations are not yet supported",
+      stop("Gaussian scale-aware conductance currently requires the graph design matrix ",
+           "that belongs to its retained raster stack; direct marginal-effect prediction grids ",
+           "are not yet supported",
            call. = FALSE)
 
     if (any(vapply(vars, function(nm) is.factor(x[[nm]]), logical(1))))
@@ -1004,6 +1038,43 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
 
   class(factory) <- c("terradish_conductance_model_factory",
                       "radish_conductance_model_factory")
+  attr(factory, "rebuild_for_surface") <- function(formula, surface,
+                                                   reference_model = NULL)
+  {
+    reference_info <- if (!is.null(reference_model))
+      attr(reference_model, "gaussian_scale_info", exact = TRUE)
+    else
+      NULL
+
+    if (is.null(reference_info))
+    {
+      stage_factory <- gaussian_smoothed_loglinear_conductance(
+        surface,
+        scale_vars = scale_vars,
+        standardize = standardize,
+        sigma_lower = sigma_lower,
+        sigma_upper = sigma_upper,
+        sigma_conversion = sigma_conversion,
+        sigma_conversion_factor = sigma_conversion_factor
+      )
+    }
+    else
+    {
+      # Keep sigma on the full-resolution parameterization so a warm-started
+      # coarse sigma represents the same map-unit distance on every stage.
+      stage_factory <- gaussian_smoothed_loglinear_conductance(
+        surface,
+        scale_vars = scale_vars,
+        standardize = standardize,
+        sigma_lower = reference_info$lower,
+        sigma_upper = reference_info$upper,
+        sigma_conversion = reference_info$conversion_mode,
+        sigma_conversion_factor = reference_info$conversion
+      )
+    }
+
+    stage_factory(formula, surface$x)
+  }
   attr(factory, "default") <- NULL
   attr(factory, "preferred_optimizer") <- "bfgs"
   attr(factory, "supports_partial") <- FALSE

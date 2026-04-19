@@ -443,7 +443,11 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   optimizes first on a space-filling subset of focal populations and then
 #'   refines on the full likelihood when supported by the measurement model.
 #'   \code{"coarse_raster"} optimizes first on an aggregated raster and then
-#'   optionally refines on the full-resolution graph.
+#'   optionally refines on the full-resolution graph. If multiple coarse
+#'   factors are supplied, they are evaluated from coarsest to finest before the
+#'   final full-resolution stage. This is an opt-in warm-start strategy, not a
+#'   replacement for the exact full-resolution likelihood unless
+#'   \code{exact_refine = FALSE}.
 #' @param approximation_control Optional named list controlling the landmark or
 #'   coarse-raster approximation. Landmark entries include
 #'   \code{n_landmarks}, \code{fraction}, \code{min_landmarks},
@@ -452,8 +456,10 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   \code{exact_refine}. For \code{approximation = "coarse_raster"},
 #'   supported entries include \code{factor}, \code{aggregate_fun},
 #'   \code{directions}, and \code{exact_refine}; this path requires
-#'   \code{conductance_surface(..., saveStack = TRUE)}. The final reported fit
-#'   is still evaluated on the full data. For
+#'   \code{conductance_surface(..., saveStack = TRUE)}. \code{factor} may be a
+#'   single positive integer or a vector such as \code{c(8, 4, 2)} for a
+#'   multilevel coarse-to-fine warm start. The final reported fit is still
+#'   evaluated on the full data. For
 #'   \code{measurement_model = leastsquares}, landmark exact-refinement is
 #'   guarded and the approximation stage is skipped.
 #'
@@ -502,6 +508,27 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' \code{details} of \code{\link{conductance_surface}} and the examples below.
 #' The dummy coding of categorical covariates is done by the function passed to
 #' \code{conductance_model} (e.g.  \code{terradish::loglinear_conductance}).
+#'
+#' \strong{Large rasters.} For large continuous rasters, two opt-in helpers can
+#' reduce runtime. First, build the graph with
+#' \code{conductance_surface(..., crop_buffer = )} when focal sites occupy only
+#' part of the raster. This removes vertices outside the buffered sampling
+#' extent before fitting. Second, use
+#' \code{approximation = "coarse_raster"} with
+#' \code{approximation_control = list(factor = c(4, 2), exact_refine = TRUE)}
+#' to optimize on one or more aggregated rasters before refining on the original
+#' graph. With \code{exact_refine = TRUE}, the returned coefficients and
+#' likelihood are from the full-resolution graph; the coarse fits are only
+#' starting values. With \code{exact_refine = FALSE}, the result is faster but
+#' approximate and should be interpreted as a screening fit.
+#'
+#' \strong{Gaussian scale-aware conductance.}
+#' \code{\link{gaussian_smoothed_loglinear_conductance}} can also use
+#' \code{approximation = "coarse_raster"}. In that case the Gaussian smoother is
+#' rebuilt on each aggregated raster, while the full-resolution sigma bounds and
+#' unit conversion are preserved so a warm-started \code{sigma} continues to
+#' mean the same map-unit distance at every stage.
+#'
 #' Currently, all of the built-in conductance models in \code{terradish} use the
 #' default contrast coding (e.g. for a categorical covariate with \code{K}
 #' factors, the estimated parameters are the \code{K-1} mean differences
@@ -622,9 +649,15 @@ terradish <- function(formula,
   # "conductance_model" (a factory) is then responsible for parsing formula,
   # constructing design matrix, and returning actual "conductance_model"
   conductance_model_factory <- conductance_model
+  rebuild_conductance_model_for_surface <- .conductance_model_factory_attr(
+    conductance_model_factory,
+    "rebuild_for_surface",
+    NULL
+  )
   if (identical(approximation, "coarse_raster") &&
       isTRUE(.conductance_model_factory_attr(conductance_model_factory,
-                                             "requires_fixed_graph", FALSE)))
+                                             "requires_fixed_graph", FALSE)) &&
+      is.null(rebuild_conductance_model_for_surface))
     stop("`approximation = \"coarse_raster\"` is not currently supported for this conductance model")
   conductance_model <- conductance_model_factory(formula, data$x)
   conductance_model_user <- .externalize_conductance_model(conductance_model)
@@ -737,11 +770,15 @@ terradish <- function(formula,
       approximation_info <- list(
         type = "coarse_raster",
         used = isTRUE(coarse_problem$used),
-        stage = if (isTRUE(coarse_problem$used))
+        stage = if (isTRUE(coarse_problem$used) &&
+                    isTRUE(coarse_problem$control$exact_refine))
+          "coarse_then_exact_refine"
+        else if (isTRUE(coarse_problem$used))
           "optimization_only"
         else
           "skipped_factor_1",
         factor = coarse_problem$control$factor,
+        n_levels = length(coarse_problem$stages),
         directions = coarse_problem$control$directions,
         full_vertices = coarse_problem$full_vertices,
         coarse_vertices = coarse_problem$coarse_vertices,
@@ -796,30 +833,40 @@ terradish <- function(formula,
     }
     else if (!is.null(coarse_problem) && isTRUE(coarse_problem$used))
     {
-      coarse_conductance_model <- conductance_model_factory(formula,
-                                                            coarse_problem$surface$x)
-      coarse_bounds <- .conductance_model_bounds(coarse_conductance_model)
       approx_phi_state <- new.env(parent = emptyenv())
       approx_phi_state$value <- NULL
-      approx_solver_state <- new.env(parent = emptyenv())
-      approx_solver_state$warm_start <- NULL
-      approx_solver_state$reuse_state <- NULL
 
-      approx_problem <- .run_terradish_optimizer(
-        theta = theta,
-        optfn = make_optfn(coarse_problem$surface,
-                           S,
-                           approx_phi_state,
-                           approx_solver_state,
-                           eval_conductance_model = coarse_conductance_model),
-        optimizer = optimizer,
-        control = control,
-        lower = coarse_bounds$lower,
-        upper = coarse_bounds$upper
-      )
-      iters <- iters + approx_problem$iters
-      theta <- c(approx_problem$par)
-      names(theta) <- names(default)
+      for (stage in coarse_problem$stages)
+      {
+        coarse_conductance_model <- if (!is.null(rebuild_conductance_model_for_surface))
+          rebuild_conductance_model_for_surface(
+            formula,
+            stage$surface,
+            reference_model = conductance_model
+          )
+        else
+          conductance_model_factory(formula, stage$surface$x)
+        coarse_bounds <- .conductance_model_bounds(coarse_conductance_model)
+        approx_solver_state <- new.env(parent = emptyenv())
+        approx_solver_state$warm_start <- NULL
+        approx_solver_state$reuse_state <- NULL
+
+        approx_problem <- .run_terradish_optimizer(
+          theta = theta,
+          optfn = make_optfn(stage$surface,
+                             S,
+                             approx_phi_state,
+                             approx_solver_state,
+                             eval_conductance_model = coarse_conductance_model),
+          optimizer = optimizer,
+          control = control,
+          lower = coarse_bounds$lower,
+          upper = coarse_bounds$upper
+        )
+        iters <- iters + approx_problem$iters
+        theta <- c(approx_problem$par)
+        names(theta) <- names(default)
+      }
 
       # The coarse graph has a different dimension, so only transfer the
       # nuisance-parameter warm start to the exact full-resolution stage.

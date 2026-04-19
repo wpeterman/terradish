@@ -29,9 +29,9 @@
     exact_refine = TRUE
   )
   control <- modifyList(defaults, control)
-  control$factor <- as.integer(control$factor)[1]
-  if (is.na(control$factor) || control$factor < 1L)
-    stop("`approximation_control$factor` must be a positive integer")
+  control$factor <- sort(unique(as.integer(control$factor)), decreasing = TRUE)
+  if (!length(control$factor) || anyNA(control$factor) || any(control$factor < 1L))
+    stop("`approximation_control$factor` must contain positive integers")
   if (!is.function(control$aggregate_fun))
     stop("`approximation_control$aggregate_fun` must be a function")
   control$directions <- as.integer(control$directions)[1]
@@ -43,9 +43,11 @@
 .coarse_raster_surface <- function(data, approximation_control = NULL)
 {
   control <- .normalize_coarse_raster_control(approximation_control, data = data)
-  if (control$factor == 1L)
+  coarse_factors <- control$factor[control$factor > 1L]
+  if (!length(coarse_factors))
   {
     return(list(surface = data,
+                stages = list(),
                 control = control,
                 used = FALSE,
                 duplicate_demes = 0L,
@@ -67,21 +69,32 @@
     data$stack,
     caller = "`approximation = \"coarse_raster\"`"
   )
-  coarse_covariates <- .aggregate_covariates(covariates,
-                                             factor = control$factor,
-                                             aggregate_fun = control$aggregate_fun)
-  coarse_surface <- conductance_surface(coarse_covariates,
-                                        coords,
-                                        directions = control$directions,
-                                        saveStack = TRUE)
+  stages <- lapply(coarse_factors, function(fact) {
+    coarse_covariates <- .aggregate_covariates(covariates,
+                                               factor = fact,
+                                               aggregate_fun = control$aggregate_fun)
+    coarse_surface <- conductance_surface(coarse_covariates,
+                                          coords,
+                                          directions = control$directions,
+                                          saveStack = TRUE)
+    list(
+      factor = fact,
+      surface = coarse_surface,
+      duplicate_demes = length(coarse_surface$demes) - length(unique(coarse_surface$demes)),
+      unique_demes = length(unique(coarse_surface$demes)),
+      coarse_vertices = nrow(coarse_surface$x)
+    )
+  })
+  names(stages) <- paste0("factor_", coarse_factors)
 
-  list(surface = coarse_surface,
+  list(surface = stages[[1L]]$surface,
+       stages = stages,
        control = control,
        used = TRUE,
-       duplicate_demes = length(coarse_surface$demes) - length(unique(coarse_surface$demes)),
-       unique_demes = length(unique(coarse_surface$demes)),
+       duplicate_demes = vapply(stages, `[[`, integer(1), "duplicate_demes"),
+       unique_demes = vapply(stages, `[[`, integer(1), "unique_demes"),
        full_vertices = nrow(data$x),
-       coarse_vertices = nrow(coarse_surface$x))
+       coarse_vertices = vapply(stages, `[[`, integer(1), "coarse_vertices"))
 }
 
 #' Coarse-to-fine optimization for large rasters
@@ -107,6 +120,13 @@
 #' coarse-resolution starting point can reduce the amount of full-resolution
 #' optimization work. Factor-valued rasters are not currently supported in the
 #' aggregation path.
+#'
+#' For most new analyses, the integrated
+#' \code{terradish(..., approximation = "coarse_raster")} interface is usually
+#' simpler because it stores approximation metadata directly on the returned
+#' model and can optionally refine the final estimate on the full-resolution
+#' graph. \code{terradish_multiscale()} remains useful when you want to inspect
+#' or retain every intermediate fit explicitly.
 #'
 #' @return A fitted \code{terradish} object from the finest raster, with an
 #' additional \code{$multiscale} component containing the per-level fits.

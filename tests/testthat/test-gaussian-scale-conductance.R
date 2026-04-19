@@ -245,7 +245,7 @@ test_that("gaussian scale-aware conductance rejects factor-valued raster layers"
   )
 })
 
-test_that("gaussian scale-aware conductance validates sigma starts and keeps coarse raster disabled", {
+test_that("gaussian scale-aware conductance validates sigma starts and supports coarse raster starts", {
   dat <- melip_fixture(1:6)
   melip.Fst <- dat$melip.Fst
   covariates <- dat$covariates[["altitude"]]
@@ -272,16 +272,22 @@ test_that("gaussian scale-aware conductance validates sigma starts and keeps coa
     "must lie within the conductance-model bounds"
   )
 
-  expect_error(
+  fit_coarse <- suppressWarnings(
     terradish(
       melip.Fst ~ altitude,
       data = surface,
       conductance_model = factory,
       measurement_model = leastsquares,
       approximation = "coarse_raster",
+      approximation_control = list(factor = 2L, exact_refine = TRUE),
       optimizer = "bfgs",
+      leverage = FALSE,
       control = NewtonRaphsonControl(maxit = 1, verbose = FALSE)
-    ),
-    "not currently supported"
+    )
   )
+
+  expect_s3_class(fit_coarse, "terradish")
+  expect_true(isTRUE(fit_coarse$approximation$used))
+  expect_equal(fit_coarse$approximation$type, "coarse_raster")
+  expect_true(all(c("altitude", "sigma.altitude") %in% names(coef(fit_coarse))))
 })

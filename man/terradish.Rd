@@ -88,7 +88,11 @@ thread counts are controlled by the external R/BLAS build rather than by
 optimizes first on a space-filling subset of focal populations and then
 refines on the full likelihood when supported by the measurement model.
 \code{"coarse_raster"} optimizes first on an aggregated raster and then
-optionally refines on the full-resolution graph.}
+optionally refines on the full-resolution graph. If multiple coarse
+factors are supplied, they are evaluated from coarsest to finest before the
+final full-resolution stage. This is an opt-in warm-start strategy, not a
+replacement for the exact full-resolution likelihood unless
+\code{exact_refine = FALSE}.}
 
 \item{approximation_control}{Optional named list controlling the landmark or
 coarse-raster approximation. Landmark entries include
@@ -98,8 +102,10 @@ coarse-raster approximation. Landmark entries include
 \code{exact_refine}. For \code{approximation = "coarse_raster"},
 supported entries include \code{factor}, \code{aggregate_fun},
 \code{directions}, and \code{exact_refine}; this path requires
-\code{conductance_surface(..., saveStack = TRUE)}. The final reported fit
-is still evaluated on the full data. For
+\code{conductance_surface(..., saveStack = TRUE)}. \code{factor} may be a
+single positive integer or a vector such as \code{c(8, 4, 2)} for a
+multilevel coarse-to-fine warm start. The final reported fit is still
+evaluated on the full data. For
 \code{measurement_model = leastsquares}, landmark exact-refinement is
 guarded and the approximation stage is skipped.}
 
@@ -164,6 +170,27 @@ For an explanation of how categorical spatial covariates are handled, see
 \code{details} of \code{\link{conductance_surface}} and the examples below.
 The dummy coding of categorical covariates is done by the function passed to
 \code{conductance_model} (e.g.  \code{terradish::loglinear_conductance}).
+
+\strong{Large rasters.} For large continuous rasters, two opt-in helpers can
+reduce runtime. First, build the graph with
+\code{conductance_surface(..., crop_buffer = )} when focal sites occupy only
+part of the raster. This removes vertices outside the buffered sampling
+extent before fitting. Second, use
+\code{approximation = "coarse_raster"} with
+\code{approximation_control = list(factor = c(4, 2), exact_refine = TRUE)}
+to optimize on one or more aggregated rasters before refining on the original
+graph. With \code{exact_refine = TRUE}, the returned coefficients and
+likelihood are from the full-resolution graph; the coarse fits are only
+starting values. With \code{exact_refine = FALSE}, the result is faster but
+approximate and should be interpreted as a screening fit.
+
+\strong{Gaussian scale-aware conductance.}
+\code{\link{gaussian_smoothed_loglinear_conductance}} can also use
+\code{approximation = "coarse_raster"}. In that case the Gaussian smoother is
+rebuilt on each aggregated raster, while the full-resolution sigma bounds and
+unit conversion are preserved so a warm-started \code{sigma} continues to
+mean the same map-unit distance at every stage.
+
 Currently, all of the built-in conductance models in \code{terradish} use the
 default contrast coding (e.g. for a categorical covariate with \code{K}
 factors, the estimated parameters are the \code{K-1} mean differences

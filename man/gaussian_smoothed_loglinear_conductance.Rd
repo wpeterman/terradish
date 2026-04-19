@@ -24,7 +24,10 @@ Gaussian scales of effect should be estimated. Defaults to all numeric
 raster variables present in the model formula.}
 
 \item{standardize}{Should each smoothed layer be centered and scaled across
-the active graph cells at every parameter evaluation? Default \code{TRUE}.}
+the active graph cells at every parameter evaluation? Default \code{TRUE}.
+This is separate from \code{\link{scale_covariates}}: the raw raster is
+smoothed first, then the smoothed active-cell values are standardized
+internally.}
 
 \item{sigma_lower, sigma_upper}{Optional lower and upper bounds for the
 Gaussian scale parameters on their natural distance scale. Scalar values
@@ -61,11 +64,23 @@ Given a model formula such as
 contains both conductance coefficients and one natural-scale \code{sigma}
 parameter for each scaled raster layer. The spatial kernel is Gaussian and is
 evaluated with an FFT-based normalized convolution over the retained raster
-stack from \code{surface}. Using a fixed full-grid kernel keeps the sigma
-derivatives smooth during optimization.
+stack from \code{surface}. The smoothing domain is fixed within each graph
+evaluation, which keeps the sigma derivatives smooth during optimization.
+When \code{\link{terradish}} is run with
+\code{approximation = "coarse_raster"}, the smoother is rebuilt on each
+coarse graph while preserving the full-resolution sigma bounds and
+conversion so coarse-stage starts remain interpretable in map units.
 Internally, the sigma parameters may be optimized on a converted scale
 (for example, approximate cell widths) and are then converted back to map
 units before they are returned to users.
+
+Unlike the standard fixed-raster workflow, users generally should not call
+\code{\link{scale_covariates}} before fitting this model. The original raster
+values are needed so the Gaussian convolution can be applied at each proposed
+\code{sigma}. If \code{standardize = TRUE}, the smoothed raster values are
+centered and scaled after smoothing, which keeps conductance coefficients on
+a stable scale while still allowing \code{sigma} to be interpreted in map
+units.
 
 The current implementation supports numeric raster formulas built from raw
 raster names, interactions, and polynomial/arithmetic terms that can be
@@ -85,26 +100,44 @@ Gaussian \code{sigma} parameters are introduced.
 \dontrun{
 library(terra)
 data(melip)
-melip.altitude <- terra::unwrap(melip.altitude)
 melip.forestcover <- terra::unwrap(melip.forestcover)
 melip.coords <- terra::unwrap(melip.coords)
 
-covariates <- c(melip.altitude, melip.forestcover)
-names(covariates) <- c("altitude", "forestcover")
-surface <- conductance_surface(covariates, melip.coords, directions = 8,
-                               saveStack = TRUE)
-
-gaussian_model <- gaussian_smoothed_loglinear_conductance(
-  surface,
-  sigma_lower = 100,
-  sigma_upper = 5000,
-  sigma_conversion = "cell"
+# Use the raw raster here. The Gaussian model smooths first and then
+# standardizes internally.
+names(melip.forestcover) <- "forestcover"
+surface <- conductance_surface(
+  melip.forestcover,
+  melip.coords,
+  directions = 8,
+  saveStack = TRUE
 )
-fit <- terradish(melip.Fst ~ altitude * forestcover + I(altitude^2),
-                 data = surface,
-                 conductance_model = gaussian_model,
-                 measurement_model = mlpe,
-                 optimizer = "bfgs")
+
+gaussian_model <- gaussian_smoothed_loglinear_conductance(surface)
+fit <- terradish(
+  melip.Fst ~ forestcover,
+  data = surface,
+  conductance_model = gaussian_model,
+  measurement_model = mlpe,
+  optimizer = "auto",
+  leverage = FALSE
+)
+
+gaussian_scale_summary(fit)
+plot(fit, type = "sigma")
+
+# Optional coarse-raster warm start for larger rasters. With exact_refine =
+# TRUE, the reported fit is refined on the original graph.
+fit_coarse <- terradish(
+  melip.Fst ~ forestcover,
+  data = surface,
+  conductance_model = gaussian_model,
+  measurement_model = mlpe,
+  approximation = "coarse_raster",
+  approximation_control = list(factor = c(4, 2), exact_refine = TRUE),
+  optimizer = "auto",
+  leverage = FALSE
+)
 }
 
 }

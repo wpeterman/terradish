@@ -65,6 +65,13 @@
 #'   columns.
 #' @param directions If \code{4}, consider only horizontal/vertical neighbours as adjacent; if \code{8}, also consider diagonal neighbours as adjacent
 #' @param saveStack If \code{TRUE}, the \code{SpatRaster} is returned with missing data masked uniformly across layers
+#' @param crop_buffer Optional nonnegative map-unit buffer around the focal
+#'   coordinates. When supplied, \code{covariates} are cropped with
+#'   \code{\link{crop_to_focal_buffer}} before the graph is constructed. This
+#'   can substantially reduce graph size for large rasters where focal sites
+#'   occupy only part of the landscape. A scalar uses the same buffer in the
+#'   x and y directions; a length-two vector is interpreted as
+#'   \code{c(x_buffer, y_buffer)}.
 #'
 #' @details NAs are shared across raster layers in \code{covariates}, and a
 #' warning is thrown if a given cell has mixed NA and non-NA values across the
@@ -75,6 +82,13 @@
 #' \code{terradish_graph} object.
 #'
 #' Disconnected components are identified and removed, so that only the largest connected component in the graph is retained. The function aborts if there are focal cells that belong to a disconnected component.
+#'
+#' If \code{crop_buffer} is supplied, cropping happens before missing-cell
+#' masking and graph construction. This changes the graph domain, so use the
+#' same cropped \code{terradish_graph} object for all models you intend to
+#' compare. A buffer that is too small can omit landscape context that may
+#' affect resistance distances; for sensitivity analyses, refit with several
+#' buffer widths and confirm that coefficients and likelihoods are stable.
 #'
 #' Categorical raster layers should be stored as factor-valued
 #' \code{SpatRaster} layers, see \code{\link[terra]{as.factor}} and the
@@ -105,6 +119,14 @@
 #'
 #' surface <- conductance_surface(covariates, melip.coords, directions = 8)
 #'
+#' # For large rasters where sites occupy only part of the map, crop first.
+#' surface_cropped <- conductance_surface(
+#'   covariates,
+#'   melip.coords,
+#'   directions = 8,
+#'   crop_buffer = 0.05
+#' )
+#'
 #' # categorical covariates:
 #' # raster layers of categorical covariates should be factor-valued, see 'details'
 #' forestcover_class <- cut(terra::values(melip.forestcover)[,1], breaks = c(0, 1/6, 1/3, 1))
@@ -120,12 +142,15 @@
 #'
 #' @export
 
-conductance_surface <- function(covariates, coords, directions=4, saveStack=TRUE)
+conductance_surface <- function(covariates, coords, directions=4, saveStack=TRUE,
+                                crop_buffer = NULL)
 {
   covariates <- .as_spatraster(covariates)
   stopifnot(directions %in% c(4, 8))
 
   coords <- .coords_matrix(coords, covariates)
+  if (!is.null(crop_buffer))
+    covariates <- crop_to_focal_buffer(covariates, coords, buffer = crop_buffer)
   if (nlyr(covariates) < 1)
     stop("'covariates' must contain at least one layer")
 

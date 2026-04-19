@@ -47,6 +47,8 @@ algebra and analytic gradients throughout.
 -   **Model comparison**: `aic_table()`, `anova()`, `terradish_grid()`
 -   **Cross-validation**: `terradish_cv()`, `terradish_cv_replicates()`,
     `cv_model_selection()`
+-   **Large-raster helpers**: focal-site cropping with `crop_buffer`,
+    coarse-raster warm starts, and `terradish_solver_benchmark()`
 -   `terra`-native throughout; `radish*` legacy names work with
     deprecation warnings during transition
 
@@ -199,7 +201,8 @@ at fixed scales, this model optimizes σ inside the likelihood
 calculation using analytic gradients and BFGS.
 
 ``` r
-# Gaussian scale model — conductance_surface must be built with saveStack = TRUE
+# Gaussian scale model: use the raw raster and retain it with saveStack = TRUE
+names(melip.forestcover) <- "forestcover"
 surface_raw <- conductance_surface(
   melip.forestcover, 
   melip.coords,
@@ -218,12 +221,94 @@ fit_gaussian <- terradish(
 
 gaussian_scale_summary(fit_gaussian)   # sigma in map units, cell widths, and radii
 plot(fit_gaussian, type = "sigma")     # Gaussian kernel plot with uncertainty band
+
+# Optional coarse-raster warm start for larger rasters. With exact_refine = TRUE,
+# the reported fit is still refined on the original full-resolution graph.
+fit_gaussian_coarse <- terradish(
+  melip.Fst ~ forestcover,
+  data              = surface_raw,
+  conductance_model = gaussian_smoothed_loglinear_conductance(surface_raw),
+  measurement_model = mlpe,
+  approximation     = "coarse_raster",
+  approximation_control = list(factor = c(4, 2), exact_refine = TRUE),
+  optimizer         = "auto",
+  leverage          = FALSE
+)
 ```
 
 See `vignette("gaussian-scale-optimization", package = "terradish")` for
 a staged workflow that fits single-raster scale-aware models, compares
 them to fixed-raster fits, and inspects `sigma` before adding additional
 landscape variables.
+
+## Working with larger rasters
+
+Large rasters are expensive because every likelihood evaluation builds or
+updates a sparse graph Laplacian, factorizes it, and solves for effective
+distances among focal sites. `terradish` includes three opt-in tools that
+address different parts of that cost.
+
+### Crop to the sampled landscape
+
+If your sampling sites occupy only a small part of a much larger raster,
+crop the raster before graph construction:
+
+``` r
+surface_cropped <- conductance_surface(
+  covariates,
+  melip.coords,
+  directions   = 8,
+  saveStack    = TRUE,
+  crop_buffer  = 0.05
+)
+```
+
+The buffer is in the raster's map units. For longitude/latitude rasters,
+that means degrees; for direct distance interpretation, use a projected
+raster. Cropping is most helpful when sites are clustered. If sites span
+the whole raster, there may be little or no speed gain.
+
+### Use coarse-raster warm starts
+
+Coarse-raster approximation optimizes first on one or more aggregated
+rasters, then optionally refines on the original graph:
+
+``` r
+fit_coarse <- terradish(
+  melip.Fst ~ forestcover + altitude,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe,
+  approximation     = "coarse_raster",
+  approximation_control = list(
+    factor       = c(4, 2),
+    exact_refine = TRUE
+  )
+)
+```
+
+With `exact_refine = TRUE`, the final coefficients, likelihood, and
+standard errors come from the full-resolution graph. The coarse stages are
+only used to find a better starting point. With `exact_refine = FALSE`, the
+fit is faster but approximate and is best treated as a screening result.
+
+### Benchmark direct solver settings
+
+The fastest direct Cholesky factorization setting depends on graph size
+and the local R/BLAS build. Use `terradish_solver_benchmark()` as a quick
+diagnostic:
+
+``` r
+terradish_solver_benchmark(
+  surface,
+  factorization = c("simplicial_ldl", "simplicial_ll", "supernodal_ll"),
+  n_replicates = 2
+)
+```
+
+For small example rasters, timings can be noisy. This benchmark is most
+useful on rasters large enough that the linear solve is a visible part of
+runtime.
 
 ## IBE and IBR joint modeling
 

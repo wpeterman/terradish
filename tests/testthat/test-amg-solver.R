@@ -387,3 +387,19 @@ test_that("AMG hierarchy reuse is threaded across nearby evaluations", {
   expect_true(fit2$solver_info$reuse_age >= 1L)
   expect_false(is.null(fit2$solver_reuse_state))
 })
+
+test_that("terradish_solver_benchmark reports direct solver timings", {
+  fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 1, verbose = FALSE))
+  bench <- terradish_solver_benchmark(
+    fx$surface,
+    factorization = c("simplicial_ldl", "simplicial_ll"),
+    n_replicates = 1
+  )
+
+  expect_s3_class(bench, "data.frame")
+  expect_equal(nrow(bench), 2L)
+  expect_true(all(c("solver", "factorization", "setup_time",
+                    "solve_time", "total_time") %in% names(bench)))
+  expect_true(all(bench$solver == "direct"))
+  expect_true(all(bench$total_time >= 0))
+})

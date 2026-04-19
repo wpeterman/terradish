@@ -14,7 +14,7 @@
 #' @importFrom stats dnorm fft fitted lm logLik model.matrix optimize pchisq plogis
 #' @importFrom stats pnorm printCoefmat prcomp qlogis qnorm reformulate residuals rnorm
 #' @importFrom stats rWishart sd setNames sigma simulate terms
-#' @importFrom terra adjacent cellFromXY geom global is.factor levels ncell nlyr patches rast
+#' @importFrom terra adjacent cellFromXY crop geom global is.factor levels ncell nlyr patches rast
 #' @importFrom terra ext extract is.lonlat res rowColFromCell unwrap values values<- xyFromCell
 #' @importFrom utils globalVariables modifyList write.csv
 #' @importFrom grDevices terrain.colors

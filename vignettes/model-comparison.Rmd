@@ -54,7 +54,12 @@ covariates <- c(melip.altitude, melip.forestcover)
 names(covariates) <- c("altitude", "forestcover")
 covariates <- scale_covariates(covariates)
 
-surface <- conductance_surface(covariates, melip.coords, directions = 8)
+surface <- conductance_surface(
+  covariates,
+  melip.coords,
+  directions = 8,
+  saveStack = TRUE
+)
 
 # Full model: both covariates
 fit_full <- terradish(
@@ -276,6 +281,27 @@ A well-behaved likelihood surface has a single, sharp peak at the MLE. A flat
 or elongated surface signals that the parameters are poorly identified, often
 because the covariates are highly correlated or the signal-to-noise ratio
 in the genetic data is low.
+
+For large rasters, a full likelihood grid can become expensive. If the surface
+was created with `saveStack = TRUE`, `terradish_grid()` can screen a grid on an
+aggregated raster:
+
+```{r likelihood-grid-coarse, eval=FALSE}
+grid_coarse <- terradish_grid(
+  theta = theta_grid,
+  formula = melip.Fst ~ forestcover + altitude,
+  data = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe,
+  approximation = "coarse_raster",
+  approximation_control = list(factor = 2L)
+)
+```
+
+This is a screening tool rather than an exact replacement for the full grid:
+the log-likelihoods are evaluated on the aggregated graph. Use it to locate
+interesting regions of parameter space, then rerun a smaller grid or a final
+optimization on the full-resolution graph.
 
 ---
 

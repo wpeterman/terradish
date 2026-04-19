@@ -185,6 +185,40 @@ fit_gaussian <- terradish(
 fit_gaussian
 ```
 
+### Optional speed-up — coarse-raster warm starts
+
+Gaussian scale optimization can be expensive because every likelihood
+evaluation has two costly pieces:
+
+1. smooth the raster at the proposed `sigma`
+2. solve the graph Laplacian to get resistance distances
+
+For large rasters, you can ask `terradish()` to optimize first on one or more
+aggregated rasters and then refine the result on the original surface:
+
+```{r gaussian-coarse-start, eval=FALSE}
+fit_gaussian_coarse <- terradish(
+  melip.Fst ~ forestcover,
+  data = surface,
+  conductance_model = gaussian_model,
+  measurement_model = mlpe,
+  approximation = "coarse_raster",
+  approximation_control = list(
+    factor = c(4, 2),
+    exact_refine = TRUE
+  ),
+  optimizer = "auto",
+  leverage = FALSE,
+  control = NewtonRaphsonControl(maxit = 12, verbose = FALSE)
+)
+```
+
+The coarse stages rebuild the Gaussian smoother on each aggregated raster, but
+they keep the full-resolution `sigma` bounds and unit conversion. That means a
+coarse-stage `sigma` is still interpreted in the original map units. With
+`exact_refine = TRUE`, the final model is not a coarse approximation; it is the
+full-resolution fit initialized from the coarse result.
+
 ### Step 4 — Inspect the fitted one-raster scale
 
 ```{r coef}
@@ -377,12 +411,12 @@ This first version is intentionally focused. Right now it supports:
 - polynomial/arithmetic terms such as `I(forestcover^2)`
 - one Gaussian scale parameter per selected raster
 - joint optimization through analytic gradients and BFGS
+- opt-in coarse-raster starts through `approximation = "coarse_raster"`
 
 It does **not yet** support:
 
 - factor-valued raster layers
 - leverage / `partial_X` diagnostics
-- coarse-raster approximation for this conductance model
 
 It does now support conditional-on-sigma marginal-effect plotting, so you can
 inspect conductance and response-scale curves after fitting, but the leverage

@@ -202,6 +202,57 @@ nrow(surface$x)
 head(surface$x)
 ```
 
+### Optional: reduce graph size for large rasters
+
+The example raster is small enough that we can fit directly. For larger
+landscapes, graph size becomes the main driver of runtime. If your sampling
+locations occupy only part of the raster, you can crop the raster to a buffered
+sampling extent before the graph is constructed:
+
+```{r crop-buffer-example, eval=FALSE}
+surface_cropped <- conductance_surface(
+  covariates,
+  melip.coords,
+  directions = 8,
+  saveStack = TRUE,
+  crop_buffer = 0.05
+)
+```
+
+The buffer is measured in the raster's map units. In a projected raster this
+might be metres; in a longitude/latitude raster it is degrees. Cropping is a
+safe speed tool only when the cropped area still contains the landscape context
+needed to estimate resistance distances. A good habit is to try a few buffer
+widths and confirm that the fitted coefficients are stable.
+
+Another speed option is a coarse-raster warm start. This fits the same model on
+aggregated rasters first, then refines the estimate on the full-resolution
+surface:
+
+```{r coarse-raster-example, eval=FALSE}
+surface_for_coarse <- conductance_surface(
+  covariates,
+  melip.coords,
+  directions = 8,
+  saveStack = TRUE
+)
+
+fit_coarse <- terradish(
+  melip.Fst ~ forestcover + altitude,
+  data = surface_for_coarse,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe,
+  approximation = "coarse_raster",
+  approximation_control = list(
+    factor = c(4, 2),
+    exact_refine = TRUE
+  )
+)
+```
+
+With `exact_refine = TRUE`, the final reported model is still evaluated on the
+original graph. The coarse fits are only used to find better starting values.
+
 ---
 
 ## Fit your first model

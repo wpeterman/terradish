@@ -135,6 +135,36 @@ test_that("coarse-raster approximation refines back to the full-data fit", {
   expect_lt(max(abs(fit_coarse$mle$theta - fit_exact$mle$theta)), 2e-2)
 })
 
+test_that("coarse-raster approximation supports multilevel factor schedules", {
+  dat <- melip_fixture(1:8)
+  melip.Fst <- dat$melip.Fst
+  surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
+
+  fit_coarse <- suppressWarnings(
+    terradish(
+      melip.Fst ~ altitude + forestcover,
+      data = surface,
+      conductance_model = loglinear_conductance,
+      measurement_model = mlpe,
+      control = NewtonRaphsonControl(maxit = 2, verbose = FALSE),
+      solver = "direct",
+      approximation = "coarse_raster",
+      approximation_control = list(
+        factor = c(4L, 2L),
+        exact_refine = TRUE
+      )
+    )
+  )
+
+  expect_equal(fit_coarse$approximation$type, "coarse_raster")
+  expect_true(isTRUE(fit_coarse$approximation$used))
+  expect_equal(fit_coarse$approximation$factor, c(4L, 2L))
+  expect_equal(fit_coarse$approximation$n_levels, 2L)
+  expect_equal(length(fit_coarse$approximation$coarse_vertices), 2L)
+  expect_true(all(fit_coarse$approximation$coarse_vertices <
+                    fit_coarse$approximation$full_vertices))
+})
+
 test_that("auto optimizer resolves to BFGS above three parameters and BFGS reports steps", {
   expect_equal(terradish:::.resolve_terradish_optimizer("auto", 2L), "newton")
   expect_equal(terradish:::.resolve_terradish_optimizer("auto", 4L), "bfgs")

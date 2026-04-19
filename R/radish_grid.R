@@ -472,12 +472,14 @@
 #'   \code{"landmark"} evaluates a landmark subset selected once and reused
 #'   across the whole grid.
 #'   \code{"coarse_raster"} keeps the full focal set but rebuilds the graph on
-#'   an aggregated raster for safer coarse screening.
+#'   one or more aggregated rasters for safer coarse screening.
 #' @param approximation_control Optional named list controlling the landmark
 #'   or coarse-raster approximation. For \code{"landmark"}, see
 #'   \code{\link{terradish}} for the supported entries. For
 #'   \code{"coarse_raster"}, supported entries include \code{factor},
-#'   \code{aggregate_fun}, and \code{directions}. Coarse-raster screening
+#'   \code{aggregate_fun}, and \code{directions}. \code{factor} may be a single
+#'   positive integer or a vector such as \code{c(4, 2)}; grid likelihoods are
+#'   evaluated on the coarsest requested approximation. Coarse-raster screening
 #'   requires that \code{data} retain its original raster stack.
 #'
 #' @return An object of class \code{terradish_grid} with components
@@ -496,7 +498,8 @@
 #' covariates <- c(terra::scale(melip.altitude),
 #'                 terra::scale(melip.forestcover))
 #' names(covariates) <- c("altitude", "forestcover")
-#' surface <- conductance_surface(covariates, melip.coords, directions = 8)
+#' surface <- conductance_surface(covariates, melip.coords, directions = 8,
+#'                                saveStack = TRUE)
 #'
 #' fit_mlpe <- terradish(melip.Fst ~ altitude + forestcover, data = surface,
 #'                    terradish::loglinear_conductance, terradish::mlpe,

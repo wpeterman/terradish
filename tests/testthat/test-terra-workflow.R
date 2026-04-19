@@ -33,6 +33,30 @@ test_that("utility helpers behave as expected", {
   expect_equal(attr(ranged_covs, "terradish_scale")$a[["scale"]], 4)
 })
 
+test_that("crop_to_focal_buffer reduces raster extent before graph construction", {
+  r <- terra::rast(nrows = 20, ncols = 20, vals = seq_len(400),
+                   xmin = 0, xmax = 20, ymin = 0, ymax = 20)
+  covs <- c(r, r * 2)
+  names(covs) <- c("a", "b")
+  covs <- scale_covariates(covs)
+  pts <- matrix(c(4.5, 4.5,
+                  6.5, 6.5,
+                  7.5, 5.5),
+                ncol = 2, byrow = TRUE)
+
+  cropped <- crop_to_focal_buffer(covs, pts, buffer = 2)
+  expect_s4_class(cropped, "SpatRaster")
+  expect_lt(terra::ncell(cropped), terra::ncell(covs))
+  expect_equal(names(attr(cropped, "terradish_scale")), c("a", "b"))
+  expect_false(anyNA(terra::cellFromXY(cropped[[1]], pts)))
+
+  full_surface <- conductance_surface(covs, pts, directions = 4)
+  cropped_surface <- conductance_surface(covs, pts, directions = 4,
+                                         crop_buffer = 2)
+  expect_lt(nrow(cropped_surface$x), nrow(full_surface$x))
+  expect_equal(length(cropped_surface$demes), nrow(pts))
+})
+
 test_that("pca_dist works when adegenet is available", {
   skip_if_not_installed("adegenet")
   data(nancycats, package = "adegenet")

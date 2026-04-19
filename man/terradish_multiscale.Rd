@@ -53,6 +53,13 @@ This helper is aimed at large continuous rasters, where a good
 coarse-resolution starting point can reduce the amount of full-resolution
 optimization work. Factor-valued rasters are not currently supported in the
 aggregation path.
+
+For most new analyses, the integrated
+\code{terradish(..., approximation = "coarse_raster")} interface is usually
+simpler because it stores approximation metadata directly on the returned
+model and can optionally refine the final estimate on the full-resolution
+graph. \code{terradish_multiscale()} remains useful when you want to inspect
+or retain every intermediate fit explicitly.
 }
 \examples{
 library(terra)
