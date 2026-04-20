@@ -45,9 +45,15 @@ BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = 
   del <- control$del
   ls.control <- control$ls.control
   etol <- etol * length(par)
+  use_armijo <- .terradish_is_armijo_control(ls.control)
 
   if (verbose)
-    cat("BFGS with Hager-Zhang line search\n")
+  {
+    if (use_armijo)
+      cat("BFGS with objective-only Armijo line search\n")
+    else
+      cat("BFGS with Hager-Zhang line search\n")
+  }
 
   convergence <- 0
   initialized <- 0
@@ -111,35 +117,74 @@ BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = 
     phi0  <- fit$objective
     dphi0 <- c(t(desc) %*% gradient_box)
 
-    line_cache <- new.env(parent = emptyenv())
-    dphi_fn <- function(alpha) 
+    if (use_armijo)
     {
-      cache_key <- .terradish_line_search_cache_key(alpha)
-      cached <- line_cache[[cache_key]]
-      if (!is.null(cached))
-        return(cached$value)
+      objective_cache <- new.env(parent = emptyenv())
+      phi_fn <- function(alpha)
+      {
+        cache_key <- .terradish_line_search_cache_key(alpha)
+        cached <- objective_cache[[cache_key]]
+        if (!is.null(cached))
+          return(cached)
 
-      tryCatch({
-        phi <- fn(project(par + alpha*desc, lower, upper), gradient = TRUE, hessian = FALSE)
-        grb <- zero_bounded_variables(phi$gradient, par + alpha*desc, lower, upper, eps)
-        value <- list(objective = phi$objective, gradient = c(t(desc) %*% grb))
-        line_cache[[cache_key]] <- list(value = value, fit = phi)
+        .terradish_record_line_search_trial(control, objective_only = TRUE)
+        value <- tryCatch({
+          phi <- fn(project(par + alpha*desc, lower, upper),
+                    gradient = FALSE,
+                    hessian = FALSE)
+          list(objective = phi$objective)
+        }, error = function(e) {
+          list(objective = NaN)
+        })
+        objective_cache[[cache_key]] <- value
         value
-      }, error = function(e) {
-        # Return a non-finite sentinel so the line search backtracks.
-        BFGSNaN()
-      })
-    }
+      }
 
-    alpha <- tryCatch({
-      HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
-    }, error = function(err) {
-      cat("Switched to backtracking\n")
-      Backtracking(dphi_fn, phi0, dphi0)
-    })
-    accepted <- line_cache[[.terradish_line_search_cache_key(alpha)]]
-    fit_from_line_search <- if (is.null(accepted)) NULL else accepted$fit
-    par <- project(par + alpha*desc, lower, upper)
+      alpha <- Armijo(phi_fn, phi0, dphi0, control = ls.control)
+      next_par <- project(par + alpha*desc, lower, upper)
+      fit_from_line_search <- if (alpha == 0)
+      {
+        fit
+      }
+      else
+      {
+        fn(next_par, gradient = TRUE, hessian = FALSE)
+      }
+      par <- next_par
+    }
+    else
+    {
+      line_cache <- new.env(parent = emptyenv())
+      dphi_fn <- function(alpha)
+      {
+        cache_key <- .terradish_line_search_cache_key(alpha)
+        cached <- line_cache[[cache_key]]
+        if (!is.null(cached))
+          return(cached$value)
+
+        .terradish_record_line_search_trial(control, gradient = TRUE)
+        tryCatch({
+          phi <- fn(project(par + alpha*desc, lower, upper), gradient = TRUE, hessian = FALSE)
+          grb <- zero_bounded_variables(phi$gradient, par + alpha*desc, lower, upper, eps)
+          value <- list(objective = phi$objective, gradient = c(t(desc) %*% grb))
+          line_cache[[cache_key]] <- list(value = value, fit = phi)
+          value
+        }, error = function(e) {
+          # Return a non-finite sentinel so the line search backtracks.
+          BFGSNaN()
+        })
+      }
+
+      alpha <- tryCatch({
+        HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
+      }, error = function(err) {
+        cat("Switched to backtracking\n")
+        Backtracking(dphi_fn, phi0, dphi0)
+      })
+      accepted <- line_cache[[.terradish_line_search_cache_key(alpha)]]
+      fit_from_line_search <- if (is.null(accepted)) NULL else accepted$fit
+      par <- project(par + alpha*desc, lower, upper)
+    }
 
     oldfit <- fit
   }

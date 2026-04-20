@@ -53,3 +53,71 @@ test_that("BoxConstrainedBFGS reuses the accepted line-search fit", {
   final_key <- formatC(fit$par[1, 1], digits = 17, format = "fg")
   expect_equal(call_counts[[final_key]], 1L)
 })
+
+test_that("BoxConstrainedBFGS supports objective-only Armijo trial steps", {
+  target <- 1
+  calls <- data.frame(par = numeric(), gradient = logical())
+
+  fn <- function(par, gradient, hessian) {
+    par <- as.matrix(par)
+    calls <<- rbind(
+      calls,
+      data.frame(par = par[1, 1], gradient = isTRUE(gradient))
+    )
+
+    diff <- par - target
+    out <- list(objective = c(0.5 * diff^2))
+    if (gradient)
+      out$gradient <- diff
+    if (hessian)
+      out$hessian <- matrix(1, 1, 1)
+    out
+  }
+
+  diagnostics <- terradish:::.terradish_new_diagnostics()
+  control <- NewtonRaphsonControl(
+    maxit = 3,
+    verbose = FALSE,
+    ls.control = ArmijoControl(initial = 4, contraction = 0.5)
+  )
+  control$diagnostics <- diagnostics
+
+  fit <- terradish:::BoxConstrainedBFGS(
+    0,
+    fn,
+    control = control
+  )
+
+  expect_equal(c(fit$par), target, tolerance = 1e-8)
+  expect_true(any(!calls$gradient))
+  expect_true(any(calls$par != 0 & !calls$gradient))
+  expect_true(any(calls$par == target & calls$gradient))
+  expect_gt(diagnostics$line_search_trials, 0L)
+  expect_equal(diagnostics$line_search_trials,
+               diagnostics$line_search_objective_only_trials)
+  expect_equal(diagnostics$line_search_gradient_trials, 0L)
+})
+
+test_that("BoxConstrainedNewton rejects ArmijoControl explicitly", {
+  fn <- function(par, gradient, hessian) {
+    out <- list(objective = sum(par^2))
+    if (gradient)
+      out$gradient <- matrix(2 * par, ncol = 1)
+    if (hessian)
+      out$hessian <- diag(2, length(par))
+    out
+  }
+
+  expect_error(
+    terradish:::BoxConstrainedNewton(
+      c(1, 1),
+      fn,
+      control = NewtonRaphsonControl(
+        maxit = 1,
+        verbose = FALSE,
+        ls.control = ArmijoControl()
+      )
+    ),
+    "supported for BFGS"
+  )
+})

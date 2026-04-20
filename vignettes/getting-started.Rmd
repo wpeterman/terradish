@@ -253,6 +253,38 @@ fit_coarse <- terradish(
 With `exact_refine = TRUE`, the final reported model is still evaluated on the
 original graph. The coarse fits are only used to find better starting values.
 
+If you are unsure which speed settings to try first, use
+`terradish_assess_settings()`. The function profiles the graph and can run short
+probe fits to compare optimizers, line searches, and direct-solver settings.
+It is an advisory tool, not a model-selection procedure: use it to choose
+computational settings, then fit and interpret the final model normally.
+
+```{r assess-settings-example, eval=FALSE}
+assessment <- terradish_assess_settings(
+  melip.Fst ~ forestcover + altitude,
+  data = surface_for_coarse,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe,
+  probe_maxit = 2,
+  coarse_probe = TRUE
+)
+
+assessment
+
+fit_tuned <- terradish(
+  melip.Fst ~ forestcover + altitude,
+  data = surface_for_coarse,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe,
+  optimizer = assessment$recommended$optimizer,
+  control = assessment$recommended$control,
+  solver = assessment$recommended$solver,
+  solver_control = assessment$recommended$solver_control,
+  approximation = assessment$recommended$approximation,
+  approximation_control = assessment$recommended$approximation_control
+)
+```
+
 ---
 
 ## Fit your first model

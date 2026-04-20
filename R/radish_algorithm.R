@@ -27,10 +27,11 @@
   }
 
   rhs_block <- if (length(rhs_blocks) == 1L) rhs_blocks[[1]] else do.call(cbind, rhs_blocks)
-  solved_block <- as.matrix(.terradish_solver_solve(state$solver_state, rhs_block)$solution)
+  solve_result <- .terradish_solver_solve(state$solver_state, rhs_block)
+  solved_block <- as.matrix(solve_result$solution)
   n_rhs <- ncol(state$Zn)
 
-  lapply(seq_along(idx), function(m)
+  out <- lapply(seq_along(idx), function(m)
   {
     k <- chunk_state[[m]]$k
     cols <- ((m - 1L) * n_rhs + 1L):(m * n_rhs)
@@ -58,6 +59,8 @@
          partial_X_k = partial_X_k,
          partial_S_k = partial_S_k)
   })
+  attr(out, "solver_info") <- solve_result$info
+  out
 }
 
 .graph_reduced_index <- function(s, n_vertices)
@@ -265,7 +268,8 @@
                                 aggr_eps_strong = 0.08,
                                 estimate_spectral_radius = TRUE,
                                 power_iters = 4L,
-                                reuse_preconditioner = TRUE),
+                                reuse_preconditioner = TRUE,
+                                reuse_preconditioner_max_age = Inf),
                      pcg_jacobi = list(tol = 1e-8, maxit = 1000L),
                      pcg = list(tol = 1e-8, maxit = 1000L),
                      stop("Unknown solver: ", solver))
@@ -278,10 +282,19 @@
       solver_control$maxit <- solver_control$maxit_final
   }
 
-  if (is.null(solver_control))
-    return(defaults)
+  control <- if (is.null(solver_control))
+    defaults
+  else
+    modifyList(defaults, solver_control)
 
-  modifyList(defaults, solver_control)
+  if (identical(solver, "amg"))
+  {
+    max_age <- control$reuse_preconditioner_max_age
+    if (length(max_age) != 1L || is.na(max_age) || max_age < 0)
+      stop("`solver_control$reuse_preconditioner_max_age` must be a nonnegative number or `Inf`")
+  }
+
+  control
 }
 
 .terradish_solver_setup <- function(s, conductance, solver, solver_control = NULL, solver_reuse_state = NULL)
@@ -369,11 +382,14 @@
   {
     edge_pairs <- .graph_edge_pairs(s, length(conductance))
     signature <- .terradish_amg_reuse_signature(control)
+    reuse_age <- as.integer(if (is.null(solver_reuse_state$reuse_age)) 0L else solver_reuse_state$reuse_age)
+    reuse_max_age <- control$reuse_preconditioner_max_age
     can_reuse <- isTRUE(control$reuse_preconditioner) &&
       !is.null(solver_reuse_state) &&
       identical(solver_reuse_state$type, "amg") &&
       identical(solver_reuse_state$signature, signature) &&
-      identical(as.integer(solver_reuse_state$n_vertices), resolution$n_vertices)
+      identical(as.integer(solver_reuse_state$n_vertices), resolution$n_vertices) &&
+      (is.infinite(reuse_max_age) || reuse_age < as.integer(reuse_max_age))
 
     if (can_reuse)
     {
@@ -393,7 +409,7 @@
                   control = control,
                   signature = signature,
                   reused_preconditioner = TRUE,
-                  reuse_age = as.integer(if (is.null(solver_reuse_state$reuse_age)) 0L else solver_reuse_state$reuse_age) + 1L))
+                  reuse_age = reuse_age + 1L))
     }
 
     return(list(type = "amg",
@@ -545,7 +561,27 @@
     NULL
   })
 
-  unlist(parLapply(cl, splits, .terradish_algorithm_derivative_chunk, state = state), recursive = FALSE)
+  chunks <- parLapply(cl, splits, .terradish_algorithm_derivative_chunk, state = state)
+  out <- unlist(chunks, recursive = FALSE)
+  attr(out, "solver_info") <- lapply(chunks, attr, "solver_info")
+  out
+}
+
+.terradish_solver_info_list <- function(info)
+{
+  if (is.null(info))
+    return(list())
+  if (!is.null(names(info)) && "type" %in% names(info))
+    return(list(info))
+  info
+}
+
+.terradish_solver_info_value <- function(info, name)
+{
+  value <- info[[name]]
+  if (is.null(value))
+    return(0)
+  sum(as.numeric(value), na.rm = TRUE)
 }
 
 #' Likelihood of parameterized conductance surface
@@ -571,6 +607,9 @@
 #' @param cores Number of worker processes to use for per-parameter derivative calculations. \code{1} evaluates serially.
 #' @param solver Linear-system solver used for the reduced Laplacian. \code{"direct"} uses the cached sparse Cholesky factorization, \code{"auto"} conservatively chooses between the direct and AMG backends based on graph size and right-hand-side count, \code{"amg"} uses smoothed-aggregation algebraic multigrid preconditioned conjugate gradients, \code{"pcg"} uses incomplete-Cholesky preconditioned conjugate gradients, and \code{"pcg_jacobi"} keeps the older Jacobi-preconditioned prototype.
 #' @param solver_control Optional named list of solver settings. For \code{solver = "direct"}, supported entries include \code{factorization} (\code{"auto"}, \code{"simplicial_ldl"}, \code{"simplicial_ll"}, or \code{"supernodal_ll"}), \code{solve_backend} (\code{"matrix"} or the experimental \code{"cholmod_cpp"} and \code{"cholmod_cpp_cached"} backends), \code{supernodal_min_vertices}, \code{supernodal_max_rhs}, and \code{perm}. For \code{solver = "auto"}, supported selection entries include \code{auto_direct_max_vertices}, \code{auto_amg_min_vertices}, and \code{auto_direct_max_rhs}. For \code{solver = "amg"}, supported entries include \code{tol}, \code{maxit}, \code{coarse_enough}, \code{npre}, \code{npost}, \code{sa_relax}, \code{aggr_eps_strong}, \code{estimate_spectral_radius}, \code{power_iters}, and \code{reuse_preconditioner}. For \code{solver = "pcg"} or \code{"pcg_jacobi"}, supported entries are \code{tol} and \code{maxit}.
+#'   \code{reuse_preconditioner_max_age} can be set to a finite nonnegative
+#'   value to periodically rebuild the AMG hierarchy instead of reusing it
+#'   indefinitely.
 #'   Direct supernodal factorizations can benefit from a threaded BLAS, but the
 #'   relevant thread counts are controlled by the external R/BLAS build rather
 #'   than by \code{terradish_algorithm()}.
@@ -643,6 +682,7 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
   Zn   <- .graph_rhs(s, N)
   solver_state <- .terradish_solver_setup(s, C$conductance, solver = solver, solver_control = solver_control, solver_reuse_state = solver_reuse_state)
   solve_main <- .terradish_solver_solve(solver_state, Zn, warm_start = solver_warm_start)
+  derivative_solver_info <- list()
   G    <- solve_main$solution
   Gmat <- as.matrix(G)
   tG   <- t(Gmat)
@@ -725,6 +765,9 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
                                    N = N)
     derivative_results <- .terradish_algorithm_derivative_chunk(idx, derivative_state)
         }
+        derivative_solver_info <- .terradish_solver_info_list(
+          attr(derivative_results, "solver_info")
+        )
 
         for (res in derivative_results)
         {
@@ -773,6 +816,17 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
                            c(nrow(S), ncol(S), length(theta)))
   }
 
+  solver_infos <- c(list(solve_main$info), derivative_solver_info)
+  algorithm_diagnostics <- list(
+    solver_setups = 1L,
+    solver_solves = length(solver_infos),
+    solver_setup_time = .terradish_solver_info_value(solve_main$info, "setup_time"),
+    solver_solve_time = sum(vapply(solver_infos,
+                                    .terradish_solver_info_value,
+                                    numeric(1),
+                                    name = "solve_time"))
+  )
+
   list (covariance    = E,
          objective     = if(!objective) NULL else loglik,
          phi           = if(!objective) NULL else phi,
@@ -788,6 +842,7 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
          num_partial_X = if(!validate)  NULL else num_partial_X,
          num_partial_S = if(!validate)  NULL else num_partial_S,
          solver_info   = solve_main$info,
+         algorithm_diagnostics = algorithm_diagnostics,
          solver_warm_start = solve_main$warm_start,
       solver_reuse_state = switch(
             solver_state$type,

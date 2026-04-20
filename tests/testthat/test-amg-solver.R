@@ -483,6 +483,27 @@ test_that("AMG hierarchy reuse is threaded across nearby evaluations", {
   expect_true(isTRUE(fit2$solver_info$reused_preconditioner))
   expect_true(fit2$solver_info$reuse_age >= 1L)
   expect_false(is.null(fit2$solver_reuse_state))
+
+  refresh_control <- control
+  refresh_control$reuse_preconditioner_max_age <- 1L
+  fit3 <- terradish_algorithm(
+    model,
+    leastsquares,
+    surface,
+    fst,
+    nu = 1000,
+    phi = fit2$phi,
+    theta = c(-0.26, 0.34),
+    partial = FALSE,
+    solver = "amg",
+    solver_control = refresh_control,
+    solver_warm_start = fit2$solver_warm_start,
+    solver_reuse_state = fit2$solver_reuse_state
+  )
+
+  expect_equal(fit3$solver_info$type, "amg")
+  expect_false(isTRUE(fit3$solver_info$reused_preconditioner))
+  expect_equal(fit3$solver_info$reuse_age, 0L)
 })
 
 test_that("terradish_solver_benchmark reports direct solver timings", {

@@ -60,6 +60,9 @@ radish_algorithm(...)
 \item{solver}{Linear-system solver used for the reduced Laplacian. \code{"direct"} uses the cached sparse Cholesky factorization, \code{"auto"} conservatively chooses between the direct and AMG backends based on graph size and right-hand-side count, \code{"amg"} uses smoothed-aggregation algebraic multigrid preconditioned conjugate gradients, \code{"pcg"} uses incomplete-Cholesky preconditioned conjugate gradients, and \code{"pcg_jacobi"} keeps the older Jacobi-preconditioned prototype.}
 
 \item{solver_control}{Optional named list of solver settings. For \code{solver = "direct"}, supported entries include \code{factorization} (\code{"auto"}, \code{"simplicial_ldl"}, \code{"simplicial_ll"}, or \code{"supernodal_ll"}), \code{solve_backend} (\code{"matrix"} or the experimental \code{"cholmod_cpp"} and \code{"cholmod_cpp_cached"} backends), \code{supernodal_min_vertices}, \code{supernodal_max_rhs}, and \code{perm}. For \code{solver = "auto"}, supported selection entries include \code{auto_direct_max_vertices}, \code{auto_amg_min_vertices}, and \code{auto_direct_max_rhs}. For \code{solver = "amg"}, supported entries include \code{tol}, \code{maxit}, \code{coarse_enough}, \code{npre}, \code{npost}, \code{sa_relax}, \code{aggr_eps_strong}, \code{estimate_spectral_radius}, \code{power_iters}, and \code{reuse_preconditioner}. For \code{solver = "pcg"} or \code{"pcg_jacobi"}, supported entries are \code{tol} and \code{maxit}.
+\code{reuse_preconditioner_max_age} can be set to a finite nonnegative
+value to periodically rebuild the AMG hierarchy instead of reusing it
+indefinitely.
 Direct supernodal factorizations can benefit from a threaded BLAS, but the
 relevant thread counts are controlled by the external R/BLAS build rather
 than by \code{terradish_algorithm()}.}

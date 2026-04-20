@@ -1,9 +1,3 @@
----
-editor_options:
-  markdown:
-    wrap: 72
----
-
 # terradish
 
 Fast gradient-based optimization of resistance surfaces for landscape
@@ -48,7 +42,8 @@ algebra and analytic gradients throughout.
 -   **Cross-validation**: `terradish_cv()`, `terradish_cv_replicates()`,
     `cv_model_selection()`
 -   **Large-raster helpers**: focal-site cropping with `crop_buffer`,
-    coarse-raster warm starts, and `terradish_solver_benchmark()`
+    coarse-raster warm starts, `terradish_solver_benchmark()`, and
+    `terradish_assess_settings()`
 -   `terra`-native throughout; `radish*` legacy names work with
     deprecation warnings during transition
 
@@ -309,6 +304,32 @@ terradish_solver_benchmark(
 For small example rasters, timings can be noisy. This benchmark is most
 useful on rasters large enough that the linear solve is a visible part of
 runtime.
+
+### Ask terradish to assess settings
+
+`terradish_assess_settings()` combines a graph profile with short,
+optional probe benchmarks. It returns an advisory recommendation for the
+optimizer, line search, direct solver settings, and whether a coarse-raster
+warm start appears worthwhile:
+
+``` r
+assessment <- terradish_assess_settings(
+  melip.Fst ~ forestcover + altitude,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe,
+  probe_maxit       = 2,
+  coarse_probe      = FALSE
+)
+
+assessment
+assessment$recommended
+```
+
+The assessment is intentionally conservative. It does not change defaults
+or refit your final model automatically; instead, inspect the recommendation
+and pass the suggested pieces into `terradish()` when they make sense for
+your analysis.
 
 ## IBE and IBR joint modeling
 

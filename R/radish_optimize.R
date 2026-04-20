@@ -1,5 +1,102 @@
 setRefClass("FunctionCall", fields = list(count = "integer"))
 
+.terradish_new_diagnostics <- function()
+{
+  diagnostics <- new.env(parent = emptyenv())
+  for (name in c("algorithm_calls",
+                 "objective_evaluations",
+                 "gradient_evaluations",
+                 "hessian_evaluations",
+                 "partial_evaluations",
+                 "line_search_trials",
+                 "line_search_objective_only_trials",
+                 "line_search_gradient_trials",
+                 "solver_setups",
+                 "solver_solves"))
+    diagnostics[[name]] <- 0L
+  diagnostics$solver_setup_time <- 0
+  diagnostics$solver_solve_time <- 0
+  diagnostics
+}
+
+.terradish_increment_diagnostic <- function(diagnostics, name, value = 1L)
+{
+  if (is.null(diagnostics) || !is.environment(diagnostics))
+    return(invisible(NULL))
+  current <- diagnostics[[name]]
+  if (is.null(current))
+    current <- if (is.integer(value)) 0L else 0
+  diagnostics[[name]] <- current + value
+  invisible(diagnostics[[name]])
+}
+
+.terradish_record_line_search_trial <- function(control,
+                                                objective_only = FALSE,
+                                                gradient = FALSE)
+{
+  diagnostics <- control$diagnostics
+  .terradish_increment_diagnostic(diagnostics, "line_search_trials")
+  if (isTRUE(objective_only))
+    .terradish_increment_diagnostic(diagnostics, "line_search_objective_only_trials")
+  if (isTRUE(gradient))
+    .terradish_increment_diagnostic(diagnostics, "line_search_gradient_trials")
+  invisible(NULL)
+}
+
+.terradish_record_algorithm_diagnostics <- function(diagnostics,
+                                                    fit,
+                                                    objective = TRUE,
+                                                    gradient = TRUE,
+                                                    hessian = TRUE,
+                                                    partial = FALSE)
+{
+  .terradish_increment_diagnostic(diagnostics, "algorithm_calls")
+  if (isTRUE(objective))
+    .terradish_increment_diagnostic(diagnostics, "objective_evaluations")
+  if (isTRUE(gradient))
+    .terradish_increment_diagnostic(diagnostics, "gradient_evaluations")
+  if (isTRUE(hessian))
+    .terradish_increment_diagnostic(diagnostics, "hessian_evaluations")
+  if (isTRUE(partial))
+    .terradish_increment_diagnostic(diagnostics, "partial_evaluations")
+
+  solver_diagnostics <- fit$algorithm_diagnostics
+  if (is.null(solver_diagnostics))
+    return(invisible(NULL))
+
+  .terradish_increment_diagnostic(diagnostics, "solver_setups",
+                                  solver_diagnostics$solver_setups)
+  .terradish_increment_diagnostic(diagnostics, "solver_solves",
+                                  solver_diagnostics$solver_solves)
+  .terradish_increment_diagnostic(diagnostics, "solver_setup_time",
+                                  solver_diagnostics$solver_setup_time)
+  .terradish_increment_diagnostic(diagnostics, "solver_solve_time",
+                                  solver_diagnostics$solver_solve_time)
+  invisible(NULL)
+}
+
+.terradish_diagnostics_snapshot <- function(diagnostics)
+{
+  if (is.null(diagnostics) || !is.environment(diagnostics))
+    return(NULL)
+
+  names <- c("algorithm_calls",
+             "objective_evaluations",
+             "gradient_evaluations",
+             "hessian_evaluations",
+             "partial_evaluations",
+             "line_search_trials",
+             "line_search_objective_only_trials",
+             "line_search_gradient_trials",
+             "solver_setups",
+             "solver_solves",
+             "solver_setup_time",
+             "solver_solve_time")
+  out <- lapply(names, function(name) diagnostics[[name]])
+  names(out) <- names
+  out
+}
+
 .safe_hessian_inverse <- function(x)
 {
   tryCatch(solve(x), error = function(e) ginv(x))
@@ -414,11 +511,14 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' @param conductance Retained for backward compatibility. Only
 #'   \code{conductance = TRUE} is currently implemented.
 #' @param optimizer The optimization algorithm to use: \code{newton} uses the
-#'   exact Hessian, with computational cost that grows linearly with the number
-#'   of parameters; \code{bfgs} uses an approximate Hessian with cheaper
-#'   iterations but often more steps; and \code{auto} selects \code{bfgs} when
-#'   there are more than three conductance parameters and \code{newton}
-#'   otherwise.
+#'   exact Hessian during optimization, with computational cost that grows
+#'   linearly with the number of parameters; \code{bfgs} uses an approximate
+#'   Hessian during optimization with cheaper iterations but often more steps;
+#'   and \code{auto} selects \code{bfgs} when there are more than three
+#'   conductance parameters and \code{newton} otherwise. Regardless of the
+#'   optimizer, \code{terradish()} evaluates the fitted model once more at the
+#'   final parameter values with the exact Hessian so standard errors and
+#'   summaries use the same final derivative machinery.
 #' @param control A list containing options for the optimization routine (see \code{\link{NewtonRaphsonControl}} for list)
 #' @param validate Numerical validation of leverage via package \code{numDeriv} (very slow, use for debugging small examples)
 #' @param cores Number of worker processes to use for Hessian and leverage calculations. \code{1} evaluates serially.
@@ -437,10 +537,11 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   \code{tol_early}, \code{tol_mid}, \code{tol_final}, \code{maxit_early},
 #'   \code{maxit_mid}, \code{maxit_final}, and \code{warmup_evals}. AMG controls
 #'   also support \code{reuse_preconditioner} to reuse multigrid hierarchy
-#'   information across nearby optimization steps when possible. Direct
-#'   supernodal factorizations can benefit from a threaded BLAS, but those
-#'   thread counts are controlled by the external R/BLAS build rather than by
-#'   \code{terradish()} itself.
+#'   information across nearby optimization steps when possible, and
+#'   \code{reuse_preconditioner_max_age} to periodically rebuild a reused
+#'   hierarchy. Direct supernodal factorizations can benefit from a threaded
+#'   BLAS, but those thread counts are controlled by the external R/BLAS build
+#'   rather than by \code{terradish()} itself.
 #' @param approximation Exploratory approximation used during optimization.
 #'   \code{"none"} uses the full focal set throughout. \code{"landmark"}
 #'   optimizes first on a space-filling subset of focal populations and then
@@ -458,11 +559,15 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   \code{"random"}, or \code{"sequential"}), \code{seed}, and
 #'   \code{exact_refine}. For \code{approximation = "coarse_raster"},
 #'   supported entries include \code{factor}, \code{aggregate_fun},
-#'   \code{directions}, and \code{exact_refine}; this path requires
-#'   \code{conductance_surface(..., saveStack = TRUE)}. \code{factor} may be a
+#'   \code{directions}, \code{exact_refine}, and \code{refine_control}; this
+#'   path requires \code{conductance_surface(..., saveStack = TRUE)}.
+#'   \code{factor} may be a
 #'   single positive integer or a vector such as \code{c(8, 4, 2)} for a
 #'   multilevel coarse-to-fine warm start. The final reported fit is still
-#'   evaluated on the full data. For
+#'   evaluated on the full data. \code{refine_control} may be a
+#'   \code{\link{NewtonRaphsonControl}} list used only for that final exact
+#'   full-resolution refinement; by default the main \code{control} is reused.
+#'   For
 #'   \code{measurement_model = leastsquares}, landmark exact-refinement is
 #'   guarded and the approximation stage is skipped.
 #'
@@ -503,9 +608,11 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' values of \code{theta} (and associated conductance) that result in
 #' resistance distances that are closest to the observed genetic distances,
 #' according to some measure of fit (like least squares). The optimization is
-#' done via Newton's method (default; requires computation of Hessian), via the
-#' BFGS algorithm (requires gradient only) if \code{optimizer = "bfgs"}, or via
-#' a simple parameter-count heuristic if \code{optimizer = "auto"}.
+#' done via Newton's method (default; requires computation of Hessian during
+#' optimization), via the BFGS algorithm (requires gradient only during
+#' optimization) if \code{optimizer = "bfgs"}, or via a simple parameter-count
+#' heuristic if \code{optimizer = "auto"}. In all cases, the final returned fit
+#' is evaluated with the exact Hessian at the optimized parameters for inference.
 #'
 #' For an explanation of how categorical spatial covariates are handled, see
 #' \code{details} of \code{\link{conductance_surface}} and the examples below.
@@ -522,8 +629,10 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' to optimize on one or more aggregated rasters before refining on the original
 #' graph. With \code{exact_refine = TRUE}, the returned coefficients and
 #' likelihood are from the full-resolution graph; the coarse fits are only
-#' starting values. With \code{exact_refine = FALSE}, the result is faster but
-#' approximate and should be interpreted as a screening fit.
+#' starting values. To keep the full-resolution cleanup deliberately short, pass
+#' \code{refine_control = NewtonRaphsonControl(maxit = 2, ...)} inside
+#' \code{approximation_control}. With \code{exact_refine = FALSE}, the result is
+#' faster but approximate and should be interpreted as a screening fit.
 #'
 #' \strong{Gaussian scale-aware conductance.}
 #' \code{\link{gaussian_smoothed_loglinear_conductance}} can also use
@@ -544,8 +653,9 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'
 #' @return An object of class \code{terradish} containing the fitted conductance
 #'   parameters, optimized nuisance parameters, log-likelihood, model
-#'   comparison statistics, and optional leverage diagnostics. See
-#'   \code{\link{terradish_methods}} for the available S3 methods.
+#'   comparison statistics, timing/evaluation diagnostics, and optional
+#'   leverage diagnostics. See \code{\link{terradish_methods}} for the
+#'   available S3 methods.
 #'
 #' @examples
 #'
@@ -697,6 +807,8 @@ terradish <- function(formula,
     leverage <- FALSE
   }
   fcalls    <- new("FunctionCall", count = 0L)
+  diagnostics <- .terradish_new_diagnostics()
+  control$diagnostics <- diagnostics
   make_optfn <- function(eval_data,
                          eval_S,
                          phi_state,
@@ -731,6 +843,14 @@ terradish <- function(formula,
       phi_state$value <- fit$phi
       solver_state$warm_start <- fit$solver_warm_start
       solver_state$reuse_state <- fit$solver_reuse_state
+      .terradish_record_algorithm_diagnostics(
+        diagnostics,
+        fit,
+        objective = TRUE,
+        gradient = gradient,
+        hessian = hessian,
+        partial = FALSE
+      )
       fit
     }
   }
@@ -798,6 +918,10 @@ terradish <- function(formula,
     exact_solver_state <- new.env(parent = emptyenv())
     exact_solver_state$warm_start <- NULL
     exact_solver_state$reuse_state <- NULL
+    exact_control <- control
+    exact_control_source <- "shared"
+    coarse_stage_details <- NULL
+    exact_refine_steps <- NA_integer_
 
     if (!is.null(landmark_problem) && isTRUE(landmark_problem$used))
     {
@@ -838,9 +962,12 @@ terradish <- function(formula,
     {
       approx_phi_state <- new.env(parent = emptyenv())
       approx_phi_state$value <- NULL
+      coarse_stage_details <- vector("list", length(coarse_problem$stages))
+      names(coarse_stage_details) <- names(coarse_problem$stages)
 
-      for (stage in coarse_problem$stages)
+      for (stage_name in names(coarse_problem$stages))
       {
+        stage <- coarse_problem$stages[[stage_name]]
         coarse_conductance_model <- if (!is.null(rebuild_conductance_model_for_surface))
           rebuild_conductance_model_for_surface(
             formula,
@@ -869,11 +996,25 @@ terradish <- function(formula,
         iters <- iters + approx_problem$iters
         theta <- c(approx_problem$par)
         names(theta) <- names(default)
+        coarse_stage_details[[stage_name]] <- list(
+          factor = stage$factor,
+          vertices = stage$coarse_vertices,
+          duplicate_demes = stage$duplicate_demes,
+          unique_demes = stage$unique_demes,
+          optimizer_steps = approx_problem$iters
+        )
       }
 
       # The coarse graph has a different dimension, so only transfer the
       # nuisance-parameter warm start to the exact full-resolution stage.
       exact_phi_state$value <- approx_phi_state$value
+      if (isTRUE(coarse_problem$control$exact_refine) &&
+          !is.null(coarse_problem$control$refine_control))
+      {
+        exact_control <- coarse_problem$control$refine_control
+        exact_control$diagnostics <- diagnostics
+        exact_control_source <- "custom"
+      }
     }
 
     if (!isTRUE(approximation_info$used) || isTRUE(approximation_info$exact_refine))
@@ -882,13 +1023,33 @@ terradish <- function(formula,
         theta = theta,
         optfn = make_optfn(data, S, exact_phi_state, exact_solver_state),
         optimizer = optimizer,
-        control = control,
+        control = exact_control,
         lower = bounds$lower,
         upper = bounds$upper
       )
       iters <- iters + exact_problem$iters
       theta <- c(exact_problem$par)
       names(theta) <- names(default)
+      if (!is.null(coarse_problem) && isTRUE(coarse_problem$used))
+        exact_refine_steps <- exact_problem$iters
+    }
+
+    if (identical(approximation_info$type, "coarse_raster") &&
+        isTRUE(approximation_info$used))
+    {
+      approximation_info$stages <- coarse_stage_details
+      approximation_info$coarse_steps <- sum(vapply(coarse_stage_details,
+                                                    `[[`,
+                                                    integer(1),
+                                                    "optimizer_steps"))
+      approximation_info$refine_steps <- if (isTRUE(approximation_info$exact_refine))
+        exact_refine_steps
+      else
+        0L
+      approximation_info$refine_control <- if (isTRUE(approximation_info$exact_refine))
+        exact_control_source
+      else
+        "not_used"
     }
   }
   else
@@ -915,6 +1076,14 @@ terradish <- function(formula,
                           solver = solver, solver_control = final_solver_control,
                           solver_warm_start = exact_solver_state$warm_start,
                           solver_reuse_state = exact_solver_state$reuse_state)
+  .terradish_record_algorithm_diagnostics(
+    diagnostics,
+    fit,
+    objective = TRUE,
+    gradient = TRUE,
+    hessian = TRUE,
+    partial = leverage
+  )
   fit$solver_warm_start <- NULL
   fit$solver_reuse_state <- NULL
 
@@ -961,6 +1130,7 @@ terradish <- function(formula,
                                  "edge"     = ncol(data$adj)),
               cost           = c("newton_steps"   = iters,
                                  "function_calls" = fcalls$count + 1),
+              diagnostics    = .terradish_diagnostics_snapshot(diagnostics),
               submodels      = list("f" = conductance_model_user,
                                     "f_internal" = conductance_model,
                                     "g" = measurement_model),
@@ -1097,6 +1267,7 @@ summary.radish <- function(object, ...)
               aic           = x$aic,
               fcalls        = x$cost["function_calls"],
               iters         = x$cost["newton_steps"],
+              diagnostics   = x$diagnostics,
               call          = x$call,
               dim           = x$dim
               )

@@ -53,11 +53,14 @@ radish(...)
 \code{conductance = TRUE} is currently implemented.}
 
 \item{optimizer}{The optimization algorithm to use: \code{newton} uses the
-exact Hessian, with computational cost that grows linearly with the number
-of parameters; \code{bfgs} uses an approximate Hessian with cheaper
-iterations but often more steps; and \code{auto} selects \code{bfgs} when
-there are more than three conductance parameters and \code{newton}
-otherwise.}
+exact Hessian during optimization, with computational cost that grows
+linearly with the number of parameters; \code{bfgs} uses an approximate
+Hessian during optimization with cheaper iterations but often more steps;
+and \code{auto} selects \code{bfgs} when there are more than three
+conductance parameters and \code{newton} otherwise. Regardless of the
+optimizer, \code{terradish()} evaluates the fitted model once more at the
+final parameter values with the exact Hessian so standard errors and
+summaries use the same final derivative machinery.}
 
 \item{control}{A list containing options for the optimization routine (see \code{\link{NewtonRaphsonControl}} for list)}
 
@@ -81,10 +84,11 @@ understands an adaptive schedule with entries such as \code{adaptive},
 \code{tol_early}, \code{tol_mid}, \code{tol_final}, \code{maxit_early},
 \code{maxit_mid}, \code{maxit_final}, and \code{warmup_evals}. AMG controls
 also support \code{reuse_preconditioner} to reuse multigrid hierarchy
-information across nearby optimization steps when possible. Direct
-supernodal factorizations can benefit from a threaded BLAS, but those
-thread counts are controlled by the external R/BLAS build rather than by
-\code{terradish()} itself.}
+information across nearby optimization steps when possible, and
+\code{reuse_preconditioner_max_age} to periodically rebuild a reused
+hierarchy. Direct supernodal factorizations can benefit from a threaded
+BLAS, but those thread counts are controlled by the external R/BLAS build
+rather than by \code{terradish()} itself.}
 
 \item{approximation}{Exploratory approximation used during optimization.
 \code{"none"} uses the full focal set throughout. \code{"landmark"}
@@ -104,11 +108,15 @@ coarse-raster approximation. Landmark entries include
 \code{"random"}, or \code{"sequential"}), \code{seed}, and
 \code{exact_refine}. For \code{approximation = "coarse_raster"},
 supported entries include \code{factor}, \code{aggregate_fun},
-\code{directions}, and \code{exact_refine}; this path requires
-\code{conductance_surface(..., saveStack = TRUE)}. \code{factor} may be a
+\code{directions}, \code{exact_refine}, and \code{refine_control}; this
+path requires \code{conductance_surface(..., saveStack = TRUE)}.
+\code{factor} may be a
 single positive integer or a vector such as \code{c(8, 4, 2)} for a
 multilevel coarse-to-fine warm start. The final reported fit is still
-evaluated on the full data. For
+evaluated on the full data. \code{refine_control} may be a
+\code{\link{NewtonRaphsonControl}} list used only for that final exact
+full-resolution refinement; by default the main \code{control} is reused.
+For
 \code{measurement_model = leastsquares}, landmark exact-refinement is
 guarded and the approximation stage is skipped.}
 
@@ -118,8 +126,9 @@ compatibility wrapper to \code{\link{terradish}}.}
 \value{
 An object of class \code{terradish} containing the fitted conductance
   parameters, optimized nuisance parameters, log-likelihood, model
-  comparison statistics, and optional leverage diagnostics. See
-  \code{\link{terradish_methods}} for the available S3 methods.
+  comparison statistics, timing/evaluation diagnostics, and optional
+  leverage diagnostics. See \code{\link{terradish_methods}} for the
+  available S3 methods.
 }
 \description{
 Uses maximum likelihood to fit a parameterized conductance surface to genetic data,
@@ -165,9 +174,11 @@ likelihood; by finding the
 values of \code{theta} (and associated conductance) that result in
 resistance distances that are closest to the observed genetic distances,
 according to some measure of fit (like least squares). The optimization is
-done via Newton's method (default; requires computation of Hessian), via the
-BFGS algorithm (requires gradient only) if \code{optimizer = "bfgs"}, or via
-a simple parameter-count heuristic if \code{optimizer = "auto"}.
+done via Newton's method (default; requires computation of Hessian during
+optimization), via the BFGS algorithm (requires gradient only during
+optimization) if \code{optimizer = "bfgs"}, or via a simple parameter-count
+heuristic if \code{optimizer = "auto"}. In all cases, the final returned fit
+is evaluated with the exact Hessian at the optimized parameters for inference.
 
 For an explanation of how categorical spatial covariates are handled, see
 \code{details} of \code{\link{conductance_surface}} and the examples below.
@@ -184,8 +195,10 @@ extent before fitting. Second, use
 to optimize on one or more aggregated rasters before refining on the original
 graph. With \code{exact_refine = TRUE}, the returned coefficients and
 likelihood are from the full-resolution graph; the coarse fits are only
-starting values. With \code{exact_refine = FALSE}, the result is faster but
-approximate and should be interpreted as a screening fit.
+starting values. To keep the full-resolution cleanup deliberately short, pass
+\code{refine_control = NewtonRaphsonControl(maxit = 2, ...)} inside
+\code{approximation_control}. With \code{exact_refine = FALSE}, the result is
+faster but approximate and should be interpreted as a screening fit.
 
 \strong{Gaussian scale-aware conductance.}
 \code{\link{gaussian_smoothed_loglinear_conductance}} can also use

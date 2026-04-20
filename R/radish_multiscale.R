@@ -26,7 +26,8 @@
     factor = 2L,
     aggregate_fun = mean,
     directions = if (!is.null(data$directions)) data$directions else 8L,
-    exact_refine = TRUE
+    exact_refine = TRUE,
+    refine_control = NULL
   )
   control <- modifyList(defaults, control)
   control$factor <- sort(unique(as.integer(control$factor)), decreasing = TRUE)
@@ -37,6 +38,8 @@
   control$directions <- as.integer(control$directions)[1]
   if (is.na(control$directions) || !control$directions %in% c(4L, 8L))
     stop("`approximation_control$directions` must be 4 or 8")
+  if (!is.null(control$refine_control) && !is.list(control$refine_control))
+    stop("`approximation_control$refine_control` must be an optimizer control list")
   control
 }
 

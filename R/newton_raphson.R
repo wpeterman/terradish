@@ -72,6 +72,9 @@ BoxConstrainedNewton <- function(par, fn, lower = rep(-Inf, length(par)), upper 
   del <- control$del
   ls.control <- control$ls.control
   etol <- etol * length(par)
+  if (.terradish_is_armijo_control(ls.control))
+    stop("`ArmijoControl()` is currently supported for BFGS optimization only; use `optimizer = \"bfgs\"` or the default Hager-Zhang line search for Newton.",
+         call. = FALSE)
 
   if (verbose)
     cat("Projected Newton-Raphson with Hager-Zhang line search\n")
@@ -117,6 +120,7 @@ BoxConstrainedNewton <- function(par, fn, lower = rep(-Inf, length(par)), upper 
       if (!is.null(cached))
         return(cached)
 
+      .terradish_record_line_search_trial(control, gradient = TRUE)
       tryCatch({
         phi <- fn(project(par + alpha*desc, lower, upper), gradient = TRUE, hessian = FALSE)
         grb <- zero_bounded_variables(phi$gradient, par + alpha*desc, lower, upper, eps)

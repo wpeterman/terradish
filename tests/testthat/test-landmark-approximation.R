@@ -130,6 +130,10 @@ test_that("coarse-raster approximation refines back to the full-data fit", {
   expect_equal(fit_coarse$approximation$factor, 2L)
   expect_lt(fit_coarse$approximation$coarse_vertices,
             fit_coarse$approximation$full_vertices)
+  expect_equal(fit_coarse$approximation$refine_control, "shared")
+  expect_gte(fit_coarse$approximation$coarse_steps, 1L)
+  expect_gte(fit_coarse$approximation$refine_steps, 1L)
+  expect_equal(length(fit_coarse$approximation$stages), 1L)
   expect_equal(dim(fit_coarse$fit$covariance), dim(fit_exact$fit$covariance))
   expect_equal(fit_coarse$loglik, fit_exact$loglik, tolerance = 1e-4)
   expect_lt(max(abs(fit_coarse$mle$theta - fit_exact$mle$theta)), 2e-2)
@@ -151,7 +155,8 @@ test_that("coarse-raster approximation supports multilevel factor schedules", {
       approximation = "coarse_raster",
       approximation_control = list(
         factor = c(4L, 2L),
-        exact_refine = TRUE
+        exact_refine = TRUE,
+        refine_control = NewtonRaphsonControl(maxit = 1, verbose = FALSE)
       )
     )
   )
@@ -163,6 +168,12 @@ test_that("coarse-raster approximation supports multilevel factor schedules", {
   expect_equal(length(fit_coarse$approximation$coarse_vertices), 2L)
   expect_true(all(fit_coarse$approximation$coarse_vertices <
                     fit_coarse$approximation$full_vertices))
+  expect_equal(fit_coarse$approximation$refine_control, "custom")
+  expect_equal(fit_coarse$approximation$refine_steps, 1L)
+  expect_equal(length(fit_coarse$approximation$stages), 2L)
+  expect_true(all(vapply(fit_coarse$approximation$stages,
+                         function(stage) stage$optimizer_steps >= 1L,
+                         logical(1))))
 })
 
 test_that("auto optimizer resolves to BFGS above three parameters and BFGS reports steps", {
@@ -187,4 +198,22 @@ test_that("auto optimizer resolves to BFGS above three parameters and BFGS repor
 
   expect_true("newton_steps" %in% names(fit_bfgs$cost))
   expect_gte(as.integer(fit_bfgs$cost[["newton_steps"]]), 1L)
+  expect_false(is.null(fit_bfgs$fit$hessian))
+  expect_false(is.null(fit_bfgs$mle$hessian))
+  expect_equal(dim(fit_bfgs$mle$hessian),
+               rep(length(fit_bfgs$mle$theta), 2L))
+  expect_true(all(c("objective_evaluations", "gradient_evaluations",
+                    "hessian_evaluations", "solver_setups",
+                    "solver_solves", "line_search_trials") %in%
+                    names(fit_bfgs$diagnostics)))
+  expect_gte(fit_bfgs$diagnostics$objective_evaluations,
+             fit_bfgs$diagnostics$gradient_evaluations)
+  expect_gte(fit_bfgs$diagnostics$gradient_evaluations,
+             fit_bfgs$diagnostics$hessian_evaluations)
+  expect_gte(fit_bfgs$diagnostics$solver_setups,
+             fit_bfgs$diagnostics$algorithm_calls)
+  expect_gte(fit_bfgs$diagnostics$solver_solves,
+             fit_bfgs$diagnostics$solver_setups)
+  expect_gt(fit_bfgs$diagnostics$line_search_trials, 0L)
+  expect_gt(fit_bfgs$diagnostics$line_search_gradient_trials, 0L)
 })
