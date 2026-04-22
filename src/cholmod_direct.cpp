@@ -1,5 +1,17 @@
 #include <RcppArmadillo.h>
-#include <Matrix/stubs.c>
+// Matrix has shipped its CHOLMOD registration wrappers under two include
+// layouts. Support either path and fail with a clear message otherwise.
+#if defined(__has_include)
+#  if __has_include(<Matrix_stubs.c>)
+#    include <Matrix_stubs.c>
+#  elif __has_include(<Matrix/stubs.c>)
+#    include <Matrix/stubs.c>
+#  else
+#    error "Compatible Matrix CHOLMOD interface headers not found. Install Matrix >= 1.6-2."
+#  endif
+#else
+#  include <Matrix_stubs.c>
+#endif
 #include <chrono>
 #include <limits>
 #include <string>

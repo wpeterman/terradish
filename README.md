@@ -1,51 +1,22 @@
-# terradish
+# **terradish** <img src="man/figures/terradish-sticker.png" align="right" height="225"/>
 
-Fast gradient-based optimization of resistance surfaces for landscape
-genetics.
+### Fast gradient-based optimization of resistance surfaces for landscape genetics.
 
-`terradish` is an R package for maximum likelihood estimation of
-isolation-by-resistance (IBR) models. The core optimization
-infrastructure (sparse Laplacian factorization, reverse-mode gradient
-backpropagation through the graph Laplacian, and the MLPE and
-generalized Wishart likelihood layers) was developed by **Nate Pope**
-as the [`radish`](https://github.com/nspope/radish) R package.
-`terradish` is a `terra`-native extension of that framework, adding new
-measurement models, Gaussian scale-of-effect optimization, IBE + IBR
-joint fitting, cross-validation tools, improved visualization, and a
-suite of helper utilities, while preserving full backward compatibility
-with `radish` function names.
+`terradish` is an R package for maximum likelihood estimation of isolation-by-resistance (IBR) models. The core optimization infrastructure (sparse Laplacian factorization, reverse-mode gradient backpropagation through the graph Laplacian, and the MLPE and generalized Wishart likelihood layers) was developed by **Nate Pope** as the [`radish`](https://github.com/nspope/radish) R package. `terradish` is a `terra`-native extension of that framework, adding new measurement models, Gaussian scale-of-effect optimization, IBE + IBR joint fitting, cross-validation tools, improved visualization, and a suite of helper utilities, while preserving full backward compatibility with `radish` function names.
 
-The central idea is **isolation by resistance (IBR)**: instead of
-assuming genetic distance simply tracks straight-line geographic
-distance (isolation by distance, IBD), IBR recognizes that the landscape
-is heterogeneous. Some cells are easy to cross; others are barriers.
-`terradish` estimates how raster covariates (altitude, forest cover,
-roads, etc.) shape this permeability using efficient sparse linear
-algebra and analytic gradients throughout.
+The central idea is **isolation by resistance (IBR)**: instead of assuming genetic distance simply tracks straight-line geographic distance (isolation by distance, IBD), IBR recognizes that the landscape is heterogeneous. Some cells are easy to cross; others are barriers. `terradish` estimates how raster covariates (altitude, forest cover, roads, etc.) shape this permeability using efficient sparse linear algebra and analytic gradients throughout.
 
 ## Key features
 
--   Four **measurement models**: `leastsquares`, `mlpe`,
-    `generalized_wishart`, `wishart_covariance`
--   Two **conductance models**: `loglinear_conductance` (standard
-    log-linear), `gaussian_smoothed_loglinear_conductance` (with
-    estimated spatial scale of effect)
--   Support for **quadratic** (`I(x^2)`) and **interaction** (`x * z`)
-    terms in conductance formulas
--   Four **plot types**: observed-vs-fitted (`"fit"`), conductance
-    surface with CI (`"surface"`), marginal effects on the genetic
-    distance scale (`"marginal_response"`, default), and marginal
-    effects on the conductance scale (`"marginal"`)
--   **IBE + IBR** joint modeling via `pairwise_endpoint_covariates()`
-    and `mlpe_covariates()`
+-   Four **measurement models**: `leastsquares`, `mlpe`, `generalized_wishart`, `wishart_covariance`
+-   Two **conductance models**: `loglinear_conductance` (standard log-linear), `gaussian_smoothed_loglinear_conductance` (with estimated spatial scale of effect)
+-   Support for **quadratic** (`I(x^2)`) and **interaction** (`x * z`) terms in conductance formulas
+-   Four **plot types**: observed-vs-fitted (`"fit"`), conductance surface with CI (`"surface"`), marginal effects on the genetic distance scale (`"marginal_response"`, default), and marginal effects on the conductance scale (`"marginal"`)
+-   **IBE + IBR** joint modeling via `pairwise_endpoint_covariates()` and `mlpe_covariates()`
 -   **Model comparison**: `aic_table()`, `anova()`, `terradish_grid()`
--   **Cross-validation**: `terradish_cv()`, `terradish_cv_replicates()`,
-    `cv_model_selection()`
--   **Large-raster helpers**: focal-site cropping with `crop_buffer`,
-    coarse-raster warm starts, `terradish_solver_benchmark()`, and
-    `terradish_assess_settings()`
--   `terra`-native throughout; `radish*` legacy names work with
-    deprecation warnings during transition
+-   **Cross-validation**: `terradish_cv()`, `terradish_cv_replicates()`, `cv_model_selection()`
+-   **Large-raster helpers**: focal-site cropping with `crop_buffer`, coarse-raster warm starts, `terradish_solver_benchmark()`, and `terradish_assess_settings()`
+-   `terra`-native throughout; `radish*` legacy names work with deprecation warnings during transition
 
 ## Installation
 
@@ -63,14 +34,10 @@ devtools::install_github("nspope/corMLPE")
 
 The workflow has four steps:
 
-1.  **Build a conductance surface**: maps raster covariates to a
-    weighted graph over the grid.
-2.  **Compute resistance distances**: effective distances between
-    sampling locations that account for the full landscape structure.
-3.  **Fit a statistical model**: relates those resistance distances to
-    observed genetic distances.
-4.  **Optimize**: parameters estimated by maximum likelihood using
-    sparse Cholesky factorization and analytic gradients.
+1.  **Build a conductance surface**: maps raster covariates to a weighted graph over the grid.
+2.  **Compute resistance distances**: effective distances between sampling locations that account for the full landscape structure.
+3.  **Fit a statistical model**: relates those resistance distances to observed genetic distances.
+4.  **Optimize**: parameters estimated by maximum likelihood using sparse Cholesky factorization and analytic gradients.
 
 ```         
 Raster covariates          Sampling locations
@@ -126,35 +93,22 @@ plot(fit, type = "marginal", data = surface) # marginal effects on conductance
 
 ## Measurement models
 
-`terradish` provides four measurement models. The right choice depends
-on the form of your genetic data and how you want to handle the
-non-independence of pairwise observations.
+`terradish` provides four measurement models. The right choice depends on the form of your genetic data and how you want to handle the non-independence of pairwise observations.
 
 | Model | Input `S` | Requires `nu` | Correlation structure |
-|--------------------|----------------|---------------|------------------|
+|----|----|----|----|
 | `leastsquares` | distance matrix | no | independent errors |
 | `mlpe` | distance matrix | no | MLPE shared-site correction |
 | `generalized_wishart` | distance matrix | yes | Wishart (McCullagh 2009) |
 | `wishart_covariance` | **covariance** matrix | yes | Wishart |
 
-**`leastsquares`** is the fastest and simplest model. It treats all
-pairwise genetic distances as independent observations and is a useful
-quick pass, but it underestimates standard errors because it ignores the
-shared-site correlation structure.
+**`leastsquares`** is the fastest and simplest model. It treats all pairwise genetic distances as independent observations and is a useful quick pass, but it underestimates standard errors because it ignores the shared-site correlation structure.
 
-**`mlpe`** ("maximum likelihood population effects") corrects for the
-non-independence that arises because every pair (A–B) and (A–C) both
-involve site A. This is the recommended default for distance-matrix data
-when the number of genetic markers is not recorded.
+**`mlpe`** ("maximum likelihood population effects") corrects for the non-independence that arises because every pair (A–B) and (A–C) both involve site A. This is the recommended default for distance-matrix data when the number of genetic markers is not recorded.
 
-**`generalized_wishart`** models the observed distance matrix as arising
-from a generalized Wishart distribution (McCullagh 2009, Peterson et al.
-2019). It requires `nu`, the number of genetic markers used to compute
-`S`. This is the principled choice when that count is available.
+**`generalized_wishart`** models the observed distance matrix as arising from a generalized Wishart distribution (McCullagh 2009, Peterson et al. 2019). It requires `nu`, the number of genetic markers used to compute `S`. This is the principled choice when that count is available.
 
-**`wishart_covariance`** is the Wishart analogue for data supplied as a
-covariance matrix (e.g. from `cov_from_biallelic()`) rather than a
-distance matrix. It also requires `nu`.
+**`wishart_covariance`** is the Wishart analogue for data supplied as a covariance matrix (e.g. from `cov_from_biallelic()`) rather than a distance matrix. It also requires `nu`.
 
 ``` r
 # Standard MLPE fit
@@ -183,17 +137,9 @@ aic_table(
 
 ## Conductance models
 
-**`loglinear_conductance`** is the standard model: conductance at each
-cell = exp(θ₁·x₁ + θ₂·x₂ + ...). A positive θ for a covariate means that
-higher values increase conductance (easier movement) at higher levels; a
-negative θ means the covariate impedes movement at higher levels. The
-model supports `I(x^2)` and `x * z` interaction terms in the formula.
+**`loglinear_conductance`** is the standard model: conductance at each cell = exp(θ₁·x₁ + θ₂·x₂ + ...). A positive θ for a covariate means that higher values increase conductance (easier movement) at higher levels; a negative θ means the covariate impedes movement at higher levels. The model supports `I(x^2)` and `x * z` interaction terms in the formula.
 
-**`gaussian_smoothed_loglinear_conductance()`** jointly estimates
-conductance coefficients and the spatial scale of effect (σ) at which
-each covariate influences conductance. Rather than pre-smoothing rasters
-at fixed scales, this model optimizes σ inside the likelihood
-calculation using analytic gradients and BFGS.
+**`gaussian_smoothed_loglinear_conductance()`** jointly estimates conductance coefficients and the spatial scale of effect (σ) at which each covariate influences conductance. Rather than pre-smoothing rasters at fixed scales, this model optimizes σ inside the likelihood calculation using analytic gradients and BFGS.
 
 ``` r
 # Gaussian scale model: use the raw raster and retain it with saveStack = TRUE
@@ -231,22 +177,15 @@ fit_gaussian_coarse <- terradish(
 )
 ```
 
-See `vignette("gaussian-scale-optimization", package = "terradish")` for
-a staged workflow that fits single-raster scale-aware models, compares
-them to fixed-raster fits, and inspects `sigma` before adding additional
-landscape variables.
+See `vignette("gaussian-scale-optimization", package = "terradish")` for a staged workflow that fits single-raster scale-aware models, compares them to fixed-raster fits, and inspects `sigma` before adding additional landscape variables.
 
 ## Working with larger rasters
 
-Large rasters are expensive because every likelihood evaluation builds or
-updates a sparse graph Laplacian, factorizes it, and solves for effective
-distances among focal sites. `terradish` includes three opt-in tools that
-address different parts of that cost.
+Large rasters are expensive because every likelihood evaluation builds or updates a sparse graph Laplacian, factorizes it, and solves for effective distances among focal sites. `terradish` includes three opt-in tools that address different parts of that cost.
 
 ### Crop to the sampled landscape
 
-If your sampling sites occupy only a small part of a much larger raster,
-crop the raster before graph construction:
+If your sampling sites occupy only a small part of a much larger raster, crop the raster before graph construction:
 
 ``` r
 surface_cropped <- conductance_surface(
@@ -258,15 +197,11 @@ surface_cropped <- conductance_surface(
 )
 ```
 
-The buffer is in the raster's map units. For longitude/latitude rasters,
-that means degrees; for direct distance interpretation, use a projected
-raster. Cropping is most helpful when sites are clustered. If sites span
-the whole raster, there may be little or no speed gain.
+The buffer is in the raster's map units. For longitude/latitude rasters, that means degrees; for direct distance interpretation, use a projected raster. Cropping is most helpful when sites are clustered. If sites span the whole raster, there may be little or no speed gain.
 
 ### Use coarse-raster warm starts
 
-Coarse-raster approximation optimizes first on one or more aggregated
-rasters, then optionally refines on the original graph:
+Coarse-raster approximation optimizes first on one or more aggregated rasters, then optionally refines on the original graph:
 
 ``` r
 fit_coarse <- terradish(
@@ -282,16 +217,11 @@ fit_coarse <- terradish(
 )
 ```
 
-With `exact_refine = TRUE`, the final coefficients, likelihood, and
-standard errors come from the full-resolution graph. The coarse stages are
-only used to find a better starting point. With `exact_refine = FALSE`, the
-fit is faster but approximate and is best treated as a screening result.
+With `exact_refine = TRUE`, the final coefficients, likelihood, and standard errors come from the full-resolution graph. The coarse stages are only used to find a better starting point. With `exact_refine = FALSE`, the fit is faster but approximate and is best treated as a screening result.
 
 ### Benchmark direct solver settings
 
-The fastest direct Cholesky factorization setting depends on graph size
-and the local R/BLAS build. Use `terradish_solver_benchmark()` as a quick
-diagnostic:
+The fastest direct Cholesky factorization setting depends on graph size and the local R/BLAS build. Use `terradish_solver_benchmark()` as a quick diagnostic:
 
 ``` r
 terradish_solver_benchmark(
@@ -301,16 +231,11 @@ terradish_solver_benchmark(
 )
 ```
 
-For small example rasters, timings can be noisy. This benchmark is most
-useful on rasters large enough that the linear solve is a visible part of
-runtime.
+For small example rasters, timings can be noisy. This benchmark is most useful on rasters large enough that the linear solve is a visible part of runtime.
 
 ### Ask terradish to assess settings
 
-`terradish_assess_settings()` combines a graph profile with short,
-optional probe benchmarks. It returns an advisory recommendation for the
-optimizer, line search, direct solver settings, and whether a coarse-raster
-warm start appears worthwhile:
+`terradish_assess_settings()` combines a graph profile with short, optional probe benchmarks. It returns an advisory recommendation for the optimizer, line search, direct solver settings, and whether a coarse-raster warm start appears worthwhile:
 
 ``` r
 assessment <- terradish_assess_settings(
@@ -326,25 +251,16 @@ assessment
 assessment$recommended
 ```
 
-The assessment is intentionally conservative. It does not change defaults
-or refit your final model automatically; instead, inspect the recommendation
-and pass the suggested pieces into `terradish()` when they make sense for
-your analysis.
+The assessment is intentionally conservative. It does not change defaults or refit your final model automatically; instead, inspect the recommendation and pass the suggested pieces into `terradish()` when they make sense for your analysis.
 
 ## IBE and IBR joint modeling
 
-Isolation by environment (IBE) and isolation by resistance (IBR) can
-operate simultaneously. `terradish` fits them together cleanly:
+Isolation by environment (IBE) and isolation by resistance (IBR) can operate simultaneously. `terradish` fits them together cleanly:
 
--   The **conductance side** captures IBR: raster covariates and
-    landscape resistance distances.
--   The **measurement side** captures IBE: pairwise environmental
-    difference covariates enter as additional predictors in the MLPE
-    model.
+-   The **conductance side** captures IBR: raster covariates and landscape resistance distances.
+-   The **measurement side** captures IBE: pairwise environmental difference covariates enter as additional predictors in the MLPE model.
 
-`pairwise_endpoint_covariates()` builds pairwise environmental
-difference matrices from point-level data; `mlpe_covariates()` extends
-the MLPE measurement model to include them.
+`pairwise_endpoint_covariates()` builds pairwise environmental difference matrices from point-level data; `mlpe_covariates()` extends the MLPE measurement model to include them.
 
 ``` r
 # Pairwise environmental differences at sampling sites
@@ -361,9 +277,7 @@ fit_ibe_ibr <- terradish(
 summary(fit_ibe_ibr)
 ```
 
-See `vignette("ibe-ibr-workflow", package = "terradish")` for a full
-guided walkthrough including interpretation of IBE vs. IBR coefficients
-and marginal-effect plots.
+See `vignette("ibe-ibr-workflow", package = "terradish")` for a full guided walkthrough including interpretation of IBE vs. IBR coefficients and marginal-effect plots.
 
 ## Model comparison and selection
 
@@ -381,8 +295,7 @@ anova(fit_full, fit_altitude_only)
 
 ### Information criteria
 
-`aic_table()` ranks any collection of fitted `terradish` models by AIC,
-AICc, or BIC:
+`aic_table()` ranks any collection of fitted `terradish` models by AIC, AICc, or BIC:
 
 ``` r
 aic_table(
@@ -399,9 +312,7 @@ aic_table(..., BIC = TRUE)
 
 ### Likelihood surface
 
-`terradish_grid()` evaluates the log-likelihood at every point on a
-user-specified parameter grid, which is useful for diagnosing
-identifiability and visualizing the shape of the likelihood surface:
+`terradish_grid()` evaluates the log-likelihood at every point on a user-specified parameter grid, which is useful for diagnosing identifiability and visualizing the shape of the likelihood surface:
 
 ``` r
 theta_grid <- as.matrix(expand.grid(
@@ -420,8 +331,7 @@ grid_result <- terradish_grid(
 
 ## Cross-validation
 
-Information criteria measure in-sample fit. Cross-validation measures
-out-of-sample predictive ability.
+Information criteria measure in-sample fit. Cross-validation measures out-of-sample predictive ability.
 
 ``` r
 # Single train/test split
@@ -453,13 +363,12 @@ cv_comparison <- cv_model_selection(
 )
 ```
 
-See `vignette("model-comparison", package = "terradish")` for a detailed
-walkthrough of all three comparison approaches (LRT, AIC, CV).
+See `vignette("model-comparison", package = "terradish")` for a detailed walkthrough of all three comparison approaches (LRT, AIC, CV).
 
 ## Vignettes
 
 | Vignette | Topic |
-|------------------------------------|------------------------------------|
+|----|----|
 | `vignette("getting-started", package = "terradish")` | Core workflow: fitting, interpreting, and visualizing |
 | `vignette("model-comparison", package = "terradish")` | LRT, AIC, cross-validation, likelihood surfaces |
 | `vignette("ibe-ibr-workflow", package = "terradish")` | Joint IBE + IBR fitting |
@@ -467,13 +376,8 @@ walkthrough of all three comparison approaches (LRT, AIC, CV).
 
 ## Attribution
 
-The core optimization infrastructure in `terradish` (sparse Cholesky
-factorization of the graph Laplacian, reverse-mode gradient
-backpropagation, and the MLPE and generalized Wishart likelihood layers)
-was developed by **Nate Pope** as the
-[`radish`](https://github.com/nspope/radish) R package. `terradish`
-builds on that foundation while extending it with new capabilities. Full
-backward compatibility with `radish` entry points is maintained.
+The core optimization infrastructure in `terradish` (sparse Cholesky factorization of the graph Laplacian, reverse-mode gradient backpropagation, and the MLPE and generalized Wishart likelihood layers) was developed by **Nate Pope** as the [`radish`](https://github.com/nspope/radish) R package. `terradish` builds on that foundation while extending it with new capabilities. Full backward compatibility with `radish` entry points is maintained.
 
-Contact Bill Peterman (Peterman.73\@osu.edu) or submit an issue on
-GitHub for bug reports and feature requests.
+Contact Bill Peterman (Peterman.73\@osu.edu) or submit an issue on GitHub for bug reports and feature requests.
+
+<p align="center"><img src="man/figures/terradish-sticker.png" alt="terradish hex sticker" height="300"/></p>

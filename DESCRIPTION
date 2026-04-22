@@ -1,7 +1,7 @@
 Package: terradish
 Type: Package
 Title: Fast Gradient-Based Optimization of Resistance Surfaces
-Version: 0.0.17
+Version: 0.0.18
 Date: 2026-04-11
 Authors@R: c(
   person(
@@ -25,7 +25,7 @@ Depends: R (>= 4.0.0)
 Imports:
   ggplot2,
   MASS,
-  Matrix,
+  Matrix (>= 1.6-2),
   methods,
   multiScaleR,
   nlme,
@@ -35,7 +35,7 @@ Imports:
   terra,
   utils
 LinkingTo:
-  Matrix,
+  Matrix (>= 1.6-2),
   Rcpp,
   RcppArmadillo,
   RcppEigen
