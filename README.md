@@ -15,6 +15,7 @@ The central idea is **isolation by resistance (IBR)**: instead of assuming genet
 -   **IBE + IBR** joint modeling via `pairwise_endpoint_covariates()` and `mlpe_covariates()`
 -   **Model comparison**: `aic_table()`, `anova()`, `terradish_grid()`
 -   **Cross-validation**: `terradish_cv()`, `terradish_cv_replicates()`, `cv_model_selection()`
+-   **Selected-pair analyses**: `pair_subset_measurement_model()` retains all sites in the graph while fitting only chosen pairwise observations
 -   **Large-raster helpers**: focal-site cropping with `crop_buffer`, coarse-raster warm starts, `terradish_solver_benchmark()`, and `terradish_assess_settings()`
 -   `terra`-native throughout; `radish*` legacy names work with deprecation warnings during transition
 
@@ -90,6 +91,34 @@ plot(fit, type = "surface", data = surface)  # fitted conductance surface + 95% 
 plot(fit, type = "fit")                      # observed vs. fitted scatter
 plot(fit, type = "marginal", data = surface) # marginal effects on conductance
 ```
+
+## Selected pair analyses
+
+You can retain all focal sites in the conductance graph while fitting the
+measurement model to only a chosen subset of pairwise observations. This
+is useful when the sampling design, biological hypothesis, or validation
+scheme focuses on selected comparisons rather than the full pairwise
+distance matrix.
+
+``` r
+selected_pairs <- rbind(
+  c(1, 2),
+  c(1, 4),
+  c(3, 5)
+)
+
+pair_mlpe <- pair_subset_measurement_model(mlpe, selected_pairs)
+
+fit_subset <- terradish(
+  melip.Fst ~ forestcover + altitude,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = pair_mlpe
+)
+```
+
+The graph solve still retains all sites, but the likelihood and MLPE
+correlation structure are evaluated only for the selected pair rows.
 
 ## Measurement models
 

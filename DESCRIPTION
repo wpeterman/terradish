@@ -1,7 +1,7 @@
 Package: terradish
 Type: Package
 Title: Fast Gradient-Based Optimization of Resistance Surfaces
-Version: 0.0.18
+Version: 0.0.19
 Date: 2026-04-11
 Authors@R: c(
   person(
@@ -19,7 +19,10 @@ Authors@R: c(
   )
 Description: Maximum likelihood estimation for parameterized conductance models
   via Newton and quasi-Newton methods, for moderate-sized problems
-  such as spatial grids with fewer than a million cells.
+  such as spatial grids with fewer than a million cells. Supports
+  terra-native workflows, multiple measurement models, scale-aware
+  conductance estimation, and selected-pair analysis while retaining all
+  focal sites in the resistance graph.
 License: BSD_3_clause + file LICENSE
 Depends: R (>= 4.0.0)
 Imports:
