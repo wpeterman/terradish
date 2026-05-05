@@ -534,13 +534,16 @@ indicates a barrier effect.
 
 ## What comes next?
 
-This vignette covered the core workflow. Two companion vignettes go further:
+This vignette covered the core workflow. Three companion vignettes go further:
 
 - **`vignette("model-comparison", package = "terradish")`** — testing and
   comparing models (likelihood ratio tests, AIC, cross-validation, likelihood
   surface visualization).
 - **`vignette("ibe-ibr-workflow", package = "terradish")`** — fitting
   isolation-by-environment (IBE) and IBR simultaneously in the same model.
+- **`vignette("wishart-covariance", package = "terradish")`** — preparing a
+  genetic covariance matrix from raw genotype data with `cov_from_genetic_data()`
+  and fitting with the `wishart_covariance` measurement model.
 
 ---
 

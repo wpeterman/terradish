@@ -2,21 +2,42 @@
 % Please edit documentation in R/genetic_distance.R
 \name{cov_from_biallelic}
 \alias{cov_from_biallelic}
-\title{Covariance from allele counts}
+\title{Covariance from biallelic allele counts}
 \usage{
-cov_from_biallelic(Y, N)
+cov_from_biallelic(
+  Y,
+  N = NULL,
+  ploidy = 2,
+  monomorphic = c("drop", "error"),
+  tol = sqrt(.Machine$double.eps)
+)
 }
 \arguments{
-\item{Y}{A matrix containing allele counts, of dimension (number of demes) x (number of loci)}
+\item{Y}{A numeric matrix containing derived-allele counts, with sampled
+units in rows and loci in columns.}
 
-\item{N}{A matrix containing the number of sampled haplotypes, of dimension (number of demes) x (number of loci)}
+\item{N}{Optional numeric matrix of sampled haploid allele counts with the
+same dimensions as \code{Y}. A scalar is recycled to all cells, a vector of
+length \code{nrow(Y)} is treated as row-specific sampling, and a vector of
+length \code{ncol(Y)} is treated as locus-specific sampling. If \code{NULL},
+\code{ploidy} is used for every cell.}
+
+\item{ploidy}{Haploid sample count used when \code{N = NULL}. The default
+\code{2} matches diploid individual genotypes coded as 0/1/2.}
+
+\item{monomorphic}{How to handle loci with pooled allele frequency 0 or 1.
+\code{"drop"} removes them with a warning; \code{"error"} preserves the
+historical strict behavior.}
+
+\item{tol}{Numerical tolerance used to identify monomorphic loci.}
 }
 \value{
 A matrix containing pairwise covariance
 }
 \description{
-Calculates covariance from counts of the derived allele across biallelic markers,
-using normalized allele frequencies
+Calculates covariance from counts of the derived allele across biallelic
+markers, using normalized allele frequencies. Rows may be individuals,
+demes, populations, or any other sampled genetic unit.
 }
 \details{
 Let \code{p[l] = sum(Y[, l]) / sum(N[, l])} be the pooled derived-allele
@@ -26,10 +47,10 @@ frequency at locus \code{l}. The function returns
 and \code{L} is the number of loci.
 }
 \examples{
+# Individual diploid genotypes at three SNPs
 Y <- matrix(c(2, 1, 0,
               1, 1, 1,
               0, 1, 2), nrow = 3, byrow = TRUE)
-N <- matrix(2, nrow = 3, ncol = 3)
-cov_from_biallelic(Y, N)
+cov_from_biallelic(Y)
 
 }

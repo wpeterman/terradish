@@ -1,0 +1,437 @@
+---
+title: "Covariance-Based IBR with wishart_covariance"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Covariance-Based IBR with wishart_covariance}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  fig.width  = 6,
+  fig.height = 4.5,
+  warning  = FALSE,
+  message  = FALSE
+)
+```
+
+## Overview
+
+The standard `terradish` workflow uses a pre-computed **distance matrix** (e.g.
+F~ST~) as the genetic response. Two measurement models — `leastsquares` and
+`mlpe` — accept such matrices and differ only in how they handle the
+non-independence of pairwise observations.
+
+When raw individual-level genotype data are available, a more principled route
+exists. Instead of collapsing genotypes to pairwise distances and then fitting a
+distance model, you can:
+
+1. Summarize the genetic data as a **covariance matrix** between populations.
+2. Fit the resistance model with `wishart_covariance`, which evaluates the full
+   Wishart likelihood on that covariance matrix using the number of markers as
+   the degrees-of-freedom parameter `nu`.
+
+This approach retains more information than a distance matrix: every off-diagonal
+element of the covariance matrix, together with the diagonal, contributes to the
+likelihood. It is the recommended path when you have access to the original
+genotype data.
+
+| Model | Input `S` | Requires `nu` | Correlation structure |
+|---|---|---|---|
+| `leastsquares` | distance matrix | no | none |
+| `mlpe` | distance matrix | no | shared-site |
+| `generalized_wishart` | distance matrix | yes | Wishart |
+| `wishart_covariance` | **covariance matrix** | yes | Wishart |
+
+This vignette covers:
+
+- Converting different types of raw genetic data to a covariance matrix with
+  `cov_from_genetic_data()` (and `cov_from_biallelic()` for biallelic SNPs).
+- Setting up the landscape and conductance surface with the bundled *Melipona*
+  data.
+- Fitting an IBR model with `wishart_covariance`.
+- Interpreting and comparing the fitted model.
+
+---
+
+## Preparing genetic covariance data
+
+`terradish` provides two functions for turning raw genotype data into a
+covariance matrix:
+
+- **`cov_from_biallelic(Y, N)`** — fast path for biallelic SNP count matrices.
+- **`cov_from_genetic_data(x, ...)`** — flexible path that handles biallelic
+  dosage, multiallelic SNPs, microsatellite allele calls, PCA scores, or any
+  other numeric encoding.
+
+Both functions return a square, symmetric covariance matrix (one row/column per
+population) that can be passed directly to `terradish` as the response `S`.
+
+### Biallelic SNPs: `cov_from_biallelic()`
+
+If your data are derived-allele counts at biallelic loci, use
+`cov_from_biallelic()`:
+
+```{r biallelic-example}
+library(terradish)
+
+# Simulated counts: 4 populations, 5 biallelic loci
+# Y[i, l] = number of derived alleles in population i at locus l
+# N[i, l] = total haploid chromosomes sampled (here, 20 diploids → N = 40)
+set.seed(42)
+n_pop <- 4
+n_loci <- 5
+Y <- matrix(sample(0:40, n_pop * n_loci, replace = TRUE),
+            nrow = n_pop, ncol = n_loci,
+            dimnames = list(paste0("pop", seq_len(n_pop)),
+                            paste0("snp", seq_len(n_loci))))
+N <- matrix(40L, nrow = n_pop, ncol = n_loci)
+
+S_biallelic <- cov_from_biallelic(Y, N)
+round(S_biallelic, 3)
+```
+
+### Numeric feature matrix: `cov_from_genetic_data()`
+
+For dosage-coded SNPs, PCA scores, or any numeric feature matrix, use
+`cov_from_genetic_data()` with `input = "features"` (the default).
+The function centers and scales each feature, then applies Gower
+double-centering to produce a covariance matrix:
+
+```{r feature-example}
+# Individual-level PCA scores: 12 individuals across 4 populations, 3 PCs
+set.seed(7)
+pca_scores <- matrix(rnorm(12 * 3), nrow = 12, ncol = 3,
+                     dimnames = list(NULL, c("PC1", "PC2", "PC3")))
+groups <- rep(c("pop1", "pop2", "pop3", "pop4"), each = 3)
+
+S_pca <- cov_from_genetic_data(pca_scores, groups = groups)
+round(S_pca, 3)
+```
+
+Setting `normalize = "features"` divides the covariance by the number of
+retained features; this puts the scale on a per-feature basis rather than
+summed across all features, which can make `tau` estimates easier to interpret
+across datasets with different numbers of markers.
+
+### Microsatellite allele calls: `cov_from_genetic_data()` with `input = "allele_calls"`
+
+For diploid microsatellite data stored as two allele-call columns per locus,
+set `input = "allele_calls"` and supply the `loci` argument to identify which
+column belongs to which locus. The function expands each locus into per-allele
+dosage columns before computing covariance:
+
+```{r microsatellite-example}
+# 9 individuals, 2 microsatellite loci, each stored in two allele-call columns
+alleles <- data.frame(
+  loc1_a = c(100, 100, 102, 102, 104, 104, 100, 102, 104),
+  loc1_b = c(100, 102, 102, 104, 104, 100, 104, 100, 102),
+  loc2_a = c(200, 202, 200, 202, 204, 204, 200, 204, 202),
+  loc2_b = c(202, 202, 204, 204, 204, 200, 202, 200, 204)
+)
+groups_ms <- rep(c("popA", "popB", "popC"), each = 3)
+
+S_ms <- cov_from_genetic_data(
+  alleles,
+  groups  = groups_ms,
+  input   = "allele_calls",
+  loci    = c("loc1", "loc1", "loc2", "loc2")
+)
+round(S_ms, 3)
+```
+
+### Key arguments
+
+| Argument | Default | Effect |
+|---|---|---|
+| `groups` | `NULL` | Population vector; if `NULL`, individual-level covariance is returned |
+| `input` | `"features"` | `"features"` for numeric matrices; `"allele_calls"` for allele-call columns |
+| `loci` | `NULL` | Required for `"allele_calls"`: maps each column to its locus |
+| `center` | `TRUE` | Centers each feature by its global mean before covariance calculation |
+| `scale` | `TRUE` | Scales each feature by its global standard deviation; drops constant features |
+| `diagonal` | `"auto"` | `"within"` replaces the Gower diagonal with within-population variance (Dyer-style); `"gower"` leaves it as-is |
+| `normalize` | `"none"` | `"features"` divides covariance by number of retained features |
+
+The `diagonal = "within"` setting is useful for Dyer-style population-graph
+workflows. Note, however, that replacing the diagonal can produce matrices that
+are not positive definite for all datasets; check eigenvalues when in doubt:
+
+```{r check-eigenvalues}
+ev <- eigen(S_ms, symmetric = TRUE, only.values = TRUE)$values
+all(ev > 0)  # TRUE → positive definite; FALSE → semi-definite or indefinite
+```
+
+---
+
+## Set up the landscape
+
+The rest of this vignette uses the bundled *Melipona* bee data from the
+getting-started vignette. Steps are identical to those already covered there —
+see `vignette("getting-started", package = "terradish")` for explanations.
+
+```{r landscape-setup}
+library(terra)
+
+data(melip)
+melip.altitude    <- terra::unwrap(melip.altitude)
+melip.forestcover <- terra::unwrap(melip.forestcover)
+melip.coords      <- terra::unwrap(melip.coords)
+
+covariates <- c(melip.altitude, melip.forestcover)
+names(covariates) <- c("altitude", "forestcover")
+covariates <- scale_covariates(covariates)
+
+surface <- conductance_surface(covariates, melip.coords, directions = 8)
+
+n_sites <- nrow(melip.coords)
+cat("Number of sampling sites:", n_sites, "\n")
+```
+
+---
+
+## Generate a covariance response for the demonstration
+
+The bundled *Melipona* data ship with a pairwise F~ST~ matrix (`melip.Fst`), not
+raw genotypes. To produce a realistic **covariance** matrix that reflects the
+same landscape, we use `simulate_covariance_response()`. This function:
+
+1. Computes the conductance-implied covariance matrix `E(theta)` at specified
+   parameter values.
+2. Forms the Wishart scale matrix `Sigma = tau * E + sigma * I`.
+3. Draws `S ~ Wishart(nu, Sigma) / nu`.
+
+```{r simulate-covariance}
+# Use conductance parameters roughly consistent with the melip fit in the
+# getting-started vignette (forestcover positive, altitude negative).
+# nu = 1000 mimics a typical medium-density SNP panel.
+sim <- simulate_covariance_response(
+  theta             = c(forestcover = 1.0, altitude = -0.5),
+  formula           = ~ forestcover + altitude,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  tau               = 1.0,
+  sigma             = 0.5,
+  nu                = 1000,
+  seed              = 123
+)
+
+# This is what would come from cov_from_genetic_data() applied to real genotypes.
+S_cov <- sim$covariance
+dim(S_cov)
+round(S_cov[1:5, 1:5], 4)
+```
+
+In a real analysis you would replace `S_cov` with the output of
+`cov_from_genetic_data()` applied to your actual genotype data, for example:
+
+```{r real-data-sketch, eval = FALSE}
+# With biallelic SNP count matrices (Y = derived allele counts, N = haploid sample sizes)
+S_cov <- cov_from_biallelic(Y, N)
+
+# With individual dosage / PCA scores grouped by population
+S_cov <- cov_from_genetic_data(dosage_matrix, groups = pop_vector,
+                                normalize = "features")
+
+# With microsatellite allele calls
+S_cov <- cov_from_genetic_data(allele_df, groups = pop_vector,
+                                input = "allele_calls",
+                                loci  = locus_id_vector)
+```
+
+---
+
+## Fit the model with `wishart_covariance`
+
+The only differences from a standard `terradish` call are:
+
+- Pass the **covariance matrix** `S_cov` as the left-hand side of the formula.
+- Set `measurement_model = wishart_covariance`.
+- Supply `nu` (the number of genetic markers used to compute `S_cov`).
+
+```{r fit-wishart-covariance}
+fit_wc <- terradish(
+  S_cov ~ forestcover + altitude,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = wishart_covariance,
+  nu                = 1000
+)
+
+summary(fit_wc)
+```
+
+### Understanding the nuisance parameters
+
+The `wishart_covariance` measurement model fits two nuisance parameters (`phi`):
+
+- **`tau`** (≥ 0): a nonnegative scale applied to the conductance-implied
+  covariance `E`. If `tau` ≈ 0, there is no detectable resistance signal in the
+  covariance data. If `tau` is large and well-estimated, resistance distance
+  strongly predicts genetic covariance.
+- **`sigma`** (log-scale): a scalar nugget added as `exp(sigma) * I` to the
+  fitted covariance matrix. This absorbs genetic variation that is not explained
+  by landscape resistance — e.g. genetic drift, population-size differences, or
+  loci under local selection.
+
+The fitted covariance model is:
+> **Sigma = tau · E(theta) + exp(sigma) · I**
+
+where `E(theta)` is the generalized inverse of the graph Laplacian evaluated at
+the estimated conductance parameters `theta`.
+
+---
+
+## Recover the true parameters
+
+Because we simulated these data with known parameters, we can check how well the
+model recovers them. In practice this comparison is obviously not available.
+
+```{r recovery}
+cat("True conductance parameters:\n")
+cat("  forestcover:", 1.0, "  altitude:", -0.5, "\n\n")
+
+cat("Estimated conductance parameters:\n")
+print(round(coef(fit_wc), 3))
+
+cat("\nTrue nuisance parameters:  tau =", sim$tau,
+    "  sigma =", sim$sigma, "\n")
+cat("Estimated nuisance parameters:\n")
+print(round(fit_wc$fit$phi, 3))
+```
+
+---
+
+## Visualize the fit
+
+### Observed vs. fitted covariance
+
+```{r plot-fit, fig.cap = "***Observed vs. fitted genetic covariance.***"}
+plot(fit_wc, type = "fit")
+```
+
+Each point represents a pair of sites. The x-axis is the fitted covariance from
+the Wishart model; the y-axis is the observed covariance in `S_cov`. Points
+near the diagonal indicate a good fit.
+
+### Estimated conductance surface
+
+```{r plot-surface, fig.cap = "***Estimated conductance surface with 95% CI bounds.***"}
+plot(fit_wc, type = "surface", data = surface)
+```
+
+### Marginal effects on covariance
+
+```{r plot-marginal, fig.cap = "***Marginal effects on predicted genetic covariance.***"}
+plot(fit_wc, data = surface)
+```
+
+---
+
+## Compare with `generalized_wishart`
+
+`generalized_wishart` fits the same Wishart distribution but works on the
+**distance** representation of the same genetic data. The distance matrix is
+obtained from the covariance matrix via `dist_from_cov()`:
+
+```{r compare-gw}
+# Convert the simulated covariance to a distance matrix
+S_dist <- dist_from_cov(S_cov)
+
+fit_gw <- terradish(
+  S_dist ~ forestcover + altitude,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = generalized_wishart,
+  nu                = 1000
+)
+
+# Side-by-side parameter estimates
+cat("wishart_covariance estimates:\n")
+print(round(coef(fit_wc), 3))
+
+cat("\ngeneralized_wishart estimates:\n")
+print(round(coef(fit_gw), 3))
+```
+
+Both models use the same Wishart distribution, so when the covariance and
+distance representations contain the same information the conductance estimates
+should agree closely. The AIC comparison is not meaningful across the two models
+here because the response is different (`S_cov` vs. `S_dist`), but the
+parameter estimates and their standard errors are directly comparable.
+
+---
+
+## Choosing between covariance and distance input
+
+| Consideration | `wishart_covariance` | `generalized_wishart` |
+|---|---|---|
+| Raw genotype data available | **Preferred** — use `cov_from_genetic_data()` | Requires an extra distance-conversion step |
+| Only a pre-computed distance matrix is available | Requires converting to covariance (not always reversible) | **Preferred** |
+| Population-size differences matter | `diagonal = "within"` can encode within-population spread | Not directly available |
+| Goal is a Dyer-style population graph | Diagonal from within-population variance is natural | Less natural |
+| `nu` is known | Both models require `nu` | Both models require `nu` |
+
+If you only have a distance matrix (e.g. F~ST~) and no individual-level data,
+use `generalized_wishart`. If you have raw genotypes, start with
+`cov_from_genetic_data()` and `wishart_covariance`.
+
+---
+
+## Quick-reference: the full workflow
+
+```{r full-workflow, eval = FALSE}
+library(terradish)
+library(terra)
+
+# 1. Load landscape data and build conductance surface
+data(melip)
+melip.altitude    <- terra::unwrap(melip.altitude)
+melip.forestcover <- terra::unwrap(melip.forestcover)
+melip.coords      <- terra::unwrap(melip.coords)
+
+covariates <- c(melip.altitude, melip.forestcover)
+names(covariates) <- c("altitude", "forestcover")
+covariates <- scale_covariates(covariates)
+surface <- conductance_surface(covariates, melip.coords, directions = 8)
+
+# 2. Prepare the genetic covariance matrix from raw genotype data
+#    (replace with your actual data and nu)
+
+# Option A: biallelic SNPs (Y = derived allele counts, N = haploid totals)
+S <- cov_from_biallelic(Y, N)
+
+# Option B: individual-level numeric features grouped by population
+S <- cov_from_genetic_data(dosage_matrix, groups = pop_vector,
+                            normalize = "features")
+
+# Option C: microsatellite allele calls
+S <- cov_from_genetic_data(allele_df, groups = pop_vector,
+                            input = "allele_calls",
+                            loci  = locus_id_vector)
+
+nu <- 500  # number of genetic markers used to compute S
+
+# 3. Fit with wishart_covariance
+fit <- terradish(
+  S ~ forestcover + altitude,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = wishart_covariance,
+  nu                = nu
+)
+
+# 4. Summarize and visualize
+summary(fit)
+coef(fit)
+
+plot(fit, type = "fit")
+plot(fit, type = "surface", data = surface)
+plot(fit, data = surface)   # marginal effects on genetic covariance
+```

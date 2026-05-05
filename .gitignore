@@ -9,3 +9,4 @@ src/*.dll
 cache/
 figure/
 vignettes/*_cache/
+.positai

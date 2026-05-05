@@ -40,13 +40,25 @@ fst_from_biallelic <- function(Y, N)
   fst
 }
 
-#' Covariance from allele counts
+#' Covariance from biallelic allele counts
 #'
-#' Calculates covariance from counts of the derived allele across biallelic markers,
-#' using normalized allele frequencies
+#' Calculates covariance from counts of the derived allele across biallelic
+#' markers, using normalized allele frequencies. Rows may be individuals,
+#' demes, populations, or any other sampled genetic unit.
 #'
-#' @param Y A matrix containing allele counts, of dimension (number of demes) x (number of loci)
-#' @param N A matrix containing the number of sampled haplotypes, of dimension (number of demes) x (number of loci)
+#' @param Y A numeric matrix containing derived-allele counts, with sampled
+#'   units in rows and loci in columns.
+#' @param N Optional numeric matrix of sampled haploid allele counts with the
+#'   same dimensions as \code{Y}. A scalar is recycled to all cells, a vector of
+#'   length \code{nrow(Y)} is treated as row-specific sampling, and a vector of
+#'   length \code{ncol(Y)} is treated as locus-specific sampling. If \code{NULL},
+#'   \code{ploidy} is used for every cell.
+#' @param ploidy Haploid sample count used when \code{N = NULL}. The default
+#'   \code{2} matches diploid individual genotypes coded as 0/1/2.
+#' @param monomorphic How to handle loci with pooled allele frequency 0 or 1.
+#'   \code{"drop"} removes them with a warning; \code{"error"} preserves the
+#'   historical strict behavior.
+#' @param tol Numerical tolerance used to identify monomorphic loci.
 #'
 #' @details
 #' Let \code{p[l] = sum(Y[, l]) / sum(N[, l])} be the pooled derived-allele
@@ -58,33 +70,400 @@ fst_from_biallelic <- function(Y, N)
 #' @return A matrix containing pairwise covariance
 #'
 #' @examples
+#' # Individual diploid genotypes at three SNPs
 #' Y <- matrix(c(2, 1, 0,
 #'               1, 1, 1,
 #'               0, 1, 2), nrow = 3, byrow = TRUE)
-#' N <- matrix(2, nrow = 3, ncol = 3)
-#' cov_from_biallelic(Y, N)
+#' cov_from_biallelic(Y)
 #'
 #' @export
 
-cov_from_biallelic <- function(Y, N)
+cov_from_biallelic <- function(Y,
+                               N = NULL,
+                               ploidy = 2,
+                               monomorphic = c("drop", "error"),
+                               tol = sqrt(.Machine$double.eps))
 {
-  if (!all(dim(Y)==dim(N)))
-    stop("Dimension mismatch")
+  monomorphic <- match.arg(monomorphic)
+
+  if (is.data.frame(Y))
+    Y <- as.matrix(Y)
+  if (!is.matrix(Y) || !is.numeric(Y) || nrow(Y) < 2L || ncol(Y) < 1L)
+    stop("`Y` must be a numeric matrix or data frame with at least two rows and one column",
+         call. = FALSE)
+  storage.mode(Y) <- "double"
+
+  N <- .biallelic_sample_size_matrix(N, Y, ploidy)
+
   if (anyNA(Y) || anyNA(N))
     stop("missing values are not currently supported")
+  if (any(!is.finite(Y)) || any(!is.finite(N)))
+    stop("`Y` and `N` must contain only finite values", call. = FALSE)
   if (any(Y<0) || any(N<0))
     stop("Cannot have negative counts")
   if (any(Y>N))
     stop("Allele counts cannot exceed number of haploids sampled")
   if (any(N <= 0))
     stop("All sample sizes in `N` must be positive")
+  if (!is.numeric(tol) || length(tol) != 1L || !is.finite(tol) || tol < 0)
+    stop("`tol` must be a finite nonnegative number", call. = FALSE)
 
   Fr <- colSums(Y) / colSums(N)
-  if (any(Fr <= 0 | Fr >= 1))
-    stop("Each locus must have pooled allele frequency strictly between 0 and 1")
+  variable <- is.finite(Fr) & Fr > tol & Fr < (1 - tol)
+  if (!all(variable))
+  {
+    if (identical(monomorphic, "error"))
+      stop("Each retained locus must have pooled allele frequency strictly between 0 and 1",
+           call. = FALSE)
+    if (!any(variable))
+      stop("No variable biallelic loci remain after dropping monomorphic loci",
+           call. = FALSE)
+    dropped <- colnames(Y)[!variable]
+    if (is.null(dropped))
+      dropped <- which(!variable)
+    warning("Dropping monomorphic biallelic loci: ",
+            paste(dropped, collapse = ", "),
+            call. = FALSE)
+    Y <- Y[, variable, drop = FALSE]
+    N <- N[, variable, drop = FALSE]
+    Fr <- Fr[variable]
+  }
+
   Y  <- (Y - N*Fr) / sqrt(N * Fr * (1-Fr))
 
   Y %*% t(Y) / ncol(Y)
+}
+
+.biallelic_sample_size_matrix <- function(N, Y, ploidy)
+{
+  if (is.null(N))
+  {
+    if (!is.numeric(ploidy) || length(ploidy) != 1L ||
+        !is.finite(ploidy) || ploidy <= 0)
+      stop("`ploidy` must be one finite positive number", call. = FALSE)
+    N <- ploidy
+  }
+
+  if (is.data.frame(N))
+    N <- as.matrix(N)
+  if (is.matrix(N))
+  {
+    if (!all(dim(Y) == dim(N)))
+      stop("Dimension mismatch", call. = FALSE)
+    if (!is.numeric(N))
+      stop("`N` must be numeric", call. = FALSE)
+    storage.mode(N) <- "double"
+    return(N)
+  }
+  if (!is.numeric(N))
+    stop("`N` must be numeric", call. = FALSE)
+  if (length(N) == 1L)
+    return(matrix(N, nrow(Y), ncol(Y), dimnames = dimnames(Y)))
+  if (length(N) == nrow(Y))
+    return(matrix(N, nrow(Y), ncol(Y), dimnames = dimnames(Y)))
+  if (length(N) == ncol(Y))
+    return(matrix(N, nrow(Y), ncol(Y), byrow = TRUE, dimnames = dimnames(Y)))
+
+  stop("`N` must be a scalar, a matrix matching `Y`, or a row- or locus-length vector",
+       call. = FALSE)
+}
+
+#' Covariance from multivariate genetic data
+#'
+#' Calculates individual- or population-level genetic covariance from
+#' multivariate genetic data. This is useful for microsatellite, multiallelic,
+#' SNP dosage, PCA score, or other numeric encodings.
+#'
+#' @param x Genetic data. For \code{input = "features"}, a numeric matrix or data
+#'   frame with individuals in rows and genetic features in columns. For
+#'   \code{input = "allele_calls"}, a matrix or data frame of allele calls with
+#'   one column per allele copy.
+#' @param groups Optional factor, character, or integer vector assigning each row
+#'   of \code{x} to a population. If \code{NULL}, each row is treated as an
+#'   individual sampled unit and an individual-level covariance matrix is
+#'   returned.
+#' @param input Input format. \code{"features"} treats \code{x} as an already
+#'   numeric feature matrix. \code{"allele_calls"} converts allele calls to
+#'   per-locus allele dosage columns before calculating covariance.
+#' @param loci Required for \code{input = "allele_calls"}; a vector with one
+#'   entry per column of \code{x} identifying the locus for each allele-copy
+#'   column. For a diploid microsatellite matrix with two columns per locus, the
+#'   two columns for each locus should have the same \code{loci} value.
+#' @param center Should feature columns be centered by their global mean before
+#'   covariance calculation? Default \code{TRUE}.
+#' @param scale Should feature columns be divided by their global standard
+#'   deviation? Default \code{TRUE}. Constant features are dropped.
+#' @param tol Tolerance used to identify constant features when
+#'   \code{scale = TRUE}.
+#' @param diagonal How to set the returned covariance diagonal. \code{"auto"}
+#'   uses \code{"within"} for grouped population data with replication and
+#'   \code{"gower"} for individual-level data. \code{"within"} replaces the
+#'   Gower covariance diagonal with the within-population genetic variance,
+#'   following the population-graph covariance construction. \code{"gower"}
+#'   leaves the double-centered distance diagonal unchanged.
+#' @param normalize Should covariance scale be normalized? \code{"none"} returns
+#'   sums over retained features. \code{"features"} divides the covariance,
+#'   squared distances, and within-population variances by the number of retained
+#'   features.
+#'
+#' @details
+#' The function first obtains a numeric feature matrix. Microsatellite data can
+#' be supplied as allele calls by setting \code{input = "allele_calls"}; these are
+#' converted to allele dosage columns, one column per locus-allele combination.
+#'
+#' If \code{groups = NULL}, rows of the processed feature matrix are used
+#' directly and squared Euclidean distances among individuals are transformed to
+#' a covariance matrix by Gower double-centering. This produces a positive
+#' semidefinite row-level covariance matrix up to numerical tolerance.
+#'
+#' If \code{groups} is supplied, population centroids are calculated in feature
+#' space before the Gower transform. With \code{diagonal = "within"}, the
+#' diagonal is replaced by the sum of within-population feature variances. This
+#' matches the covariance construction used before population-graph
+#' partial-correlation filtering in Dyer-style population graph workflows.
+#'
+#' Missing values are not currently supported because common microsatellite
+#' imputation choices can change the resulting covariance.
+#'
+#' If the grouped Dyer-style result is used as \code{S} in
+#' \code{\link{wishart_covariance}}, inspect the eigenvalues first. The
+#' within-population diagonal is useful for population-graph workflows, but it
+#' does not guarantee a positive-definite covariance matrix for every dataset.
+#'
+#' @return A square covariance matrix with one row and column per individual or
+#'   population. Attributes include the processed row features or population
+#'   centroids, within-population variances when applicable, squared distances,
+#'   and retained feature metadata.
+#'
+#' @seealso \code{\link{wishart_covariance}}
+#'
+#' @examples
+#' # Numeric allele dosage / feature matrix
+#' x <- matrix(c(0, 1,
+#'               1, 1,
+#'               2, 0,
+#'               2, 1,
+#'               0, 2,
+#'               1, 2),
+#'             ncol = 2, byrow = TRUE)
+#' cov_from_genetic_data(x)
+#'
+#' groups <- rep(c("pop1", "pop2", "pop3"), each = 2)
+#' cov_from_genetic_data(x, groups = groups)
+#'
+#' # Microsatellite-style allele-call columns: two allele copies per locus
+#' alleles <- data.frame(
+#'   loc1_a = c(100, 100, 102, 102, 104, 104),
+#'   loc1_b = c(100, 102, 102, 104, 104, 100),
+#'   loc2_a = c(200, 202, 200, 202, 204, 204),
+#'   loc2_b = c(202, 202, 204, 204, 204, 200)
+#' )
+#' cov_from_genetic_data(
+#'   alleles,
+#'   groups = groups,
+#'   input = "allele_calls",
+#'   loci = c("loc1", "loc1", "loc2", "loc2")
+#' )
+#'
+#' @export
+cov_from_genetic_data <- function(x,
+                                  groups = NULL,
+                                  input = c("features", "allele_calls"),
+                                  loci = NULL,
+                                  center = TRUE,
+                                  scale = TRUE,
+                                  tol = sqrt(.Machine$double.eps),
+                                  diagonal = c("auto", "within", "gower"),
+                                  normalize = c("none", "features"))
+{
+  input <- match.arg(input)
+  diagonal <- match.arg(diagonal)
+  normalize <- match.arg(normalize)
+
+  if (is.data.frame(x))
+    x <- as.matrix(x)
+  if (!is.matrix(x) || nrow(x) < 2L || ncol(x) < 1L)
+    stop("`x` must be a matrix or data frame with at least two rows and one column",
+         call. = FALSE)
+  if (!is.null(groups))
+  {
+    if (length(groups) != nrow(x))
+      stop("`groups` must have one entry per row of `x`", call. = FALSE)
+    if (anyNA(groups))
+      stop("missing values are not supported in `groups`", call. = FALSE)
+  }
+  if (!is.logical(center) || length(center) != 1L || is.na(center))
+    stop("`center` must be TRUE or FALSE", call. = FALSE)
+  if (!is.logical(scale) || length(scale) != 1L || is.na(scale))
+    stop("`scale` must be TRUE or FALSE", call. = FALSE)
+  if (!is.numeric(tol) || length(tol) != 1L || !is.finite(tol) || tol < 0)
+    stop("`tol` must be a finite nonnegative number", call. = FALSE)
+
+  features <- if (identical(input, "allele_calls"))
+    .allele_call_feature_matrix(x, loci)
+  else
+    .numeric_genetic_feature_matrix(x)
+
+  feature_center <- if (isTRUE(center))
+    colMeans(features)
+  else
+    setNames(rep(0, ncol(features)), colnames(features))
+  features <- sweep(features, 2L, feature_center, "-")
+
+  feature_scale <- setNames(rep(1, ncol(features)), colnames(features))
+  retained <- rep(TRUE, ncol(features))
+  if (isTRUE(scale))
+  {
+    feature_scale <- apply(features, 2L, stats::sd)
+    retained <- is.finite(feature_scale) & feature_scale > tol
+    if (!any(retained))
+      stop("No variable genetic features remain after scaling", call. = FALSE)
+    if (any(!retained))
+      warning("Dropping constant or near-constant genetic features: ",
+              paste(colnames(features)[!retained], collapse = ", "),
+              call. = FALSE)
+    features <- sweep(features[, retained, drop = FALSE],
+                      2L, feature_scale[retained], "/")
+    feature_center <- feature_center[retained]
+    feature_scale <- feature_scale[retained]
+  }
+
+  normalizer <- if (identical(normalize, "features")) ncol(features) else 1
+
+  if (is.null(groups))
+  {
+    unit_features <- features
+    unit_names <- rownames(features)
+    if (is.null(unit_names) || anyNA(unit_names) || any(!nzchar(unit_names)))
+      unit_names <- paste0("sample", seq_len(nrow(features)))
+    else if (anyDuplicated(unit_names))
+      unit_names <- make.unique(unit_names)
+    rownames(unit_features) <- unit_names
+    unit_size <- setNames(rep(1L, nrow(unit_features)), unit_names)
+    within_variance <- NULL
+    level <- "individual"
+    if (identical(diagonal, "within"))
+      stop("`diagonal = \"within\"` requires population groups; use `diagonal = \"gower\"` for individual-level covariance",
+           call. = FALSE)
+    diagonal <- "gower"
+  }
+  else
+  {
+    groups <- if (is.factor(groups))
+      droplevels(groups)
+    else
+      factor(groups, levels = unique(groups))
+    if (nlevels(groups) < 2L)
+      stop("`groups` must contain at least two populations", call. = FALSE)
+    group_size <- as.numeric(table(groups))
+    names(group_size) <- levels(groups)
+
+    unit_features <- rowsum(features, groups, reorder = TRUE)
+    unit_features <- sweep(unit_features, 1L, group_size, "/")
+    rownames(unit_features) <- levels(groups)
+    unit_size <- group_size
+    level <- if (all(group_size == 1L)) "individual" else "population"
+
+    if (identical(diagonal, "auto"))
+      diagonal <- if (identical(level, "individual")) "gower" else "within"
+    if (identical(diagonal, "within"))
+    {
+      if (all(group_size < 2L))
+        stop("`diagonal = \"within\"` requires at least one population with two or more samples",
+             call. = FALSE)
+      if (any(group_size < 2L))
+        warning("Some populations contain fewer than two individuals; their within-population variance is set to zero.",
+                call. = FALSE)
+    }
+
+    within_variance <- vapply(levels(groups), function(g)
+    {
+      xg <- features[groups == g, , drop = FALSE]
+      if (nrow(xg) < 2L)
+        return(0)
+      sum(apply(xg, 2L, stats::var))
+    }, numeric(1))
+  }
+
+  centroid_dist2 <- as.matrix(stats::dist(unit_features))^2 / normalizer
+  row_mean <- rowMeans(centroid_dist2)
+  col_mean <- colMeans(centroid_dist2)
+  grand_mean <- mean(centroid_dist2)
+  covariance <- -0.5 * (
+    centroid_dist2 -
+      outer(row_mean, rep(1, length(row_mean))) -
+      outer(rep(1, length(col_mean)), col_mean) +
+      grand_mean
+  )
+
+  if (!is.null(within_variance))
+    within_variance <- within_variance / normalizer
+  if (identical(diagonal, "within"))
+    diag(covariance) <- within_variance
+
+  covariance <- (covariance + t(covariance)) / 2
+  rownames(covariance) <- colnames(covariance) <- rownames(unit_features)
+  attr(covariance, "centroids") <- unit_features
+  attr(covariance, "unit_features") <- unit_features
+  if (!is.null(within_variance))
+    attr(covariance, "within_variance") <- within_variance
+  attr(covariance, "centroid_distance2") <- centroid_dist2
+  attr(covariance, "unit_distance2") <- centroid_dist2
+  attr(covariance, "unit_size") <- unit_size
+  attr(covariance, "feature_center") <- feature_center
+  attr(covariance, "feature_scale") <- feature_scale
+  attr(covariance, "retained_features") <- colnames(features)
+  attr(covariance, "input") <- input
+  attr(covariance, "level") <- level
+  attr(covariance, "diagonal") <- diagonal
+  attr(covariance, "normalize") <- normalize
+  attr(covariance, "normalizer") <- normalizer
+
+  covariance
+}
+
+.numeric_genetic_feature_matrix <- function(x)
+{
+  if (!is.numeric(x))
+    stop("`x` must be numeric when `input = \"features\"`", call. = FALSE)
+  storage.mode(x) <- "double"
+  if (anyNA(x))
+    stop("missing values are not currently supported in `x`", call. = FALSE)
+  if (is.null(colnames(x)))
+    colnames(x) <- paste0("feature", seq_len(ncol(x)))
+  x
+}
+
+.allele_call_feature_matrix <- function(x, loci)
+{
+  if (anyNA(x))
+    stop("missing values are not currently supported in allele calls", call. = FALSE)
+  if (is.null(loci))
+    stop("`loci` is required when `input = \"allele_calls\"`", call. = FALSE)
+  if (length(loci) != ncol(x))
+    stop("`loci` must have one entry per allele-call column", call. = FALSE)
+  if (anyNA(loci) || any(!nzchar(as.character(loci))))
+    stop("`loci` values must be non-missing and non-empty", call. = FALSE)
+
+  x_chr <- matrix(as.character(x), nrow = nrow(x), ncol = ncol(x))
+  loci <- as.character(loci)
+  locus_names <- unique(loci)
+  out <- vector("list", length(locus_names))
+  names(out) <- locus_names
+
+  for (loc in locus_names)
+  {
+    loc_values <- x_chr[, loci == loc, drop = FALSE]
+    alleles <- sort(unique(c(loc_values)))
+    loc_counts <- vapply(alleles, function(allele)
+      rowSums(loc_values == allele),
+      numeric(nrow(loc_values)))
+    loc_counts <- as.matrix(loc_counts)
+    colnames(loc_counts) <- paste0(loc, ":", alleles)
+    out[[loc]] <- loc_counts
+  }
+
+  do.call(cbind, out)
 }
 
 #' Distance matrix from covariance matrix
