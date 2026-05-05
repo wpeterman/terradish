@@ -16,3 +16,5 @@
 ^\.claude$
 ^vignettes/.*_cache$
 ^\.positai$
+^future_dev_ideas$
+^future_dev_ideas\.md$
