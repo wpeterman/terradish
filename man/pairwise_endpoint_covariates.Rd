@@ -12,33 +12,68 @@ pairwise_endpoint_covariates(
 )
 }
 \arguments{
-\item{x}{Site-level covariates. Supported inputs are numeric vectors,
-matrices, data frames, and \code{terra::SpatRaster} objects. When
-\code{x} is a raster, \code{coords} supplies the focal-point locations to
-extract.}
+\item{x}{Site-level covariates.  Supported inputs:
+\itemize{
+  \item A numeric vector (one covariate per site).
+  \item A numeric matrix or data frame (sites in rows, covariates in
+    columns).
+  \item A \code{terra::SpatRaster}: values are extracted at \code{coords}.
+}}
 
-\item{coords}{Optional focal-point coordinates used when \code{x} is a
-raster. Accepts the same inputs as \code{\link{conductance_surface}}.}
+\item{coords}{Required when \code{x} is a raster.  Focal-point coordinates
+in the same projection as \code{x}; accepts the same inputs as
+\code{\link{conductance_surface}}.}
 
-\item{transform}{How to convert site-level covariates into pairwise
-endpoint-difference covariates. \code{"absdiff"} and \code{"sqdiff"}
-return one column per site-level covariate; \code{"euclidean"} and
-\code{"manhattan"} collapse multivariate site-level covariates to a single
-pairwise distance.}
+\item{transform}{How to collapse site-level values into a pairwise
+environmental-mismatch measure.
+\describe{
+  \item{\code{"absdiff"}}{Absolute difference between endpoints:
+    \eqn{|x_i - x_j|}.  One output column per covariate.  Symmetric;
+    suitable when you expect environmental dissimilarity (regardless of
+    direction) to drive differentiation.}
+  \item{\code{"sqdiff"}}{Squared difference:
+    \eqn{(x_i - x_j)^2}.  One output column per covariate.  Like
+    \code{"absdiff"} but penalizes large differences more heavily.}
+  \item{\code{"euclidean"}}{Euclidean distance across all covariates:
+    \eqn{\sqrt{\sum_k (x_{ik} - x_{jk})^2}}.  Collapses multivariate
+    data to a single dissimilarity measure.}
+  \item{\code{"manhattan"}}{Manhattan (city-block) distance:
+    \eqn{\sum_k |x_{ik} - x_{jk}|}.  Collapses to a single measure;
+    less sensitive to outliers than Euclidean.}
+}}
 
-\item{scale}{Should site-level covariates be standardized before the pairwise
-transform is applied?}
+\item{scale}{Logical.  If \code{TRUE}, standardize (z-score) site-level
+covariates before computing the pairwise transform.  Recommended when
+covariates are on different scales.}
 }
 \value{
-A matrix with one row per unordered pair of focal points and one or
-  more columns of endpoint-difference covariates. The returned object carries
-  class \code{"terradish_pairwise_covariates"} so it can be subset and
-  rebuilt automatically inside \code{\link{terradish_cv}}.
+A numeric matrix of class \code{"terradish_pairwise_covariates"}
+  with one row per unordered site pair and named columns reflecting the
+  chosen transform (e.g. \code{"absdiff_altitude"},
+  \code{"euclidean"}).
 }
 \description{
-Construct pairwise covariates from site-level environmental values so they
-can be used alongside isolation-by-resistance terms in an MLPE measurement
-model.
+Constructs pairwise environmental-mismatch covariates from site-level
+values.  The result can be used alongside isolation-by-resistance (IBR)
+terms to model isolation by environment (IBE) within
+\code{\link{mlpe_covariates}}.
+}
+\details{
+The function produces a \eqn{n(n-1)/2 \times p} matrix of pairwise
+endpoint-difference covariates, where \eqn{n} is the number of focal sites
+and \eqn{p} is the number of output columns (one per input covariate for
+\code{"absdiff"} and \code{"sqdiff"}; one for \code{"euclidean"} and
+\code{"manhattan"}).  Rows correspond to the lower triangle of the
+pairwise distance matrix, scanned column by column.
+
+The returned object has class \code{"terradish_pairwise_covariates"}.  This
+class carries the original site-level covariate matrix and the chosen
+transform as attributes, so that \code{\link{terradish_cv}} can
+automatically rebuild the correct pairwise covariates for each train/test
+split.
+
+If \code{x} already has class \code{"terradish_pairwise_covariates"}, it is
+returned unchanged (pass-through).
 }
 \examples{
 library(terra)
@@ -60,5 +95,6 @@ head(z_env)
 
 }
 \seealso{
-\code{\link{mlpe_covariates}}, \code{\link{terradish_cv}}
+\code{\link{mlpe_covariates}}, \code{\link{terradish_cv}},
+  \code{\link{terradish}}
 }

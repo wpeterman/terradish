@@ -9,21 +9,41 @@ pca_dist(gi, n_axes = 64, scale = TRUE)
 \arguments{
 \item{gi}{A \code{genind} object from \pkg{adegenet}.}
 
-\item{n_axes}{Number of principal component axes to retain.}
+\item{n_axes}{Number of principal component axes to retain.  Capped at the
+total number of available axes.}
 
-\item{scale}{Should the resulting distance matrix be rescaled to \code{[0,1]}?}
+\item{scale}{Logical.  If \code{TRUE} (default), the resulting distance
+matrix is rescaled to \code{[0, 1]} via \code{\link{scale_to_0_1}}.}
 }
 \value{
-A symmetric distance matrix.
+A symmetric numeric distance matrix with one row/column per
+  individual in \code{gi}.
 }
 \description{
-Computes Euclidean distances among individuals using retained principal
-component axes from an \code{adegenet::genind} object.
+Runs a PCA on allele-frequency data from an \code{adegenet::genind} object
+and returns Euclidean distances computed on the retained principal component
+scores.
+}
+\details{
+Missing genotypes in \code{gi} are imputed by the allele-mean method
+(equivalent to \code{adegenet::tab(gi, NA.method = "mean")}), then a
+standard PCA via \code{\link[stats]{prcomp}} is applied to the allele
+frequency table.  Euclidean distances are then computed on the first
+\code{n_axes} scores.
+
+This is a convenience wrapper designed for users who prefer to work from
+a \code{genind} object.  For biallelic SNP data the more direct
+\code{\link{dist_from_biallelic}} is generally faster and does not require
+the \pkg{adegenet} package.
 }
 \examples{
 if (requireNamespace("adegenet", quietly = TRUE)) {
   data(nancycats, package = "adegenet")
-  pca_dist(nancycats, n_axes = 4)
+  d <- pca_dist(nancycats, n_axes = 4)
+  dim(d)
 }
 
+}
+\seealso{
+\code{\link{dist_from_biallelic}}, \code{\link{cov_from_genetic_data}}
 }

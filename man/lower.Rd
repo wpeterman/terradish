@@ -2,20 +2,38 @@
 % Please edit documentation in R/convenience_funcs.R
 \name{lower}
 \alias{lower}
-\title{Extract the lower triangle of a matrix}
+\title{Extract the strict lower triangle of a matrix}
 \usage{
 lower(x)
 }
 \arguments{
-\item{x}{A square matrix.}
+\item{x}{A square numeric matrix.}
 }
 \value{
-A vector containing the strict lower triangle of \code{x}.
+A numeric vector of length \eqn{n(n-1)/2} containing the strict
+  lower-triangular entries of \code{x}, where \eqn{n} is the dimension of
+  \code{x}.
 }
 \description{
-Returns the lower-triangular entries of a square matrix as a vector.
+Returns the entries strictly below the main diagonal of a square matrix,
+scanned column-by-column (standard R column-major order).
+}
+\details{
+This is a thin wrapper around \code{x[lower.tri(x)]}.  It is provided as a
+convenience for extracting vectorized pairwise measurements from symmetric
+matrices such as distance or covariance matrices.
 }
 \examples{
-lower(matrix(1:9, nrow = 3))
+m <- matrix(1:9, nrow = 3)
+lower(m)  # entries (2,1), (3,1), (3,2)
 
+# Useful for extracting pairwise distances:
+D <- matrix(c(0, 0.1, 0.3,
+              0.1, 0, 0.2,
+              0.3, 0.2, 0), nrow = 3)
+lower(D)
+
+}
+\seealso{
+\code{\link[base]{lower.tri}}
 }

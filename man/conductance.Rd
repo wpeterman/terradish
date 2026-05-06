@@ -13,22 +13,45 @@ conductance(x, ...)
 \method{conductance}{radish_graph}(x, fit, quantile = 0.95, ...)
 }
 \arguments{
-\item{x}{A \code{terradish_graph} object.}
+\item{x}{A \code{terradish_graph} object returned by
+\code{\link{conductance_surface}}.}
 
 \item{...}{Additional arguments passed to methods.}
 
-\item{fit}{A fitted object returned by \code{\link{terradish}}.}
+\item{fit}{A fitted model returned by \code{\link{terradish}}.}
 
-\item{quantile}{Confidence level used to compute conductance intervals.}
+\item{quantile}{Confidence level for the pointwise conductance interval.
+The default \code{0.95} gives a 95% interval computed via the delta method
+applied to the MLE of \code{theta} and its inverse Hessian.}
 }
 \value{
-If the graph retains its raster stack, a three-layer
-  \code{terra::SpatRaster} with estimate and interval bounds. Otherwise a
-  matrix with one row per active cell.
+If \code{x$stack} is non-\code{NULL} (the default when
+\code{saveStack = TRUE} in \code{\link{conductance_surface}}), a three-layer
+\code{terra::SpatRaster} with layer names:
+\describe{
+  \item{\code{est}}{Point-estimate conductance at each active cell.}
+  \item{\code{lower<Q>}}{Lower bound of the \code{quantile*100}\% interval
+    (e.g. \code{lower95} for the default \code{quantile = 0.95}).}
+  \item{\code{upper<Q>}}{Upper bound of the interval.}
+}
+Otherwise, a numeric matrix with one row per active cell and columns
+\code{est}, \code{lower<Q>}, and \code{upper<Q>}.
 }
 \description{
-Returns fitted conductance values, and confidence intervals when available,
-for a \code{terradish_graph} and fitted \code{terradish} object.
+Extracts per-cell conductance values and pointwise confidence intervals from
+a fitted \code{terradish} model, returning either a raster (when the graph
+stores its stack) or a matrix.
+}
+\details{
+Confidence intervals are computed on the log-conductance scale and then
+exponentiated, so the point estimate always lies within the interval.  The
+intervals are asymptotic (delta method) and reflect only uncertainty in the
+conductance parameters \code{theta}; they do not account for uncertainty in
+the nuisance parameters \code{phi}.
+
+The function requires the MLE to be in the interior of the parameter space
+(\code{fit$fit$boundary == FALSE}); if the MLE is on the boundary (no
+detectable IBR signal) an error is thrown.
 }
 \examples{
 library(terra)
@@ -48,6 +71,11 @@ fit <- terradish(melip.Fst ~ forestcover + altitude, surface,
               control = NewtonRaphsonControl(maxit = 5))
 
 cond <- conductance(surface, fit)
-cond
+names(cond)   # "est", "lower95", "upper95"
+plot(cond)
 
+}
+\seealso{
+\code{\link{terradish}}, \code{\link{conductance_surface}},
+  \code{\link{plot.terradish}}
 }

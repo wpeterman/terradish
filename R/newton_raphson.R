@@ -127,6 +127,7 @@ BoxConstrainedNewton <- function(par, fn, lower = rep(-Inf, length(par)), upper 
     cat("Projected Newton-Raphson with Hager-Zhang line search\n")
 
   convergence <- 0
+  line_search_failed <- FALSE
   par <- as.matrix(par)
 
   for (i in 1:maxit)
@@ -183,9 +184,18 @@ BoxConstrainedNewton <- function(par, fn, lower = rep(-Inf, length(par)), upper 
     alpha <- tryCatch({
       HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
     }, error = function(err) {
-      cat("... switched to backtracking\n")
-      Backtracking(dphi_fn, phi0, dphi0)
+      message("Hager-Zhang line search failed; switching to bounded backtracking.")
+      Backtracking(dphi_fn, phi0, dphi0, control = ls.control)
     })
+    if (!is.finite(alpha) || alpha <= 0 ||
+        identical(attr(alpha, "line_search_status"), "failed"))
+    {
+      convergence <- 2
+      line_search_failed <- TRUE
+      warning("Failed to find a usable line-search step; returning the current parameter values.",
+              call. = FALSE, immediate. = TRUE)
+      break
+    }
     par <- project(par + alpha*desc, lower, upper)
 
     oldfit <- fit
@@ -198,9 +208,9 @@ BoxConstrainedNewton <- function(par, fn, lower = rep(-Inf, length(par)), upper 
     else
       cat ("Solution on interior with `max(abs(gradient))` ==", max(abs(fit$gradient)), "and `diff(f)` ==", delta, "\n")
 
-  if (i == maxit)
+  if (!line_search_failed && i == maxit)
   {
-    warning("`maxit` reached for Newton steps")
+    warning("`maxit` reached for Newton steps", immediate. = TRUE)
     convergence = 1
   } 
 

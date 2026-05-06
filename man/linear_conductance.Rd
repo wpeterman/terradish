@@ -7,24 +7,53 @@
 linear_conductance(formula, x)
 }
 \arguments{
-\item{formula}{Model formula describing which spatial covariates to include.}
+\item{formula}{Model formula describing which spatial covariates drive
+conductance. The left-hand side is ignored; only the right-hand side terms
+are used.}
 
-\item{x}{Data frame of spatial covariates from a \code{terradish_graph}.}
+\item{x}{Data frame of spatial covariates extracted from a
+\code{\link{conductance_surface}} object (typically \code{surface$x}).}
+}
+\value{
+A function of class \code{"terradish_conductance_model"} that
+  accepts a numeric vector of conductance parameters \code{theta} and
+  returns a list with elements \code{conductance}, \code{confint}, and
+  internal derivative functions.
 }
 \description{
-A function of class "conductance_model" that represents a linear
-mapping from spatial covariates to conductance
+Returns a function of class \code{"terradish_conductance_model"} that
+represents a linear mapping from spatial covariates to conductance.
 }
 \details{
-The model is of the form:
+The conductance at grid cell \code{i} is:
 
-  \code{C[i] = x[i, 1] * theta[1] + x[i, 2] * theta[2] + ...}
+\deqn{C_i = \theta_1 x_{i1} + \theta_2 x_{i2} + \ldots}
 
-where \code{C[i]} is the conductance of vertex \code{i}, \code{x[i, j]} is the value of spatial
-covariate \code{j} at vertex \code{i}, and \code{theta[j]} is the parameter associated with
-covariate "j". The intercept is omitted as it is non-identifiable.
+The intercept is omitted because it is non-identifiable (multiplying all
+conductances by a constant leaves resistance distances unchanged).
 
-Categorical covariates are dummy-coded using the default contrasts, via \code{\link[stats]{model.matrix}}.
+\strong{When to prefer \code{linear_conductance} over
+\code{loglinear_conductance}:}
+\itemize{
+  \item When you want conductance to be a direct, additive mixture of
+    raster layers (e.g. habitat suitability scores that already live on a
+    natural additive scale).
+  \item When theory predicts a linear relationship.
+}
+
+\strong{Caution:} conductance must be strictly positive. The optimizer does
+not automatically enforce this; choose starting values and parameter bounds
+so that \eqn{C_i > 0} throughout the optimization. Fitting is safer when
+covariates are non-negative and parameters are constrained to be positive.
+For unrestricted parameters, \code{\link{loglinear_conductance}} is more
+numerically robust.
+
+Default starting values are all 1 (rather than 0 as in
+\code{loglinear_conductance}) to ensure positive conductances at the start.
+
+Categorical covariates and in-formula transformations are supported via
+\code{\link[stats]{model.matrix}}, the same as in
+\code{\link{loglinear_conductance}}.
 }
 \examples{
 x <- data.frame(altitude = c(1, 2, 3), forestcover = c(2, 5, 4))
@@ -32,4 +61,7 @@ model <- linear_conductance(~ altitude + forestcover, x)
 fit <- model(c(altitude = 0.5, forestcover = 1))
 fit$conductance
 
+}
+\seealso{
+\code{\link{loglinear_conductance}}, \code{\link{terradish}}
 }

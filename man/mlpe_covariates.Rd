@@ -2,7 +2,7 @@
 % Please edit documentation in R/mlpe_covariates.R
 \name{mlpe_covariates}
 \alias{mlpe_covariates}
-\title{MLPE with endpoint-difference covariates}
+\title{MLPE measurement model with pairwise endpoint-difference covariates}
 \usage{
 mlpe_covariates(
   x,
@@ -13,40 +13,56 @@ mlpe_covariates(
 )
 }
 \arguments{
-\item{x}{Pairwise endpoint-difference covariates returned by
-\code{\link{pairwise_endpoint_covariates}}, or site-level environmental
-covariates that can be converted by that helper.}
+\item{x}{Pairwise endpoint-difference covariates (the output of
+\code{\link{pairwise_endpoint_covariates}}), \emph{or} site-level
+environmental data in any format accepted by that helper (numeric vector,
+matrix, data frame, or \code{terra::SpatRaster}).}
 
-\item{coords}{Optional focal-point coordinates used when \code{x} is a
-raster.}
+\item{coords}{Optional focal-point coordinates, required when \code{x} is
+a raster.  Accepts the same formats as \code{\link{conductance_surface}}.}
 
-\item{transform}{Pairwise transform passed through to
-\code{\link{pairwise_endpoint_covariates}} when \code{x} contains site-level
-covariates rather than a precomputed pairwise matrix.}
+\item{transform}{Pairwise transform applied when \code{x} is not already a
+\code{"terradish_pairwise_covariates"} object.  Passed through to
+\code{\link{pairwise_endpoint_covariates}}.}
 
-\item{scale}{Should site-level covariates be standardized before their
-pairwise transform is computed?}
+\item{scale}{Logical.  Standardize site-level covariates before the
+pairwise transform?  Passed to \code{\link{pairwise_endpoint_covariates}}.}
 
-\item{rho_start}{Starting value for the MLPE correlation parameter on the
-natural scale, constrained to \code{(0, 0.5)}.}
+\item{rho_start}{Starting value for the MLPE correlation parameter \eqn{\rho}
+on its natural scale, which must lie in \code{(0, 0.5)}.  The default
+\code{0.2} corresponds to a moderate shared-site correlation.  Adjust if
+the optimizer fails to improve from the starting value.}
 }
 \value{
-A function of class \code{"terradish_measurement_model"} suitable for
-  \code{\link{terradish}}, \code{\link{terradish_grid}}, and
-  \code{\link{terradish_cv}}.
+A function of class \code{"terradish_measurement_model"} suitable
+  for use as the \code{measurement_model} argument of \code{\link{terradish}},
+  \code{\link{terradish_grid}}, and \code{\link{terradish_cv}}.
 }
 \description{
-Create an MLPE measurement model whose mean structure includes both
-resistance distance and one or more pairwise endpoint-difference covariates.
+Creates an MLPE measurement model whose mean structure includes both an IBR
+term (resistance distance) and one or more fixed pairwise environmental
+covariates (IBE terms).
 }
 \details{
-The fitted mean structure is
-\code{S_ij = alpha + beta * R_ij + Z_ij \%*\% gamma + e_ij}, where
-\code{R_ij} is the resistance distance implied by the optimized conductance
-surface and \code{Z_ij} are fixed endpoint-difference covariates. When the
-model is constructed from site-level covariates or the output of
-\code{pairwise_endpoint_covariates()}, \code{\link{terradish_cv}} can rebuild
-the measurement model automatically on each train/test split.
+The fitted mean structure is:
+
+\deqn{S_{ij} = \alpha + \beta R_{ij} + Z_{ij}^\top \gamma + e_{ij}}
+
+where \eqn{R_{ij}} is the resistance distance (IBR) and \eqn{Z_{ij}} is the
+row of pairwise endpoint-difference covariates for the pair \eqn{(i,j)}
+(IBE).  The residuals follow the MLPE correlation structure of Clarke et al.
+(2002).
+
+The nuisance parameters (intercept \eqn{\alpha}, IBR slope \eqn{\beta},
+IBE coefficients \eqn{\gamma}, log-precision \code{tau}, and logit MLPE
+correlation \code{rho}) are all profiled out during optimization; only the
+conductance parameters in the formula are optimized by the outer loop.
+
+When \code{x} is site-level data or the output of
+\code{pairwise_endpoint_covariates()}, the pairwise covariate matrix is
+stored as an attribute of the returned function.  This allows
+\code{\link{terradish_cv}} to rebuild the correct pairwise covariates for
+each train/test split automatically.
 }
 \examples{
 library(terra)
@@ -68,5 +84,6 @@ summary(fit_joint)
 
 }
 \seealso{
-\code{\link{mlpe}}, \code{\link{pairwise_endpoint_covariates}}
+\code{\link{mlpe}}, \code{\link{pairwise_endpoint_covariates}},
+  \code{\link{terradish_cv}}
 }

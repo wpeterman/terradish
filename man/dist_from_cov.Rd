@@ -2,22 +2,37 @@
 % Please edit documentation in R/genetic_distance.R
 \name{dist_from_cov}
 \alias{dist_from_cov}
-\title{Distance matrix from covariance matrix}
+\title{Squared-distance matrix from a covariance matrix}
 \usage{
 dist_from_cov(Cov)
 }
 \arguments{
-\item{Cov}{A covariance matrix (does not need to be full-rank)}
+\item{Cov}{A square numeric covariance matrix.  Does not need to be
+full-rank (e.g. the output of \code{\link{cov_from_biallelic}} is
+positive semi-definite).}
 }
 \value{
-A distance matrix of the same dimension as the input
+A symmetric numeric matrix of the same dimension as \code{Cov} with
+  zero diagonal and non-negative off-diagonal entries.
 }
 \description{
-Returns the squared-distance matrix associated with a given covariance matrix
+Converts a covariance matrix to its associated squared pairwise distance
+matrix.  This inverts the Gower double-centering used by
+\code{\link{cov_from_genetic_data}}.
 }
 \details{
-The returned squared-distance matrix is
-\code{D[i, j] = Cov[i, i] + Cov[j, j] - 2 * Cov[i, j]}.
+The squared distance between units \eqn{i} and \eqn{j} is:
+
+\deqn{D_{ij} = C_{ii} + C_{jj} - 2 C_{ij}}
+
+which is the law-of-cosines identity relating a covariance matrix to its
+implied squared Euclidean distances.  The diagonal of the returned matrix
+is zero.
+
+Use this function to convert a covariance matrix produced by
+\code{\link{cov_from_biallelic}} or \code{\link{cov_from_genetic_data}} into
+a distance matrix suitable for \code{\link{generalized_wishart}} or
+\code{\link{mlpe}}.
 }
 \examples{
 Cov <- matrix(c(2.0, 1.2, 0.8,
@@ -25,4 +40,14 @@ Cov <- matrix(c(2.0, 1.2, 0.8,
                 0.8, 0.7, 1.1), nrow = 3, byrow = TRUE)
 dist_from_cov(Cov)
 
+# Round-trip: covariance -> distance -> (verify non-negative, zero diag)
+Y <- matrix(c(2, 1, 0, 1, 1, 1, 0, 1, 2), nrow = 3, byrow = TRUE)
+S_cov  <- cov_from_biallelic(Y)
+S_dist <- dist_from_cov(S_cov)
+diag(S_dist)   # all zeros
+
+}
+\seealso{
+\code{\link{cov_from_biallelic}}, \code{\link{cov_from_genetic_data}},
+  \code{\link{dist_from_biallelic}}
 }

@@ -7,22 +7,41 @@
 scale_to_0_1(x)
 }
 \arguments{
-\item{x}{Numeric vector, matrix, dist object, or \code{terra::SpatRaster}.}
+\item{x}{Numeric vector, matrix, \code{dist} object, or
+\code{terra::SpatRaster}.  \code{PackedSpatRaster} objects (from
+\code{terra::wrap()}) are unwrapped automatically.}
 }
 \value{
-An object of the same general type as \code{x}, rescaled to
-  \code{[0, 1]} where possible.
+An object of the same class as \code{x} with values in
+  \code{[0, 1]} (non-\code{NA} entries only).
 }
 \description{
-Rescales numeric values so the minimum non-missing value is 0 and the
-maximum is 1. \code{terra::SpatRaster} inputs are rescaled in place and
-returned as rasters.
+Rescales numeric values so the minimum non-missing value maps to 0 and
+the maximum maps to 1.  \code{terra::SpatRaster} inputs are rescaled
+layer-by-layer using only the finite (non-\code{NA}) values.
+}
+\details{
+The transformation applied to each element is
+\eqn{(x - \min) / (\max - \min)}, computed over non-\code{NA} values.
+\code{NA} values are propagated unchanged.
+
+If all non-missing values are identical (constant layer or vector), the
+output is set to 0 for all non-missing entries rather than producing
+\code{NaN} from a zero-range denominator.
+
+For rasters, each layer is rescaled independently using its own minimum and
+maximum.
 }
 \examples{
 scale_to_0_1(c(2, 4, 6))
+scale_to_0_1(c(5, 5, NA))  # constant non-NA values become 0
 
 library(terra)
 r <- terra::rast(nrows = 2, ncols = 2, vals = c(1, 3, 5, NA))
 scale_to_0_1(r)
 
+}
+\seealso{
+\code{\link{scale_covariates}} for standardized (z-score or min-max)
+  scaling with metadata retained for back-transformation.
 }

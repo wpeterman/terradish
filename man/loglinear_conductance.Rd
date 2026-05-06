@@ -7,30 +7,75 @@
 loglinear_conductance(formula, x)
 }
 \arguments{
-\item{formula}{Model formula describing which spatial covariates to include.}
+\item{formula}{Model formula describing which spatial covariates drive
+conductance. The left-hand side is ignored; only the right-hand side terms
+are used (e.g. \code{~ altitude + forestcover}).}
 
-\item{x}{Data frame of spatial covariates from a
-\code{terradish_graph}.}
+\item{x}{Data frame of spatial covariates extracted from a
+\code{\link{conductance_surface}} object (typically \code{surface$x}).
+Every variable named on the right-hand side of \code{formula} must be a
+column of \code{x}.}
+}
+\value{
+A function of class \code{"terradish_conductance_model"} that
+  accepts a numeric vector of conductance parameters \code{theta} and
+  returns a list with elements \code{conductance} (a vector of per-cell
+  conductance values), \code{confint} (a function for confidence intervals),
+  and derivative functions used internally by the optimizer.
 }
 \description{
-Returns a function of class "conductance_model" that represents a log-linear
-mapping from spatial covariates to conductance
+Returns a function of class \code{"terradish_conductance_model"} that
+represents a log-linear mapping from spatial covariates to conductance.
+This is the recommended conductance model for most applications.
 }
 \details{
-The model is of the form
+The conductance at grid cell \code{i} is:
 
-  \code{C[i] = exp(x[i, 1] * theta[1] + x[i, 2] * theta[2] + ...)}
+\deqn{C_i = \exp(\theta_1 x_{i1} + \theta_2 x_{i2} + \ldots)}
 
-where \code{C[i]} is the conductance of vertex \code{i}, \code{x[i, j]} is the value of spatial
-covariate \code{j} at vertex \code{i}, and \code{theta[j]} is the parameter associated with
-covariate "j". The intercept is omitted as it is non-identifiable.
+where \eqn{x_{ij}} is the value of covariate \eqn{j} at cell \eqn{i} and
+\eqn{\theta_j} is the corresponding conductance parameter.
 
-Categorical covariates are dummy-coded using the default contrasts, via \code{\link[stats]{model.matrix}}.
+The intercept is intentionally omitted: multiplying all conductances by a
+constant does not change the effective resistance distances, so an intercept
+is non-identifiable.
+
+\strong{Interpreting \eqn{\theta}:}
+\itemize{
+  \item \eqn{\theta_j > 0}: higher values of covariate \eqn{j} increase
+    conductance (easier movement, lower resistance distance).
+  \item \eqn{\theta_j < 0}: higher values act as a barrier.
+  \item \eqn{\theta_j = 0}: the covariate has no effect on conductance.
+  \item A one-standard-deviation increase in covariate \eqn{j} multiplies
+    conductance by \eqn{\exp(\theta_j)}.
+}
+
+The exponential link guarantees strictly positive conductances for any real
+\eqn{\theta}, making \code{loglinear_conductance} more numerically stable
+than \code{\link{linear_conductance}} when parameters stray far from zero.
+
+Categorical covariates must be stored as \code{factor} columns in \code{x}
+(see \code{\link{conductance_surface}} for how to encode them). They are
+dummy-coded using the default R contrasts via
+\code{\link[stats]{model.matrix}}, with one level dropped as a reference.
+In-formula transformations such as \code{I(x^2)} and interaction terms
+\code{x * z} are supported.
 }
 \examples{
 x <- data.frame(altitude = c(-1, 0, 1), forestcover = c(0.2, 0.6, 0.5))
 model <- loglinear_conductance(~ altitude + forestcover, x)
-fit <- model(c(altitude = 0.3, forestcover = -0.2))
-fit$conductance
 
+# Evaluate at specific parameter values
+fit <- model(c(altitude = 0.3, forestcover = -0.2))
+fit$conductance  # per-cell conductance values
+
+# Interaction and polynomial terms work too
+x2 <- data.frame(altitude = c(-1, 0, 1), fc = c(0.2, 0.6, 0.5))
+model2 <- loglinear_conductance(~ altitude + I(altitude^2) + fc, x2)
+
+}
+\seealso{
+\code{\link{linear_conductance}},
+  \code{\link{gaussian_smoothed_loglinear_conductance}},
+  \code{\link{conductance_surface}}, \code{\link{terradish}}
 }

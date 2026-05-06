@@ -12,6 +12,7 @@ Gradient-based optimization of conductance and resistance surfaces.
 
 Authors:
 \itemize{
+  \item Bill Peterman \email{peterman.73@osu.edu}
   \item Nathaniel S. Pope \email{nspope@utexas.edu}
 }
 

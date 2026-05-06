@@ -33,73 +33,112 @@ terradish_assess_settings(
 \item{data}{A \code{terradish_graph} object returned by
 \code{\link{conductance_surface}}.}
 
-\item{conductance_model}{Conductance-model factory.}
+\item{conductance_model}{Conductance-model factory (e.g.
+\code{\link{loglinear_conductance}}).}
 
-\item{measurement_model}{Measurement model used by optimizer probes.}
+\item{measurement_model}{Measurement model used during optimizer probes.
+Should match the model you plan to use for the final fit.}
 
-\item{nu}{Optional number of genetic markers passed to measurement models
-that require it.}
+\item{nu}{Number of genetic markers passed to measurement models that
+require it (\code{\link{generalized_wishart}},
+\code{\link{wishart_covariance}}).  Ignored by \code{\link{mlpe}} and
+\code{\link{leastsquares}}.}
 
-\item{theta}{Optional starting values for conductance parameters.}
+\item{theta}{Optional starting conductance parameter values.  If
+\code{NULL}, the default all-zero start is used.}
 
-\item{nonnegative}{Should regression-like measurement models constrain the
+\item{nonnegative}{Should regression measurement models constrain the IBR
 slope to be nonnegative during probes?}
 
-\item{optimizer_probe}{If \code{TRUE}, run short optimization probes.}
+\item{optimizer_probe}{Logical.  Run short optimization probes to compare
+Newton-Raphson vs. BFGS and line-search algorithms?}
 
-\item{solver_probe}{If \code{TRUE}, benchmark direct solver settings with
-\code{\link{terradish_solver_benchmark}}.}
+\item{solver_probe}{Logical.  Benchmark direct Cholesky solver settings
+(factorization style and solve backend) via
+\code{\link{terradish_solver_benchmark}}?}
 
-\item{coarse_probe}{If \code{TRUE}, include a coarse-raster warm-start probe
-when \code{data} retains a continuous raster stack.}
+\item{coarse_probe}{Logical.  Include a coarse-raster warm-start probe?
+Only applicable when \code{data} retains its raster stack
+(\code{saveStack = TRUE}).}
 
-\item{optimizer_candidates}{Character vector of optimizer probes. Supported
-values are \code{"newton_hager_zhang"}, \code{"bfgs_hager_zhang"}, and
+\item{optimizer_candidates}{Character vector of optimizer configurations to
+probe.  Supported entries:
+\code{"newton_hager_zhang"}, \code{"bfgs_hager_zhang"},
 \code{"bfgs_armijo"}.}
 
-\item{probe_maxit}{Maximum optimizer steps for each optimization probe. Keep
-this small; the assessment is meant to compare early evaluation cost, not
-replace a final model fit.}
+\item{probe_maxit}{Maximum optimizer steps per probe.  Keep small (default
+\code{2}); the assessment compares early iteration cost, not convergence.}
 
-\item{factorization, solve_backend}{Direct solver settings to benchmark when
-\code{solver_probe = TRUE}.}
+\item{factorization}{Character vector of Cholesky factorization styles to
+benchmark when \code{solver_probe = TRUE}.  Options:
+\code{"simplicial_ldl"}, \code{"simplicial_ll"}, \code{"supernodal_ll"}.}
 
-\item{coarse_factor}{Aggregation factor used for the optional coarse-raster
-probe.}
+\item{solve_backend}{Character vector of solve backends to benchmark when
+\code{solver_probe = TRUE}.  Options:
+\code{"matrix"}, \code{"cholmod_cpp"}, \code{"cholmod_cpp_cached"}.}
+
+\item{coarse_factor}{Raster aggregation factor for the coarse-raster probe
+(passed to the \code{factor} entry of \code{approximation_control}).}
 
 \item{coarse_refine_maxit}{Maximum full-resolution refinement steps for the
-optional coarse-raster probe.}
+coarse-raster probe.}
 
-\item{loglik_tolerance}{Maximum log-likelihood difference allowed when
-choosing the fastest acceptable optimization probe.}
+\item{loglik_tolerance}{Maximum log-likelihood difference below the best
+probe that is still considered acceptable when choosing the fastest option.}
 
-\item{max_seconds}{Soft time budget. The current probe is allowed to finish,
-but later probes are skipped once this budget is exceeded.}
+\item{max_seconds}{Soft wall-time budget in seconds.  Each probe that starts
+before the budget is exceeded is allowed to finish; later probes are
+skipped.}
 
-\item{cores}{Number of worker processes passed to optimization probes.}
+\item{cores}{Number of parallel worker processes passed to probes.}
 
-\item{verbose}{Should assessment progress be printed?}
+\item{verbose}{Logical.  Print progress as probes run?}
 }
 \value{
-An object of class \code{terradish_setting_assessment} with graph
-  profile information, benchmark tables, recommended settings, and notes.
+An object of class \code{"terradish_setting_assessment"} with
+  components:
+\describe{
+  \item{\code{profile}}{A list of graph statistics (number of vertices,
+    edges, focal sites, parameters, etc.).}
+  \item{\code{optimizer_benchmark}}{A data frame of optimizer probe results
+    (one row per candidate), or \code{NULL} if \code{optimizer_probe = FALSE}.}
+  \item{\code{solver_benchmark}}{A data frame of solver probe results, or
+    \code{NULL} if \code{solver_probe = FALSE}.}
+  \item{\code{recommended}}{A named list of recommended settings:
+    \code{optimizer}, \code{control}, \code{solver}, \code{solver_control},
+    \code{approximation}, \code{approximation_control}.}
+  \item{\code{notes}}{Character vector of advisory messages.}
+}
+A \code{print} method summarizes the profile and recommendations.
 }
 \description{
 Profiles a \code{terradish} graph and, optionally, runs short probe
 benchmarks to recommend optimizer, line-search, solver, and approximation
-settings for a fitted model.
+settings for a fitted model.  Use this function before a large or slow fit
+to identify the fastest computational configuration for your data.
 }
 \details{
-The assessment is advisory. It does not change package defaults and should
-not be treated as a formal model-selection procedure. Short probes are useful
-for detecting expensive line searches, poor direct-solver choices, or cases
-where BFGS avoids costly repeated Hessian solves. Final model interpretation
-should still be based on a normal \code{\link{terradish}} fit using the
-chosen settings.
+\code{terradish_assess_settings} is an advisory tool, not a model-selection
+procedure.  It does not change package defaults and its output does not
+affect parameter estimation.  Use it to choose \emph{computational}
+settings; then fit and interpret your model as usual.
 
-The returned \code{$recommended} component is intentionally a plain list of
-arguments. Users can inspect or edit it before passing the pieces into
-\code{\link{terradish}}.
+Short probes work well for comparing early-iteration cost of different
+optimizers.  They are most informative for large graphs (> 100,000 vertices)
+where a single function evaluation is slow.  For small graphs the default
+Newton-Raphson + Hager-Zhang settings typically converge in seconds, and
+assessment adds more overhead than it saves.
+
+The returned \code{$recommended} list is intentionally a plain named list of
+arguments (\code{optimizer}, \code{control}, \code{solver},
+\code{solver_control}, \code{approximation},
+\code{approximation_control}).  You can inspect, edit, or pass it directly:
+\preformatted{
+fit <- terradish(formula, data,
+                 optimizer = assessment$recommended$optimizer,
+                 control   = assessment$recommended$control,
+                 solver    = assessment$recommended$solver)
+}
 }
 \examples{
 \dontrun{

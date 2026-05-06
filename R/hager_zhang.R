@@ -129,7 +129,8 @@ HagerZhang <- function (dphifn, phi_0, dphi_0, control = HagerZhangControl())
   }
   if (!(is.finite(phi_c) && is.finite(dphi_c)))
   {
-    warning("Failed to achieve finite new evaluation point, using alpha=0")
+    warning("Failed to achieve finite new evaluation point, using alpha=0",
+            immediate. = TRUE)
     return(0) #return(list(0, phi0))
   }
   st$alphas <- c(st$alphas, c)

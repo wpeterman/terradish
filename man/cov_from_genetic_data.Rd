@@ -58,10 +58,30 @@ squared distances, and within-population variances by the number of retained
 features.}
 }
 \value{
-A square covariance matrix with one row and column per individual or
-  population. Attributes include the processed row features or population
-  centroids, within-population variances when applicable, squared distances,
-  and retained feature metadata.
+A symmetric numeric matrix with one row and column per individual
+  (when \code{groups = NULL}) or population (when \code{groups} is
+  supplied).  The matrix is positive semi-definite up to numerical
+  tolerance, except when \code{diagonal = "within"} is used (see Details).
+  The following attributes are attached:
+\describe{
+  \item{\code{centroids}}{Feature matrix of population centroids (or
+    individual feature vectors when ungrouped).}
+  \item{\code{centroid_distance2}}{Squared Euclidean distance matrix among
+    centroids.}
+  \item{\code{within_variance}}{Named vector of within-population variances
+    (only when \code{groups} is supplied and some populations have \eqn{\geq
+    2} individuals).}
+  \item{\code{unit_size}}{Named integer vector of group sizes.}
+  \item{\code{feature_center}, \code{feature_scale}}{Centering and scaling
+    constants applied to each retained feature.}
+  \item{\code{retained_features}}{Names of the features kept after constant
+    features were dropped.}
+  \item{\code{level}}{Either \code{"individual"} or \code{"population"}.}
+  \item{\code{diagonal}}{The \code{diagonal} method actually used.}
+  \item{\code{normalizer}}{Divisor applied to the covariance and distances
+    (\code{1} for \code{normalize = "none"}, number of retained features for
+    \code{normalize = "features"}).}
+}
 }
 \description{
 Calculates individual- or population-level genetic covariance from
@@ -124,5 +144,6 @@ cov_from_genetic_data(
 
 }
 \seealso{
-\code{\link{wishart_covariance}}
+\code{\link{wishart_covariance}}, \code{\link{cov_from_biallelic}},
+  \code{\link{dist_from_cov}}, \code{\link{simulate_covariance_response}}
 }

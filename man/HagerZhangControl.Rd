@@ -18,31 +18,80 @@ HagerZhangControl(
 )
 }
 \arguments{
-\item{delta}{Sufficient decrease parameter.}
+\item{delta}{Sufficient decrease constant (Wolfe condition 1). Must satisfy
+\code{0 < delta < sigma < 1}. Smaller values accept shorter steps more
+readily.}
 
-\item{sigma}{Curvature condition parameter.}
+\item{sigma}{Curvature condition constant (Wolfe condition 2). Must satisfy
+\code{delta < sigma < 1}. Values close to 1 relax the curvature requirement
+and allow fewer function evaluations per step.}
 
-\item{alphamax}{Maximum step size allowed during line search.}
+\item{alphamax}{Upper bound on the trial step length. The default \code{Inf}
+lets the bracketing phase grow the step without limit.}
 
-\item{rho}{Multiplicative expansion factor during bracketing.}
+\item{rho}{Multiplicative expansion factor applied during the initial
+bracketing phase. Must be \code{> 1}.}
 
-\item{epsilon}{Tolerance used when defining acceptable function increase.}
+\item{epsilon}{Non-negative tolerance defining an "approximate Wolfe" regime
+near a local minimum: a small positive value (default \code{1e-6})
+allows the algorithm to accept a slightly increased objective near
+convergence.}
 
-\item{gamma}{Minimum proportional shrinkage required after secant updates.}
+\item{gamma}{Minimum fractional reduction of the bracket required after each
+secant step. Steps that shrink by less than this factor trigger bisection
+instead. Must be in \code{(0, 1)}.}
 
-\item{linesearchmax}{Maximum number of line-search iterations.}
+\item{linesearchmax}{Maximum number of line-search function evaluations.
+Raise this if the optimizer reports repeated line-search failures on
+difficult problems.}
 
-\item{psi3}{Backtracking factor used when initial evaluations are non-finite.}
+\item{psi3}{Backtracking multiplier applied when the initial trial step
+produces a non-finite objective. Must be in \code{(0, 1)}.}
 
-\item{c}{Initial trial step length.}
+\item{c}{Initial trial step length passed to the line search. The default
+\code{1.0} is appropriate for Newton and quasi-Newton methods that
+produce unit-scale search directions.}
 
-\item{verbose}{Should line-search progress be printed?}
+\item{verbose}{Should line-search progress (trial step lengths and objective
+values) be printed to the console?}
 }
 \description{
 Tuning parameters for the Hager-Zhang line-search implementation.
+}
+\details{
+\code{HagerZhangControl()} is the default line search used by
+\code{\link{NewtonRaphsonControl}}. It implements the approximate Wolfe
+conditions from Hager and Zhang (2006), which combine sufficient-decrease
+and curvature checks with a bracketing-plus-secant strategy.
+
+The default parameters work well for most resistance-surface optimization
+problems. Common reasons to change them:
+
+\itemize{
+  \item \strong{Line-search failures}: increase \code{linesearchmax} or
+    loosen \code{sigma} toward 1.
+  \item \strong{Slow convergence with many small steps}: tighten \code{sigma}
+    (e.g. 0.1) to enforce a stronger curvature condition.
+  \item \strong{Initial non-finite objectives}: increase \code{psi3} to take
+    larger backtracking steps when \code{c} is too large.
+}
 }
 \examples{
 ctrl <- HagerZhangControl(verbose = FALSE, linesearchmax = 10)
 str(ctrl)
 
+# Use inside NewtonRaphsonControl:
+opt_ctrl <- NewtonRaphsonControl(
+  maxit = 50,
+  ls.control = HagerZhangControl(sigma = 0.5, linesearchmax = 30)
+)
+
+}
+\references{
+Hager WW, Zhang H. 2006. Algorithm 851: CG\_DESCENT, a conjugate gradient
+method with guaranteed descent. ACM Transactions on Mathematical Software
+32(1):113-137.
+}
+\seealso{
+\code{\link{NewtonRaphsonControl}}, \code{\link{ArmijoControl}}
 }

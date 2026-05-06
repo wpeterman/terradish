@@ -2,21 +2,39 @@
 % Please edit documentation in R/genetic_distance.R
 \name{fst_from_biallelic}
 \alias{fst_from_biallelic}
-\title{Fst from allele counts}
+\title{F_ST from biallelic allele counts}
 \usage{
 fst_from_biallelic(Y, N)
 }
 \arguments{
-\item{Y}{A matrix containing allele counts, of dimension (number of demes) x (number of loci)}
+\item{Y}{Numeric matrix of derived-allele counts with rows as populations
+and columns as loci.}
 
-\item{N}{A matrix containing the number of sampled haplotypes, of dimension (number of demes) x (number of loci)}
+\item{N}{Numeric matrix of sampled haploid chromosomes with the same
+dimensions as \code{Y}.  For diploid data without missing genotypes,
+\code{N = 2 * n_individuals} for each cell.}
 }
 \value{
-A matrix containing pairwise Fst
+A symmetric numeric matrix of pairwise F\eqn{_{ST}} with zero
+  diagonal.
 }
 \description{
-Calculates Fst using the estimator of Bhatia et al.
-from counts of the derived allele across biallelic markers
+Estimates pairwise F\eqn{_{ST}} from counts of the derived allele across
+biallelic markers using the ratio-of-averages estimator of Bhatia et al.
+(2013).
+}
+\details{
+The estimator computes, for each locus, the squared allele-frequency
+difference between populations, corrects for within-population
+heterozygosity, and then forms a ratio of locus-averages (Bhatia et al.
+2013).  Diagonal entries are set to 0.
+
+The result is not guaranteed to lie in \eqn{[0, 1]} for every pair; small
+negative values can arise from sampling noise in very similar populations.
+
+To use F\eqn{_{ST}} as the response in \code{\link{terradish}}, pass the
+matrix directly to the formula left-hand side with \code{\link{mlpe}} or
+\code{\link{generalized_wishart}}.
 }
 \examples{
 Y <- matrix(c(2, 1, 0,
@@ -25,4 +43,12 @@ Y <- matrix(c(2, 1, 0,
 N <- matrix(2, nrow = 3, ncol = 3)
 fst_from_biallelic(Y, N)
 
+}
+\references{
+Bhatia G, Patterson N, Sankararaman S, Price AL. 2013. Estimating and
+interpreting F\eqn{_{ST}}: the impact of rare variants. Genome Research
+23(9):1514-1521.
+}
+\seealso{
+\code{\link{cov_from_biallelic}}, \code{\link{dist_from_biallelic}}
 }

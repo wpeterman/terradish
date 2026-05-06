@@ -2,7 +2,7 @@
 % Please edit documentation in R/convenience_funcs.R
 \name{scale_covariates}
 \alias{scale_covariates}
-\title{Scale raster covariates and retain original scale metadata}
+\title{Scale raster covariates and retain original-scale metadata}
 \usage{
 scale_covariates(
   covariates,
@@ -12,38 +12,68 @@ scale_covariates(
 )
 }
 \arguments{
-\item{covariates}{A \code{SpatRaster} or \code{PackedSpatRaster} whose layers
-should be scaled.}
+\item{covariates}{A \code{SpatRaster} or \code{PackedSpatRaster} whose
+layers should be scaled.}
 
-\item{method}{Scaling method. \code{"zscore"} centers each layer by its
-non-missing mean and divides by its non-missing standard deviation.
-\code{"minmax"} rescales each layer to \code{[0, 1]} using its
-non-missing minimum and range.}
+\item{method}{Scaling method applied to each layer independently.
+\code{"zscore"} (default) subtracts the layer mean and divides by the
+standard deviation, giving zero mean and unit variance.
+\code{"minmax"} maps the minimum to 0 and the maximum to 1.}
 
-\item{center}{Should each layer be centered before scaling when
-\code{method = "zscore"}?}
+\item{center}{Logical.  Only used when \code{method = "zscore"}.  If
+\code{TRUE} (default), subtract the layer mean before dividing by the
+standard deviation.}
 
-\item{scale}{Should each layer be divided by its standard deviation when
-\code{method = "zscore"}?}
+\item{scale}{Logical.  Only used when \code{method = "zscore"}.  If
+\code{TRUE} (default), divide by the layer standard deviation.  If
+\code{FALSE} with \code{center = TRUE}, layers are centered but not
+divided.}
 }
 \value{
 A \code{SpatRaster} with transformed values and a
-  \code{"terradish_scale"} attribute containing per-layer centers and
-  scales.
+  \code{"terradish_scale"} attribute.
 }
 \description{
 Transforms each layer of a \code{SpatRaster} and stores the original-scale
-offset and divisor as a \code{"terradish_scale"} attribute. If this
-transformed raster is used to build a \code{\link{conductance_surface}},
-\code{plot(type = "marginal")} can automatically back-transform x-axes to
-the original covariate units.
+offset and divisor as a \code{"terradish_scale"} attribute.  When the scaled
+raster is used to build a \code{\link{conductance_surface}}, marginal-effect
+plots (\code{plot(fit, type = "marginal", data = surface)}) can
+automatically back-transform x-axes to the original covariate units.
+}
+\details{
+Scaling is strongly recommended before fitting conductance models.  In the
+loglinear model, conductance is \eqn{\exp(\theta \cdot x)}.  When \code{x}
+has a large range (e.g. altitude in metres), a small change in \eqn{\theta}
+produces enormous conductance differences, making the objective surface
+poorly conditioned and the optimizer slow to converge.
+
+Missing values (\code{NA}) are excluded from the computation of the mean,
+standard deviation, minimum, and range, and are left as \code{NA} in the
+output.
+
+If a layer is constant (all values identical), the scale is set to 1 to
+avoid division by zero; the layer is then returned unchanged (or centered
+to 0 if \code{center = TRUE}).
+
+The \code{"terradish_scale"} attribute is a named list with one element per
+layer; each element is a named numeric vector with entries \code{center} and
+\code{scale} (the subtracted offset and the divisor, respectively).
+\code{crop_to_focal_buffer} and \code{conductance_surface} preserve this
+attribute.
 }
 \examples{
 library(terra)
-r <- c(terra::rast(nrows = 2, ncols = 2, vals = c(1, 2, 3, NA)),
-       terra::rast(nrows = 2, ncols = 2, vals = c(2, 5, 4, NA)))
+r <- c(terra::rast(nrows = 2, ncols = 2, vals = c(100, 200, 300, NA)),
+       terra::rast(nrows = 2, ncols = 2, vals = c(0.2, 0.5, 0.4, NA)))
 names(r) <- c("altitude", "forestcover")
-scaled_r <- scale_covariates(r)
-attr(scaled_r, "terradish_scale")
 
+scaled_r <- scale_covariates(r)
+attr(scaled_r, "terradish_scale")  # per-layer center and scale
+
+# min-max scaling to [0, 1]
+scaled_mm <- scale_covariates(r, method = "minmax")
+
+}
+\seealso{
+\code{\link{scale_to_0_1}}, \code{\link{conductance_surface}}
 }

@@ -1,7 +1,7 @@
 Package: terradish
 Type: Package
 Title: Fast Gradient-Based Optimization of Resistance Surfaces
-Version: 0.0.22
+Version: 0.0.23
 Date: 2026-05-06
 Authors@R: c(
   person(
@@ -51,6 +51,6 @@ Suggests:
   rmarkdown,
   testthat (>= 3.0.0)
 VignetteBuilder: knitr
-RoxygenNote: 7.3.3
 Encoding: UTF-8
 Config/testthat/edition: 3
+Config/roxygen2/version: 8.0.0

@@ -2,25 +2,27 @@
 % Please edit documentation in R/genetic_distance.R
 \name{dist_from_biallelic}
 \alias{dist_from_biallelic}
-\title{Distance from allele counts}
+\title{Genetic distance matrix from biallelic allele counts}
 \usage{
 dist_from_biallelic(Y, N)
 }
 \arguments{
-\item{Y}{A matrix containing allele counts, of dimension (number of demes) x (number of loci)}
+\item{Y}{Numeric matrix of derived-allele counts (populations/individuals in
+rows, loci in columns).}
 
-\item{N}{A matrix containing the number of sampled haplotypes, of dimension (number of demes) x (number of loci)}
+\item{N}{Numeric matrix of haploid sample sizes with the same dimensions as
+\code{Y}.  See \code{\link{cov_from_biallelic}} for flexible \code{N}
+specifications.}
 }
 \value{
-A matrix containing pairwise distance
+A symmetric numeric matrix of pairwise squared distances with zero
+  diagonal.  Suitable for use with \code{\link{mlpe}} or
+  \code{\link{generalized_wishart}}.
 }
 \description{
-Calculates genetic distance from counts of the derived allele across biallelic markers,
-using normalized allele frequencies
-}
-\details{
-This is a convenience wrapper for
-\code{dist_from_cov(cov_from_biallelic(Y, N))}.
+Computes pairwise squared genetic distances from biallelic (SNP) allele
+counts.  This is a convenience wrapper for
+\code{\link{dist_from_cov}(\link{cov_from_biallelic}(Y, N))}.
 }
 \examples{
 Y <- matrix(c(2, 1, 0,
@@ -29,4 +31,8 @@ Y <- matrix(c(2, 1, 0,
 N <- matrix(2, nrow = 3, ncol = 3)
 dist_from_biallelic(Y, N)
 
+}
+\seealso{
+\code{\link{cov_from_biallelic}}, \code{\link{dist_from_cov}},
+  \code{\link{fst_from_biallelic}}
 }

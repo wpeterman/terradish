@@ -2,7 +2,7 @@
 % Please edit documentation in R/newton_raphson.R
 \name{NewtonRaphsonControl}
 \alias{NewtonRaphsonControl}
-\title{Controls for Newton-like optimizer}
+\title{Control settings for Newton-like optimizers}
 \usage{
 NewtonRaphsonControl(
   maxit = 100,
@@ -16,27 +16,75 @@ NewtonRaphsonControl(
 )
 }
 \arguments{
-\item{maxit}{Maximum number of Newton steps}
+\item{maxit}{Maximum number of Newton or quasi-Newton steps.  Increase if
+the optimizer reports a convergence warning on large or difficult problems.}
 
-\item{ctol}{Convergence tolerance in the gradient (max(abs(grad)) < ctol)}
+\item{ctol}{Gradient convergence tolerance.  Optimization stops when
+\code{max(abs(gradient)) < ctol}.}
 
-\item{ftol}{Convergence tolerance in the objective (f - fold < ftol)}
+\item{ftol}{Objective convergence tolerance.  Optimization also stops when
+the improvement in the objective over one step falls below \code{ftol}.}
 
-\item{etol}{Maximum spectral gap for a eigenvalue to be considered too close to singular}
+\item{etol}{Eigenvalue threshold used to detect near-singular Hessians.
+Eigenvalues smaller than \code{etol * length(par)} are treated as zero
+when forming the Newton step.  Increasing this value regularizes the step
+at the cost of slower convergence near flat regions.}
 
-\item{verbose}{Print progress to stdout}
+\item{verbose}{Logical.  If \code{TRUE}, print the iteration count,
+objective value, and gradient norm at each step.}
 
-\item{eps}{For box-constrained optimization, how close to a boundary can be considered "on the boundary"}
+\item{eps}{Box-constraint tolerance.  A parameter is considered to be
+"on the boundary" when it is within \code{eps * abs(par)} of the bound.
+Active-constraint gradient components are zeroed before the step is taken.}
 
-\item{del}{For quasi-Newton methods, a typical step size used to initialize the approximate Hessian}
+\item{del}{Typical initial step length for quasi-Newton (BFGS) methods.
+Used to scale the initial approximate Hessian before any updates are
+available.}
 
-\item{ls.control}{Control settings for the line search}
+\item{ls.control}{Control object for the line search, created by
+\code{\link{HagerZhangControl}} (default) or \code{\link{ArmijoControl}}.
+\code{ArmijoControl} is only valid when \code{optimizer = "bfgs"} is
+passed to \code{\link{terradish}}.}
 }
 \description{
-Control settings for Newton and quasi-Newton algorithms
+Tuning parameters shared by Newton-Raphson and BFGS quasi-Newton
+optimizers inside \code{\link{terradish}}.
+}
+\details{
+Both convergence criteria (\code{ctol} and \code{ftol}) must be satisfied
+simultaneously before the optimizer declares convergence.  If you want
+gradient-only convergence, set \code{ftol} to a very small number; for
+objective-only, set \code{ctol} small.
+
+For most resistance-surface models the defaults converge reliably.  Consider
+changing them when:
+
+\itemize{
+  \item The optimizer hits \code{maxit} before converging — increase
+    \code{maxit}.
+  \item You want a quick exploratory fit — reduce \code{maxit} (e.g. 5–10).
+  \item Fitting is slow because of oscillation — tighten \code{ctol} or
+    switch to a more conservative line search via \code{ls.control}.
+}
 }
 \examples{
 ctrl <- NewtonRaphsonControl(maxit = 25, verbose = FALSE)
 str(ctrl)
 
+# Verbose fit with relaxed tolerances for a quick exploratory run:
+ctrl_quick <- NewtonRaphsonControl(maxit = 10, verbose = TRUE,
+                                   ctol = 1e-3, ftol = 1e-3)
+
+# Pass to terradish():
+\dontrun{
+fit <- terradish(melip.Fst ~ forestcover + altitude, data = surface,
+                 conductance_model = loglinear_conductance,
+                 measurement_model = mlpe,
+                 control = NewtonRaphsonControl(maxit = 200))
+}
+
+}
+\seealso{
+\code{\link{HagerZhangControl}}, \code{\link{ArmijoControl}},
+  \code{\link{terradish}}
 }

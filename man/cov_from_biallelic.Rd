@@ -2,7 +2,7 @@
 % Please edit documentation in R/genetic_distance.R
 \name{cov_from_biallelic}
 \alias{cov_from_biallelic}
-\title{Covariance from biallelic allele counts}
+\title{Genetic covariance from biallelic allele counts}
 \usage{
 cov_from_biallelic(
   Y,
@@ -13,44 +13,79 @@ cov_from_biallelic(
 )
 }
 \arguments{
-\item{Y}{A numeric matrix containing derived-allele counts, with sampled
-units in rows and loci in columns.}
+\item{Y}{Numeric matrix of derived-allele counts with sampled units in rows
+and loci in columns.  For diploid individuals genotyped as 0/1/2, this is
+the standard dosage matrix.}
 
-\item{N}{Optional numeric matrix of sampled haploid allele counts with the
-same dimensions as \code{Y}. A scalar is recycled to all cells, a vector of
-length \code{nrow(Y)} is treated as row-specific sampling, and a vector of
-length \code{ncol(Y)} is treated as locus-specific sampling. If \code{NULL},
-\code{ploidy} is used for every cell.}
+\item{N}{Optional haploid sample-size specification.  Controls how many
+chromosomes were sampled at each locus for each unit:
+\itemize{
+  \item \code{NULL}: use \code{ploidy} for all cells.
+  \item A scalar: recycled to all cells.
+  \item A vector of length \code{nrow(Y)}: row-specific sample sizes
+    (same at every locus for that row).
+  \item A vector of length \code{ncol(Y)}: locus-specific sample sizes
+    (same across all rows).
+  \item A matrix matching \code{dim(Y)}: fully general cell-level sizes.
+}}
 
-\item{ploidy}{Haploid sample count used when \code{N = NULL}. The default
-\code{2} matches diploid individual genotypes coded as 0/1/2.}
+\item{ploidy}{Haploid chromosome count per unit, used when \code{N = NULL}.
+The default \code{2} corresponds to diploid individuals with dosage coding
+0/1/2 (so each individual contributes two chromosomes at each locus).}
 
-\item{monomorphic}{How to handle loci with pooled allele frequency 0 or 1.
-\code{"drop"} removes them with a warning; \code{"error"} preserves the
-historical strict behavior.}
+\item{monomorphic}{How to handle loci with pooled allele frequency 0 or 1
+(fixed across all rows).  \code{"drop"} (default) removes them and emits a
+warning; \code{"error"} stops with an error to preserve historical strict
+behavior.}
 
-\item{tol}{Numerical tolerance used to identify monomorphic loci.}
+\item{tol}{Tolerance for identifying monomorphic loci.  A locus is treated
+as monomorphic when its pooled frequency is within \code{tol} of 0 or 1.}
 }
 \value{
-A matrix containing pairwise covariance
+A symmetric positive-semidefinite numeric matrix of pairwise
+  genetic covariances.  Row and column names match those of \code{Y} when
+  present.
 }
 \description{
-Calculates covariance from counts of the derived allele across biallelic
-markers, using normalized allele frequencies. Rows may be individuals,
-demes, populations, or any other sampled genetic unit.
+Computes a sample covariance matrix from counts of the derived allele across
+biallelic (SNP) markers.  Rows may be individuals, populations, or any other
+sampled genetic unit.  The result is directly suitable as the response
+\code{S} in \code{\link{wishart_covariance}}.
 }
 \details{
-Let \code{p[l] = sum(Y[, l]) / sum(N[, l])} be the pooled derived-allele
-frequency at locus \code{l}. The function returns
-\code{Z \%*\% t(Z) / L}, where
-\code{Z[i, l] = (Y[i, l] - N[i, l] * p[l]) / sqrt(N[i, l] * p[l] * (1 - p[l]))}
-and \code{L} is the number of loci.
+Let \eqn{p_\ell = \sum_i Y_{i\ell} / \sum_i N_{i\ell}} be the pooled
+derived-allele frequency at locus \eqn{\ell}.  The normalized allele dosage
+is:
+
+\deqn{Z_{i\ell} = \frac{Y_{i\ell} - N_{i\ell} p_\ell}
+                       {\sqrt{N_{i\ell} p_\ell (1 - p_\ell)}}}
+
+The function returns \eqn{Z Z^\top / L}, where \eqn{L} is the number of
+retained (polymorphic) loci.  The resulting matrix is the sample covariance
+in normalized allele-frequency space, analogous to the genomic relationship
+matrix of Yang et al. (2010).
+
+To convert the covariance to a pairwise distance matrix, use
+\code{\link{dist_from_cov}}.  For non-biallelic or multiallelic data, use
+\code{\link{cov_from_genetic_data}}.
 }
 \examples{
-# Individual diploid genotypes at three SNPs
+# Individual diploid dosage matrix: 3 individuals, 3 SNPs
 Y <- matrix(c(2, 1, 0,
               1, 1, 1,
               0, 1, 2), nrow = 3, byrow = TRUE)
-cov_from_biallelic(Y)
+cov_from_biallelic(Y)          # ploidy = 2 by default
 
+# Population-level counts with unequal sampling
+Y2 <- matrix(c(10, 4, 1,
+               5,  5, 3), nrow = 2, byrow = TRUE)
+N2 <- matrix(c(20, 20, 10,
+               10, 10, 6), nrow = 2, byrow = TRUE)
+cov_from_biallelic(Y2, N = N2)
+
+}
+\seealso{
+\code{\link{cov_from_genetic_data}}, \code{\link{fst_from_biallelic}},
+  \code{\link{dist_from_biallelic}}, \code{\link{dist_from_cov}},
+  \code{\link{wishart_covariance}}
 }

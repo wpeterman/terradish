@@ -56,6 +56,7 @@ BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = 
   }
 
   convergence <- 0
+  line_search_failed <- FALSE
   initialized <- 0
   par <- as.matrix(par)
   fit_from_line_search <- NULL
@@ -178,9 +179,18 @@ BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = 
       alpha <- tryCatch({
         HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
       }, error = function(err) {
-        cat("Switched to backtracking\n")
-        Backtracking(dphi_fn, phi0, dphi0)
+        message("Hager-Zhang line search failed; switching to bounded backtracking.")
+        Backtracking(dphi_fn, phi0, dphi0, control = ls.control)
       })
+      if (!is.finite(alpha) || alpha <= 0 ||
+          identical(attr(alpha, "line_search_status"), "failed"))
+      {
+        convergence <- 2
+        line_search_failed <- TRUE
+        warning("Failed to find a usable line-search step; returning the current parameter values.",
+                call. = FALSE, immediate. = TRUE)
+        break
+      }
       accepted <- line_cache[[.terradish_line_search_cache_key(alpha)]]
       fit_from_line_search <- if (is.null(accepted)) NULL else accepted$fit
       par <- project(par + alpha*desc, lower, upper)
@@ -196,9 +206,9 @@ BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = 
     else
       cat ("Solution on interior with `max(abs(gradient))` ==", max(abs(fit$gradient)), "and `diff(f)` ==", delta, "\n")
 
-  if (i == maxit)
+  if (!line_search_failed && i == maxit)
   {
-    warning("`maxit` reached for quasi-Newton steps")
+    warning("`maxit` reached for quasi-Newton steps", immediate. = TRUE)
     convergence = 1
   } 
 

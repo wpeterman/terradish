@@ -121,3 +121,51 @@ test_that("BoxConstrainedNewton rejects ArmijoControl explicitly", {
     "supported for BFGS"
   )
 })
+
+test_that("Backtracking returns a failed zero step when no trial improves", {
+  dphifn <- function(alpha) {
+    list(objective = Inf, gradient = Inf)
+  }
+
+  expect_warning(
+    step <- terradish:::Backtracking(
+      dphifn,
+      phi_0 = 1,
+      dphi_0 = -1,
+      control = HagerZhangControl(linesearchmax = 3, c = 1, psi3 = 0.5)
+    ),
+    "failed to find"
+  )
+
+  expect_equal(as.numeric(step), 0)
+  expect_equal(attr(step, "line_search_status"), "failed")
+  expect_equal(attr(step, "line_search_iterations"), 3L)
+})
+
+test_that("BoxConstrainedNewton stops immediately on unusable line-search steps", {
+  fn <- function(par, gradient, hessian) {
+    out <- list(objective = sum(par^2) / 2)
+    if (gradient)
+      out$gradient <- matrix(par, ncol = 1)
+    if (hessian)
+      out$hessian <- diag(length(par))
+    out
+  }
+
+  expect_warning(
+    fit <- terradish:::BoxConstrainedNewton(
+      c(1, 1),
+      fn,
+      control = NewtonRaphsonControl(
+        maxit = 20,
+        verbose = FALSE,
+        ls.control = HagerZhangControl(c = 0)
+      )
+    ),
+    "usable line-search step"
+  )
+
+  expect_equal(fit$convergence, 2)
+  expect_equal(fit$iters, 1L)
+  expect_equal(c(fit$par), c(1, 1))
+})
