@@ -207,6 +207,42 @@ test_that("cov_from_genetic_data converts individual allele calls", {
   expect_equal(attr(cov_calls, "level"), "individual")
 })
 
+test_that("cov_from_genetic_data imputes missing allele calls to locus modes", {
+  calls <- data.frame(
+    loc1_a = c(100, NA, 102, 102),
+    loc1_b = c(100, 100, 102, 104),
+    loc2_a = c(200, 202, 200, 202),
+    loc2_b = c(202, NA, 204, 204)
+  )
+  imputed_calls <- calls
+  imputed_calls$loc1_a[2] <- 100
+  imputed_calls$loc2_b[2] <- 202
+
+  expect_message(
+    cov_missing <- cov_from_genetic_data(
+      calls,
+      input = "allele_calls",
+      loci = c("loc1", "loc1", "loc2", "loc2"),
+      center = FALSE,
+      scale = FALSE
+    ),
+    "Imputed 2 missing allele call"
+  )
+  cov_imputed <- cov_from_genetic_data(
+    imputed_calls,
+    input = "allele_calls",
+    loci = c("loc1", "loc1", "loc2", "loc2"),
+    center = FALSE,
+    scale = FALSE
+  )
+
+  expect_equal(cov_missing[, ], cov_imputed[, ])
+  expect_equal(attr(cov_missing, "imputed_allele_calls"),
+               c(loc1 = 1L, loc2 = 1L))
+  expect_equal(attr(cov_missing, "imputed_modal_alleles"),
+               c(loc1 = "100", loc2 = "202"))
+})
+
 test_that("cov_from_genetic_data validates inputs and drops constant features", {
   expect_error(
     cov_from_genetic_data(matrix(1:4, nrow = 2), "pop1"),
@@ -223,6 +259,14 @@ test_that("cov_from_genetic_data validates inputs and drops constant features", 
       input = "allele_calls"
     ),
     "`loci` is required"
+  )
+  expect_error(
+    cov_from_genetic_data(
+      matrix(NA, nrow = 2, ncol = 1),
+      input = "allele_calls",
+      loci = "loc1"
+    ),
+    "all calls are missing"
   )
   expect_error(
     cov_from_genetic_data(matrix(1:4, nrow = 4), rep("pop1", 4)),

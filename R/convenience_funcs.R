@@ -1,16 +1,34 @@
 #' Rescale values to the unit interval
 #'
-#' Rescales numeric values so the minimum non-missing value is 0 and the
-#' maximum is 1. \code{terra::SpatRaster} inputs are rescaled in place and
-#' returned as rasters.
+#' Rescales numeric values so the minimum non-missing value maps to 0 and
+#' the maximum maps to 1.  \code{terra::SpatRaster} inputs are rescaled
+#' layer-by-layer using only the finite (non-\code{NA}) values.
 #'
-#' @param x Numeric vector, matrix, dist object, or \code{terra::SpatRaster}.
+#' @param x Numeric vector, matrix, \code{dist} object, or
+#'   \code{terra::SpatRaster}.  \code{PackedSpatRaster} objects (from
+#'   \code{terra::wrap()}) are unwrapped automatically.
 #'
-#' @return An object of the same general type as \code{x}, rescaled to
-#'   \code{[0, 1]} where possible.
+#' @details
+#' The transformation applied to each element is
+#' \eqn{(x - \min) / (\max - \min)}, computed over non-\code{NA} values.
+#' \code{NA} values are propagated unchanged.
+#'
+#' If all non-missing values are identical (constant layer or vector), the
+#' output is set to 0 for all non-missing entries rather than producing
+#' \code{NaN} from a zero-range denominator.
+#'
+#' For rasters, each layer is rescaled independently using its own minimum and
+#' maximum.
+#'
+#' @return An object of the same class as \code{x} with values in
+#'   \code{[0, 1]} (non-\code{NA} entries only).
+#'
+#' @seealso \code{\link{scale_covariates}} for standardized (z-score or min-max)
+#'   scaling with metadata retained for back-transformation.
 #'
 #' @examples
 #' scale_to_0_1(c(2, 4, 6))
+#' scale_to_0_1(c(5, 5, NA))  # constant non-NA values become 0
 #'
 #' library(terra)
 #' r <- terra::rast(nrows = 2, ncols = 2, vals = c(1, 3, 5, NA))
@@ -49,36 +67,65 @@ scale_to_0_1 <- function(x)
   (x - rng[1]) / diff(rng)
 }
 
-#' Scale raster covariates and retain original scale metadata
+#' Scale raster covariates and retain original-scale metadata
 #'
 #' Transforms each layer of a \code{SpatRaster} and stores the original-scale
-#' offset and divisor as a \code{"terradish_scale"} attribute. If this
-#' transformed raster is used to build a \code{\link{conductance_surface}},
-#' \code{plot(type = "marginal")} can automatically back-transform x-axes to
-#' the original covariate units.
+#' offset and divisor as a \code{"terradish_scale"} attribute.  When the scaled
+#' raster is used to build a \code{\link{conductance_surface}}, marginal-effect
+#' plots (\code{plot(fit, type = "marginal", data = surface)}) can
+#' automatically back-transform x-axes to the original covariate units.
 #'
-#' @param covariates A \code{SpatRaster} or \code{PackedSpatRaster} whose layers
-#'   should be scaled.
-#' @param method Scaling method. \code{"zscore"} centers each layer by its
-#'   non-missing mean and divides by its non-missing standard deviation.
-#'   \code{"minmax"} rescales each layer to \code{[0, 1]} using its
-#'   non-missing minimum and range.
-#' @param center Should each layer be centered before scaling when
-#'   \code{method = "zscore"}?
-#' @param scale Should each layer be divided by its standard deviation when
-#'   \code{method = "zscore"}?
+#' @param covariates A \code{SpatRaster} or \code{PackedSpatRaster} whose
+#'   layers should be scaled.
+#' @param method Scaling method applied to each layer independently.
+#'   \code{"zscore"} (default) subtracts the layer mean and divides by the
+#'   standard deviation, giving zero mean and unit variance.
+#'   \code{"minmax"} maps the minimum to 0 and the maximum to 1.
+#' @param center Logical.  Only used when \code{method = "zscore"}.  If
+#'   \code{TRUE} (default), subtract the layer mean before dividing by the
+#'   standard deviation.
+#' @param scale Logical.  Only used when \code{method = "zscore"}.  If
+#'   \code{TRUE} (default), divide by the layer standard deviation.  If
+#'   \code{FALSE} with \code{center = TRUE}, layers are centered but not
+#'   divided.
+#'
+#' @details
+#' Scaling is strongly recommended before fitting conductance models.  In the
+#' loglinear model, conductance is \eqn{\exp(\theta \cdot x)}.  When \code{x}
+#' has a large range (e.g. altitude in metres), a small change in \eqn{\theta}
+#' produces enormous conductance differences, making the objective surface
+#' poorly conditioned and the optimizer slow to converge.
+#'
+#' Missing values (\code{NA}) are excluded from the computation of the mean,
+#' standard deviation, minimum, and range, and are left as \code{NA} in the
+#' output.
+#'
+#' If a layer is constant (all values identical), the scale is set to 1 to
+#' avoid division by zero; the layer is then returned unchanged (or centered
+#' to 0 if \code{center = TRUE}).
+#'
+#' The \code{"terradish_scale"} attribute is a named list with one element per
+#' layer; each element is a named numeric vector with entries \code{center} and
+#' \code{scale} (the subtracted offset and the divisor, respectively).
+#' \code{crop_to_focal_buffer} and \code{conductance_surface} preserve this
+#' attribute.
 #'
 #' @return A \code{SpatRaster} with transformed values and a
-#'   \code{"terradish_scale"} attribute containing per-layer centers and
-#'   scales.
+#'   \code{"terradish_scale"} attribute.
+#'
+#' @seealso \code{\link{scale_to_0_1}}, \code{\link{conductance_surface}}
 #'
 #' @examples
 #' library(terra)
-#' r <- c(terra::rast(nrows = 2, ncols = 2, vals = c(1, 2, 3, NA)),
-#'        terra::rast(nrows = 2, ncols = 2, vals = c(2, 5, 4, NA)))
+#' r <- c(terra::rast(nrows = 2, ncols = 2, vals = c(100, 200, 300, NA)),
+#'        terra::rast(nrows = 2, ncols = 2, vals = c(0.2, 0.5, 0.4, NA)))
 #' names(r) <- c("altitude", "forestcover")
+#'
 #' scaled_r <- scale_covariates(r)
-#' attr(scaled_r, "terradish_scale")
+#' attr(scaled_r, "terradish_scale")  # per-layer center and scale
+#'
+#' # min-max scaling to [0, 1]
+#' scaled_mm <- scale_covariates(r, method = "minmax")
 #'
 #' @export
 scale_covariates <- function(covariates,
@@ -122,16 +169,33 @@ scale_covariates <- function(covariates,
   covariates
 }
 
-#' Extract the lower triangle of a matrix
+#' Extract the strict lower triangle of a matrix
 #'
-#' Returns the lower-triangular entries of a square matrix as a vector.
+#' Returns the entries strictly below the main diagonal of a square matrix,
+#' scanned column-by-column (standard R column-major order).
 #'
-#' @param x A square matrix.
+#' @param x A square numeric matrix.
 #'
-#' @return A vector containing the strict lower triangle of \code{x}.
+#' @return A numeric vector of length \eqn{n(n-1)/2} containing the strict
+#'   lower-triangular entries of \code{x}, where \eqn{n} is the dimension of
+#'   \code{x}.
+#'
+#' @details
+#' This is a thin wrapper around \code{x[lower.tri(x)]}.  It is provided as a
+#' convenience for extracting vectorized pairwise measurements from symmetric
+#' matrices such as distance or covariance matrices.
+#'
+#' @seealso \code{\link[base]{lower.tri}}
 #'
 #' @examples
-#' lower(matrix(1:9, nrow = 3))
+#' m <- matrix(1:9, nrow = 3)
+#' lower(m)  # entries (2,1), (3,1), (3,2)
+#'
+#' # Useful for extracting pairwise distances:
+#' D <- matrix(c(0, 0.1, 0.3,
+#'               0.1, 0, 0.2,
+#'               0.3, 0.2, 0), nrow = 3)
+#' lower(D)
 #'
 #' @export
 lower <- function(x)
@@ -142,19 +206,38 @@ lower <- function(x)
 
 #' Pairwise genetic distances from PCA scores
 #'
-#' Computes Euclidean distances among individuals using retained principal
-#' component axes from an \code{adegenet::genind} object.
+#' Runs a PCA on allele-frequency data from an \code{adegenet::genind} object
+#' and returns Euclidean distances computed on the retained principal component
+#' scores.
 #'
 #' @param gi A \code{genind} object from \pkg{adegenet}.
-#' @param n_axes Number of principal component axes to retain.
-#' @param scale Should the resulting distance matrix be rescaled to \code{[0,1]}?
+#' @param n_axes Number of principal component axes to retain.  Capped at the
+#'   total number of available axes.
+#' @param scale Logical.  If \code{TRUE} (default), the resulting distance
+#'   matrix is rescaled to \code{[0, 1]} via \code{\link{scale_to_0_1}}.
 #'
-#' @return A symmetric distance matrix.
+#' @details
+#' Missing genotypes in \code{gi} are imputed by the allele-mean method
+#' (equivalent to \code{adegenet::tab(gi, NA.method = "mean")}), then a
+#' standard PCA via \code{\link[stats]{prcomp}} is applied to the allele
+#' frequency table.  Euclidean distances are then computed on the first
+#' \code{n_axes} scores.
+#'
+#' This is a convenience wrapper designed for users who prefer to work from
+#' a \code{genind} object.  For biallelic SNP data the more direct
+#' \code{\link{dist_from_biallelic}} is generally faster and does not require
+#' the \pkg{adegenet} package.
+#'
+#' @return A symmetric numeric distance matrix with one row/column per
+#'   individual in \code{gi}.
+#'
+#' @seealso \code{\link{dist_from_biallelic}}, \code{\link{cov_from_genetic_data}}
 #'
 #' @examples
 #' if (requireNamespace("adegenet", quietly = TRUE)) {
 #'   data(nancycats, package = "adegenet")
-#'   pca_dist(nancycats, n_axes = 4)
+#'   d <- pca_dist(nancycats, n_axes = 4)
+#'   dim(d)
 #' }
 #'
 #' @export

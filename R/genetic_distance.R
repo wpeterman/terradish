@@ -1,12 +1,37 @@
-#' Fst from allele counts
+#' F_ST from biallelic allele counts
 #'
-#' Calculates Fst using the estimator of Bhatia et al.
-#' from counts of the derived allele across biallelic markers
+#' Estimates pairwise F\eqn{_{ST}} from counts of the derived allele across
+#' biallelic markers using the ratio-of-averages estimator of Bhatia et al.
+#' (2013).
 #'
-#' @param Y A matrix containing allele counts, of dimension (number of demes) x (number of loci)
-#' @param N A matrix containing the number of sampled haplotypes, of dimension (number of demes) x (number of loci)
+#' @param Y Numeric matrix of derived-allele counts with rows as populations
+#'   and columns as loci.
+#' @param N Numeric matrix of sampled haploid chromosomes with the same
+#'   dimensions as \code{Y}.  For diploid data without missing genotypes,
+#'   \code{N = 2 * n_individuals} for each cell.
 #'
-#' @return A matrix containing pairwise Fst
+#' @details
+#' The estimator computes, for each locus, the squared allele-frequency
+#' difference between populations, corrects for within-population
+#' heterozygosity, and then forms a ratio of locus-averages (Bhatia et al.
+#' 2013).  Diagonal entries are set to 0.
+#'
+#' The result is not guaranteed to lie in \eqn{[0, 1]} for every pair; small
+#' negative values can arise from sampling noise in very similar populations.
+#'
+#' To use F\eqn{_{ST}} as the response in \code{\link{terradish}}, pass the
+#' matrix directly to the formula left-hand side with \code{\link{mlpe}} or
+#' \code{\link{generalized_wishart}}.
+#'
+#' @references
+#' Bhatia G, Patterson N, Sankararaman S, Price AL. 2013. Estimating and
+#' interpreting F\eqn{_{ST}}: the impact of rare variants. Genome Research
+#' 23(9):1514-1521.
+#'
+#' @return A symmetric numeric matrix of pairwise F\eqn{_{ST}} with zero
+#'   diagonal.
+#'
+#' @seealso \code{\link{cov_from_biallelic}}, \code{\link{dist_from_biallelic}}
 #'
 #' @examples
 #' Y <- matrix(c(2, 1, 0,
@@ -40,41 +65,75 @@ fst_from_biallelic <- function(Y, N)
   fst
 }
 
-#' Covariance from biallelic allele counts
+#' Genetic covariance from biallelic allele counts
 #'
-#' Calculates covariance from counts of the derived allele across biallelic
-#' markers, using normalized allele frequencies. Rows may be individuals,
-#' demes, populations, or any other sampled genetic unit.
+#' Computes a sample covariance matrix from counts of the derived allele across
+#' biallelic (SNP) markers.  Rows may be individuals, populations, or any other
+#' sampled genetic unit.  The result is directly suitable as the response
+#' \code{S} in \code{\link{wishart_covariance}}.
 #'
-#' @param Y A numeric matrix containing derived-allele counts, with sampled
-#'   units in rows and loci in columns.
-#' @param N Optional numeric matrix of sampled haploid allele counts with the
-#'   same dimensions as \code{Y}. A scalar is recycled to all cells, a vector of
-#'   length \code{nrow(Y)} is treated as row-specific sampling, and a vector of
-#'   length \code{ncol(Y)} is treated as locus-specific sampling. If \code{NULL},
-#'   \code{ploidy} is used for every cell.
-#' @param ploidy Haploid sample count used when \code{N = NULL}. The default
-#'   \code{2} matches diploid individual genotypes coded as 0/1/2.
-#' @param monomorphic How to handle loci with pooled allele frequency 0 or 1.
-#'   \code{"drop"} removes them with a warning; \code{"error"} preserves the
-#'   historical strict behavior.
-#' @param tol Numerical tolerance used to identify monomorphic loci.
+#' @param Y Numeric matrix of derived-allele counts with sampled units in rows
+#'   and loci in columns.  For diploid individuals genotyped as 0/1/2, this is
+#'   the standard dosage matrix.
+#' @param N Optional haploid sample-size specification.  Controls how many
+#'   chromosomes were sampled at each locus for each unit:
+#'   \itemize{
+#'     \item \code{NULL}: use \code{ploidy} for all cells.
+#'     \item A scalar: recycled to all cells.
+#'     \item A vector of length \code{nrow(Y)}: row-specific sample sizes
+#'       (same at every locus for that row).
+#'     \item A vector of length \code{ncol(Y)}: locus-specific sample sizes
+#'       (same across all rows).
+#'     \item A matrix matching \code{dim(Y)}: fully general cell-level sizes.
+#'   }
+#' @param ploidy Haploid chromosome count per unit, used when \code{N = NULL}.
+#'   The default \code{2} corresponds to diploid individuals with dosage coding
+#'   0/1/2 (so each individual contributes two chromosomes at each locus).
+#' @param monomorphic How to handle loci with pooled allele frequency 0 or 1
+#'   (fixed across all rows).  \code{"drop"} (default) removes them and emits a
+#'   warning; \code{"error"} stops with an error to preserve historical strict
+#'   behavior.
+#' @param tol Tolerance for identifying monomorphic loci.  A locus is treated
+#'   as monomorphic when its pooled frequency is within \code{tol} of 0 or 1.
 #'
 #' @details
-#' Let \code{p[l] = sum(Y[, l]) / sum(N[, l])} be the pooled derived-allele
-#' frequency at locus \code{l}. The function returns
-#' \code{Z \%*\% t(Z) / L}, where
-#' \code{Z[i, l] = (Y[i, l] - N[i, l] * p[l]) / sqrt(N[i, l] * p[l] * (1 - p[l]))}
-#' and \code{L} is the number of loci.
+#' Let \eqn{p_\ell = \sum_i Y_{i\ell} / \sum_i N_{i\ell}} be the pooled
+#' derived-allele frequency at locus \eqn{\ell}.  The normalized allele dosage
+#' is:
 #'
-#' @return A matrix containing pairwise covariance
+#' \deqn{Z_{i\ell} = \frac{Y_{i\ell} - N_{i\ell} p_\ell}
+#'                        {\sqrt{N_{i\ell} p_\ell (1 - p_\ell)}}}
+#'
+#' The function returns \eqn{Z Z^\top / L}, where \eqn{L} is the number of
+#' retained (polymorphic) loci.  The resulting matrix is the sample covariance
+#' in normalized allele-frequency space, analogous to the genomic relationship
+#' matrix of Yang et al. (2010).
+#'
+#' To convert the covariance to a pairwise distance matrix, use
+#' \code{\link{dist_from_cov}}.  For non-biallelic or multiallelic data, use
+#' \code{\link{cov_from_genetic_data}}.
+#'
+#' @return A symmetric positive-semidefinite numeric matrix of pairwise
+#'   genetic covariances.  Row and column names match those of \code{Y} when
+#'   present.
+#'
+#' @seealso \code{\link{cov_from_genetic_data}}, \code{\link{fst_from_biallelic}},
+#'   \code{\link{dist_from_biallelic}}, \code{\link{dist_from_cov}},
+#'   \code{\link{wishart_covariance}}
 #'
 #' @examples
-#' # Individual diploid genotypes at three SNPs
+#' # Individual diploid dosage matrix: 3 individuals, 3 SNPs
 #' Y <- matrix(c(2, 1, 0,
 #'               1, 1, 1,
 #'               0, 1, 2), nrow = 3, byrow = TRUE)
-#' cov_from_biallelic(Y)
+#' cov_from_biallelic(Y)          # ploidy = 2 by default
+#'
+#' # Population-level counts with unequal sampling
+#' Y2 <- matrix(c(10, 4, 1,
+#'                5,  5, 3), nrow = 2, byrow = TRUE)
+#' N2 <- matrix(c(20, 20, 10,
+#'                10, 10, 6), nrow = 2, byrow = TRUE)
+#' cov_from_biallelic(Y2, N = N2)
 #'
 #' @export
 
@@ -210,6 +269,8 @@ cov_from_biallelic <- function(Y,
 #' The function first obtains a numeric feature matrix. Microsatellite data can
 #' be supplied as allele calls by setting \code{input = "allele_calls"}; these are
 #' converted to allele dosage columns, one column per locus-allele combination.
+#' Missing allele calls are imputed to the modal observed allele within each
+#' locus, with a message reporting the number of imputed calls.
 #'
 #' If \code{groups = NULL}, rows of the processed feature matrix are used
 #' directly and squared Euclidean distances among individuals are transformed to
@@ -230,12 +291,33 @@ cov_from_biallelic <- function(Y,
 #' within-population diagonal is useful for population-graph workflows, but it
 #' does not guarantee a positive-definite covariance matrix for every dataset.
 #'
-#' @return A square covariance matrix with one row and column per individual or
-#'   population. Attributes include the processed row features or population
-#'   centroids, within-population variances when applicable, squared distances,
-#'   and retained feature metadata.
+#' @return A symmetric numeric matrix with one row and column per individual
+#'   (when \code{groups = NULL}) or population (when \code{groups} is
+#'   supplied).  The matrix is positive semi-definite up to numerical
+#'   tolerance, except when \code{diagonal = "within"} is used (see Details).
+#'   The following attributes are attached:
+#' \describe{
+#'   \item{\code{centroids}}{Feature matrix of population centroids (or
+#'     individual feature vectors when ungrouped).}
+#'   \item{\code{centroid_distance2}}{Squared Euclidean distance matrix among
+#'     centroids.}
+#'   \item{\code{within_variance}}{Named vector of within-population variances
+#'     (only when \code{groups} is supplied and some populations have \eqn{\geq
+#'     2} individuals).}
+#'   \item{\code{unit_size}}{Named integer vector of group sizes.}
+#'   \item{\code{feature_center}, \code{feature_scale}}{Centering and scaling
+#'     constants applied to each retained feature.}
+#'   \item{\code{retained_features}}{Names of the features kept after constant
+#'     features were dropped.}
+#'   \item{\code{level}}{Either \code{"individual"} or \code{"population"}.}
+#'   \item{\code{diagonal}}{The \code{diagonal} method actually used.}
+#'   \item{\code{normalizer}}{Divisor applied to the covariance and distances
+#'     (\code{1} for \code{normalize = "none"}, number of retained features for
+#'     \code{normalize = "features"}).}
+#' }
 #'
-#' @seealso \code{\link{wishart_covariance}}
+#' @seealso \code{\link{wishart_covariance}}, \code{\link{cov_from_biallelic}},
+#'   \code{\link{dist_from_cov}}, \code{\link{simulate_covariance_response}}
 #'
 #' @examples
 #' # Numeric allele dosage / feature matrix
@@ -303,6 +385,8 @@ cov_from_genetic_data <- function(x,
     .allele_call_feature_matrix(x, loci)
   else
     .numeric_genetic_feature_matrix(x)
+  imputed_allele_calls <- attr(features, "imputed_allele_calls")
+  imputed_modal_alleles <- attr(features, "imputed_modal_alleles")
 
   feature_center <- if (isTRUE(center))
     colMeans(features)
@@ -414,6 +498,11 @@ cov_from_genetic_data <- function(x,
   attr(covariance, "feature_scale") <- feature_scale
   attr(covariance, "retained_features") <- colnames(features)
   attr(covariance, "input") <- input
+  if (!is.null(imputed_allele_calls))
+  {
+    attr(covariance, "imputed_allele_calls") <- imputed_allele_calls
+    attr(covariance, "imputed_modal_alleles") <- imputed_modal_alleles
+  }
   attr(covariance, "level") <- level
   attr(covariance, "diagonal") <- diagonal
   attr(covariance, "normalize") <- normalize
@@ -436,8 +525,6 @@ cov_from_genetic_data <- function(x,
 
 .allele_call_feature_matrix <- function(x, loci)
 {
-  if (anyNA(x))
-    stop("missing values are not currently supported in allele calls", call. = FALSE)
   if (is.null(loci))
     stop("`loci` is required when `input = \"allele_calls\"`", call. = FALSE)
   if (length(loci) != ncol(x))
@@ -450,10 +537,26 @@ cov_from_genetic_data <- function(x,
   locus_names <- unique(loci)
   out <- vector("list", length(locus_names))
   names(out) <- locus_names
+  imputed <- integer(length(locus_names))
+  names(imputed) <- locus_names
+  imputed_allele <- setNames(rep(NA_character_, length(locus_names)),
+                             locus_names)
 
   for (loc in locus_names)
   {
     loc_values <- x_chr[, loci == loc, drop = FALSE]
+    missing <- is.na(loc_values)
+    if (any(missing))
+    {
+      observed <- loc_values[!missing]
+      if (!length(observed))
+        stop("Cannot impute allele calls for locus `", loc,
+             "` because all calls are missing", call. = FALSE)
+      modal <- .modal_allele(observed)
+      loc_values[missing] <- modal
+      imputed[[loc]] <- sum(missing)
+      imputed_allele[[loc]] <- modal
+    }
     alleles <- sort(unique(c(loc_values)))
     loc_counts <- vapply(alleles, function(allele)
       rowSums(loc_values == allele),
@@ -463,26 +566,64 @@ cov_from_genetic_data <- function(x,
     out[[loc]] <- loc_counts
   }
 
-  do.call(cbind, out)
+  if (sum(imputed) > 0L)
+    message("Imputed ", sum(imputed),
+            " missing allele call(s) to the modal allele within each locus.")
+
+  features <- do.call(cbind, out)
+  attr(features, "imputed_allele_calls") <- imputed[imputed > 0L]
+  attr(features, "imputed_modal_alleles") <- imputed_allele[imputed > 0L]
+  features
 }
 
-#' Distance matrix from covariance matrix
+.modal_allele <- function(x)
+{
+  counts <- table(x)
+  modes <- names(counts)[counts == max(counts)]
+  sort(modes)[1]
+}
+
+#' Squared-distance matrix from a covariance matrix
 #'
-#' Returns the squared-distance matrix associated with a given covariance matrix
+#' Converts a covariance matrix to its associated squared pairwise distance
+#' matrix.  This inverts the Gower double-centering used by
+#' \code{\link{cov_from_genetic_data}}.
 #'
-#' @param Cov A covariance matrix (does not need to be full-rank)
+#' @param Cov A square numeric covariance matrix.  Does not need to be
+#'   full-rank (e.g. the output of \code{\link{cov_from_biallelic}} is
+#'   positive semi-definite).
 #'
 #' @details
-#' The returned squared-distance matrix is
-#' \code{D[i, j] = Cov[i, i] + Cov[j, j] - 2 * Cov[i, j]}.
+#' The squared distance between units \eqn{i} and \eqn{j} is:
 #'
-#' @return A distance matrix of the same dimension as the input
+#' \deqn{D_{ij} = C_{ii} + C_{jj} - 2 C_{ij}}
+#'
+#' which is the law-of-cosines identity relating a covariance matrix to its
+#' implied squared Euclidean distances.  The diagonal of the returned matrix
+#' is zero.
+#'
+#' Use this function to convert a covariance matrix produced by
+#' \code{\link{cov_from_biallelic}} or \code{\link{cov_from_genetic_data}} into
+#' a distance matrix suitable for \code{\link{generalized_wishart}} or
+#' \code{\link{mlpe}}.
+#'
+#' @return A symmetric numeric matrix of the same dimension as \code{Cov} with
+#'   zero diagonal and non-negative off-diagonal entries.
+#'
+#' @seealso \code{\link{cov_from_biallelic}}, \code{\link{cov_from_genetic_data}},
+#'   \code{\link{dist_from_biallelic}}
 #'
 #' @examples
 #' Cov <- matrix(c(2.0, 1.2, 0.8,
 #'                 1.2, 1.5, 0.7,
 #'                 0.8, 0.7, 1.1), nrow = 3, byrow = TRUE)
 #' dist_from_cov(Cov)
+#'
+#' # Round-trip: covariance -> distance -> (verify non-negative, zero diag)
+#' Y <- matrix(c(2, 1, 0, 1, 1, 1, 0, 1, 2), nrow = 3, byrow = TRUE)
+#' S_cov  <- cov_from_biallelic(Y)
+#' S_dist <- dist_from_cov(S_cov)
+#' diag(S_dist)   # all zeros
 #'
 #' @export
 
@@ -492,19 +633,24 @@ dist_from_cov <- function(Cov)
   diag(Cov) %*% t(ones) + ones %*% t(diag(Cov)) - 2*Cov
 }
 
-#' Distance from allele counts
+#' Genetic distance matrix from biallelic allele counts
 #'
-#' Calculates genetic distance from counts of the derived allele across biallelic markers,
-#' using normalized allele frequencies
+#' Computes pairwise squared genetic distances from biallelic (SNP) allele
+#' counts.  This is a convenience wrapper for
+#' \code{\link{dist_from_cov}(\link{cov_from_biallelic}(Y, N))}.
 #'
-#' @param Y A matrix containing allele counts, of dimension (number of demes) x (number of loci)
-#' @param N A matrix containing the number of sampled haplotypes, of dimension (number of demes) x (number of loci)
+#' @param Y Numeric matrix of derived-allele counts (populations/individuals in
+#'   rows, loci in columns).
+#' @param N Numeric matrix of haploid sample sizes with the same dimensions as
+#'   \code{Y}.  See \code{\link{cov_from_biallelic}} for flexible \code{N}
+#'   specifications.
 #'
-#' @details
-#' This is a convenience wrapper for
-#' \code{dist_from_cov(cov_from_biallelic(Y, N))}.
+#' @return A symmetric numeric matrix of pairwise squared distances with zero
+#'   diagonal.  Suitable for use with \code{\link{mlpe}} or
+#'   \code{\link{generalized_wishart}}.
 #'
-#' @return A matrix containing pairwise distance
+#' @seealso \code{\link{cov_from_biallelic}}, \code{\link{dist_from_cov}},
+#'   \code{\link{fst_from_biallelic}}
 #'
 #' @examples
 #' Y <- matrix(c(2, 1, 0,

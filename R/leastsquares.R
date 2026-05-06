@@ -1,40 +1,73 @@
-#' (Nonnegative) least squares
+#' Least-squares measurement model
 #'
-#' A function of class \code{measurement_model} that calculates likelihood,
-#' gradient, hessian, and partial derivatives of nuisance parameters and the
-#' Laplacian generalized inverse, using nonnegative least squares.
+#' A function of class \code{"terradish_measurement_model"} that evaluates a
+#' Gaussian likelihood with independent errors and a linear mean structure
+#' relating observed genetic distances to resistance distances.  This is the
+#' fastest measurement model and a useful first-pass choice; prefer
+#' \code{\link{mlpe}} for inference because it correctly accounts for the
+#' non-independence of pairwise measurements.
 #'
-#' @param E A submatrix of the generalized inverse of the graph Laplacian (e.g. a covariance matrix)
-#' @param S A matrix of observed genetic distances
-#' @param phi Nuisance parameters (see details)
-#' @param nu Unused
-#' @param gradient Compute gradient of negative loglikelihood with regard to \code{phi}?
-#' @param hessian Compute Hessian matrix of negative loglikelihood with regard to \code{phi}?
-#' @param partial Compute second partial derivatives of negative loglikelihood with regard to \code{phi}, \code{E}, \code{S}?
-#' @param nonnegative Force slope to be nonnegative?
-#' @param validate Numerical validation via package \code{numDeriv} (very slow, use for debugging small examples)
+#' @param E Conductance-implied covariance matrix: the generalized inverse of
+#'   the graph Laplacian, evaluated at the current conductance parameters.
+#'   Passed automatically by the optimizer; users normally do not call this
+#'   function directly.
+#' @param S Square, symmetric matrix of observed pairwise genetic distances
+#'   (e.g. F\eqn{_{ST}}). Must have the same dimensions as \code{E}.
+#' @param phi Named numeric vector of nuisance parameters \code{(alpha, beta,
+#'   tau)}.  Omit to obtain maximum-likelihood starting values from an
+#'   \code{nlme::gls} fit.
+#' @param nu Unused; present for a common interface with Wishart measurement
+#'   models.
+#' @param gradient Logical. Compute gradient of the negative log-likelihood
+#'   with respect to \code{phi}?
+#' @param hessian Logical. Compute Hessian of the negative log-likelihood with
+#'   respect to \code{phi}?
+#' @param partial Logical. Compute second partial derivatives with respect to
+#'   \code{phi}, \code{E}, and \code{S}? Required by the optimizer; set
+#'   \code{FALSE} only for standalone likelihood evaluations.
+#' @param nonnegative Logical. Constrain the IBR slope \code{beta} to be
+#'   nonnegative? Default \code{TRUE} prevents a nonsensical negative
+#'   resistance-distance effect.
+#' @param validate Logical. Numerically validate gradients and Hessians via
+#'   \pkg{numDeriv}? Very slow; intended for debugging small examples only.
 #'
-#' @details The nuisance parameters \code{phi} are the intercept ("alpha"), slope ("beta"), and negative log residual
-#' standard deviation ("tau") of the least squares regression. If not supplied, \code{phi} 
-#' is estimated via maximum likelihood by \code{nlme::gls}. The model is
-#' \code{S_ij = alpha + beta * R_ij + e_ij}, where \code{R_ij} is the
-#' resistance distance implied by \code{E} and \code{e_ij} are independent
-#' Gaussian errors with precision \code{exp(tau)}.
+#' @details
+#' The nuisance parameters are:
+#' \describe{
+#'   \item{\code{alpha}}{Intercept of the regression of genetic distance on
+#'     resistance distance.}
+#'   \item{\code{beta}}{Slope (IBR effect); constrained \eqn{\geq 0} when
+#'     \code{nonnegative = TRUE}.}
+#'   \item{\code{tau}}{Log-precision of the Gaussian errors: residual variance
+#'     is \eqn{\exp(-\tau)}.}
+#' }
+#' The mean structure is \eqn{S_{ij} = \alpha + \beta R_{ij} + e_{ij}}, where
+#' \eqn{R_{ij}} is the resistance distance between sites \eqn{i} and \eqn{j}
+#' (derived from \code{E}) and \eqn{e_{ij}} are independent Gaussian errors
+#' with common precision \eqn{\exp(\tau)}.
 #'
-#' @seealso \code{\link{terradish_measurement_model}}
+#' Pairwise genetic distances are not independent: any two pairs sharing a
+#' sampling site are correlated.  \code{leastsquares} ignores this, which
+#' underestimates standard errors.  For inferential purposes, \code{\link{mlpe}}
+#' is strongly preferred.  Use \code{leastsquares} when speed matters more than
+#' precision, or for initial parameter exploration.
 #'
-#' @return A list containing:
-#'  \item{covariance}{rows/columns of the generalized inverse of the graph Laplacian for a subset of target vertices}
-#'  \item{objective}{(if \code{objective}) the negative loglikelihood}
-#'  \item{fitted}{((if \code{objective}) a matrix of expected genetic distances among target vertices}
-#'  \item{boundary}{(if \code{objective}) is the MLE on the boundary (e.g. no genetic structure)?}
-#'  \item{gradient}{(if \code{gradient}) gradient of negative loglikelihood with respect to phi}
-#'  \item{hessian}{(if \code{hessian}) Hessian matrix of the negative loglikelihood with respect to phi}
-#'  \item{gradient_E}{(if \code{partial}) gradient with respect to the generalized inverse of the graph Laplacian}
-#'  \item{partial_E}{(if \code{partial}) Jacobian of \code{gradient_E} with respect to phi}
-#'  \item{partial_S}{(if \code{partial}) Jacobian of \code{gradient} with respect to S}
-#'  \item{jacobian_E}{(if \code{partial}) a function used for reverse algorithmic differentiation}
-#'  \item{jacobian_S}{(if \code{partial}) a function used for reverse algorithmic differentiation}
+#' @seealso \code{\link{mlpe}}, \code{\link{generalized_wishart}},
+#'   \code{\link{wishart_covariance}}, \code{\link{terradish}}
+#'
+#' @return When \code{phi} is missing, a list with elements \code{phi}
+#'   (starting values), \code{lower}, and \code{upper} (parameter bounds).
+#'   Otherwise a list containing:
+#'  \item{objective}{Negative log-likelihood.}
+#'  \item{fitted}{Matrix of expected genetic distances (same dimensions as \code{S}).}
+#'  \item{boundary}{Logical; \code{TRUE} if the MLE is on the boundary (\code{beta = 0}), indicating no detectable IBR signal.}
+#'  \item{gradient}{Gradient of the negative log-likelihood with respect to \code{phi} (if \code{gradient = TRUE}).}
+#'  \item{hessian}{Hessian matrix with respect to \code{phi} (if \code{hessian = TRUE}).}
+#'  \item{gradient_E}{Gradient with respect to \code{E} (if \code{partial = TRUE}).}
+#'  \item{partial_E}{Jacobian of \code{gradient_E} with respect to \code{phi} (if \code{partial = TRUE}).}
+#'  \item{partial_S}{Jacobian of \code{gradient} with respect to the lower triangle of \code{S} (if \code{partial = TRUE}).}
+#'  \item{jacobian_E}{Function for reverse-mode algorithmic differentiation through \code{E} (if \code{partial = TRUE}).}
+#'  \item{jacobian_S}{Function for reverse-mode algorithmic differentiation through \code{S} (if \code{partial = TRUE}).}
 #'
 #' @examples
 #'

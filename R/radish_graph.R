@@ -55,50 +55,86 @@
 
 #' Create a parameterized conductance surface
 #'
-#' Given a set of spatial covariates and a set of spatial coordinates, create a
-#' graph representing a parameterized conductance surface.
+#' Reads spatial covariates and focal-point coordinates and builds a weighted
+#' graph suitable for computing conductance-weighted resistance distances.
+#' This is the first step of every \code{terradish} workflow.
 #'
-#' @param covariates A \code{SpatRaster} containing spatial covariates
-#' @param coords A point object containing coordinates for a set of focal cells,
-#'   with the same projection as \code{covariates}. Supported inputs are
-#'   \code{SpatVector}, matrices, and data frames with \code{x}/\code{y}
-#'   columns.
-#' @param directions If \code{4}, consider only horizontal/vertical neighbours as adjacent; if \code{8}, also consider diagonal neighbours as adjacent
-#' @param saveStack If \code{TRUE}, the \code{SpatRaster} is returned with missing data masked uniformly across layers
-#' @param crop_buffer Optional nonnegative map-unit buffer around the focal
-#'   coordinates. When supplied, \code{covariates} are cropped with
-#'   \code{\link{crop_to_focal_buffer}} before the graph is constructed. This
-#'   can substantially reduce graph size for large rasters where focal sites
-#'   occupy only part of the landscape. A scalar uses the same buffer in the
-#'   x and y directions; a length-two vector is interpreted as
-#'   \code{c(x_buffer, y_buffer)}.
+#' @param covariates A \code{SpatRaster} (or \code{PackedSpatRaster}) whose
+#'   layers contain the spatial covariates to be used in the conductance model.
+#'   Layer names must match the right-hand side of the formula passed to
+#'   \code{\link{terradish}}.  Scale continuous layers with
+#'   \code{\link{scale_covariates}} before calling this function.
+#' @param coords Locations of the focal sampling sites, in the same coordinate
+#'   reference system as \code{covariates}.  Supported inputs:
+#'   \code{terra::SpatVector} of points, a two-column numeric matrix (x in
+#'   column 1, y in column 2), or a data frame with columns named \code{x} and
+#'   \code{y} (or at least two columns, using the first two).
+#' @param directions Adjacency rule for the graph.  \code{4} connects each
+#'   cell to its four horizontal/vertical neighbours (rook adjacency);
+#'   \code{8} additionally includes the four diagonal neighbours (queen
+#'   adjacency).  \strong{\code{8} is recommended} for landscape genetics:
+#'   it allows diagonal movement, produces smoother resistance surfaces, and
+#'   is less sensitive to grid orientation artifacts.
+#' @param saveStack Logical.  If \code{TRUE} (default), the masked
+#'   \code{SpatRaster} is stored inside the returned \code{terradish_graph}
+#'   object.  Required for raster-based conductance visualization
+#'   (\code{plot(fit, type = "surface")}) and marginal-effect plots.  Set to
+#'   \code{FALSE} to reduce memory use when the raster is large and
+#'   visualization is not needed.
+#' @param crop_buffer Optional nonnegative map-unit buffer to crop
+#'   \code{covariates} around the focal coordinates before graph construction.
+#'   When supplied, \code{\link{crop_to_focal_buffer}} is called internally.
+#'   A scalar applies the same buffer in both x and y directions; a
+#'   length-two vector gives \code{c(x_buffer, y_buffer)}.  Units are the
+#'   raster's map units (degrees for lon/lat, metres for projected rasters).
+#'   See Details.
 #'
-#' @details NAs are shared across raster layers in \code{covariates}, and a
-#' warning is thrown if a given cell has mixed NA and non-NA values across the
-#' stack. Comparing models with different patterns of missing spatial data
-#' (e.g. fit to different stacks of rasters) can give superficially
-#' inconsistant results, as these essentially involve different sets of
-#' vertices. Thus model comparison should use models fitted to the same
+#' @details
+#' \strong{Missing values:} \code{NA} is propagated uniformly across all
+#' layers so every cell is either complete or entirely missing.  A warning is
+#' issued if some cells are \code{NA} in only a subset of layers, because this
+#' indicates that different covariates cover different areas — model comparison
+#' across raster stacks with different \code{NA} patterns is problematic since
+#' the graph vertices differ.  Always compare models using the same
 #' \code{terradish_graph} object.
 #'
-#' Disconnected components are identified and removed, so that only the largest connected component in the graph is retained. The function aborts if there are focal cells that belong to a disconnected component.
+#' \strong{Disconnected components:} after masking, the graph may contain
+#' cells that are isolated from the main component.  The function retains only
+#' the largest connected component and warns about the number of pruned cells.
+#' The function aborts if any focal site belongs to a disconnected component.
 #'
-#' If \code{crop_buffer} is supplied, cropping happens before missing-cell
-#' masking and graph construction. This changes the graph domain, so use the
-#' same cropped \code{terradish_graph} object for all models you intend to
-#' compare. A buffer that is too small can omit landscape context that may
-#' affect resistance distances; for sensitivity analyses, refit with several
-#' buffer widths and confirm that coefficients and likelihoods are stable.
+#' \strong{Cropping:} when \code{crop_buffer} is supplied, cropping changes
+#' the graph domain.  Always use the same \code{terradish_graph} for all
+#' models you intend to compare.  A buffer that is too tight may cut off
+#' landscape corridors that affect resistance distances; check stability by
+#' refitting with several buffer values.
 #'
-#' Categorical raster layers should be stored as factor-valued
-#' \code{SpatRaster} layers, see \code{\link[terra]{as.factor}} and the
-#' examples below. The names of levels are taken from the \code{VALUE} column
-#' of the associated levels table when present; otherwise the first non-\code{ID}
-#' column is used.
+#' \strong{Categorical covariates:} raster layers representing categorical
+#' variables must be stored as factor-valued \code{SpatRaster} layers (see
+#' \code{\link[terra]{as.factor}} and the example below).  Level names are
+#' taken from the \code{VALUE} column of the levels table when present;
+#' otherwise the first non-\code{ID} column is used.  Factor levels are
+#' dummy-coded by \code{\link[stats]{model.matrix}} during model fitting, with
+#' one level as the reference.
 #'
-#' @seealso \code{\link{terradish}}, \code{\link[terra]{rast}}
+#' \strong{Directions:} \code{directions = 4} gives a more conservative graph
+#' that can underestimate resistance in diagonal corridors.
+#' \code{directions = 8} is preferred unless there is a specific reason to
+#' restrict movement to the cardinal directions.
 #'
-#' @return An object of class \code{terradish_graph}
+#' @return An object of class \code{"terradish_graph"} (also inheriting
+#'   \code{"radish_graph"}) containing:
+#' \describe{
+#'   \item{\code{demes}}{Integer indices of cells corresponding to focal sites.}
+#'   \item{\code{x}}{Data frame of covariate values at non-missing cells.}
+#'   \item{\code{adj}}{Edge list (upper-triangular, 0-based).}
+#'   \item{\code{edge_pairs}}{Integer matrix of adjacent cell pairs.}
+#'   \item{\code{vertex_coordinates}}{xy-coordinate matrix of active cells.}
+#'   \item{\code{directions}}{The adjacency rule (4 or 8).}
+#'   \item{\code{covariates}}{Names of the covariate columns.}
+#'   \item{\code{stack}}{The masked \code{SpatRaster} (or \code{NULL} if
+#'     \code{saveStack = FALSE}).}
+#' }
 #'
 #' @references
 #'
@@ -253,17 +289,44 @@ conductance_surface <- function(covariates, coords, directions=4, saveStack=TRUE
 
 #' Estimate conductance from a fitted model
 #'
-#' Returns fitted conductance values, and confidence intervals when available,
-#' for a \code{terradish_graph} and fitted \code{terradish} object.
+#' Extracts per-cell conductance values and pointwise confidence intervals from
+#' a fitted \code{terradish} model, returning either a raster (when the graph
+#' stores its stack) or a matrix.
 #'
-#' @param x A \code{terradish_graph} object.
-#' @param fit A fitted object returned by \code{\link{terradish}}.
-#' @param quantile Confidence level used to compute conductance intervals.
+#' @param x A \code{terradish_graph} object returned by
+#'   \code{\link{conductance_surface}}.
+#' @param fit A fitted model returned by \code{\link{terradish}}.
+#' @param quantile Confidence level for the pointwise conductance interval.
+#'   The default \code{0.95} gives a 95% interval computed via the delta method
+#'   applied to the MLE of \code{theta} and its inverse Hessian.
 #' @param ... Additional arguments passed to methods.
 #'
-#' @return If the graph retains its raster stack, a three-layer
-#'   \code{terra::SpatRaster} with estimate and interval bounds. Otherwise a
-#'   matrix with one row per active cell.
+#' @details
+#' Confidence intervals are computed on the log-conductance scale and then
+#' exponentiated, so the point estimate always lies within the interval.  The
+#' intervals are asymptotic (delta method) and reflect only uncertainty in the
+#' conductance parameters \code{theta}; they do not account for uncertainty in
+#' the nuisance parameters \code{phi}.
+#'
+#' The function requires the MLE to be in the interior of the parameter space
+#' (\code{fit$fit$boundary == FALSE}); if the MLE is on the boundary (no
+#' detectable IBR signal) an error is thrown.
+#'
+#' @return
+#' If \code{x$stack} is non-\code{NULL} (the default when
+#' \code{saveStack = TRUE} in \code{\link{conductance_surface}}), a three-layer
+#' \code{terra::SpatRaster} with layer names:
+#' \describe{
+#'   \item{\code{est}}{Point-estimate conductance at each active cell.}
+#'   \item{\code{lower<Q>}}{Lower bound of the \code{quantile*100}\% interval
+#'     (e.g. \code{lower95} for the default \code{quantile = 0.95}).}
+#'   \item{\code{upper<Q>}}{Upper bound of the interval.}
+#' }
+#' Otherwise, a numeric matrix with one row per active cell and columns
+#' \code{est}, \code{lower<Q>}, and \code{upper<Q>}.
+#'
+#' @seealso \code{\link{terradish}}, \code{\link{conductance_surface}},
+#'   \code{\link{plot.terradish}}
 #'
 #' @examples
 #' library(terra)
@@ -283,7 +346,8 @@ conductance_surface <- function(covariates, coords, directions=4, saveStack=TRUE
 #'               control = NewtonRaphsonControl(maxit = 5))
 #'
 #' cond <- conductance(surface, fit)
-#' cond
+#' names(cond)   # "est", "lower95", "upper95"
+#' plot(cond)
 #'
 #' @export
 conductance <- function(x, ...)

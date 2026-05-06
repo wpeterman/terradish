@@ -72,6 +72,8 @@ SNP dosage, PCA score, or other numeric encodings.
 The function first obtains a numeric feature matrix. Microsatellite data can
 be supplied as allele calls by setting \code{input = "allele_calls"}; these are
 converted to allele dosage columns, one column per locus-allele combination.
+Missing allele calls are imputed to the modal observed allele within each
+locus, with a message reporting the number of imputed calls.
 
 If \code{groups = NULL}, rows of the processed feature matrix are used
 directly and squared Euclidean distances among individuals are transformed to

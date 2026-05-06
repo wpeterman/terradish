@@ -1,44 +1,76 @@
-#' Maximum likelihood population effects
+#' Maximum likelihood population effects (MLPE) measurement model
 #'
-#' A function of class \code{measurement_model} that calculates likelihood,
-#' gradient, hessian, and partial derivatives of nuisance parameters and the
-#' Laplacian generalized inverse, using the "maximum likelihood population
-#' effects" model of Clarke et al (2002) with a non-negative slope
-#' between genetic and resistance distance.
+#' A function of class \code{"terradish_measurement_model"} that evaluates the
+#' maximum likelihood population effects (MLPE) likelihood.  MLPE accounts for
+#' the non-independence of pairwise genetic distances that share a sampling
+#' site, and is the recommended measurement model for distance-matrix data.
 #'
-#' @param E A submatrix of the generalized inverse of the graph Laplacian (e.g. a covariance matrix)
-#' @param S A matrix of observed genetic distances
-#' @param phi Nuisance parameters (see details)
-#' @param nu Unused
-#' @param gradient Compute gradient of negative loglikelihood with regard to \code{phi}?
-#' @param hessian Compute Hessian matrix of negative loglikelihood with regard to \code{phi}?
-#' @param partial Compute second partial derivatives of negative loglikelihood with regard to \code{phi}, \code{E}, \code{S}?
-#' @param nonnegative Force slope to be nonnegative?
-#' @param validate Numerical validation via package \code{numDeriv} (very slow, use for debugging small examples)
+#' @param E Conductance-implied covariance matrix: the generalized inverse of
+#'   the graph Laplacian, evaluated at the current conductance parameters.
+#'   Passed automatically by the optimizer; users normally do not call this
+#'   function directly.
+#' @param S Square, symmetric matrix of observed pairwise genetic distances
+#'   (e.g. F\eqn{_{ST}}). Must have the same dimensions as \code{E}.
+#' @param phi Named numeric vector of nuisance parameters \code{(alpha, beta,
+#'   tau, rho)}.  Omit to obtain starting values: \code{alpha}, \code{beta},
+#'   and \code{tau} from a least-squares fit, and \code{rho} initialized at a
+#'   weak positive correlation.
+#' @param nu Unused; present for a common interface with Wishart measurement
+#'   models.
+#' @param gradient Logical. Compute gradient of the negative log-likelihood
+#'   with respect to \code{phi}?
+#' @param hessian Logical. Compute Hessian of the negative log-likelihood with
+#'   respect to \code{phi}?
+#' @param partial Logical. Compute second partial derivatives with respect to
+#'   \code{phi}, \code{E}, and \code{S}? Required by the optimizer.
+#' @param nonnegative Logical. Constrain the IBR slope \code{beta} to be
+#'   nonnegative? Default \code{TRUE}.
+#' @param validate Logical. Numerically validate gradients and Hessians via
+#'   \pkg{numDeriv}? Very slow; for debugging small examples only.
 #'
-#' @details The nuisance parameters \code{phi} are the intercept ("alpha"), slope ("beta"), negative log residual
-#' deviation ("tau"), and logit-transformed correlation parameter ("rho") of the MLPE regression. If not supplied, \code{phi}
-#' is initialized from the least-squares fit together with a weak positive
-#' correlation start. The mean structure is
-#' \code{S_ij = alpha + beta * R_ij + e_ij}, where \code{R_ij} is the
-#' resistance distance implied by \code{E}. The residual vector follows the
-#' MLPE correlation structure with precision \code{exp(tau)} and correlation
-#' parameter \code{plogis(rho) / 2}.
+#' @details
+#' The nuisance parameters are:
+#' \describe{
+#'   \item{\code{alpha}}{Intercept of the mean structure.}
+#'   \item{\code{beta}}{IBR slope (resistance-distance effect); constrained
+#'     \eqn{\geq 0} when \code{nonnegative = TRUE}.}
+#'   \item{\code{tau}}{Log-precision parameter: residual variance is
+#'     \eqn{\exp(-\tau)}.}
+#'   \item{\code{rho}}{Logit-transformed MLPE correlation parameter; the
+#'     actual correlation is \eqn{\text{plogis}(\rho)/2 \in (0, 0.5)}.}
+#' }
 #'
-#' @seealso \code{\link{terradish_measurement_model}}
+#' The mean structure is \eqn{S_{ij} = \alpha + \beta R_{ij} + e_{ij}}, where
+#' \eqn{R_{ij}} is the resistance distance derived from \code{E}.  The
+#' residual vector \eqn{e} follows the MLPE correlation structure of Clarke
+#' et al. (2002): two pairs \eqn{(i,j)} and \eqn{(i,k)} sharing site \eqn{i}
+#' have correlation \eqn{\rho}, while pairs sharing no site are uncorrelated.
 #'
-#' @return A list containing:
-#'  \item{covariance}{rows/columns of the generalized inverse of the graph Laplacian for a subset of target vertices}
-#'  \item{objective}{(if \code{objective}) the negative loglikelihood}
-#'  \item{fitted}{((if \code{objective}) a matrix of expected genetic distances among target vertices}
-#'  \item{boundary}{(if \code{objective}) is the MLE on the boundary (e.g. no genetic structure)?}
-#'  \item{gradient}{(if \code{gradient}) gradient of negative loglikelihood with respect to phi}
-#'  \item{hessian}{(if \code{hessian}) Hessian matrix of the negative loglikelihood with respect to phi}
-#'  \item{gradient_E}{(if \code{partial}) gradient with respect to the generalized inverse of the graph Laplacian}
-#'  \item{partial_E}{(if \code{partial}) Jacobian of \code{gradient_E} with respect to phi}
-#'  \item{partial_S}{(if \code{partial}) Jacobian of \code{gradient} with respect to S}
-#'  \item{jacobian_E}{(if \code{partial}) a function used for reverse algorithmic differentiation}
-#'  \item{jacobian_S}{(if \code{partial}) a function used for reverse algorithmic differentiation}
+#' Use \code{\link{mlpe_covariates}} to extend the mean structure with
+#' additional fixed pairwise covariates (isolation by environment).
+#'
+#' @references
+#' Clarke RT, Rothery P, Raybould AF. 2002. Confidence limits for regression
+#' relationships between distance matrices: estimating gene flow with distance.
+#' Journal of Agricultural, Biological, and Environmental Statistics
+#' 7(3):361-372.
+#'
+#' @seealso \code{\link{leastsquares}}, \code{\link{mlpe_covariates}},
+#'   \code{\link{generalized_wishart}}, \code{\link{terradish}}
+#'
+#' @return When \code{phi} is missing, a list with elements \code{phi}
+#'   (starting values), \code{lower}, and \code{upper} (parameter bounds).
+#'   Otherwise a list containing:
+#'  \item{objective}{Negative log-likelihood.}
+#'  \item{fitted}{Matrix of expected genetic distances (same dimensions as \code{S}).}
+#'  \item{boundary}{Logical; \code{TRUE} if \code{beta = 0}, indicating no detectable IBR signal.}
+#'  \item{gradient}{Gradient with respect to \code{phi} (if \code{gradient = TRUE}).}
+#'  \item{hessian}{Hessian matrix with respect to \code{phi} (if \code{hessian = TRUE}).}
+#'  \item{gradient_E}{Gradient with respect to \code{E} (if \code{partial = TRUE}).}
+#'  \item{partial_E}{Jacobian of \code{gradient_E} with respect to \code{phi} (if \code{partial = TRUE}).}
+#'  \item{partial_S}{Jacobian of \code{gradient} with respect to the lower triangle of \code{S} (if \code{partial = TRUE}).}
+#'  \item{jacobian_E}{Function for reverse-mode AD through \code{E} (if \code{partial = TRUE}).}
+#'  \item{jacobian_S}{Function for reverse-mode AD through \code{S} (if \code{partial = TRUE}).}
 #'
 #' @examples
 #' library(terra)

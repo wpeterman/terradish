@@ -1,46 +1,87 @@
-#' Wishart covariance regression
+#' Wishart covariance measurement model
 #'
-#' A function of class \code{measurement_model} that calculates likelihood,
-#' gradient, hessian, and partial derivatives of nuisance parameters and the
-#' Laplacian generalized inverse, using a Wishart model for an observed
-#' covariance matrix.
+#' A function of class \code{"terradish_measurement_model"} that evaluates a
+#' Wishart likelihood for an observed genetic \strong{covariance} matrix.
+#' This is the natural model when raw genotype data are summarized with
+#' \code{\link{cov_from_genetic_data}} or \code{\link{cov_from_biallelic}}
+#' rather than as pairwise distances.  For distance-matrix data use
+#' \code{\link{generalized_wishart}}.
 #'
-#' @param E A submatrix of the generalized inverse of the graph Laplacian (e.g.
-#'   a covariance matrix implied by the resistance surface).
-#' @param S A matrix of observed genetic covariance.
-#' @param phi Nuisance parameters (see details).
-#' @param nu Number of genetic markers.
-#' @param gradient Compute gradient of negative loglikelihood with regard to
-#'   \code{phi}?
-#' @param hessian Compute Hessian matrix of negative loglikelihood with regard
-#'   to \code{phi}?
-#' @param partial Compute second partial derivatives of negative loglikelihood
-#'   with regard to \code{phi}, \code{E}, \code{S}?
-#' @param nonnegative Unused.
-#' @param validate Numerical validation via package \code{numDeriv} (very slow,
-#'   use for debugging small examples).
+#' @param E Conductance-implied covariance matrix: the generalized inverse of
+#'   the graph Laplacian at the current conductance parameters.  Passed
+#'   automatically by the optimizer; users normally do not call this function
+#'   directly.
+#' @param S Square, symmetric matrix of observed population-level genetic
+#'   covariance.  Typically the output of \code{\link{cov_from_genetic_data}}
+#'   or \code{\link{cov_from_biallelic}}.  Must have the same dimensions as
+#'   \code{E} and should be positive (semi-)definite.
+#' @param phi Named numeric vector of nuisance parameters \code{(tau, sigma)}.
+#'   Omit to obtain least-squares starting values.
+#' @param nu Positive integer.  The number of genetic markers used to compute
+#'   \code{S}, which acts as the Wishart degrees-of-freedom parameter.  Must be
+#'   supplied; it is not estimated.  Pass via the \code{nu} argument of
+#'   \code{\link{terradish}}.
+#' @param gradient Logical. Compute gradient of the negative log-likelihood
+#'   with respect to \code{phi}?
+#' @param hessian Logical. Compute Hessian with respect to \code{phi}?
+#' @param partial Logical. Compute second partial derivatives with respect to
+#'   \code{phi}, \code{E}, and \code{S}?
+#' @param nonnegative Unused; present for interface consistency.
+#' @param validate Logical. Numerically validate gradients and Hessians via
+#'   \pkg{numDeriv}? Very slow; for debugging small examples only.
 #'
-#' @details The nuisance parameters are the scaling of the generalized inverse
-#' of the graph Laplacian ("tau"; can be zero) and a log scalar multiple of the
-#' identity matrix that is added to the generalized inverse ("sigma"). The
-#' fitted covariance is \code{Sigma = tau * E + exp(sigma) * I}, and the model
-#' evaluates a Wishart negative log-likelihood for the observed covariance
-#' matrix \code{S}, treating \code{nu} as the effective number of loci.
+#' @details
+#' The nuisance parameters are:
+#' \describe{
+#'   \item{\code{tau}}{Nonnegative scale applied to the conductance-implied
+#'     covariance \code{E}.  A value near zero signals no detectable resistance
+#'     effect.}
+#'   \item{\code{sigma}}{Log-scale nugget: the identity component added to the
+#'     model covariance is \eqn{\exp(\sigma)}.  It absorbs genetic drift,
+#'     population-size differences, and any variation not explained by landscape
+#'     resistance.}
+#' }
 #'
-#' @seealso \code{\link{terradish_measurement_model}},
-#'   \code{\link{generalized_wishart}}
+#' The fitted covariance is \eqn{\Sigma = \tau E + \exp(\sigma) I}.  The
+#' negative log-likelihood is:
 #'
-#' @return A list containing:
-#'  \item{objective}{the negative loglikelihood}
-#'  \item{fitted}{the fitted covariance response matrix}
-#'  \item{boundary}{is the MLE on the boundary (e.g. no spatial genetic structure)?}
-#'  \item{gradient}{gradient of negative loglikelihood with respect to phi}
-#'  \item{hessian}{Hessian matrix of negative loglikelihood with respect to phi}
-#'  \item{gradient_E}{gradient with respect to the generalized inverse of the graph Laplacian}
-#'  \item{partial_E}{Jacobian of \code{gradient_E} with respect to phi}
-#'  \item{partial_S}{Jacobian of \code{gradient} with respect to the strict lower triangle of S}
-#'  \item{jacobian_E}{a function used for reverse algorithmic differentiation}
-#'  \item{jacobian_S}{a function used for reverse algorithmic differentiation}
+#' \deqn{-\ell = \frac{\nu}{2} \left[ \log|\Sigma| + \mathrm{tr}(\Sigma^{-1} S) \right]}
+#'
+#' treating \code{S} as a sample covariance with \eqn{\nu} degrees of freedom
+#' (i.e. a Wishart distribution scaled by \eqn{1/\nu}).
+#'
+#' \strong{Typical workflow:}
+#' \enumerate{
+#'   \item Compute \code{S} from raw genotypes:
+#'     \code{S <- cov_from_genetic_data(dosage_matrix, groups = pop_vector)}.
+#'   \item Set \code{nu} to the number of retained markers
+#'     (\code{attr(S, "normalizer")} if \code{normalize = "features"}, or the
+#'     column count of the feature matrix).
+#'   \item Fit:
+#'     \code{terradish(S ~ ..., measurement_model = wishart_covariance, nu = nu)}.
+#' }
+#'
+#' If \code{S} has a non-positive-definite covariance (which can happen with
+#' the \code{diagonal = "within"} option of \code{cov_from_genetic_data}),
+#' inspect eigenvalues before fitting.
+#'
+#' @seealso \code{\link{cov_from_genetic_data}}, \code{\link{cov_from_biallelic}},
+#'   \code{\link{generalized_wishart}}, \code{\link{simulate_covariance_response}},
+#'   \code{\link{terradish}}
+#'
+#' @return When \code{phi} is missing, a list with elements \code{phi}
+#'   (least-squares starting values for \code{(tau, sigma)}), \code{lower}
+#'   (\code{c(0, -Inf)}), and \code{upper}.  Otherwise a list containing:
+#'  \item{objective}{Negative log-likelihood.}
+#'  \item{fitted}{Fitted covariance matrix \eqn{\Sigma} (same dimensions as \code{S}).}
+#'  \item{boundary}{Logical; \code{TRUE} if \code{tau = 0}, indicating no detectable IBR signal.}
+#'  \item{gradient}{Gradient with respect to \code{phi} (if \code{gradient = TRUE}).}
+#'  \item{hessian}{Hessian matrix with respect to \code{phi} (if \code{hessian = TRUE}).}
+#'  \item{gradient_E}{Gradient with respect to \code{E} (if \code{partial = TRUE}).}
+#'  \item{partial_E}{Jacobian of \code{gradient_E} with respect to \code{phi} (if \code{partial = TRUE}).}
+#'  \item{partial_S}{Jacobian of \code{gradient} with respect to the lower triangle of \code{S} (if \code{partial = TRUE}).}
+#'  \item{jacobian_E}{Function for reverse-mode AD through \code{E} (if \code{partial = TRUE}).}
+#'  \item{jacobian_S}{Function for reverse-mode AD through \code{S} (if \code{partial = TRUE}).}
 #'
 #' @examples
 #' E <- matrix(c(1.2, 0.3, 0.2,

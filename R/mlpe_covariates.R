@@ -1,29 +1,65 @@
 #' Pairwise endpoint-difference covariates
 #'
-#' Construct pairwise covariates from site-level environmental values so they
-#' can be used alongside isolation-by-resistance terms in an MLPE measurement
-#' model.
+#' Constructs pairwise environmental-mismatch covariates from site-level
+#' values.  The result can be used alongside isolation-by-resistance (IBR)
+#' terms to model isolation by environment (IBE) within
+#' \code{\link{mlpe_covariates}}.
 #'
-#' @param x Site-level covariates. Supported inputs are numeric vectors,
-#'   matrices, data frames, and \code{terra::SpatRaster} objects. When
-#'   \code{x} is a raster, \code{coords} supplies the focal-point locations to
-#'   extract.
-#' @param coords Optional focal-point coordinates used when \code{x} is a
-#'   raster. Accepts the same inputs as \code{\link{conductance_surface}}.
-#' @param transform How to convert site-level covariates into pairwise
-#'   endpoint-difference covariates. \code{"absdiff"} and \code{"sqdiff"}
-#'   return one column per site-level covariate; \code{"euclidean"} and
-#'   \code{"manhattan"} collapse multivariate site-level covariates to a single
-#'   pairwise distance.
-#' @param scale Should site-level covariates be standardized before the pairwise
-#'   transform is applied?
+#' @param x Site-level covariates.  Supported inputs:
+#'   \itemize{
+#'     \item A numeric vector (one covariate per site).
+#'     \item A numeric matrix or data frame (sites in rows, covariates in
+#'       columns).
+#'     \item A \code{terra::SpatRaster}: values are extracted at \code{coords}.
+#'   }
+#' @param coords Required when \code{x} is a raster.  Focal-point coordinates
+#'   in the same projection as \code{x}; accepts the same inputs as
+#'   \code{\link{conductance_surface}}.
+#' @param transform How to collapse site-level values into a pairwise
+#'   environmental-mismatch measure.
+#'   \describe{
+#'     \item{\code{"absdiff"}}{Absolute difference between endpoints:
+#'       \eqn{|x_i - x_j|}.  One output column per covariate.  Symmetric;
+#'       suitable when you expect environmental dissimilarity (regardless of
+#'       direction) to drive differentiation.}
+#'     \item{\code{"sqdiff"}}{Squared difference:
+#'       \eqn{(x_i - x_j)^2}.  One output column per covariate.  Like
+#'       \code{"absdiff"} but penalizes large differences more heavily.}
+#'     \item{\code{"euclidean"}}{Euclidean distance across all covariates:
+#'       \eqn{\sqrt{\sum_k (x_{ik} - x_{jk})^2}}.  Collapses multivariate
+#'       data to a single dissimilarity measure.}
+#'     \item{\code{"manhattan"}}{Manhattan (city-block) distance:
+#'       \eqn{\sum_k |x_{ik} - x_{jk}|}.  Collapses to a single measure;
+#'       less sensitive to outliers than Euclidean.}
+#'   }
+#' @param scale Logical.  If \code{TRUE}, standardize (z-score) site-level
+#'   covariates before computing the pairwise transform.  Recommended when
+#'   covariates are on different scales.
 #'
-#' @return A matrix with one row per unordered pair of focal points and one or
-#'   more columns of endpoint-difference covariates. The returned object carries
-#'   class \code{"terradish_pairwise_covariates"} so it can be subset and
-#'   rebuilt automatically inside \code{\link{terradish_cv}}.
+#' @details
+#' The function produces a \eqn{n(n-1)/2 \times p} matrix of pairwise
+#' endpoint-difference covariates, where \eqn{n} is the number of focal sites
+#' and \eqn{p} is the number of output columns (one per input covariate for
+#' \code{"absdiff"} and \code{"sqdiff"}; one for \code{"euclidean"} and
+#' \code{"manhattan"}).  Rows correspond to the lower triangle of the
+#' pairwise distance matrix, scanned column by column.
 #'
-#' @seealso \code{\link{mlpe_covariates}}, \code{\link{terradish_cv}}
+#' The returned object has class \code{"terradish_pairwise_covariates"}.  This
+#' class carries the original site-level covariate matrix and the chosen
+#' transform as attributes, so that \code{\link{terradish_cv}} can
+#' automatically rebuild the correct pairwise covariates for each train/test
+#' split.
+#'
+#' If \code{x} already has class \code{"terradish_pairwise_covariates"}, it is
+#' returned unchanged (pass-through).
+#'
+#' @return A numeric matrix of class \code{"terradish_pairwise_covariates"}
+#'   with one row per unordered site pair and named columns reflecting the
+#'   chosen transform (e.g. \code{"absdiff_altitude"},
+#'   \code{"euclidean"}).
+#'
+#' @seealso \code{\link{mlpe_covariates}}, \code{\link{terradish_cv}},
+#'   \code{\link{terradish}}
 #'
 #' @examples
 #' library(terra)
@@ -59,37 +95,55 @@ pairwise_endpoint_covariates <- function(x,
   .make_pairwise_endpoint_covariates(site_covariates, transform = transform)
 }
 
-#' MLPE with endpoint-difference covariates
+#' MLPE measurement model with pairwise endpoint-difference covariates
 #'
-#' Create an MLPE measurement model whose mean structure includes both
-#' resistance distance and one or more pairwise endpoint-difference covariates.
+#' Creates an MLPE measurement model whose mean structure includes both an IBR
+#' term (resistance distance) and one or more fixed pairwise environmental
+#' covariates (IBE terms).
 #'
-#' @param x Pairwise endpoint-difference covariates returned by
-#'   \code{\link{pairwise_endpoint_covariates}}, or site-level environmental
-#'   covariates that can be converted by that helper.
-#' @param coords Optional focal-point coordinates used when \code{x} is a
-#'   raster.
-#' @param transform Pairwise transform passed through to
-#'   \code{\link{pairwise_endpoint_covariates}} when \code{x} contains site-level
-#'   covariates rather than a precomputed pairwise matrix.
-#' @param scale Should site-level covariates be standardized before their
-#'   pairwise transform is computed?
-#' @param rho_start Starting value for the MLPE correlation parameter on the
-#'   natural scale, constrained to \code{(0, 0.5)}.
+#' @param x Pairwise endpoint-difference covariates (the output of
+#'   \code{\link{pairwise_endpoint_covariates}}), \emph{or} site-level
+#'   environmental data in any format accepted by that helper (numeric vector,
+#'   matrix, data frame, or \code{terra::SpatRaster}).
+#' @param coords Optional focal-point coordinates, required when \code{x} is
+#'   a raster.  Accepts the same formats as \code{\link{conductance_surface}}.
+#' @param transform Pairwise transform applied when \code{x} is not already a
+#'   \code{"terradish_pairwise_covariates"} object.  Passed through to
+#'   \code{\link{pairwise_endpoint_covariates}}.
+#' @param scale Logical.  Standardize site-level covariates before the
+#'   pairwise transform?  Passed to \code{\link{pairwise_endpoint_covariates}}.
+#' @param rho_start Starting value for the MLPE correlation parameter \eqn{\rho}
+#'   on its natural scale, which must lie in \code{(0, 0.5)}.  The default
+#'   \code{0.2} corresponds to a moderate shared-site correlation.  Adjust if
+#'   the optimizer fails to improve from the starting value.
 #'
-#' @details The fitted mean structure is
-#' \code{S_ij = alpha + beta * R_ij + Z_ij \%*\% gamma + e_ij}, where
-#' \code{R_ij} is the resistance distance implied by the optimized conductance
-#' surface and \code{Z_ij} are fixed endpoint-difference covariates. When the
-#' model is constructed from site-level covariates or the output of
-#' \code{pairwise_endpoint_covariates()}, \code{\link{terradish_cv}} can rebuild
-#' the measurement model automatically on each train/test split.
+#' @details
+#' The fitted mean structure is:
 #'
-#' @return A function of class \code{"terradish_measurement_model"} suitable for
-#'   \code{\link{terradish}}, \code{\link{terradish_grid}}, and
-#'   \code{\link{terradish_cv}}.
+#' \deqn{S_{ij} = \alpha + \beta R_{ij} + Z_{ij}^\top \gamma + e_{ij}}
 #'
-#' @seealso \code{\link{mlpe}}, \code{\link{pairwise_endpoint_covariates}}
+#' where \eqn{R_{ij}} is the resistance distance (IBR) and \eqn{Z_{ij}} is the
+#' row of pairwise endpoint-difference covariates for the pair \eqn{(i,j)}
+#' (IBE).  The residuals follow the MLPE correlation structure of Clarke et al.
+#' (2002).
+#'
+#' The nuisance parameters (intercept \eqn{\alpha}, IBR slope \eqn{\beta},
+#' IBE coefficients \eqn{\gamma}, log-precision \code{tau}, and logit MLPE
+#' correlation \code{rho}) are all profiled out during optimization; only the
+#' conductance parameters in the formula are optimized by the outer loop.
+#'
+#' When \code{x} is site-level data or the output of
+#' \code{pairwise_endpoint_covariates()}, the pairwise covariate matrix is
+#' stored as an attribute of the returned function.  This allows
+#' \code{\link{terradish_cv}} to rebuild the correct pairwise covariates for
+#' each train/test split automatically.
+#'
+#' @return A function of class \code{"terradish_measurement_model"} suitable
+#'   for use as the \code{measurement_model} argument of \code{\link{terradish}},
+#'   \code{\link{terradish_grid}}, and \code{\link{terradish_cv}}.
+#'
+#' @seealso \code{\link{mlpe}}, \code{\link{pairwise_endpoint_covariates}},
+#'   \code{\link{terradish_cv}}
 #'
 #' @examples
 #' library(terra)
