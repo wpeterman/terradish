@@ -11,6 +11,7 @@ This repository contains an R package. The goal of any automated coding work is 
 - Do not silently change numerical behavior, defaults, or return values.
 - When touching package code, also inspect tests, documentation, and examples that may need updating.
 
+
 ## Package structure
 Typical files and directories that may be relevant:
 - `DESCRIPTION`
@@ -38,6 +39,16 @@ Typical files and directories that may be relevant:
 - If function behavior, arguments, defaults, return values, or examples change, update the roxygen comments in `R/`.
 - Do not edit generated `.Rd` files directly unless explicitly instructed.
 - Keep examples lightweight and CRAN-safe.
+- Do not use em-dashes within sentences. Reserve use for headings, tables, bullet lists.
+- Use American English.
+- Do not create or fabricate references in support of methods.
+
+## Vignette rules
+- Be as descriptive in text as possible to make the document educational.
+- Provide annotation of code.
+- Do not use em-dashes within sentences. Reserve use for headings, tables, bullet lists.
+- Use American English.
+- Do not create or fabricate references in support of methods.
 
 ## Testing rules
 - For any nontrivial code change, add or update tests in `tests/testthat/`.
@@ -49,6 +60,7 @@ Typical files and directories that may be relevant:
 - When making a commit, increase the version by 0.0.1, unless a larger increment is specified.
 - Provide a succinct, minimal review of what the update contains.
 - Correspondingly, update the version in `DESCRIPTION`.
+- If `NEWS`exists, add entry with new version numbers a brief, bullet description of the changes.
 - Do not commit changes until explicitly asked. Minor related edits can accumulate into one commit.
 
 ## Development workflow

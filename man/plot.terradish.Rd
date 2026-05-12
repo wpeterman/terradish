@@ -10,6 +10,7 @@
   type = c("marginal_response", "fit", "surface", "marginal", "sigma"),
   data = NULL,
   covariates = NULL,
+  marginal_covariates = NULL,
   conductance_model = NULL,
   distance_per_map_unit = NULL,
   distance_unit = NULL,
@@ -35,6 +36,11 @@ for \code{type = "surface"}, \code{type = "marginal"}, and
 \code{type = "marginal"}, the x-axis of each panel is back-transformed to
 the original units using the corresponding per-layer offset and divisor.
 Layer names must match the covariate names used in the model formula.}
+
+\item{marginal_covariates}{Optional character vector used with
+\code{type = "marginal"} or \code{type = "marginal_response"} to plot only
+selected covariate panels. Values should usually be raw formula variable
+names such as \code{"altitude"}; displayed panel labels are also accepted.}
 
 \item{conductance_model}{Optional conductance model factory used when fitting
 \code{x}. When omitted, \code{plot()} first tries to reuse the fitted
@@ -99,9 +105,11 @@ Three plot types for objects returned by \code{\link{terradish}}:
     effects obtained by mapping the marginal conductance curve through the
     fitted measurement-model mean and adding predictive bands that combine
     \code{theta} uncertainty, conditional \code{phi} uncertainty, and the
-    residual variance implied by \code{tau}. For Gaussian scale-aware
-    conductance models, the predictive bands are likewise conditional on the
-    fitted \code{sigma} values.}
+    residual variance implied by \code{tau} for distance-response models.
+    Covariance-response fits from \code{\link{wishart_covariance}} are shown
+    as the average fitted genetic covariance over the modeled lower triangle.
+    For Gaussian scale-aware conductance models, the predictive bands are
+    likewise conditional on the fitted \code{sigma} values.}
   \item{\code{"sigma"}}{For Gaussian scale-aware conductance models, plots
     the fitted Gaussian kernel against distance for each \code{sigma} term,
     with a dashed line at the fitted effective distance containing 90\% of

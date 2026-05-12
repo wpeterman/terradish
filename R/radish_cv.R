@@ -22,6 +22,7 @@
 }
 
 .fit_terradish_with_fallback <- function(formula, data, measurement_model, nu = NULL,
+                                         conductance_model = loglinear_conductance,
                                          theta = NULL, cores = 1L, dots = list(),
                                          response_matrix = NULL)
 {
@@ -29,7 +30,7 @@
   {
     args <- c(list(formula = formula,
                    data = data,
-                   conductance_model = loglinear_conductance,
+                   conductance_model = conductance_model,
                    measurement_model = measurement_model,
                    nu = nu,
                    optimizer = optimizer,
@@ -49,6 +50,27 @@
     stop("Could not optimize terradish model: ", conditionMessage(fit), call. = FALSE)
 
   fit
+}
+
+.cv_conductance_model_for_surface <- function(conductance_model, formula,
+                                              surface, reference_model = NULL)
+{
+  rebuild_for_surface <- attr(conductance_model, "rebuild_for_surface",
+                              exact = TRUE)
+  if (isTRUE(attr(conductance_model, "requires_fixed_graph", exact = TRUE)) &&
+      is.function(rebuild_for_surface))
+  {
+    rebuilt_factory <- function(formula, x)
+      rebuild_for_surface(formula, surface, reference_model = reference_model)
+    attrs <- attributes(conductance_model)
+    attrs$rebuild_for_surface <- NULL
+    attrs$requires_fixed_graph <- NULL
+    attrs$class <- class(conductance_model)
+    attributes(rebuilt_factory) <- attrs
+    return(rebuilt_factory)
+  }
+
+  conductance_model
 }
 
 .result_dir_files <- function(path)
@@ -410,6 +432,12 @@ radish_parameters <- function(...)
 #' @param fit_full Should the model also be fit to all focal points?
 #' @param directions Neighborhood definition passed to
 #'   \code{\link{conductance_surface}}.
+#' @param conductance_model Conductance-model factory used for training and
+#'   held-out evaluation. Defaults to \code{\link{loglinear_conductance}}.
+#'   Factories that require a fixed graph, such as
+#'   \code{\link{gaussian_smoothed_loglinear_conductance}}, are rebuilt on each
+#'   cross-validation surface when they provide a \code{rebuild_for_surface}
+#'   method.
 #' @param cores Number of worker processes to use in downstream \code{terradish}
 #'   fits and grid evaluation.
 #' @param ... Additional arguments passed to \code{\link{terradish}}, such as
@@ -451,11 +479,15 @@ terradish_cv <- function(pts,
                       seed = NULL,
                       fit_full = TRUE,
                       directions = 8,
+                      conductance_model = loglinear_conductance,
                       cores = 1L,
                       ...)
 {
   stopifnot(length(prop_train) == 1, is.numeric(prop_train), prop_train > 0, prop_train < 1)
   stopifnot(length(cores) == 1, is.numeric(cores), cores >= 1)
+  stopifnot(inherits(conductance_model,
+                    c("terradish_conductance_model_factory",
+                      "radish_conductance_model_factory")))
 
   if (is.null(seed))
     seed <- sample.int(.Machine$integer.max, 1)
@@ -504,9 +536,13 @@ terradish_cv <- function(pts,
   gd_mat <- gd_mat_full[train_, train_, drop = FALSE]
   training_surface <- conductance_surface(covariates, pts[train_, , drop = FALSE],
                                           directions = directions)
+  training_conductance_model <- .cv_conductance_model_for_surface(
+    conductance_model, fmla_radish, training_surface
+  )
   fit <- .fit_terradish_with_fallback(fmla_radish, training_surface,
                                       measurement_model = measurement_model_train,
                                       nu = nu,
+                                      conductance_model = training_conductance_model,
                                       cores = cores,
                                       dots = training_dots,
                                       response_matrix = gd_mat)
@@ -517,11 +553,15 @@ terradish_cv <- function(pts,
   gd_mat <- gd_mat_full[test_, test_, drop = FALSE]
   test_surface <- conductance_surface(covariates, pts[test_, , drop = FALSE],
                                       directions = directions)
+  test_conductance_model <- .cv_conductance_model_for_surface(
+    conductance_model, fmla_radish, test_surface,
+    reference_model = fit$submodels$f_internal
+  )
   measurement_model_test <- .terradish_measurement_model(model, subset = test_)
   ll <- terradish_grid(theta = matrix(coef(fit), nrow = 1),
                     formula = fmla_radish,
                     data = test_surface,
-                    conductance_model = loglinear_conductance,
+                    conductance_model = test_conductance_model,
                     measurement_model = measurement_model_test,
                     nu = nu,
                     cores = cores,
@@ -538,10 +578,15 @@ terradish_cv <- function(pts,
   {
     gd_mat <- gd_mat_full
     full_surface <- conductance_surface(covariates, pts, directions = directions)
+    full_conductance_model <- .cv_conductance_model_for_surface(
+      conductance_model, fmla_radish, full_surface,
+      reference_model = fit$submodels$f_internal
+    )
     measurement_model_full <- .terradish_measurement_model(model)
     out$full_mod <- .fit_terradish_with_fallback(fmla_radish, full_surface,
                                                  measurement_model = measurement_model_full,
                                                  nu = nu,
+                                                 conductance_model = full_conductance_model,
                                                  theta = fit$mle$theta,
                                                  cores = cores,
                                                  dots = training_dots,
@@ -573,6 +618,8 @@ terradish_cv <- function(pts,
 #'   retained in the returned object?
 #' @param directions Neighborhood definition passed to
 #'   \code{\link{conductance_surface}}.
+#' @param conductance_model Conductance-model factory used for each replicate.
+#'   See \code{\link{terradish_cv}}.
 #' @param cores Number of worker processes to use in downstream \code{terradish}
 #'   fits and grid evaluation.
 #' @param ... Additional arguments passed to \code{\link{terradish}}, such as
@@ -616,6 +663,7 @@ terradish_cv_replicates <- function(pts,
                                     fit_full = FALSE,
                                     keep_fits = FALSE,
                                     directions = 8,
+                                    conductance_model = loglinear_conductance,
                                     cores = 1L,
                                     ...)
 {
@@ -657,6 +705,7 @@ terradish_cv_replicates <- function(pts,
           seed = seeds[i],
           fit_full = fit_full,
           directions = directions,
+          conductance_model = conductance_model,
           cores = cores
         ),
         list(...)

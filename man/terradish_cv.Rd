@@ -15,6 +15,7 @@ terradish_cv(
   seed = NULL,
   fit_full = TRUE,
   directions = 8,
+  conductance_model = loglinear_conductance,
   cores = 1L,
   ...
 )
@@ -44,6 +45,13 @@ generated and returned.}
 
 \item{directions}{Neighborhood definition passed to
 \code{\link{conductance_surface}}.}
+
+\item{conductance_model}{Conductance-model factory used for training and
+held-out evaluation. Defaults to \code{\link{loglinear_conductance}}.
+Factories that require a fixed graph, such as
+\code{\link{gaussian_smoothed_loglinear_conductance}}, are rebuilt on each
+cross-validation surface when they provide a \code{rebuild_for_surface}
+method.}
 
 \item{cores}{Number of worker processes to use in downstream \code{terradish}
 fits and grid evaluation.}

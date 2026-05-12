@@ -149,10 +149,18 @@ test_that("plot methods handle covariance responses and smooth conductance", {
                 levels(marginal_plot$data$covariate))
   expect_true(all(is.finite(marginal_plot$data$est)))
 
-  expect_error(
-    plot(fit, type = "marginal_response", data = surface, n = 4),
-    "regression-style measurement model"
-  )
+  marginal_response_plot <- plot(fit, type = "marginal_response",
+                                 data = surface, n = 4)
+  expect_s3_class(marginal_response_plot, "ggplot")
+  expect_equal(marginal_response_plot$scales$get_scales("y")$name,
+               "Predicted genetic covariance")
+  expect_true("altitude (original scale)" %in%
+                levels(marginal_response_plot$data$covariate))
+  expect_true(all(is.finite(marginal_response_plot$data$est)))
+  expect_true(all(marginal_response_plot$data$lower <=
+                    marginal_response_plot$data$est))
+  expect_true(all(marginal_response_plot$data$est <=
+                    marginal_response_plot$data$upper))
 })
 
 test_that("wishart_covariance supports leverage on full covariance responses", {

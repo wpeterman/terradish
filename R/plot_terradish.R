@@ -23,9 +23,11 @@
 #'     effects obtained by mapping the marginal conductance curve through the
 #'     fitted measurement-model mean and adding predictive bands that combine
 #'     \code{theta} uncertainty, conditional \code{phi} uncertainty, and the
-#'     residual variance implied by \code{tau}. For Gaussian scale-aware
-#'     conductance models, the predictive bands are likewise conditional on the
-#'     fitted \code{sigma} values.}
+#'     residual variance implied by \code{tau} for distance-response models.
+#'     Covariance-response fits from \code{\link{wishart_covariance}} are shown
+#'     as the average fitted genetic covariance over the modeled lower triangle.
+#'     For Gaussian scale-aware conductance models, the predictive bands are
+#'     likewise conditional on the fitted \code{sigma} values.}
 #'   \item{\code{"sigma"}}{For Gaussian scale-aware conductance models, plots
 #'     the fitted Gaussian kernel against distance for each \code{sigma} term,
 #'     with a dashed line at the fitted effective distance containing 90\% of
@@ -44,6 +46,10 @@
 #'   \code{type = "marginal"}, the x-axis of each panel is back-transformed to
 #'   the original units using the corresponding per-layer offset and divisor.
 #'   Layer names must match the covariate names used in the model formula.
+#' @param marginal_covariates Optional character vector used with
+#'   \code{type = "marginal"} or \code{type = "marginal_response"} to plot only
+#'   selected covariate panels. Values should usually be raw formula variable
+#'   names such as \code{"altitude"}; displayed panel labels are also accepted.
 #' @param conductance_model Optional conductance model factory used when fitting
 #'   \code{x}. When omitted, \code{plot()} first tries to reuse the fitted
 #'   conductance model stored in \code{x}; if that is unavailable, it falls back
@@ -116,7 +122,7 @@
 #'
 #' @name plot.terradish
 #' @method plot terradish
-#' @importFrom ggplot2 aes coord_equal element_blank facet_wrap geom_abline geom_line geom_point geom_raster geom_rect geom_ribbon geom_rug geom_text geom_vline ggplot labs scale_fill_gradientn scale_y_continuous theme theme_bw
+#' @importFrom ggplot2 aes coord_equal element_blank element_line element_rect element_text facet_wrap geom_abline geom_line geom_point geom_raster geom_rect geom_ribbon geom_rug geom_text geom_vline ggplot labs margin scale_fill_gradientn scale_x_continuous scale_y_continuous theme theme_bw
 #' @importFrom stats lm
 #' @importFrom terra global values
 #' @export
@@ -125,6 +131,7 @@ plot.terradish <- function(x,
                                      "marginal", "sigma"),
                             data = NULL,
                             covariates = NULL,
+                            marginal_covariates = NULL,
                             conductance_model = NULL,
                             distance_per_map_unit = NULL,
                             distance_unit = NULL,
@@ -145,10 +152,12 @@ plot.terradish <- function(x,
                                      distance_per_map_unit = distance_per_map_unit,
                                      distance_unit = distance_unit),
     marginal = .plot_terradish_marginal(x, data, covariates,
-                                        conductance_model, quantile, n),
+                                        conductance_model, quantile, n,
+                                        marginal_covariates = marginal_covariates),
     marginal_response = .plot_terradish_marginal(x, data, covariates,
                                                 conductance_model, quantile, n,
-                                                response_scale = TRUE)
+                                                response_scale = TRUE,
+                                                marginal_covariates = marginal_covariates)
   )
 }
 
@@ -190,6 +199,59 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
     (!is.null(fit$fit$response) &&
        is.matrix(fit$fit$response) &&
        any(abs(diag(fit$fit$response)) > sqrt(.Machine$double.eps)))
+}
+
+.terradish_plot_number <- function(x)
+{
+  x[abs(x) < sqrt(.Machine$double.eps)] <- 0
+  prettyNum(format(x, digits = 3, trim = TRUE, scientific = FALSE),
+            big.mark = ",")
+}
+
+.terradish_plot_theme <- function()
+{
+  theme_bw(base_size = 11) +
+    theme(
+      panel.grid = element_blank(),
+      panel.border = element_blank(),
+      axis.line = element_line(colour = "black", linewidth = 0.4),
+      axis.ticks = element_line(colour = "black", linewidth = 0.35),
+      axis.text = element_text(colour = "black", size = 9),
+      axis.title = element_text(colour = "black", size = 10),
+      axis.title.x = element_text(margin = margin(t = 7)),
+      axis.title.y = element_text(margin = margin(r = 7)),
+      strip.background = element_rect(fill = "white", colour = NA),
+      strip.text = element_text(colour = "black", size = 10),
+      plot.title = element_text(colour = "black", size = 11, hjust = 0),
+      legend.background = element_rect(fill = "white", colour = NA),
+      legend.key = element_rect(fill = "white", colour = NA)
+    )
+}
+
+.select_marginal_covariates <- function(requested, available,
+                                        labels = NULL,
+                                        what = "marginal_covariates")
+{
+  if (is.null(requested))
+    return(available)
+
+  requested <- unique(as.character(requested))
+  if (!length(requested))
+    return(available)
+
+  if (is.null(labels))
+    labels <- available
+
+  matched <- available[available %in% requested | labels %in% requested]
+  missing <- setdiff(requested, c(available, labels))
+  if (length(missing) > 0)
+    stop("Unknown `", what, "` value(s): ",
+         paste(missing, collapse = ", "),
+         ". Available panels are: ",
+         paste(available, collapse = ", "),
+         call. = FALSE)
+
+  matched
 }
 
 .plot_terradish_sigma <- function(fit, quantile, n,
@@ -282,9 +344,10 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
               inherit.aes = FALSE, hjust = 1.02, vjust = 1,
               size = 3) +
     facet_wrap(~covariate, scales = "free_x", ncol = 1) +
+    scale_x_continuous(labels = .terradish_plot_number) +
+    scale_y_continuous(labels = .terradish_plot_number) +
     labs(x = paste0("Distance (", distance_label, ")"), y = "Weight") +
-    theme_bw() +
-    theme(panel.grid = element_blank())
+    .terradish_plot_theme()
 }
 
 
@@ -332,8 +395,10 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
     geom_abline(intercept = unname(coef(lm_fit)[1]),
                 slope = unname(coef(lm_fit)[2]),
                 colour = "steelblue", linewidth = 0.8) +
+    scale_x_continuous(labels = .terradish_plot_number) +
+    scale_y_continuous(labels = .terradish_plot_number) +
     labs(x = xlab, y = ylab, title = main) +
-    theme_bw()
+    .terradish_plot_theme()
 }
 
 
@@ -379,9 +444,10 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
     coord_equal(expand = FALSE) +
     scale_fill_gradientn(colours = terrain.colors(100), limits = clim,
                          name = "Conductance") +
+    scale_x_continuous(labels = .terradish_plot_number) +
+    scale_y_continuous(labels = .terradish_plot_number) +
     labs(x = NULL, y = NULL) +
-    theme_bw() +
-    theme(panel.grid = element_blank())
+    .terradish_plot_theme()
 }
 
 .marginal_back_transform <- function(plot_vars, x_data, data_stack, covariates)
@@ -504,6 +570,20 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
 .marginal_response_components <- function(fit)
 {
   phi <- c(fit$fit$phi[, 1])
+  if (.fit_uses_covariance_response(fit))
+  {
+    if (length(phi) == 0 || !all(c("tau", "sigma") %in% names(phi)))
+      stop('plot(type = "marginal_response") requires covariance-response ',
+           'measurement models to expose `tau` and `sigma` nuisance ',
+           'parameters.',
+           call. = FALSE)
+
+    return(list(type = "covariance",
+                tau = unname(phi["tau"]),
+                sigma = unname(phi["sigma"]),
+                vcov_phi = .safe_hessian_inverse(fit$fit$phi_hessian)))
+  }
+
   if (length(phi) == 0 || !all(c("alpha", "beta", "tau") %in% names(phi)))
     stop('plot(type = "marginal_response") currently requires a ',
          'regression-style measurement model with nuisance parameters ',
@@ -542,10 +622,89 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
     0
 
   list(offset = offset,
+       type = "distance",
        beta = unname(phi["beta"]),
        grad_template = grad_template,
        vcov_phi = vcov_phi,
        residual_var = exp(-unname(phi["tau"]) + 0.5 * tau_var))
+}
+
+.marginal_response_summary_covariance <- function(formula, x_data, x_seq,
+                                                  covariate,
+                                                  conductance_model_factory,
+                                                  theta, vcov_theta,
+                                                  response_components,
+                                                  quantile, graph_data)
+{
+  z       <- qnorm((1 + quantile) / 2)
+  N       <- nrow(x_data)
+  n_focal <- length(graph_data$demes)
+  n_resp  <- n_focal * (n_focal + 1L) / 2L
+  estimates <- lower <- upper <- numeric(length(x_seq))
+
+  # Average fitted covariance over the modeled lower triangle, including the
+  # diagonal. Use a symmetric weight matrix because E is symmetric but the
+  # Laplacian adjoint receives a full matrix gradient.
+  W <- matrix(1 / (2 * n_resp), n_focal, n_focal)
+  diag(W) <- 1 / n_resp
+  Zn <- .graph_rhs(graph_data, N)
+  solver_reuse_state <- NULL
+
+  tau <- response_components$tau
+  nugget <- exp(response_components$sigma)
+  vcov_phi <- response_components$vcov_phi
+
+  for (i in seq_along(x_seq))
+  {
+    eval_data <- x_data
+    eval_data[[covariate]] <- x_seq[i]
+    eval_data <- rbind(eval_data, x_data)
+    keep <- seq_len(N)
+
+    cond_fn <- conductance_model_factory(formula, eval_data)
+    cond_vals <- cond_fn(theta)
+    conductance <- cond_vals$conductance[keep]
+    df__dtheta_mat <- .conductance_df_dtheta_matrix(cond_vals, theta)[keep, ,
+                                                                      drop = FALSE]
+
+    solver_state <- .terradish_solver_setup(
+      graph_data, conductance,
+      solver             = "direct",
+      solver_reuse_state = solver_reuse_state
+    )
+    solve_result <- .terradish_solver_solve(solver_state, Zn)
+    G  <- as.matrix(solve_result$solution)
+    tG <- t(G)
+    solver_reuse_state <- list(
+      type      = "direct",
+      factor    = solver_state$factor,
+      signature = solver_state$signature
+    )
+
+    E_eval <- as.matrix(graph_rhs_crossprod(graph_data$demes, N, G))
+    mean_E <- mean(E_eval[lower.tri(E_eval, diag = TRUE)])
+    estimates[i] <- tau * mean_E + nugget * n_focal / n_resp
+
+    W_dQnG <- (tau * W) %*% tG
+    dl_dC  <- backpropagate_laplacian_to_conductance(W_dQnG, tG, graph_data$adj)
+    grad_theta <- c(crossprod(df__dtheta_mat, c(dl_dC)))
+
+    grad_phi <- numeric(nrow(vcov_phi))
+    names(grad_phi) <- rownames(vcov_phi)
+    if ("tau" %in% names(grad_phi))
+      grad_phi["tau"] <- mean_E
+    if ("sigma" %in% names(grad_phi))
+      grad_phi["sigma"] <- nugget * n_focal / n_resp
+
+    var_theta <- max(drop(t(grad_theta) %*% vcov_theta %*% grad_theta), 0)
+    var_phi <- max(drop(t(grad_phi) %*% vcov_phi %*% grad_phi), 0)
+    pred_se <- sqrt(var_theta + var_phi)
+
+    lower[i] <- estimates[i] - z * pred_se
+    upper[i] <- estimates[i] + z * pred_se
+  }
+
+  data.frame(est = estimates, lower = pmin(lower, upper), upper = pmax(lower, upper))
 }
 
 .marginal_response_summary <- function(formula, x_data, x_seq, covariate,
@@ -553,6 +712,20 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
                                        vcov_theta, response_components,
                                        quantile, graph_data)
 {
+  if (identical(response_components$type, "covariance"))
+    return(.marginal_response_summary_covariance(
+      formula = formula,
+      x_data = x_data,
+      x_seq = x_seq,
+      covariate = covariate,
+      conductance_model_factory = conductance_model_factory,
+      theta = theta,
+      vcov_theta = vcov_theta,
+      response_components = response_components,
+      quantile = quantile,
+      graph_data = graph_data
+    ))
+
   z       <- qnorm((1 + quantile) / 2)
   N       <- nrow(x_data)
   n_focal <- length(graph_data$demes)
@@ -647,7 +820,8 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
 # Marginal effect plots
 .plot_terradish_marginal <- function(fit, data, covariates,
                                       conductance_model_factory, quantile, n,
-                                      response_scale = FALSE)
+                                      response_scale = FALSE,
+                                      marginal_covariates = NULL)
 {
   if (is.null(data) || !inherits(data, c("terradish_graph", "radish_graph")))
     stop('Marginal plots require `data`: ',
@@ -676,7 +850,8 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
       n = n,
       plot_context = gaussian_plot_context,
       response_components = response_components,
-      graph_data = if (isTRUE(response_scale)) data else NULL
+      graph_data = if (isTRUE(response_scale)) data else NULL,
+      marginal_covariates = marginal_covariates
     )
 
     return(
@@ -688,13 +863,17 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
                  sides = "b", linewidth = 0.3) +
         facet_wrap(~covariate, scales = "free_x",
                    ncol = min(length(levels(marginal_data$curve_data$covariate)), 3L)) +
+        scale_x_continuous(labels = .terradish_plot_number) +
         scale_y_continuous(name = if (isTRUE(response_scale))
-          "Predicted genetic distance"
+          if (.fit_uses_covariance_response(fit))
+            "Predicted genetic covariance"
+          else
+            "Predicted genetic distance"
         else
-          "Conductance") +
+          "Conductance",
+          labels = .terradish_plot_number) +
         labs(x = NULL) +
-        theme_bw() +
-        theme(panel.grid = element_blank())
+        .terradish_plot_theme()
     )
   }
 
@@ -743,6 +922,14 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
 
   back_transform <- .marginal_back_transform(plot_vars, x_data,
                                              data$stack, covariates)
+  plot_labels <- vapply(plot_vars, function(nm) {
+    if (!is.null(back_transform) && nm %in% names(back_transform))
+      back_transform[[nm]]$label
+    else
+      paste0(nm, " (scaled)")
+  }, character(1))
+  plot_vars <- .select_marginal_covariates(marginal_covariates, plot_vars,
+                                           labels = plot_labels)
   curves <- vector("list", length(plot_vars))
   rugs <- vector("list", length(plot_vars))
   names(curves) <- names(rugs) <- plot_vars
@@ -817,11 +1004,15 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
     geom_rug(data = rug_data, aes(x = x), inherit.aes = FALSE,
              sides = "b", linewidth = 0.3) +
     facet_wrap(~covariate, scales = "free_x", ncol = min(length(plot_vars), 3L)) +
+    scale_x_continuous(labels = .terradish_plot_number) +
     scale_y_continuous(name = if (isTRUE(response_scale))
-      "Predicted genetic distance"
+      if (.fit_uses_covariance_response(fit))
+        "Predicted genetic covariance"
+      else
+        "Predicted genetic distance"
     else
-      "Conductance") +
+      "Conductance",
+      labels = .terradish_plot_number) +
     labs(x = NULL) +
-    theme_bw() +
-    theme(panel.grid = element_blank())
+    .terradish_plot_theme()
 }

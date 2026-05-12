@@ -16,6 +16,7 @@ terradish_cv_replicates(
   fit_full = FALSE,
   keep_fits = FALSE,
   directions = 8,
+  conductance_model = loglinear_conductance,
   cores = 1L,
   ...
 )
@@ -48,6 +49,9 @@ retained in the returned object?}
 
 \item{directions}{Neighborhood definition passed to
 \code{\link{conductance_surface}}.}
+
+\item{conductance_model}{Conductance-model factory used for each replicate.
+See \code{\link{terradish_cv}}.}
 
 \item{cores}{Number of worker processes to use in downstream \code{terradish}
 fits and grid evaluation.}

@@ -507,7 +507,8 @@
 .gaussian_scale_marginal_data <- function(theta, vcov, quantile, n,
                                           plot_context,
                                           response_components = NULL,
-                                          graph_data = NULL)
+                                          graph_data = NULL,
+                                          marginal_covariates = NULL)
 {
   theta <- c(theta)
   vcov <- as.matrix(vcov)
@@ -532,11 +533,17 @@
     Zn <- .graph_rhs(graph_data, N)
   }
 
-  curves <- vector("list", length(plot_context$vars))
-  rugs <- vector("list", length(plot_context$vars))
-  names(curves) <- names(rugs) <- plot_context$vars
+  plot_labels <- vapply(plot_context$vars,
+                        function(nm) base_state$back_transform[[nm]]$label,
+                        character(1))
+  plot_vars <- .select_marginal_covariates(marginal_covariates,
+                                           plot_context$vars,
+                                           labels = plot_labels)
+  curves <- vector("list", length(plot_vars))
+  rugs <- vector("list", length(plot_vars))
+  names(curves) <- names(rugs) <- plot_vars
 
-  for (nm in plot_context$vars)
+  for (nm in plot_vars)
   {
     x_range <- range(base_state$model[[nm]])
     x_seq <- seq(x_range[1], x_range[2], length.out = as.integer(n))

@@ -17,6 +17,54 @@ test_that("terradish_cv returns a cross-validation summary", {
   expect_length(out$cv_loglik, 1L)
 })
 
+test_that("terradish_cv forwards supported conductance models", {
+  dat <- melip_fixture(1:12)
+  melip.Fst <- dat$melip.Fst
+
+  out <- suppressWarnings(
+    terradish_cv(dat$coords, dat$covariates,
+                 melip.Fst ~ s(altitude, df = 3),
+                 model = "ls",
+                 conductance_model = smooth_loglinear_conductance,
+                 prop_train = 0.8,
+                 seed = 1,
+                 fit_full = FALSE,
+                 control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+  )
+
+  expect_length(out$cv_loglik, 1L)
+  expect_true(is.finite(out$cv_loglik))
+  expect_true(grepl("^s\\(altitude\\)\\.", names(coef(out$train_mod))[1]))
+})
+
+test_that("terradish_cv rebuilds fixed-graph conductance factories on splits", {
+  dat <- melip_fixture(1:12)
+  melip.Fst <- dat$melip.Fst
+
+  fixed_graph_factory <- function(formula, x)
+    stop("factory should be rebuilt for each CV surface", call. = FALSE)
+  class(fixed_graph_factory) <- c("terradish_conductance_model_factory",
+                                  "radish_conductance_model_factory")
+  attr(fixed_graph_factory, "requires_fixed_graph") <- TRUE
+  attr(fixed_graph_factory, "rebuild_for_surface") <- function(formula, surface,
+                                                               reference_model = NULL)
+    loglinear_conductance(formula, surface$x)
+
+  out <- suppressWarnings(
+    terradish_cv(dat$coords, dat$covariates,
+                 melip.Fst ~ altitude + forestcover,
+                 model = "ls",
+                 conductance_model = fixed_graph_factory,
+                 prop_train = 0.8,
+                 seed = 1,
+                 fit_full = FALSE,
+                 control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+  )
+
+  expect_length(out$cv_loglik, 1L)
+  expect_true(is.finite(out$cv_loglik))
+})
+
 test_that("terradish_cv_replicates summarizes repeated held-out loglikelihood", {
   dat <- melip_fixture(1:12)
   melip.Fst <- dat$melip.Fst

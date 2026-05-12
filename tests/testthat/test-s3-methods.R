@@ -126,6 +126,28 @@ test_that("plot methods return expected objects", {
                "Predicted genetic distance")
 })
 
+test_that("marginal plots support covariate panel selection", {
+  fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+
+  marg <- plot(fx$fit, type = "marginal", data = fx$surface, n = 8,
+               marginal_covariates = "altitude")
+  expect_s3_class(marg, "ggplot")
+  expect_equal(levels(marg$data$covariate), "altitude (original scale)")
+
+  marg_response <- plot(fx$fit, type = "marginal_response", data = fx$surface,
+                        n = 8,
+                        marginal_covariates = "forestcover (original scale)")
+  expect_s3_class(marg_response, "ggplot")
+  expect_equal(levels(marg_response$data$covariate),
+               "forestcover (original scale)")
+
+  expect_error(
+    plot(fx$fit, type = "marginal", data = fx$surface, n = 8,
+         marginal_covariates = "missing_covariate"),
+    "Unknown `marginal_covariates`"
+  )
+})
+
 test_that("marginal plots can infer original covariate units from surface metadata", {
   fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
 
