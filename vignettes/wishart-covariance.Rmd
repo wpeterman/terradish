@@ -326,11 +326,16 @@ near the diagonal indicate a good fit.
 plot(fit_wc, type = "surface", data = surface)
 ```
 
-### Marginal effects on covariance
+### Marginal effects on conductance
 
-```{r plot-marginal, fig.cap = "***Marginal effects on predicted genetic covariance.***"}
-plot(fit_wc, data = surface)
+```{r plot-marginal, fig.cap = "***Marginal effects on the fitted conductance scale.***"}
+plot(fit_wc, type = "marginal", data = surface)
 ```
+
+Response-scale marginal plots are currently defined for regression-style
+measurement models such as `mlpe`. For covariance-response models, inspect the
+conductance-scale marginal effects alongside the observed-vs-fitted covariance
+plot above.
 
 ---
 
@@ -433,5 +438,5 @@ coef(fit)
 
 plot(fit, type = "fit")
 plot(fit, type = "surface", data = surface)
-plot(fit, data = surface)   # marginal effects on genetic covariance
+plot(fit, type = "marginal", data = surface)   # conductance-scale effects
 ```

@@ -16,5 +16,6 @@ Legacy \code{"radish_*"} class names are retained for backward
 compatibility.
 }
 \seealso{
-\code{\link{linear_conductance}}, \code{\link{loglinear_conductance}}
+\code{\link{linear_conductance}}, \code{\link{loglinear_conductance}},
+  \code{\link{smooth_loglinear_conductance}}
 }

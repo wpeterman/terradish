@@ -93,6 +93,68 @@ test_that("terradish can optimize with wishart_covariance on covariance response
   expect_equal(dim(fitted(fit, type = "response")), dim(genetic_cov))
 })
 
+test_that("plot methods handle covariance responses and smooth conductance", {
+  dat <- melip_fixture(keep = 1:6)
+  surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
+  theta_true <- c(altitude = 0.15, forestcover = -0.2)
+
+  sim <- simulate_covariance_response(
+    theta = theta_true,
+    formula = ~ altitude + forestcover,
+    data = surface,
+    conductance_model = loglinear_conductance,
+    tau = 0.7,
+    sigma = 0.15,
+    nu = 40,
+    seed = 3
+  )
+  genetic_cov <- sim$covariance
+
+  fit <- suppressWarnings(
+    terradish(genetic_cov ~ s(altitude, df = 3),
+              data = surface,
+              conductance_model = smooth_loglinear_conductance,
+              measurement_model = wishart_covariance,
+              nu = 40,
+              leverage = FALSE,
+              control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+  )
+
+  fit_plot <- plot(fit, type = "fit")
+  expect_s3_class(fit_plot, "ggplot")
+  expect_equal(nrow(fit_plot$data), sum(lower.tri(genetic_cov, diag = TRUE)))
+  expect_equal(fit_plot$labels$x, "Genetic covariance (fitted)")
+  expect_equal(fit_plot$labels$y, "Genetic covariance (observed)")
+  expect_equal(fit_plot$data$fitted,
+               fitted(fit, type = "response")[lower.tri(genetic_cov, diag = TRUE)])
+
+  surface_plot <- plot(fit, type = "surface", data = surface)
+  expect_s3_class(surface_plot, "ggplot")
+
+  conductance_raster <- conductance(surface, fit, quantile = 0.95)
+  expect_s4_class(conductance_raster, "SpatRaster")
+  expect_equal(names(conductance_raster), c("est", "lower95", "upper95"))
+  conductance_values <- terra::values(conductance_raster, dataframe = TRUE)
+  complete_cells <- stats::complete.cases(conductance_values)
+  expect_true(any(complete_cells))
+  expect_true(all(is.finite(as.matrix(conductance_values[complete_cells, ]))))
+  expect_true(all(conductance_values$lower95[complete_cells] <=
+                    conductance_values$est[complete_cells]))
+  expect_true(all(conductance_values$est[complete_cells] <=
+                    conductance_values$upper95[complete_cells]))
+
+  marginal_plot <- plot(fit, type = "marginal", data = surface, n = 8)
+  expect_s3_class(marginal_plot, "ggplot")
+  expect_true("altitude (original scale)" %in%
+                levels(marginal_plot$data$covariate))
+  expect_true(all(is.finite(marginal_plot$data$est)))
+
+  expect_error(
+    plot(fit, type = "marginal_response", data = surface, n = 4),
+    "regression-style measurement model"
+  )
+})
+
 test_that("wishart_covariance supports leverage on full covariance responses", {
   dat <- melip_fixture(keep = 1:6)
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)

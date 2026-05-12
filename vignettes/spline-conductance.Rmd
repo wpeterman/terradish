@@ -1,0 +1,380 @@
+---
+title: "Spline Conductance Models in terradish"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Spline Conductance Models in terradish}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse  = TRUE,
+  comment   = "#>",
+  fig.width  = 6,
+  fig.height = 4.5,
+  warning   = FALSE,
+  message   = FALSE
+)
+```
+
+## Why use splines for conductance?
+
+The default `terradish` conductance model is log-linear:
+
+$$C_i = \exp(\theta_1 x_{i1} + \theta_2 x_{i2} + \ldots)$$
+
+This is often the right first model. It is stable, easy to interpret, and asks a
+simple question: does conductance increase or decrease as a raster covariate
+increases?
+
+Ecological responses are not always that simple. Movement may be easiest at
+intermediate elevation, or a predictor may have little effect until a threshold
+is crossed. A straight line on the log-conductance scale cannot represent those
+shapes.
+
+`smooth_loglinear_conductance()` extends the log-linear model by expanding
+selected raster covariates into spline basis columns before the conductance
+surface is evaluated. The model is still a positive log-link conductance model:
+
+$$C_i = \exp(B_i \theta)$$
+
+where `B_i` is the row of the expanded design matrix for raster cell `i`. The
+only change is that selected variables enter through basis columns rather than
+one raw linear column.
+
+This gives `terradish` a GAM-like conductance surface while keeping the usual
+resistance-distance likelihood, MLPE measurement model, model comparison tools,
+and plotting workflow.
+
+---
+
+## What is implemented?
+
+Spline conductance models are created with `smooth_loglinear_conductance()`.
+Smooth terms are written in the conductance formula with `s()`:
+
+```{r smooth-syntax, eval = FALSE}
+smooth_loglinear_conductance(
+  ~ forestcover + s(altitude, df = 4),
+  x = surface$x
+)
+```
+
+The supported pieces are intentionally small and explicit:
+
+- `s(variable, df = 4)` creates a spline basis for one numeric raster layer.
+- `s(variable, k = 4)` is an alias for `df = 4`.
+- `basis = "ns"` uses natural splines from `splines::ns()`.
+- `basis = "bs"` uses B-splines from `splines::bs()`.
+- Ordinary terms can be mixed with smooth terms, as in
+  `~ forestcover + s(altitude, df = 4)`.
+
+This first implementation does **not** estimate a smoothing penalty. The chosen
+`df` or `k` controls the flexibility of the effect. For that reason, spline
+models should usually be introduced in small steps and compared against simpler
+linear models.
+
+Two practical constraints follow from the implementation:
+
+- Smooth terms currently support one raw numeric column name, such as
+  `s(altitude)`, rather than transformations like `s(I(altitude^2))`.
+- Derivatives are taken with respect to the expanded basis coefficients. The
+  optimizer sees an ordinary log-linear conductance model after expansion.
+
+---
+
+## Worked example with the melip data
+
+We will use the bundled *Melipona* bee example data. The goal is not to declare
+a final ecological model from a tiny subset of the data. The goal is to show the
+full spline workflow:
+
+1. prepare raster covariates and sampling locations
+2. fit a linear baseline model
+3. fit one smooth effect
+4. fit two smooth effects
+5. compare the models
+6. inspect fitted conductance and marginal effects
+
+To keep the vignette fast, we use 12 sampling sites.
+
+```{r load}
+library(terradish)
+library(terra)
+
+data(melip)
+melip.altitude    <- terra::unwrap(melip.altitude)
+melip.forestcover <- terra::unwrap(melip.forestcover)
+melip.coords      <- terra::unwrap(melip.coords)
+
+keep <- 1:12
+melip.Fst <- melip.Fst[keep, keep, drop = FALSE]
+coords <- melip.coords[keep]
+```
+
+### Prepare the raster covariates
+
+Spline basis construction is sensitive to the scale and range of the covariate.
+As in the standard `terradish` workflow, we center and scale continuous raster
+layers before fitting:
+
+```{r prepare-covariates}
+covariates <- c(melip.altitude, melip.forestcover)
+names(covariates) <- c("altitude", "forestcover")
+
+covariates <- scale_covariates(covariates)
+
+surface <- conductance_surface(
+  covariates,
+  coords,
+  directions = 8,
+  saveStack = TRUE
+)
+```
+
+The `surface$x` data frame contains the covariate values for active graph
+vertices. This is the object used internally to create the conductance design
+matrix.
+
+```{r inspect-surface}
+head(surface$x)
+```
+
+---
+
+## Step 1: fit a linear baseline
+
+A spline model is easiest to interpret when it is compared to the linear model
+it generalizes. We start with the usual log-linear conductance model:
+
+```{r fit-linear}
+control <- NewtonRaphsonControl(maxit = 8, verbose = FALSE)
+
+fit_linear <- terradish(
+  melip.Fst ~ altitude + forestcover,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe,
+  control           = control
+)
+
+coef(fit_linear)
+```
+
+In this model, each raster contributes one conductance parameter. A positive
+coefficient means higher covariate values increase conductance and reduce
+resistance distance; a negative coefficient means higher values act more like a
+barrier.
+
+---
+
+## Step 2: fit one smooth effect
+
+Now let altitude have a non-linear effect while keeping forest cover linear:
+
+```{r fit-spline-altitude}
+fit_spline_altitude <- terradish(
+  melip.Fst ~ forestcover + s(altitude, df = 4),
+  data              = surface,
+  conductance_model = smooth_loglinear_conductance,
+  measurement_model = mlpe,
+  control           = control
+)
+
+coef(fit_spline_altitude)
+```
+
+The coefficient names show what changed. Instead of one `altitude` coefficient,
+the fitted model has several `s(altitude).*` coefficients. These are not meant
+to be interpreted one at a time. They define the shape of the altitude effect
+together.
+
+We can inspect the corresponding conductance model directly:
+
+```{r inspect-model}
+smooth_model <- smooth_loglinear_conductance(
+  ~ forestcover + s(altitude, df = 4),
+  surface$x
+)
+
+attr(smooth_model, "default")
+attr(smooth_model, "smooth_loglinear_info")
+```
+
+The default parameter vector has one entry per expanded design column. When
+`terradish()` fits a spline conductance model, these are the parameters it
+optimizes.
+
+---
+
+## Step 3: fit two smooth effects
+
+More flexibility is not automatically better. Still, it is useful to see the
+syntax for a model where both raster covariates have smooth effects:
+
+```{r fit-spline-both}
+fit_spline_both <- terradish(
+  melip.Fst ~ s(altitude, df = 4) + s(forestcover, df = 4),
+  data              = surface,
+  conductance_model = smooth_loglinear_conductance,
+  measurement_model = mlpe,
+  control           = control
+)
+
+coef(fit_spline_both)
+```
+
+This model estimates eight conductance basis coefficients before the MLPE
+measurement parameters are considered. That is a lot of flexibility for 12
+sampling sites, so model comparison and visual diagnostics are essential.
+
+---
+
+## Step 4: compare spline and linear models
+
+Spline models can be compared with the same likelihood tools used elsewhere in
+`terradish`. Because these candidate models have different numbers of
+parameters, AIC or AICc is often more useful than a likelihood ratio test.
+
+```{r compare-models}
+aic_table(
+  list(fit_linear, fit_spline_altitude, fit_spline_both),
+  mod_names = c("Linear", "Altitude spline", "Altitude + forestcover splines"),
+  AICc = TRUE
+)
+```
+
+Read this as a first-pass diagnostic, not as a universal rule that splines
+should always be retained or rejected. A spline model is most compelling when it
+both improves the information criterion and produces a biologically plausible
+effect curve.
+
+---
+
+## Step 5: plot the fitted conductance surface
+
+The fitted conductance surface is still obtained with `conductance()`:
+
+```{r conductance-raster, fig.cap = "***Fitted conductance surface from the altitude-spline model. Sampling sites are shown in red.***"}
+spline_conductance <- conductance(surface, fit_spline_altitude)
+
+plot(spline_conductance, main = "Altitude spline conductance")
+points(coords, pch = 19, cex = 0.8, col = "red")
+```
+
+This map shows the combined effect of all terms in the conductance model. In the
+altitude-spline model, that means the smooth altitude effect plus the linear
+forest-cover effect.
+
+---
+
+## Step 6: plot marginal effects on the conductance scale
+
+Spline coefficients are hard to interpret directly. The effect curve is usually
+the right diagnostic:
+
+```{r marginal-plot, fig.cap = "***Marginal conductance-scale effects from the altitude-spline model.***"}
+plot(
+  fit_spline_altitude,
+  type = "marginal",
+  data = surface,
+  n = 50
+)
+```
+
+For spline-expanded models, marginal plots are shown against the original
+covariate, such as `altitude`, rather than against individual basis columns.
+That is the easiest way to ask whether the fitted shape makes ecological sense.
+
+You can also inspect the same marginal shape on the response scale:
+
+```{r marginal-response-plot, fig.cap = "***Marginal response-scale effects from the altitude-spline model.***"}
+plot(
+  fit_spline_altitude,
+  type = "marginal_response",
+  data = surface,
+  n = 50
+)
+```
+
+Use these plots as shape diagnostics. With small datasets, apparently complex
+curves can be unstable even when the optimizer converges.
+
+---
+
+## Natural splines and B-splines
+
+By default, `smooth_loglinear_conductance()` uses natural splines. Natural
+splines are often a good default because they are constrained to be linear
+beyond their boundary knots, which reduces edge behavior.
+
+B-splines are also available:
+
+```{r bs-model}
+fit_bs_altitude <- terradish(
+  melip.Fst ~ forestcover + s(altitude, k = 4, basis = "bs", degree = 2),
+  data              = surface,
+  conductance_model = smooth_loglinear_conductance,
+  measurement_model = mlpe,
+  control           = control
+)
+
+coef(fit_bs_altitude)
+```
+
+Here `k = 4` requests four basis columns and `degree = 2` requests a quadratic
+B-spline basis. The same caution applies: choose small basis dimensions unless
+the data strongly support more flexibility.
+
+---
+
+## A small recoverability check
+
+The package also ships a longer example script that simulates a covariance
+response from a known non-linear conductance surface and then compares linear
+and spline recovery:
+
+```{r recovery-script-path}
+system.file("examples", "spline-recovery-melip.R", package = "terradish")
+```
+
+That script is intended for interactive exploration from RStudio:
+
+```{r recovery-script, eval = FALSE}
+source(system.file("examples", "spline-recovery-melip.R", package = "terradish"))
+
+recovery <- run_spline_recovery_example()
+recovery$model_comparison
+
+melip_spline <- fit_melip_spline_example()
+melip_spline$model_comparison
+```
+
+The simulation part is deliberately not run inside this vignette because it is
+more expensive than the basic worked example. It is useful when you want to
+check whether a candidate spline specification can recover a known non-linear
+conductance surface under controlled conditions.
+
+---
+
+## Practical workflow
+
+For real analyses, use spline conductance models as a staged extension of the
+linear workflow:
+
+1. Fit a simple IBD or linear conductance baseline.
+2. Add one smooth term to the covariate with the clearest biological rationale.
+3. Keep `df` or `k` small for first-pass model comparison.
+4. Compare against the simpler model with AICc or held-out prediction.
+5. Inspect the marginal curve before interpreting the result.
+6. Add additional smooth terms only if the one-smooth model is stable.
+
+This keeps the spline model tied to an interpretable landscape-genetics
+question: does the landscape effect look meaningfully non-linear, and is that
+extra flexibility supported by the data?
+

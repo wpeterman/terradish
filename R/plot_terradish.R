@@ -2,7 +2,11 @@
 #'
 #' Three plot types for objects returned by \code{\link{terradish}}:
 #' \describe{
-#'   \item{\code{"fit"}}{Observed vs. fitted pairwise genetic distances.}
+#'   \item{\code{"fit"}}{Observed vs. fitted response values. Distance-response
+#'     models are shown as pairwise genetic distance against fitted resistance
+#'     distance; covariance-response models such as
+#'     \code{\link{wishart_covariance}} are shown as observed genetic covariance
+#'     against fitted genetic covariance.}
 #'   \item{\code{"surface"}}{Fitted conductance surface with asymptotic confidence
 #'     interval bounds, displayed in three side-by-side panels.}
 #'   \item{\code{"marginal"}}{Marginal effect of each raster covariate on
@@ -10,7 +14,11 @@
 #'     observed values of all other model covariates, with a 95\% pointwise
 #'     confidence band via the delta method. For Gaussian scale-aware
 #'     conductance models, these curves are conditional on the fitted
-#'     \code{sigma} values and are shown on the smoothed covariate scale.}
+#'     \code{sigma} values and are shown on the smoothed covariate scale. For
+#'     spline-expanded conductance models from
+#'     \code{\link{smooth_loglinear_conductance}}, panels are shown against the
+#'     original covariate named inside each \code{s()} term rather than against
+#'     the individual basis columns.}
 #'   \item{\code{"marginal_response"}}{Approximate response-scale marginal
 #'     effects obtained by mapping the marginal conductance curve through the
 #'     fitted measurement-model mean and adding predictive bands that combine
@@ -70,7 +78,8 @@
 #' }
 #'
 #' @seealso \code{\link{terradish}}, \code{\link{conductance}},
-#'   \code{\link{fitted.radish}}, \code{\link{loglinear_conductance}}
+#'   \code{\link{fitted.radish}}, \code{\link{loglinear_conductance}},
+#'   \code{\link{smooth_loglinear_conductance}}
 #'
 #' @examples
 #' \dontrun{
@@ -107,10 +116,7 @@
 #'
 #' @name plot.terradish
 #' @method plot terradish
-#' @importFrom ggplot2 aes coord_equal element_blank facet_wrap geom_abline
-#'   geom_line geom_point geom_raster geom_rect geom_ribbon geom_rug geom_text
-#'   geom_vline ggplot labs scale_fill_gradientn scale_y_continuous theme
-#'   theme_bw
+#' @importFrom ggplot2 aes coord_equal element_blank facet_wrap geom_abline geom_line geom_point geom_raster geom_rect geom_ribbon geom_rug geom_text geom_vline ggplot labs scale_fill_gradientn scale_y_continuous theme theme_bw
 #' @importFrom stats lm
 #' @importFrom terra global values
 #' @export
@@ -157,12 +163,33 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
     return(conductance_model)
 
   fitted_model <- fit$submodels$f_internal
+  plot_factory <- attr(fitted_model, "plot_factory", exact = TRUE)
+  if (inherits(plot_factory,
+               c("terradish_conductance_model_factory",
+                 "radish_conductance_model_factory")))
+    return(plot_factory)
+
   if (inherits(fitted_model,
                c("terradish_conductance_model", "radish_conductance_model")) &&
       isTRUE(attr(fitted_model, "gaussian_scale", exact = TRUE)))
     return(fitted_model)
 
   loglinear_conductance
+}
+
+.conductance_factory_uses_log_link <- function(conductance_model_factory)
+{
+  identical(conductance_model_factory, loglinear_conductance) ||
+    identical(conductance_model_factory, smooth_loglinear_conductance) ||
+    identical(attr(conductance_model_factory, "link", exact = TRUE), "log")
+}
+
+.fit_uses_covariance_response <- function(fit)
+{
+  identical(fit$submodels$g, wishart_covariance) ||
+    (!is.null(fit$fit$response) &&
+       is.matrix(fit$fit$response) &&
+       any(abs(diag(fit$fit$response)) > sqrt(.Machine$double.eps)))
 }
 
 .plot_terradish_sigma <- function(fit, quantile, n,
@@ -265,20 +292,38 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
 
 # Observed vs. fitted plot
 .plot_terradish_fit <- function(fit,
-                                 xlab = "Resistance distance (fitted)",
-                                 ylab = "Genetic distance (observed)",
+                                 xlab = NULL,
+                                 ylab = NULL,
                                  main = "",
                                  pch = 19,
                                  cex  = 0.6,
                                  col  = "#00000099",
                                  ...)
 {
-  obs  <- fit$fit$response
-  pred <- fitted(fit, "distance")
+  obs <- fit$fit$response
+  if (.fit_uses_covariance_response(fit))
+  {
+    pred <- fitted(fit, "response")
+    keep <- lower.tri(obs, diag = TRUE)
+    if (is.null(xlab))
+      xlab <- "Genetic covariance (fitted)"
+    if (is.null(ylab))
+      ylab <- "Genetic covariance (observed)"
+  }
+  else
+  {
+    pred <- fitted(fit, "distance")
+    keep <- lower.tri(obs)
+    if (is.null(xlab))
+      xlab <- "Resistance distance (fitted)"
+    if (is.null(ylab))
+      ylab <- "Genetic distance (observed)"
+  }
 
-  # lower triangle only — avoid duplicate pairs and the zero diagonal
-  obs_v  <- obs[lower.tri(obs)]
-  pred_v <- pred[lower.tri(pred)]
+  # Use one matrix triangle to avoid duplicate symmetric values. For covariance
+  # responses, keep the diagonal because it is part of the modeled response.
+  obs_v  <- obs[keep]
+  pred_v <- pred[keep]
   plot_data <- data.frame(observed = obs_v, fitted = pred_v)
   lm_fit <- lm(observed ~ fitted, data = plot_data)
 
@@ -426,7 +471,7 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
     cond_vals <- cond_fn(theta)
     keep <- seq_len(nrow(x_data))
 
-    if (identical(conductance_model_factory, loglinear_conductance))
+    if (.conductance_factory_uses_log_link(conductance_model_factory))
     {
       eta <- log(cond_vals$conductance[keep])
       eta_hat <- mean(eta)

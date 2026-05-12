@@ -70,7 +70,8 @@ fit <- model(c(altitude = 0.3, forestcover = -0.2))
 fit$conductance  # per-cell conductance values
 
 # Interaction and polynomial terms work too
-x2 <- data.frame(altitude = c(-1, 0, 1), fc = c(0.2, 0.6, 0.5))
+x2 <- data.frame(altitude = c(-1, -0.25, 0.5, 1),
+                 fc = c(0.2, 0.6, 0.5, 0.8))
 model2 <- loglinear_conductance(~ altitude + I(altitude^2) + fc, x2)
 
 }

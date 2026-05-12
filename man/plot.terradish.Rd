@@ -78,7 +78,11 @@ Invisibly:
 \description{
 Three plot types for objects returned by \code{\link{terradish}}:
 \describe{
-  \item{\code{"fit"}}{Observed vs. fitted pairwise genetic distances.}
+  \item{\code{"fit"}}{Observed vs. fitted response values. Distance-response
+    models are shown as pairwise genetic distance against fitted resistance
+    distance; covariance-response models such as
+    \code{\link{wishart_covariance}} are shown as observed genetic covariance
+    against fitted genetic covariance.}
   \item{\code{"surface"}}{Fitted conductance surface with asymptotic confidence
     interval bounds, displayed in three side-by-side panels.}
   \item{\code{"marginal"}}{Marginal effect of each raster covariate on
@@ -86,7 +90,11 @@ Three plot types for objects returned by \code{\link{terradish}}:
     observed values of all other model covariates, with a 95\% pointwise
     confidence band via the delta method. For Gaussian scale-aware
     conductance models, these curves are conditional on the fitted
-    \code{sigma} values and are shown on the smoothed covariate scale.}
+    \code{sigma} values and are shown on the smoothed covariate scale. For
+    spline-expanded conductance models from
+    \code{\link{smooth_loglinear_conductance}}, panels are shown against the
+    original covariate named inside each \code{s()} term rather than against
+    the individual basis columns.}
   \item{\code{"marginal_response"}}{Approximate response-scale marginal
     effects obtained by mapping the marginal conductance curve through the
     fitted measurement-model mean and adding predictive bands that combine
@@ -137,5 +145,6 @@ plot(fit, type = "marginal_response", data = surface)
 }
 \seealso{
 \code{\link{terradish}}, \code{\link{conductance}},
-  \code{\link{fitted.radish}}, \code{\link{loglinear_conductance}}
+  \code{\link{fitted.radish}}, \code{\link{loglinear_conductance}},
+  \code{\link{smooth_loglinear_conductance}}
 }
