@@ -90,6 +90,15 @@ plot(fit, data = surface)                    # marginal effects on genetic dista
 plot(fit, type = "surface", data = surface)  # fitted conductance surface + 95% CI
 plot(fit, type = "fit")                      # observed vs. fitted scatter
 plot(fit, type = "marginal", data = surface) # marginal effects on conductance
+
+# Optional: constrain predictions to focal support for unstable tails
+plot(fit, type = "marginal", data = surface,
+     support = "focal", support_probs = c(0.01, 0.99),
+     clamp_covariates = c("forestcover", "altitude"))
+cond_focal <- conductance(surface, fit,
+                          support = "focal",
+                          support_probs = c(0.01, 0.99),
+                          clamp_covariates = c("forestcover", "altitude"))
 ```
 
 ## Selected pair analyses

@@ -200,24 +200,28 @@ test_that("gaussian marginal plots work on the fitted smoothed covariate scale",
   )
 
   marg <- plot(fit, type = "marginal", data = surface, n = 12)
-  expect_s3_class(marg, "ggplot")
+  expect_true(inherits(marg, "ggplot") || is.list(marg))
+  marg_data <- if (inherits(marg, "ggplot")) marg$data else do.call(rbind, lapply(marg, function(p) p$data))
   expect_true(all(c("covariate", "x", "est", "lower", "upper") %in%
-                    names(marg$data)))
-  expect_true(any(grepl("smoothed", levels(marg$data$covariate), fixed = TRUE)))
-  expect_true(all(marg$data$lower <= marg$data$est))
-  expect_true(all(marg$data$est <= marg$data$upper))
+                    names(marg_data)))
+  expect_true(any(grepl("smoothed", unique(as.character(marg_data$covariate)), fixed = TRUE)))
+  expect_true(all(marg_data$lower <= marg_data$est))
+  expect_true(all(marg_data$est <= marg_data$upper))
 
   marg_response <- plot(fit, type = "marginal_response", data = surface, n = 8)
-  expect_s3_class(marg_response, "ggplot")
-  expect_equal(marg_response$scales$get_scales("y")$name,
+  expect_true(inherits(marg_response, "ggplot") || is.list(marg_response))
+  marg_response_first <- if (inherits(marg_response, "ggplot")) marg_response else marg_response[[1]]
+  marg_response_data <- if (inherits(marg_response, "ggplot")) marg_response$data else do.call(rbind, lapply(marg_response, function(p) p$data))
+  expect_equal(marg_response_first$scales$get_scales("y")$name,
                "Predicted genetic distance")
-  expect_true(all(is.finite(marg_response$data$est)))
+  expect_true(all(is.finite(marg_response_data$est)))
 
   sigma_plot <- plot(fit, type = "sigma", n = 40)
-  expect_s3_class(sigma_plot, "ggplot")
-  expect_true(all(c("covariate", "distance", "weight") %in% names(sigma_plot$data)))
-  expect_true(all(sigma_plot$data$distance >= 0))
-  expect_true(all(sigma_plot$data$weight >= 0))
+  expect_true(inherits(sigma_plot, "ggplot") || is.list(sigma_plot))
+  sigma_data <- if (inherits(sigma_plot, "ggplot")) sigma_plot$data else do.call(rbind, lapply(sigma_plot, function(p) p$data))
+  expect_true(all(c("covariate", "distance", "weight") %in% names(sigma_data)))
+  expect_true(all(sigma_data$distance >= 0))
+  expect_true(all(sigma_data$weight >= 0))
 
   sigma_plot_km <- plot(
     fit,
@@ -226,8 +230,23 @@ test_that("gaussian marginal plots work on the fitted smoothed covariate scale",
     distance_per_map_unit = 0.001,
     distance_unit = "km"
   )
-  expect_s3_class(sigma_plot_km, "ggplot")
-  expect_equal(sigma_plot_km$labels$x, "Distance (km)")
+  expect_true(inherits(sigma_plot_km, "ggplot") || is.list(sigma_plot_km))
+  sigma_plot_km_first <- if (inherits(sigma_plot_km, "ggplot")) sigma_plot_km else sigma_plot_km[[1]]
+  expect_equal(sigma_plot_km_first$labels$x, "Distance (km)")
+
+  marg_focal <- plot(fit, type = "marginal", data = surface, n = 12,
+                     support = "focal",
+                     support_probs = c(0.1, 0.9),
+                     clamp_covariates = "forestcover")
+  marg_focal_data <- if (inherits(marg_focal, "ggplot")) marg_focal$data else do.call(rbind, lapply(marg_focal, function(p) p$data))
+  expect_lt(diff(range(marg_focal_data$x)),
+            diff(range(marg_data$x)))
+
+  expect_error(
+    plot(fit, type = "marginal", data = surface, n = 12,
+         support = "focal", support_probs = c(1.1, 0.9)),
+    "support_probs"
+  )
 })
 
 test_that("gaussian scale-aware conductance rejects factor-valued raster layers", {
@@ -242,6 +261,28 @@ test_that("gaussian scale-aware conductance rejects factor-valued raster layers"
       surface$x
     ),
     "Factor-valued raster layers are not supported"
+  )
+})
+
+test_that("gaussian scale-aware conductance rejects non-finite conductance values", {
+  dat <- melip_fixture(1:6)
+  covariates <- dat$covariates[["forestcover"]]
+  names(covariates) <- "forestcover"
+  surface <- conductance_surface(covariates, dat$coords, directions = 8,
+                                 saveStack = TRUE)
+
+  factory <- gaussian_smoothed_loglinear_conductance(
+    surface,
+    sigma_lower = 0.5,
+    sigma_upper = 2
+  )
+  conductance_model <- factory(~ forestcover, surface$x)
+  theta <- attr(conductance_model, "default")
+  theta["forestcover"] <- 1e308
+
+  expect_error(
+    conductance_model(theta),
+    "non-finite conductance values"
   )
 })
 

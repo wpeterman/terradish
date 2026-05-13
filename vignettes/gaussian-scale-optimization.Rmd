@@ -346,6 +346,19 @@ plot(fitted_conductance[[1]], main = "Fitted conductance")
 points(coords, pch = 19, col = "red")
 ```
 
+When tails are weakly supported at focal sites, you can request focal-support
+clamping directly in prediction:
+
+```{r gaussian-support-clamp, eval = FALSE}
+fitted_conductance_focal <- conductance(
+  surface,
+  fit_gaussian,
+  support = "focal",
+  support_probs = c(0.01, 0.99),
+  clamp_covariates = "forestcover"
+)
+```
+
 ---
 
 ## Stage 2 — Add a second raster only after sigma looks sensible

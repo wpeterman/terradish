@@ -60,3 +60,42 @@ test_that("cv_model_selection forwards AICc and BIC to aic_table", {
   expect_true(is.list(bic_sel))
   expect_true("BIC" %in% names(bic_sel$AIC_tab))
 })
+
+test_that("default model labels append [mlpe:n] when pairwise covariates are present", {
+  set.seed(1)
+  z <- pairwise_endpoint_covariates(matrix(rnorm(12), nrow = 4, ncol = 3))
+  g_joint <- mlpe_covariates(z)
+
+  fit_base <- list(
+    formula = stats::as.formula(~ altitude),
+    dim = c(vertices = 20, focal = 6, edge = 30),
+    loglik = -10,
+    aic = 30,
+    df = 2,
+    submodels = list(g = mlpe)
+  )
+  fit_joint <- list(
+    formula = stats::as.formula(~ altitude + forestcover),
+    dim = c(vertices = 20, focal = 6, edge = 30),
+    loglik = -9,
+    aic = 28,
+    df = 3,
+    submodels = list(g = g_joint)
+  )
+
+  tab <- aic_table(list(fit_base, fit_joint))
+  expect_true(any(grepl("\\[mlpe:3\\]$", tab$model)))
+  expect_true(any(tab$model == "altitude"))
+  expect_true(any(tab$model == "altitude + forestcover [mlpe:3]"))
+
+  custom <- aic_table(list(fit_base, fit_joint), mod_names = c("base", "joint"))
+  expect_setequal(custom$model, c("base", "joint"))
+
+  cv_list <- list(
+    list(train_mod = fit_base, cv_loglik = fit_base$loglik, full_mod = fit_base),
+    list(train_mod = fit_joint, cv_loglik = fit_joint$loglik, full_mod = fit_joint)
+  )
+  cv_out <- cv_model_selection(cv_list, aic = TRUE)
+  expect_true(any(cv_out$loglik_tab$model == "altitude + forestcover [mlpe:3]"))
+  expect_true(any(cv_out$AIC_tab$model == "altitude + forestcover [mlpe:3]"))
+})

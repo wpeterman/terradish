@@ -196,6 +196,81 @@ head(surface$x)
 
 ---
 
+## Checking settings before spline fitting
+
+`terradish_assess_settings()` is worth calling before fitting spline conductance
+models for an additional reason beyond raw graph size: **spline formulas expand
+the conductance parameter count**. A formula with `s(altitude, df = 4)` has four
+basis coefficients for altitude alone, plus any other terms. With enough
+parameters, Newton-Raphson can become slower than BFGS per iteration. The
+assessment handles this automatically — it probes the expanded model, not the
+raw formula, and reports the smooth-term expansion in the `$profile` and in its
+notes.
+
+```{r assess-spline, eval = FALSE}
+# Assessment for the altitude natural-spline model (df = 4)
+# Uses the same surface built above (saveStack = TRUE required for solver probes)
+assessment_spline <- terradish_assess_settings(
+  melip.Fst ~ forestcover + s(altitude, df = 4),
+  data              = surface,
+  conductance_model = smooth_loglinear_conductance,
+  measurement_model = mlpe,
+  probe_maxit       = 2,
+  verbose           = TRUE
+)
+
+assessment_spline
+```
+
+The printed summary will include a note such as:
+
+```
+Notes:
+  - Smooth conductance formula expanded to 5 conductance parameters across
+    1 smooth term (4 spline basis columns).
+```
+
+This confirms that the formula was evaluated on the expanded design matrix (one
+linear forest-cover column plus four altitude basis columns = five parameters
+total), and that probes were run with that full parameter count.
+
+Spline expansions can make extreme starting values more risky because the
+expanded linear predictor is exponentiated into conductance. If a spline fit
+stops with a `CHOLMOD` warning or a `non-positive-definite reduced Laplacian`
+message, first scale the input rasters, restart with coefficients closer to
+zero, and check the retained graph cells for missing or infinite covariate
+values. During diagnosis, rerun `terradish_assess_settings(..., verbose = TRUE)`
+and consider `solver = "auto"` or `solver = "amg"` to separate direct-solver
+factorization problems from the conductance specification.
+
+### Passing `$recommended` to each candidate fit
+
+When the assessment recommends a non-default optimizer (e.g. `bfgs` instead of
+`newton` because the parameter count after expansion is high), apply it to all
+candidate models to keep comparisons fair:
+
+```{r assess-spline-use, eval = FALSE}
+# Extract recommended optimizer and control once
+rec <- assessment_spline$recommended
+
+fit_ns_assessed <- terradish(
+  melip.Fst ~ forestcover + s(altitude, df = 4),
+  data              = surface,
+  conductance_model = smooth_loglinear_conductance,
+  measurement_model = mlpe,
+  optimizer         = rec$optimizer,
+  control           = rec$control,
+  solver            = rec$solver,
+  solver_control    = rec$solver_control
+)
+```
+
+For this vignette we run a lightweight assessment (`probe_maxit = 1`) and reuse
+its recommendations across the candidate fits so the workflow is exercised in
+real code while staying fast.
+
+---
+
 ## Model fitting: from linear to spline
 
 We fit four candidate models, moving from most constrained to most flexible:
@@ -211,7 +286,15 @@ We use a small `maxit` to keep the vignette fast; for real analyses, allow more
 iterations.
 
 ```{r fit-models}
-control <- NewtonRaphsonControl(maxit = 12, verbose = FALSE)
+assessment_spline_light <- terradish_assess_settings(
+  melip.Fst ~ forestcover + s(altitude, df = 4),
+  data              = surface,
+  conductance_model = smooth_loglinear_conductance,
+  measurement_model = mlpe,
+  probe_maxit       = 1,
+  verbose           = FALSE
+)
+rec <- assessment_spline_light$recommended
 
 # 1. Log-linear baseline (one parameter per covariate)
 fit_linear <- terradish(
@@ -219,7 +302,12 @@ fit_linear <- terradish(
   data              = surface,
   conductance_model = loglinear_conductance,
   measurement_model = mlpe,
-  control           = control
+  optimizer         = rec$optimizer,
+  control           = rec$control,
+  solver            = rec$solver,
+  solver_control    = rec$solver_control,
+  approximation     = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 
 # 2. Natural spline on altitude, linear forest cover (df = 4)
@@ -228,7 +316,12 @@ fit_ns_alt <- terradish(
   data              = surface,
   conductance_model = smooth_loglinear_conductance,
   measurement_model = mlpe,
-  control           = control
+  optimizer         = rec$optimizer,
+  control           = rec$control,
+  solver            = rec$solver,
+  solver_control    = rec$solver_control,
+  approximation     = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 
 # 3. Natural splines on both covariates (df = 4 each)
@@ -237,7 +330,12 @@ fit_ns_both <- terradish(
   data              = surface,
   conductance_model = smooth_loglinear_conductance,
   measurement_model = mlpe,
-  control           = control
+  optimizer         = rec$optimizer,
+  control           = rec$control,
+  solver            = rec$solver,
+  solver_control    = rec$solver_control,
+  approximation     = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 
 # 4. Cubic B-spline on altitude, linear forest cover (k = 4 columns, degree 3)
@@ -246,7 +344,12 @@ fit_bs_alt <- terradish(
   data              = surface,
   conductance_model = smooth_loglinear_conductance,
   measurement_model = mlpe,
-  control           = control
+  optimizer         = rec$optimizer,
+  control           = rec$control,
+  solver            = rec$solver,
+  solver_control    = rec$solver_control,
+  approximation     = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 ```
 
@@ -416,6 +519,32 @@ p_resp_bs <- plot(fit_bs_alt, type = "marginal_response", data = surface,
 p_resp_ns | p_resp_bs
 ```
 
+### Robust tails with focal-support clamping
+
+Spline models are especially sensitive to sparse support at covariate tails.
+To keep spline marginals and predicted conductance maps anchored to focal-site
+support, use `support = "focal"` with quantile bounds:
+
+```{r spline-support-clamp, eval = FALSE}
+plot(
+  fit_ns_alt,
+  type = "marginal",
+  data = surface,
+  n = 80,
+  support = "focal",
+  support_probs = c(0.01, 0.99),
+  clamp_covariates = "altitude"
+)
+
+cond_ns_alt_focal <- conductance(
+  surface,
+  fit_ns_alt,
+  support = "focal",
+  support_probs = c(0.01, 0.99),
+  clamp_covariates = c("altitude", "forestcover")
+)
+```
+
 ---
 
 ## Observed vs. fitted genetic distances
@@ -483,7 +612,12 @@ fit_ns2 <- terradish(
   data              = surface,
   conductance_model = smooth_loglinear_conductance,
   measurement_model = mlpe,
-  control           = control
+  optimizer         = rec$optimizer,
+  control           = rec$control,
+  solver            = rec$solver,
+  solver_control    = rec$solver_control,
+  approximation     = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 
 fit_ns3 <- terradish(
@@ -491,7 +625,12 @@ fit_ns3 <- terradish(
   data              = surface,
   conductance_model = smooth_loglinear_conductance,
   measurement_model = mlpe,
-  control           = control
+  optimizer         = rec$optimizer,
+  control           = rec$control,
+  solver            = rec$solver,
+  solver_control    = rec$solver_control,
+  approximation     = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 
 fit_ns6 <- terradish(
@@ -499,7 +638,12 @@ fit_ns6 <- terradish(
   data              = surface,
   conductance_model = smooth_loglinear_conductance,
   measurement_model = mlpe,
-  control           = control
+  optimizer         = rec$optimizer,
+  control           = rec$control,
+  solver            = rec$solver,
+  solver_control    = rec$solver_control,
+  approximation     = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 
 # Use marginal_covariates = "altitude" to pull only the altitude panel from
@@ -551,7 +695,12 @@ fit_bs1 <- terradish(
   data              = surface,
   conductance_model = smooth_loglinear_conductance,
   measurement_model = mlpe,
-  control           = control
+  optimizer         = rec$optimizer,
+  control           = rec$control,
+  solver            = rec$solver,
+  solver_control    = rec$solver_control,
+  approximation     = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 
 fit_bs2 <- terradish(
@@ -559,7 +708,12 @@ fit_bs2 <- terradish(
   data              = surface,
   conductance_model = smooth_loglinear_conductance,
   measurement_model = mlpe,
-  control           = control
+  optimizer         = rec$optimizer,
+  control           = rec$control,
+  solver            = rec$solver,
+  solver_control    = rec$solver_control,
+  approximation     = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 
 pd1 <- plot(fit_bs1,    type = "marginal", data = surface, n = 80,
@@ -599,7 +753,12 @@ fit_mixed <- terradish(
   data              = surface,
   conductance_model = smooth_loglinear_conductance,
   measurement_model = mlpe,
-  control           = control
+  optimizer         = rec$optimizer,
+  control           = rec$control,
+  solver            = rec$solver,
+  solver_control    = rec$solver_control,
+  approximation     = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 
 coef(fit_mixed)
@@ -651,158 +810,6 @@ aic_table(
 
 ---
 
-## Cross-validation: catching overfitted splines
-
-AICc penalizes extra parameters, but the penalty is derived from asymptotic
-theory and may underestimate the true cost of over-parameterization for small
-or spatially autocorrelated datasets. A **held-out log-likelihood** from a
-train/test split is a direct, assumption-free check: fit the model on a subset
-of sites, then ask how well the fitted conductance parameters predict the
-withheld pairs.
-
-The expected pattern when splines overfit:
-
-- **In-sample log-likelihood** increases monotonically as df grows — the model
-  always fits the data it was trained on at least as well.
-- **Held-out log-likelihood** improves up to some optimal df, then degrades as
-  the model captures idiosyncratic features of the training sites rather than
-  genuine landscape signal.
-
-`terradish_cv()` and `terradish_cv_replicates()` accept a `conductance_model`
-argument, so they work directly with `smooth_loglinear_conductance`. We run
-**5 repeated train/test splits** for each candidate model. Repeating is
-important: a single 75/25 split with only 34 sites can be noisy.
-
-```{r cv-reps}
-cv_ctrl <- NewtonRaphsonControl(maxit = 12, verbose = FALSE)
-
-# Shared seeds so every model is evaluated on the same splits.
-cv_seeds <- c(11L, 22L, 33L, 44L, 55L)
-
-# Helper: run repeated CV for one formula / conductance model.
-# keep_fits = TRUE retains per-replicate train_mod so we can extract
-# training log-likelihoods for the bias-variance plot below.
-run_cv <- function(fmla, cond_model) {
-  terradish_cv_replicates(
-    pts               = melip.coords,
-    covariates        = covariates,
-    fmla              = fmla,
-    model             = "mlpe",
-    conductance_model = cond_model,
-    prop_train        = 0.75,
-    seeds             = cv_seeds,
-    fit_full          = FALSE,
-    keep_fits         = TRUE,
-    control           = cv_ctrl
-  )
-}
-
-cv_linear <- run_cv(melip.Fst ~ altitude + forestcover,
-                    loglinear_conductance)
-
-cv_ns2    <- run_cv(melip.Fst ~ forestcover + s(altitude, df = 2),
-                    smooth_loglinear_conductance)
-
-cv_ns3    <- run_cv(melip.Fst ~ forestcover + s(altitude, df = 3),
-                    smooth_loglinear_conductance)
-
-cv_ns4    <- run_cv(melip.Fst ~ forestcover + s(altitude, df = 4),
-                    smooth_loglinear_conductance)
-
-cv_ns6    <- run_cv(melip.Fst ~ forestcover + s(altitude, df = 6),
-                    smooth_loglinear_conductance)
-```
-
-### Cross-validation summary table
-
-```{r cv-table}
-all_cv <- list(cv_linear, cv_ns2, cv_ns3, cv_ns4, cv_ns6)
-
-cv_summary <- data.frame(
-  model      = c("Linear", "ns df=2", "ns df=3", "ns df=4", "ns df=6"),
-  K_cond     = c(2L, 3L, 4L, 5L, 7L),
-  mean_cv_ll = round(sapply(all_cv, `[[`, "mean_loglik"), 3),
-  sd_cv_ll   = round(sapply(all_cv, `[[`, "sd_loglik"),   3)
-)
-cv_summary$delta_cv <- round(cv_summary$mean_cv_ll -
-                               max(cv_summary$mean_cv_ll), 3)
-
-cv_summary[order(-cv_summary$mean_cv_ll), ]
-```
-
-The model with the **highest mean held-out log-likelihood** generalizes best.
-The SD column shows how sensitive the result is to the particular split; large
-SD relative to the differences between models means more replicates are needed
-before drawing conclusions.
-
-### Visualizing the bias–variance tradeoff
-
-Training and test log-likelihoods are evaluated on different numbers of
-site-pairs (25 training sites → 300 pairs; 9 test sites → 36 pairs), so their
-absolute values are not comparable on a shared y-axis. The plot below uses
-**separate panels** for training and test, each with an independent y-axis,
-so both curves are clearly visible:
-
-```{r cv-plot, fig.cap = "***In-sample (training) vs. held-out (test) mean log-likelihood across five repeated splits.*** Each panel has its own y-axis scale because training and test sets contain different numbers of site-pairs. Training LL (left) rises monotonically with flexibility. Held-out LL (right) peaks at an intermediate df and degrades for the most flexible model, diagnosing over-parameterization.", fig.height = 4.5}
-library(ggplot2)
-
-df_vals  <- c(1, 2, 3, 4, 6)
-x_labels <- c("Linear\n(df=1)", "ns\ndf=2", "ns\ndf=3", "ns\ndf=4", "ns\ndf=6")
-
-# Because run_cv() used keep_fits = TRUE, each fit stores train_mod.
-# Extract per-replicate training LL directly from those objects.
-get_train_ll <- function(cv_obj)
-  sapply(cv_obj$fits, function(x) x$train_mod$loglik)
-
-all_cv <- list(cv_linear, cv_ns2, cv_ns3, cv_ns4, cv_ns6)
-
-train_mean <- sapply(all_cv, function(cv) mean(get_train_ll(cv)))
-train_sd   <- sapply(all_cv, function(cv) sd(get_train_ll(cv)))
-test_mean  <- sapply(all_cv, `[[`, "mean_loglik")
-test_sd    <- sapply(all_cv, `[[`, "sd_loglik")
-
-# Tidy long data frame — one row per model × panel
-ll_long <- rbind(
-  data.frame(df = df_vals, mean_ll = train_mean, sd_ll = train_sd,
-             panel = "Training (in-sample)"),
-  data.frame(df = df_vals, mean_ll = test_mean,  sd_ll = test_sd,
-             panel = "Test (held-out)")
-)
-ll_long$panel <- factor(ll_long$panel,
-                        levels = c("Training (in-sample)", "Test (held-out)"))
-
-ggplot(ll_long, aes(x = df, y = mean_ll)) +
-  geom_ribbon(aes(ymin = mean_ll - sd_ll, ymax = mean_ll + sd_ll),
-              fill = "steelblue", alpha = 0.25) +
-  geom_line(colour = "steelblue", linewidth = 1) +
-  geom_point(colour = "steelblue", size = 3) +
-  facet_wrap(~ panel, scales = "free_y") +
-  scale_x_continuous(breaks = df_vals, labels = x_labels) +
-  labs(x = "Model (altitude flexibility)",
-       y = "Mean log-likelihood ± 1 SD") +
-  theme_bw(base_size = 12) +
-  theme(strip.text = element_text(face = "bold"))
-```
-
-The shaded ribbon is ±1 SD across the five replicate splits. Narrow ribbons
-indicate the CV ranking is stable across different site subsets; wide ribbons
-suggest more replicates are needed before conclusions can be drawn.
-
-### Take-aways from CV
-
-1. **Training log-likelihood always rises with df** — never use it alone to
-   choose a spline specification.
-2. **Held-out log-likelihood has a peak** — the df at which test performance
-   degrades is a data-driven upper bound on useful flexibility.
-3. **AICc and CV should agree** on the direction of over-parameterization. When
-   they disagree, prefer the more conservative (simpler) model and check whether
-   the more flexible model's marginal curve is ecologically plausible.
-4. **One split is noisy**. `terradish_cv_replicates()` repeats the split across
-   multiple seeds; report the mean and SD of held-out log-likelihood rather than
-   a single value.
-
----
-
 ## Practical recommendations
 
 ### When to use spline conductance
@@ -832,11 +839,27 @@ Use `smooth_loglinear_conductance()` when:
 
 ```{r workflow, eval = FALSE}
 # Step 1: Fit a linear baseline — this is your reference
+assessment <- terradish_assess_settings(
+  S ~ covar2 + s(covar1, df = 3),
+  data              = surface,
+  conductance_model = smooth_loglinear_conductance,
+  measurement_model = mlpe,
+  probe_maxit       = 1,
+  verbose           = FALSE
+)
+rec <- assessment$recommended
+
 fit_linear <- terradish(
   S ~ covar1 + covar2,
   data              = surface,
   conductance_model = loglinear_conductance,
-  measurement_model = mlpe
+  measurement_model = mlpe,
+  optimizer         = rec$optimizer,
+  control           = rec$control,
+  solver            = rec$solver,
+  solver_control    = rec$solver_control,
+  approximation     = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 
 # Step 2: Inspect the linear marginal effects.
@@ -850,7 +873,13 @@ fit_spline <- terradish(
   S ~ covar2 + s(covar1, df = 3),
   data              = surface,
   conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe
+  measurement_model = mlpe,
+  optimizer         = rec$optimizer,
+  control           = rec$control,
+  solver            = rec$solver,
+  solver_control    = rec$solver_control,
+  approximation     = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 
 # Step 4: Compare with AICc
@@ -866,7 +895,13 @@ fit_spline4 <- terradish(
   S ~ covar2 + s(covar1, df = 4),
   data              = surface,
   conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe
+  measurement_model = mlpe,
+  optimizer         = rec$optimizer,
+  control           = rec$control,
+  solver            = rec$solver,
+  solver_control    = rec$solver_control,
+  approximation     = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 
 aic_table(list(fit_linear, fit_spline, fit_spline4),
@@ -956,34 +991,63 @@ covariates <- scale_covariates(covariates)   # Always scale before fitting
 surface <- conductance_surface(covariates, melip.coords,
                                directions = 8, saveStack = TRUE)
 
-# ---- 2. Fit candidate models ----
+# ---- 2. Assess once and reuse recommended settings ----
+assessment <- terradish_assess_settings(
+  melip.Fst ~ forestcover + s(altitude, df = 4),
+  data              = surface,
+  conductance_model = smooth_loglinear_conductance,
+  measurement_model = mlpe,
+  probe_maxit       = 1,
+  verbose           = FALSE
+)
+rec <- assessment$recommended
+
+# ---- 3. Fit candidate models ----
 # Linear baseline
 fit_lin <- terradish(
   melip.Fst ~ altitude + forestcover,
   data = surface, conductance_model = loglinear_conductance,
-  measurement_model = mlpe
+  measurement_model = mlpe,
+  optimizer = rec$optimizer,
+  control = rec$control,
+  solver = rec$solver,
+  solver_control = rec$solver_control,
+  approximation = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 
 # Natural spline on altitude (df = 4)
 fit_ns <- terradish(
   melip.Fst ~ forestcover + s(altitude, df = 4),
   data = surface, conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe
+  measurement_model = mlpe,
+  optimizer = rec$optimizer,
+  control = rec$control,
+  solver = rec$solver,
+  solver_control = rec$solver_control,
+  approximation = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 
 # B-spline on altitude (k = 4, cubic)
 fit_bs <- terradish(
   melip.Fst ~ forestcover + s(altitude, k = 4, basis = "bs", degree = 3),
   data = surface, conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe
+  measurement_model = mlpe,
+  optimizer = rec$optimizer,
+  control = rec$control,
+  solver = rec$solver,
+  solver_control = rec$solver_control,
+  approximation = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 
-# ---- 3. Compare ----
+# ---- 4. Compare ----
 aic_table(list(fit_lin, fit_ns, fit_bs),
           mod_names = c("Linear", "ns df=4", "bs k=4"),
           AICc = TRUE)
 
-# ---- 4. Visualize the best model ----
+# ---- 5. Visualize the best model ----
 best <- fit_ns   # replace with whichever model won
 
 plot(best, type = "fit")                       # Observed vs fitted

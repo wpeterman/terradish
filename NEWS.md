@@ -1,3 +1,11 @@
+terradish 0.0.27
+---------
+* Added package-native focal-support clamping controls for plotting and conductance prediction via `support`, `support_probs`, and `clamp_covariates`
+* Extended support-constrained marginal plotting to Gaussian scale-aware conductance workflows
+* Updated plotting defaults to return per-panel outputs as individual plots (single `ggplot` or named list) and keep plotting calls silent unless explicitly printed
+* Expanded regression tests for support clamping in standard and Gaussian marginal workflows and support-constrained conductance prediction
+* Updated README and core vignettes with documented support-clamping usage patterns for stable tail interpretation
+
 terradish 0.0.26
 ---------
 * Added conditional confidence intervals for nuisance parameters in `summary()`

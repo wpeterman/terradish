@@ -243,6 +243,33 @@
   )
 }
 
+.terradish_solver_warning_is_fatal <- function(message)
+{
+  grepl("matrix not positive definite", message, ignore.case = TRUE) ||
+    grepl("CHOLMOD", message, ignore.case = TRUE)
+}
+
+.terradish_with_solver_warning_guard <- function(expr, context)
+{
+  withCallingHandlers(
+    expr,
+    warning = function(w)
+    {
+      message <- conditionMessage(w)
+      if (.terradish_solver_warning_is_fatal(message))
+      {
+        stop(
+          context,
+          " ",
+          message,
+          " Current conductance values produced a non-positive-definite reduced Laplacian.",
+          call. = FALSE
+        )
+      }
+    }
+  )
+}
+
 .choleski_template <- function(s, factorization)
 {
   templates <- s$choleski_templates
@@ -319,15 +346,18 @@
         !is.null(solver_reuse_state$handle)
 
       setup_start <- proc.time()[["elapsed"]]
-      handle <- if (can_reuse)
-      {
-        cholmod_direct_update(solver_reuse_state$handle, Qn)
-        solver_reuse_state$handle
-      }
-      else
-      {
-        cholmod_direct_create(Qn, factorization, isTRUE(control$perm))
-      }
+      handle <- .terradish_with_solver_warning_guard(
+        if (can_reuse)
+        {
+          cholmod_direct_update(solver_reuse_state$handle, Qn)
+          solver_reuse_state$handle
+        }
+        else
+        {
+          cholmod_direct_create(Qn, factorization, isTRUE(control$perm))
+        },
+        context = "Failed to prepare the direct solver."
+      )
       setup_time <- proc.time()[["elapsed"]] - setup_start
 
       return(list(type = "direct",
@@ -352,16 +382,19 @@
     template <- if (can_reuse) solver_reuse_state$factor else .choleski_template(s, factorization)
 
     setup_start <- proc.time()[["elapsed"]]
-    factor <- if (is.null(template))
-    {
-      switch(factorization,
-             simplicial_ldl = Cholesky(Qn, LDL = TRUE, super = FALSE, perm = isTRUE(control$perm)),
-             simplicial_ll = Cholesky(Qn, LDL = FALSE, super = FALSE, perm = isTRUE(control$perm)),
-             supernodal_ll = Cholesky(Qn, LDL = FALSE, super = TRUE, perm = isTRUE(control$perm)),
-             stop("Unknown direct factorization mode: ", factorization))
-    }
-    else
-      update(template, Qn)
+    factor <- .terradish_with_solver_warning_guard(
+      if (is.null(template))
+      {
+        switch(factorization,
+               simplicial_ldl = Cholesky(Qn, LDL = TRUE, super = FALSE, perm = isTRUE(control$perm)),
+               simplicial_ll = Cholesky(Qn, LDL = FALSE, super = FALSE, perm = isTRUE(control$perm)),
+               supernodal_ll = Cholesky(Qn, LDL = FALSE, super = TRUE, perm = isTRUE(control$perm)),
+               stop("Unknown direct factorization mode: ", factorization))
+      }
+      else
+        update(template, Qn),
+      context = "Failed to prepare the direct solver."
+    )
     setup_time <- proc.time()[["elapsed"]] - setup_start
 
     return(list(type = "direct",
@@ -477,7 +510,10 @@
     else
     {
       solve_start <- proc.time()[["elapsed"]]
-      solution <- solve(solver_state$factor, rhs)
+      solution <- .terradish_with_solver_warning_guard(
+        solve(solver_state$factor, rhs),
+        context = "Failed to solve the reduced Laplacian."
+      )
       solve_time <- proc.time()[["elapsed"]] - solve_start
     }
 
@@ -613,6 +649,12 @@
 #'   Direct supernodal factorizations can benefit from a threaded BLAS, but the
 #'   relevant thread counts are controlled by the external R/BLAS build rather
 #'   than by \code{terradish_algorithm()}.
+#'   If the direct solver stops with a CHOLMOD or
+#'   non-positive-definite reduced Laplacian message, the current conductance
+#'   values made the graph numerically singular. Check for missing or infinite
+#'   raster covariates, use scaled covariates and moderate starting values near
+#'   zero, and try \code{solver = "auto"} or \code{solver = "amg"} while
+#'   diagnosing the fit.
 #' @param solver_warm_start Optional initial guess for the reduced-system solve. This is primarily useful for iterative solvers when evaluating nearby parameter values.
 #' @param solver_reuse_state Optional reusable solver state returned by a prior
 #'   \code{terradish_algorithm()} call. This is used to reuse AMG hierarchy

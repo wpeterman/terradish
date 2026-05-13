@@ -20,7 +20,9 @@ aic_table(
 \item{BIC}{Should BIC be used instead of AIC?}
 
 \item{mod_names}{Optional model names. By default the right-hand side of
-each fitted formula is used.}
+each fitted formula is used. For MLPE measurement models with additional
+pairwise covariates, the default appends \code{[mlpe:n]}, where \code{n}
+is the number of added pairwise covariate columns.}
 
 \item{verbose}{Should the table be printed to the console?}
 }

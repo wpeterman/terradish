@@ -62,6 +62,24 @@ test_that("smooth_loglinear_conductance supports k alias and B-splines", {
   expect_true(all(is.finite(model(theta)$conductance)))
 })
 
+test_that("smooth_loglinear_conductance rejects non-finite conductance values", {
+  x <- data.frame(
+    altitude = seq(0, 10, length.out = 15),
+    forestcover = seq(10, 150, length.out = 15)
+  )
+  model <- smooth_loglinear_conductance(
+    ~ forestcover + s(altitude, df = 3),
+    x
+  )
+  theta <- attr(model, "default")
+  theta["forestcover"] <- 1e308
+
+  expect_error(
+    model(theta),
+    "non-finite conductance values"
+  )
+})
+
 test_that("smooth_loglinear_conductance carries plotting metadata", {
   x <- data.frame(altitude = seq(0, 10, length.out = 15))
   model <- smooth_loglinear_conductance(
@@ -95,16 +113,19 @@ test_that("plot methods resolve smooth conductance models automatically", {
   expect_true(grepl("^s\\(altitude\\)\\.", names(coef(fit))[1]))
 
   marg <- plot(fit, type = "marginal", data = surface, n = 10)
-  expect_s3_class(marg, "ggplot")
-  expect_true("altitude (original scale)" %in% levels(marg$data$covariate))
-  expect_true(all(c("x", "est", "lower", "upper") %in% names(marg$data)))
-  expect_true(all(is.finite(marg$data$est)))
+  expect_true(inherits(marg, "ggplot") || is.list(marg))
+  marg_data <- if (inherits(marg, "ggplot")) marg$data else do.call(rbind, lapply(marg, function(p) p$data))
+  expect_true("altitude (original scale)" %in%
+                unique(as.character(marg_data$covariate)))
+  expect_true(all(c("x", "est", "lower", "upper") %in% names(marg_data)))
+  expect_true(all(is.finite(marg_data$est)))
 
   marg_response <- plot(fit, type = "marginal_response", data = surface, n = 5)
-  expect_s3_class(marg_response, "ggplot")
+  expect_true(inherits(marg_response, "ggplot") || is.list(marg_response))
+  marg_response_data <- if (inherits(marg_response, "ggplot")) marg_response$data else do.call(rbind, lapply(marg_response, function(p) p$data))
   expect_true("altitude (original scale)" %in%
-                levels(marg_response$data$covariate))
-  expect_true(all(is.finite(marg_response$data$est)))
+                unique(as.character(marg_response_data$covariate)))
+  expect_true(all(is.finite(marg_response_data$est)))
 })
 
 test_that("smooth_loglinear_conductance rejects unsupported smooth terms", {

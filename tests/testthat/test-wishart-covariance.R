@@ -129,7 +129,7 @@ test_that("plot methods handle covariance responses and smooth conductance", {
                fitted(fit, type = "response")[lower.tri(genetic_cov, diag = TRUE)])
 
   surface_plot <- plot(fit, type = "surface", data = surface)
-  expect_s3_class(surface_plot, "ggplot")
+  expect_true(inherits(surface_plot, "ggplot") || is.list(surface_plot))
 
   conductance_raster <- conductance(surface, fit, quantile = 0.95)
   expect_s4_class(conductance_raster, "SpatRaster")
@@ -144,23 +144,26 @@ test_that("plot methods handle covariance responses and smooth conductance", {
                     conductance_values$upper95[complete_cells]))
 
   marginal_plot <- plot(fit, type = "marginal", data = surface, n = 8)
-  expect_s3_class(marginal_plot, "ggplot")
+  expect_true(inherits(marginal_plot, "ggplot") || is.list(marginal_plot))
+  marginal_data <- if (inherits(marginal_plot, "ggplot")) marginal_plot$data else do.call(rbind, lapply(marginal_plot, function(p) p$data))
   expect_true("altitude (original scale)" %in%
-                levels(marginal_plot$data$covariate))
-  expect_true(all(is.finite(marginal_plot$data$est)))
+                unique(as.character(marginal_data$covariate)))
+  expect_true(all(is.finite(marginal_data$est)))
 
   marginal_response_plot <- plot(fit, type = "marginal_response",
                                  data = surface, n = 4)
-  expect_s3_class(marginal_response_plot, "ggplot")
-  expect_equal(marginal_response_plot$scales$get_scales("y")$name,
+  expect_true(inherits(marginal_response_plot, "ggplot") || is.list(marginal_response_plot))
+  marginal_response_first <- if (inherits(marginal_response_plot, "ggplot")) marginal_response_plot else marginal_response_plot[[1]]
+  marginal_response_data <- if (inherits(marginal_response_plot, "ggplot")) marginal_response_plot$data else do.call(rbind, lapply(marginal_response_plot, function(p) p$data))
+  expect_equal(marginal_response_first$scales$get_scales("y")$name,
                "Predicted genetic covariance")
   expect_true("altitude (original scale)" %in%
-                levels(marginal_response_plot$data$covariate))
-  expect_true(all(is.finite(marginal_response_plot$data$est)))
-  expect_true(all(marginal_response_plot$data$lower <=
-                    marginal_response_plot$data$est))
-  expect_true(all(marginal_response_plot$data$est <=
-                    marginal_response_plot$data$upper))
+                unique(as.character(marginal_response_data$covariate)))
+  expect_true(all(is.finite(marginal_response_data$est)))
+  expect_true(all(marginal_response_data$lower <=
+                    marginal_response_data$est))
+  expect_true(all(marginal_response_data$est <=
+                    marginal_response_data$upper))
 })
 
 test_that("wishart_covariance supports leverage on full covariance responses", {

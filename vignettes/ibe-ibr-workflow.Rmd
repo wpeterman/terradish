@@ -493,6 +493,30 @@ the IBE term changes the estimated landscape permeability:
 plot(fit_ibr, type = "marginal", data = surface)
 ```
 
+### Constraining inference to focal support
+
+If a covariate tail is weakly represented at focal sites, use focal-support
+clamping to stabilize interpretation:
+
+```{r ibe-ibr-support-clamp, eval = FALSE}
+plot(
+  fit_joint,
+  type = "marginal",
+  data = surface,
+  support = "focal",
+  support_probs = c(0.01, 0.99),
+  clamp_covariates = c("altitude", "forestcover")
+)
+
+cond_joint_focal <- conductance(
+  surface,
+  fit_joint,
+  support = "focal",
+  support_probs = c(0.01, 0.99),
+  clamp_covariates = c("altitude", "forestcover")
+)
+```
+
 ---
 
 ## Step 7 — Saved-results utilities

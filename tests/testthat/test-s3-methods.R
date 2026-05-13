@@ -81,49 +81,64 @@ test_that("legacy radish wrapper warns and keeps compatibility classes", {
 
 test_that("plot methods return expected objects", {
   fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+  collect_plot_data <- function(obj) {
+    if (inherits(obj, "ggplot"))
+      return(obj$data)
+    do.call(rbind, lapply(obj, function(p) p$data))
+  }
+  first_plot <- function(obj) if (inherits(obj, "ggplot")) obj else obj[[1]]
 
   fit_tab <- plot(fx$fit, type = "fit")
   expect_s3_class(fit_tab, "ggplot")
   expect_true(all(c("observed", "fitted") %in% names(fit_tab$data)))
   expect_gt(nrow(fit_tab$data), 0L)
+  expect_s3_class(fit_tab$theme$panel.border, "element_rect")
+  expect_true(is.na(fit_tab$theme$panel.border$fill))
+  expect_equal(fit_tab$theme$panel.border$colour, "black")
+  expect_equal(fit_tab$theme$axis.title$face, "bold")
+  expect_equal(fit_tab$theme$axis.title$size - fit_tab$theme$axis.text$size, 2)
 
   cond <- plot(fx$fit, type = "surface", data = fx$surface)
-  expect_s3_class(cond, "ggplot")
-  expect_true(all(c("x", "y", "conductance", "panel") %in% names(cond$data)))
+  expect_true(inherits(cond, "ggplot") || is.list(cond))
+  cond_data <- collect_plot_data(cond)
+  expect_true(all(c("x", "y", "conductance") %in% names(cond_data)))
 
   marg <- plot(fx$fit, type = "marginal", data = fx$surface, n = 20)
-  expect_s3_class(marg, "ggplot")
+  expect_true(inherits(marg, "ggplot") || is.list(marg))
+  marg_data <- collect_plot_data(marg)
   expect_true(all(c("covariate", "x", "est", "lower", "upper") %in%
-                    names(marg$data)))
+                    names(marg_data)))
   expect_true(all(c("altitude (original scale)",
                     "forestcover (original scale)") %in%
-                    levels(marg$data$covariate)))
-  expect_true(all(vapply(split(marg$data$x, marg$data$covariate),
+                    unique(as.character(marg_data$covariate))))
+  expect_true(all(vapply(split(marg_data$x, marg_data$covariate),
                          function(z) !any(diff(z) < 0),
                          logical(1))))
-  expect_true(all(marg$data$lower <= marg$data$est))
-  expect_true(all(marg$data$est <= marg$data$upper))
-  expect_true(all(marg$data$lower <= marg$data$upper))
-  expect_true(all((marg$data$upper - marg$data$lower) > 0))
+  expect_true(all(marg_data$lower <= marg_data$est))
+  expect_true(all(marg_data$est <= marg_data$upper))
+  expect_true(all(marg_data$lower <= marg_data$upper))
+  expect_true(all((marg_data$upper - marg_data$lower) > 0))
 
   marg_response <- plot(fx$fit, type = "marginal_response",
                         data = fx$surface, n = 20)
-  expect_s3_class(marg_response, "ggplot")
+  expect_true(inherits(marg_response, "ggplot") || is.list(marg_response))
+  marg_response_data <- collect_plot_data(marg_response)
+  marg_response_first <- first_plot(marg_response)
   expect_true(all(c("covariate", "x", "est", "lower", "upper") %in%
-                    names(marg_response$data)))
+                    names(marg_response_data)))
   expect_true(all(c("altitude (original scale)",
                     "forestcover (original scale)") %in%
-                    levels(marg_response$data$covariate)))
-  expect_true(all(vapply(split(marg_response$data$x,
-                               marg_response$data$covariate),
+                    unique(as.character(marg_response_data$covariate))))
+  expect_true(all(vapply(split(marg_response_data$x,
+                               marg_response_data$covariate),
                          function(z) !any(diff(z) < 0),
                          logical(1))))
-  expect_true(all(is.finite(marg_response$data$est)))
-  expect_true(all(marg_response$data$lower <= marg_response$data$est))
-  expect_true(all(marg_response$data$est <= marg_response$data$upper))
-  expect_true(all((marg_response$data$upper - marg_response$data$lower) > 0))
-  expect_gt(min(marg_response$data$upper - marg_response$data$lower), 1e-4)
-  expect_equal(marg_response$scales$get_scales("y")$name,
+  expect_true(all(is.finite(marg_response_data$est)))
+  expect_true(all(marg_response_data$lower <= marg_response_data$est))
+  expect_true(all(marg_response_data$est <= marg_response_data$upper))
+  expect_true(all((marg_response_data$upper - marg_response_data$lower) > 0))
+  expect_gt(min(marg_response_data$upper - marg_response_data$lower), 1e-4)
+  expect_equal(marg_response_first$scales$get_scales("y")$name,
                "Predicted genetic distance")
 })
 
@@ -133,13 +148,14 @@ test_that("marginal plots support covariate panel selection", {
   marg <- plot(fx$fit, type = "marginal", data = fx$surface, n = 8,
                marginal_covariates = "altitude")
   expect_s3_class(marg, "ggplot")
-  expect_equal(levels(marg$data$covariate), "altitude (original scale)")
+  expect_equal(unique(as.character(marg$data$covariate)),
+               "altitude (original scale)")
 
   marg_response <- plot(fx$fit, type = "marginal_response", data = fx$surface,
                         n = 8,
                         marginal_covariates = "forestcover (original scale)")
   expect_s3_class(marg_response, "ggplot")
-  expect_equal(levels(marg_response$data$covariate),
+  expect_equal(unique(as.character(marg_response$data$covariate)),
                "forestcover (original scale)")
 
   expect_error(
@@ -157,23 +173,68 @@ test_that("marginal plots can infer original covariate units from surface metada
 
   marg_scaled <- plot(fx$fit, type = "marginal", data = surface_scaled, n = 20)
   marg_orig <- plot(fx$fit, type = "marginal", data = fx$surface, n = 20)
+  marg_scaled_data <- if (inherits(marg_scaled, "ggplot")) marg_scaled$data else do.call(rbind, lapply(marg_scaled, function(p) p$data))
+  marg_orig_data <- if (inherits(marg_orig, "ggplot")) marg_orig$data else do.call(rbind, lapply(marg_orig, function(p) p$data))
 
   expect_true(all(c("altitude (original scale)",
                     "forestcover (original scale)") %in%
-                    levels(marg_orig$data$covariate)))
-  expect_false(isTRUE(all.equal(range(marg_scaled$data$x),
-                                range(marg_orig$data$x))))
+                    unique(as.character(marg_orig_data$covariate))))
+  expect_false(isTRUE(all.equal(range(marg_scaled_data$x),
+                                range(marg_orig_data$x))))
 
-  x_ranges <- tapply(marg_orig$data$x, marg_orig$data$covariate, range)
+  x_ranges <- tapply(marg_orig_data$x, marg_orig_data$covariate, range)
   expect_equal(unname(x_ranges[["altitude (original scale)"]]),
                c(-0.0001180684, 1.0632071528),
                tolerance = 1e-6)
   expect_equal(unname(x_ranges[["forestcover (original scale)"]]),
                c(0.004033356, 0.94775),
                tolerance = 1e-6)
-  expect_true(all(vapply(split(marg_orig$data$x, marg_orig$data$covariate),
+  expect_true(all(vapply(split(marg_orig_data$x, marg_orig_data$covariate),
                          function(z) !any(diff(z) < 0),
                          logical(1))))
+})
+
+test_that("marginal plots can clamp evaluation support to focal-site ranges", {
+  fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+  surface <- fx$surface
+
+  focal <- unique(surface$demes)
+  non_focal <- setdiff(seq_len(nrow(surface$x)), focal)
+  expect_gt(length(non_focal), 0L)
+
+  surface_extreme <- surface
+  surface_extreme$x$altitude[non_focal] <- min(surface$x$altitude[focal]) - 25
+
+  collect_plot_data <- function(obj)
+    if (inherits(obj, "ggplot")) obj$data else do.call(rbind, lapply(obj, function(p) p$data))
+
+  marg_all <- plot(fx$fit, type = "marginal", data = surface_extreme, n = 20,
+                   support = "none", clamp_covariates = "altitude")
+  marg_focal <- plot(fx$fit, type = "marginal", data = surface_extreme, n = 20,
+                     support = "focal", clamp_covariates = "altitude")
+  marg_trim <- plot(fx$fit, type = "marginal", data = surface_extreme, n = 20,
+                    support = "focal", support_probs = c(0.1, 0.9),
+                    clamp_covariates = "altitude")
+
+  data_all <- collect_plot_data(marg_all)
+  data_focal <- collect_plot_data(marg_focal)
+  data_trim <- collect_plot_data(marg_trim)
+
+  alt_all <- data_all[data_all$covariate == "altitude (original scale)", "x"]
+  alt_focal <- data_focal[data_focal$covariate == "altitude (original scale)", "x"]
+  alt_trim <- data_trim[data_trim$covariate == "altitude (original scale)", "x"]
+
+  expect_lt(min(alt_all), min(alt_focal))
+  expect_gt(max(alt_trim) - min(alt_trim),
+            0)
+  expect_lt(max(alt_trim) - min(alt_trim),
+            max(alt_focal) - min(alt_focal))
+
+  expect_error(
+    plot(fx$fit, type = "marginal", data = surface_extreme,
+         support = "focal", support_probs = c(-0.1, 1)),
+    "support_probs"
+  )
 })
 
 test_that("legacy-only radish classes dispatch S3 methods", {

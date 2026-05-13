@@ -8,9 +8,25 @@
 \usage{
 conductance(x, ...)
 
-\method{conductance}{terradish_graph}(x, fit, quantile = 0.95, ...)
+\method{conductance}{terradish_graph}(
+  x,
+  fit,
+  quantile = 0.95,
+  support = c("none", "focal"),
+  support_probs = c(0, 1),
+  clamp_covariates = NULL,
+  ...
+)
 
-\method{conductance}{radish_graph}(x, fit, quantile = 0.95, ...)
+\method{conductance}{radish_graph}(
+  x,
+  fit,
+  quantile = 0.95,
+  support = c("none", "focal"),
+  support_probs = c(0, 1),
+  clamp_covariates = NULL,
+  ...
+)
 }
 \arguments{
 \item{x}{A \code{terradish_graph} object returned by
@@ -23,6 +39,19 @@ conductance(x, ...)
 \item{quantile}{Confidence level for the pointwise conductance interval.
 The default \code{0.95} gives a 95% interval computed via the delta method
 applied to the MLE of \code{theta} and its inverse Hessian.}
+
+\item{support}{Optional support constraint for conductance evaluation.
+Use \code{"none"} (default) to evaluate the fitted conductance model over
+the full graph covariate domain, or \code{"focal"} to clamp selected
+covariates to focal-site support.}
+
+\item{support_probs}{Optional length-2 probability vector used with
+\code{support = "focal"} to compute clamping bounds from focal-cell
+quantiles. The default \code{c(0, 1)} uses the focal min/max.}
+
+\item{clamp_covariates}{Optional character vector of covariate names to
+clamp when \code{support = "focal"}. Defaults to all numeric covariates in
+\code{x$x}.}
 }
 \value{
 If \code{x$stack} is non-\code{NULL} (the default when
@@ -48,6 +77,11 @@ exponentiated, so the point estimate always lies within the interval.  The
 intervals are asymptotic (delta method) and reflect only uncertainty in the
 conductance parameters \code{theta}; they do not account for uncertainty in
 the nuisance parameters \code{phi}.
+
+With \code{support = "focal"}, selected covariates are clamped to focal-site
+support before conductance is evaluated. This constrains prediction to
+empirical covariate support among \code{x$demes} and can stabilize extreme
+tails when focal sampling is sparse.
 
 The function requires the MLE to be in the interior of the parameter space
 (\code{fit$fit$boundary == FALSE}); if the MLE is on the boundary (no

@@ -35,6 +35,11 @@
 #'     confidence interval of that effective distance.}
 #' }
 #'
+#' For \code{type = "surface"}, \code{"marginal"}, and
+#' \code{"marginal_response"}, optional support-constrained evaluation can be
+#' requested with \code{support = "focal"} to clamp selected covariates to
+#' empirical focal-site support before prediction.
+#'
 #' @param x A fitted \code{terradish} object.
 #' @param type One of \code{"marginal_response"} (default), \code{"fit"},
 #'   \code{"surface"}, \code{"marginal"}, or \code{"sigma"}.
@@ -65,6 +70,19 @@
 #'   Defaults to \code{100} for \code{"marginal_response"} (each point
 #'   requires a full Laplacian solve) and \code{200} for \code{"marginal"}.
 #'   Supply an explicit integer to override.
+#' @param support Optional support constraint used for
+#'   \code{type = "surface"}, \code{"marginal"}, and
+#'   \code{"marginal_response"}. Use \code{"none"} (default) to evaluate over
+#'   the full graph covariate domain, or \code{"focal"} to constrain selected
+#'   covariates to the empirical support at focal sampling cells
+#'   (\code{data$demes}).
+#' @param support_probs Optional length-2 probability vector used with
+#'   \code{support = "focal"} to define clamping bounds from focal-cell
+#'   quantiles. The default \code{c(0, 1)} uses the focal min/max; for robust
+#'   trimming, values like \code{c(0.01, 0.99)} are often useful.
+#' @param clamp_covariates Optional character vector of covariate names to clamp
+#'   when \code{support = "focal"}. Defaults to all numeric covariates used by
+#'   each plot type.
 #' @param ... Additional graphical parameters forwarded to
 #'   \code{\link[graphics]{plot}} (for \code{"fit"}) or ignored for the other
 #'   types.
@@ -73,14 +91,10 @@
 #' \itemize{
 #'   \item \code{"fit"}: a \code{ggplot} object with observed-vs-fitted
 #'     pairwise distances.
-#'   \item \code{"surface"}: a \code{ggplot} object with faceted conductance
-#'     estimate and interval maps.
-#'   \item \code{"marginal"}: a \code{ggplot} object with faceted marginal
-#'     conductance effects and pointwise confidence bands.
-#'   \item \code{"marginal_response"}: a \code{ggplot} object with faceted
-#'     response-scale marginal effects and predictive bands.
-#'   \item \code{"sigma"}: a \code{ggplot} object with faceted Gaussian kernel
-#'     weight curves and fitted effective distances for each scale parameter.
+#'   \item \code{"surface"}, \code{"marginal"}, \code{"marginal_response"},
+#'     and \code{"sigma"}: either a single \code{ggplot} object (one panel) or
+#'     a named list of \code{ggplot} objects (multiple panels), with one plot
+#'     per panel/covariate.
 #' }
 #'
 #' @seealso \code{\link{terradish}}, \code{\link{conductance}},
@@ -122,7 +136,7 @@
 #'
 #' @name plot.terradish
 #' @method plot terradish
-#' @importFrom ggplot2 aes coord_equal element_blank element_line element_rect element_text facet_wrap geom_abline geom_line geom_point geom_raster geom_rect geom_ribbon geom_rug geom_text geom_vline ggplot labs margin scale_fill_gradientn scale_x_continuous scale_y_continuous theme theme_bw
+#' @importFrom ggplot2 aes coord_equal element_blank element_line element_rect element_text geom_abline geom_line geom_point geom_raster geom_rect geom_ribbon geom_rug geom_text geom_vline ggplot labs margin scale_fill_gradientn scale_x_continuous scale_y_continuous theme theme_bw
 #' @importFrom stats lm
 #' @importFrom terra global values
 #' @export
@@ -137,28 +151,42 @@ plot.terradish <- function(x,
                             distance_unit = NULL,
                             quantile = 0.95,
                             n = NULL,
+                            support = c("none", "focal"),
+                            support_probs = c(0, 1),
+                            clamp_covariates = NULL,
                             ...)
 {
   type <- match.arg(type)
+  support <- match.arg(support)
   conductance_model <- .resolve_plot_conductance_model(x, conductance_model)
   n <- as.integer(if (is.null(n))
     if (identical(type, "marginal_response")) 100L else 200L
   else
     n)
-  switch(type,
-    fit      = .plot_terradish_fit(x, ...),
-    surface  = .plot_terradish_surface(x, data, quantile),
-    sigma    = .plot_terradish_sigma(x, quantile, n,
-                                     distance_per_map_unit = distance_per_map_unit,
-                                     distance_unit = distance_unit),
-    marginal = .plot_terradish_marginal(x, data, covariates,
-                                        conductance_model, quantile, n,
-                                        marginal_covariates = marginal_covariates),
-    marginal_response = .plot_terradish_marginal(x, data, covariates,
-                                                conductance_model, quantile, n,
-                                                response_scale = TRUE,
-                                                marginal_covariates = marginal_covariates)
+  out <- switch(type,
+                fit      = .plot_terradish_fit(x, ...),
+                surface  = .plot_terradish_surface(x, data, quantile,
+                                                   support = support,
+                                                   support_probs = support_probs,
+                                                   clamp_covariates = clamp_covariates),
+                sigma    = .plot_terradish_sigma(x, quantile, n,
+                                                 distance_per_map_unit = distance_per_map_unit,
+                                                 distance_unit = distance_unit),
+                marginal = .plot_terradish_marginal(x, data, covariates,
+                                                    conductance_model, quantile, n,
+                                                    marginal_covariates = marginal_covariates,
+                                                    support = support,
+                                                    support_probs = support_probs,
+                                                    clamp_covariates = clamp_covariates),
+                marginal_response = .plot_terradish_marginal(x, data, covariates,
+                                                             conductance_model, quantile, n,
+                                                             response_scale = TRUE,
+                                                             marginal_covariates = marginal_covariates,
+                                                             support = support,
+                                                             support_probs = support_probs,
+                                                             clamp_covariates = clamp_covariates)
   )
+  invisible(out)
 }
 
 #' @rdname plot.terradish
@@ -213,11 +241,11 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
   theme_bw(base_size = 11) +
     theme(
       panel.grid = element_blank(),
-      panel.border = element_blank(),
-      axis.line = element_line(colour = "black", linewidth = 0.4),
+      panel.border = element_rect(fill = NA, colour = "black", linewidth = 0.4),
+      axis.line = element_blank(),
       axis.ticks = element_line(colour = "black", linewidth = 0.35),
       axis.text = element_text(colour = "black", size = 9),
-      axis.title = element_text(colour = "black", size = 10),
+      axis.title = element_text(colour = "black", size = 11, face = "bold"),
       axis.title.x = element_text(margin = margin(t = 7)),
       axis.title.y = element_text(margin = margin(r = 7)),
       strip.background = element_rect(fill = "white", colour = NA),
@@ -226,6 +254,96 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
       legend.background = element_rect(fill = "white", colour = NA),
       legend.key = element_rect(fill = "white", colour = NA)
     )
+}
+
+.finalize_panel_plots <- function(plots)
+{
+  if (length(plots) == 1L)
+    plots[[1L]]
+  else
+    plots
+}
+
+.normalize_support_probs <- function(support_probs)
+{
+  if (length(support_probs) != 2L || any(!is.finite(support_probs)))
+    stop("`support_probs` must be a length-2 numeric vector with finite values.",
+         call. = FALSE)
+
+  support_probs <- as.numeric(support_probs)
+  if (any(support_probs < 0 | support_probs > 1))
+    stop("`support_probs` values must lie in [0, 1].", call. = FALSE)
+  if (support_probs[1] > support_probs[2])
+    stop("`support_probs[1]` must be <= `support_probs[2]`.", call. = FALSE)
+  support_probs
+}
+
+.support_rows <- function(data, support = c("none", "focal"))
+{
+  support <- match.arg(support)
+  n <- nrow(data$x)
+  if (identical(support, "none"))
+    return(seq_len(n))
+
+  idx <- sort(unique(as.integer(data$demes)))
+  idx <- idx[is.finite(idx) & idx >= 1L & idx <= n]
+  if (!length(idx))
+    stop("Could not resolve focal support rows from `data$demes`.", call. = FALSE)
+  idx
+}
+
+.clamp_graph_covariates <- function(data,
+                                    support = c("none", "focal"),
+                                    support_probs = c(0, 1),
+                                    clamp_covariates = NULL)
+{
+  support <- match.arg(support)
+  if (identical(support, "none"))
+    return(data)
+
+  support_probs <- .normalize_support_probs(support_probs)
+  rows <- .support_rows(data, support = support)
+  out <- data
+
+  if (is.null(clamp_covariates))
+    clamp_covariates <- names(out$x)
+  clamp_covariates <- intersect(unique(as.character(clamp_covariates)),
+                                names(out$x))
+  if (!length(clamp_covariates))
+    stop("No `clamp_covariates` matched `data$x` column names.", call. = FALSE)
+
+  is_num <- vapply(out$x[, clamp_covariates, drop = FALSE], is.numeric, logical(1))
+  if (any(!is_num))
+  {
+    warning("Skipping non-numeric clamp covariates: ",
+            paste(clamp_covariates[!is_num], collapse = ", "),
+            call. = FALSE)
+    clamp_covariates <- clamp_covariates[is_num]
+  }
+  if (!length(clamp_covariates))
+    stop("No numeric clamp covariates were available after filtering.", call. = FALSE)
+
+  for (nm in clamp_covariates)
+  {
+    focal_vals <- out$x[rows, nm]
+    limits <- stats::quantile(focal_vals,
+                              probs = support_probs,
+                              na.rm = TRUE,
+                              names = FALSE)
+    if (any(!is.finite(limits)))
+      stop("Support bounds are non-finite for covariate `", nm, "`.",
+           call. = FALSE)
+
+    limits <- sort(as.numeric(limits))
+    out$x[[nm]] <- pmin(pmax(out$x[[nm]], limits[1]), limits[2])
+  }
+
+  attr(out, "support_clamp") <- list(
+    support = support,
+    support_probs = support_probs,
+    clamp_covariates = clamp_covariates
+  )
+  out
 }
 
 .select_marginal_covariates <- function(requested, available,
@@ -327,27 +445,33 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
     distance_label
   )
 
-  curve_data$covariate <- factor(curve_data$covariate, levels = sigma_table$covariate)
-  summary_data$covariate <- factor(summary_data$covariate, levels = sigma_table$covariate)
+  plots <- lapply(seq_len(nrow(summary_data)), function(i) {
+    covariate_i <- summary_data$covariate[i]
+    curve_i <- curve_data[curve_data$covariate == covariate_i, , drop = FALSE]
+    summary_i <- summary_data[i, , drop = FALSE]
 
-  ggplot(curve_data, aes(x = distance, y = weight)) +
-    geom_rect(data = summary_data,
-              aes(xmin = distance_lower, xmax = distance_upper,
-                  ymin = -Inf, ymax = Inf),
-              inherit.aes = FALSE, fill = "grey80", alpha = 0.5) +
-    geom_line(linewidth = 0.7, colour = "black") +
-    geom_vline(data = summary_data, aes(xintercept = distance),
-               inherit.aes = FALSE, colour = "#d95f02",
-               linewidth = 0.6, linetype = "dashed") +
-    geom_text(data = summary_data,
-              aes(x = Inf, y = label_y, label = label),
-              inherit.aes = FALSE, hjust = 1.02, vjust = 1,
-              size = 3) +
-    facet_wrap(~covariate, scales = "free_x", ncol = 1) +
-    scale_x_continuous(labels = .terradish_plot_number) +
-    scale_y_continuous(labels = .terradish_plot_number) +
-    labs(x = paste0("Distance (", distance_label, ")"), y = "Weight") +
-    .terradish_plot_theme()
+    ggplot(curve_i, aes(x = distance, y = weight)) +
+      geom_rect(data = summary_i,
+                aes(xmin = distance_lower, xmax = distance_upper,
+                    ymin = -Inf, ymax = Inf),
+                inherit.aes = FALSE, fill = "grey80", alpha = 0.5) +
+      geom_line(linewidth = 0.7, colour = "black") +
+      geom_vline(data = summary_i, aes(xintercept = distance),
+                 inherit.aes = FALSE, colour = "#d95f02",
+                 linewidth = 0.6, linetype = "dashed") +
+      geom_text(data = summary_i,
+                aes(x = Inf, y = label_y, label = label),
+                inherit.aes = FALSE, hjust = 1.02, vjust = 1,
+                size = 3) +
+      scale_x_continuous(labels = .terradish_plot_number) +
+      scale_y_continuous(labels = .terradish_plot_number) +
+      labs(title = covariate_i,
+           x = paste0("Distance (", distance_label, ")"),
+           y = "Weight") +
+      .terradish_plot_theme()
+  })
+  names(plots) <- summary_data$covariate
+  .finalize_panel_plots(plots)
 }
 
 
@@ -403,7 +527,10 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
 
 
 # Conductance surface + CI
-.plot_terradish_surface <- function(fit, data, quantile)
+.plot_terradish_surface <- function(fit, data, quantile,
+                                    support = c("none", "focal"),
+                                    support_probs = c(0, 1),
+                                    clamp_covariates = NULL)
 {
   if (is.null(data) || !inherits(data, c("terradish_graph", "radish_graph")))
     stop('plot(type = "surface") requires `data`: ',
@@ -415,7 +542,11 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
          "estimated (IBD or boundary model).",
          call. = FALSE)
 
-  cond  <- conductance(data, fit, quantile = quantile)
+  cond  <- conductance(data, fit,
+                       quantile = quantile,
+                       support = support,
+                       support_probs = support_probs,
+                       clamp_covariates = clamp_covariates)
   q_pct <- round(100 * quantile)
 
   lower_nm <- paste0("lower", q_pct)
@@ -430,24 +561,24 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
                    paste0("Lower ", q_pct, "% CI"),
                    paste0("Upper ", q_pct, "% CI"))
 
-  plot_data <- do.call(rbind, Map(function(layer_name, panel_name) {
+  plots <- lapply(seq_along(panel_names), function(i) {
+    layer_name <- c("est", lower_nm, upper_nm)[i]
+    panel_name <- panel_names[i]
     layer_data <- as.data.frame(cond[[layer_name]], xy = TRUE, na.rm = TRUE)
     names(layer_data)[3] <- "conductance"
-    layer_data$panel <- panel_name
-    layer_data
-  }, c("est", lower_nm, upper_nm), panel_names))
-  plot_data$panel <- factor(plot_data$panel, levels = panel_names)
 
-  ggplot(plot_data, aes(x = x, y = y, fill = conductance)) +
-    geom_raster() +
-    facet_wrap(~panel, nrow = 1) +
-    coord_equal(expand = FALSE) +
-    scale_fill_gradientn(colours = terrain.colors(100), limits = clim,
-                         name = "Conductance") +
-    scale_x_continuous(labels = .terradish_plot_number) +
-    scale_y_continuous(labels = .terradish_plot_number) +
-    labs(x = NULL, y = NULL) +
-    .terradish_plot_theme()
+    ggplot(layer_data, aes(x = x, y = y, fill = conductance)) +
+      geom_raster() +
+      coord_equal(expand = FALSE) +
+      scale_fill_gradientn(colours = terrain.colors(100), limits = clim,
+                           name = "Conductance") +
+      scale_x_continuous(labels = .terradish_plot_number) +
+      scale_y_continuous(labels = .terradish_plot_number) +
+      labs(title = panel_name, x = NULL, y = NULL) +
+      .terradish_plot_theme()
+  })
+  names(plots) <- panel_names
+  .finalize_panel_plots(plots)
 }
 
 .marginal_back_transform <- function(plot_vars, x_data, data_stack, covariates)
@@ -821,8 +952,13 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
 .plot_terradish_marginal <- function(fit, data, covariates,
                                       conductance_model_factory, quantile, n,
                                       response_scale = FALSE,
-                                      marginal_covariates = NULL)
+                                      marginal_covariates = NULL,
+                                      support = c("none", "focal"),
+                                      support_probs = c(0, 1),
+                                      clamp_covariates = NULL)
 {
+  support <- match.arg(support)
+
   if (is.null(data) || !inherits(data, c("terradish_graph", "radish_graph")))
     stop('Marginal plots require `data`: ',
          'supply the terradish_graph used for fitting.',
@@ -842,6 +978,10 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
       .marginal_response_components(fit)
     else
       NULL
+    support_rows <- if (identical(support, "focal"))
+      .support_rows(data, support = "focal")
+    else
+      NULL
 
     marginal_data <- .gaussian_scale_marginal_data(
       theta = fit$mle$theta_internal,
@@ -851,30 +991,39 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
       plot_context = gaussian_plot_context,
       response_components = response_components,
       graph_data = if (isTRUE(response_scale)) data else NULL,
-      marginal_covariates = marginal_covariates
+      marginal_covariates = marginal_covariates,
+      support_rows = support_rows,
+      support_probs = support_probs,
+      clamp_vars = clamp_covariates
     )
 
-    return(
-      ggplot(marginal_data$curve_data, aes(x = x, y = est)) +
+    ylab <- if (isTRUE(response_scale))
+      if (.fit_uses_covariance_response(fit))
+        "Predicted genetic covariance"
+      else
+        "Predicted genetic distance"
+    else
+      "Conductance"
+
+    plot_levels <- levels(marginal_data$curve_data$covariate)
+    plots <- lapply(plot_levels, function(panel_name) {
+      curve_i <- marginal_data$curve_data[marginal_data$curve_data$covariate == panel_name,
+                                          , drop = FALSE]
+      rug_i <- marginal_data$rug_data[marginal_data$rug_data$covariate == panel_name,
+                                      , drop = FALSE]
+      ggplot(curve_i, aes(x = x, y = est)) +
         geom_ribbon(aes(ymin = lower, ymax = upper),
                     fill = "grey80", alpha = 0.5) +
         geom_line(linewidth = 0.6, colour = "black") +
-        geom_rug(data = marginal_data$rug_data, aes(x = x), inherit.aes = FALSE,
+        geom_rug(data = rug_i, aes(x = x), inherit.aes = FALSE,
                  sides = "b", linewidth = 0.3) +
-        facet_wrap(~covariate, scales = "free_x",
-                   ncol = min(length(levels(marginal_data$curve_data$covariate)), 3L)) +
         scale_x_continuous(labels = .terradish_plot_number) +
-        scale_y_continuous(name = if (isTRUE(response_scale))
-          if (.fit_uses_covariance_response(fit))
-            "Predicted genetic covariance"
-          else
-            "Predicted genetic distance"
-        else
-          "Conductance",
-          labels = .terradish_plot_number) +
-        labs(x = NULL) +
+        scale_y_continuous(name = ylab, labels = .terradish_plot_number) +
+        labs(title = panel_name, x = NULL) +
         .terradish_plot_theme()
-    )
+    })
+    names(plots) <- plot_levels
+    return(.finalize_panel_plots(plots))
   }
 
   if (!inherits(conductance_model_factory,
@@ -911,25 +1060,36 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
   if (length(plot_vars) == 0)
     stop("No continuous covariates available to plot.", call. = FALSE)
 
-  # Average over the observed values of non-focal covariates so marginal
-  # uncertainty reflects the empirical surface, not a single mean-covariate row.
-  x_data  <- data$x[, available, drop = FALSE]
-
-  response_components <- if (isTRUE(response_scale))
-    .marginal_response_components(fit)
-  else
-    NULL
-
-  back_transform <- .marginal_back_transform(plot_vars, x_data,
-                                             data$stack, covariates)
+  x_data_pre <- data$x[, available, drop = FALSE]
+  back_transform_pre <- .marginal_back_transform(plot_vars, x_data_pre,
+                                                 data$stack, covariates)
   plot_labels <- vapply(plot_vars, function(nm) {
-    if (!is.null(back_transform) && nm %in% names(back_transform))
-      back_transform[[nm]]$label
+    if (!is.null(back_transform_pre) && nm %in% names(back_transform_pre))
+      back_transform_pre[[nm]]$label
     else
       paste0(nm, " (scaled)")
   }, character(1))
   plot_vars <- .select_marginal_covariates(marginal_covariates, plot_vars,
                                            labels = plot_labels)
+  if (is.null(clamp_covariates))
+    clamp_covariates <- plot_vars
+  data <- .clamp_graph_covariates(
+    data = data,
+    support = support,
+    support_probs = support_probs,
+    clamp_covariates = clamp_covariates
+  )
+
+  # Average over the observed values of non-focal covariates so marginal
+  # uncertainty reflects the empirical surface, not a single mean-covariate row.
+  x_data <- data$x[, available, drop = FALSE]
+  response_components <- if (isTRUE(response_scale))
+    .marginal_response_components(fit)
+  else
+    NULL
+  back_transform <- .marginal_back_transform(plot_vars, x_data,
+                                             data$stack, covariates)
+
   curves <- vector("list", length(plot_vars))
   rugs <- vector("list", length(plot_vars))
   names(curves) <- names(rugs) <- plot_vars
@@ -989,30 +1149,30 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
     rugs[[nm]] <- data.frame(covariate = panel_lab, x = rug_vals)
   }
 
-  curve_data <- do.call(rbind, curves)
-  rug_data <- do.call(rbind, rugs)
-  curve_data$covariate <- factor(curve_data$covariate,
-                                 levels = vapply(curves, function(z) z$covariate[1],
-                                                 character(1)))
-  rug_data$covariate <- factor(rug_data$covariate,
-                               levels = levels(curve_data$covariate))
-
-  ggplot(curve_data, aes(x = x, y = est)) +
-    geom_ribbon(aes(ymin = lower, ymax = upper),
-                fill = "grey80", alpha = 0.5) +
-    geom_line(linewidth = 0.6, colour = "black") +
-    geom_rug(data = rug_data, aes(x = x), inherit.aes = FALSE,
-             sides = "b", linewidth = 0.3) +
-    facet_wrap(~covariate, scales = "free_x", ncol = min(length(plot_vars), 3L)) +
-    scale_x_continuous(labels = .terradish_plot_number) +
-    scale_y_continuous(name = if (isTRUE(response_scale))
-      if (.fit_uses_covariance_response(fit))
-        "Predicted genetic covariance"
-      else
-        "Predicted genetic distance"
+  ylab <- if (isTRUE(response_scale))
+    if (.fit_uses_covariance_response(fit))
+      "Predicted genetic covariance"
     else
-      "Conductance",
-      labels = .terradish_plot_number) +
-    labs(x = NULL) +
-    .terradish_plot_theme()
+      "Predicted genetic distance"
+  else
+    "Conductance"
+  panel_labels <- vapply(curves, function(z) z$covariate[1], character(1))
+  plots <- lapply(seq_along(curves), function(i) {
+    curve_i <- curves[[i]]
+    rug_i <- rugs[[i]]
+    panel_name <- panel_labels[i]
+
+    ggplot(curve_i, aes(x = x, y = est)) +
+      geom_ribbon(aes(ymin = lower, ymax = upper),
+                  fill = "grey80", alpha = 0.5) +
+      geom_line(linewidth = 0.6, colour = "black") +
+      geom_rug(data = rug_i, aes(x = x), inherit.aes = FALSE,
+               sides = "b", linewidth = 0.3) +
+      scale_x_continuous(labels = .terradish_plot_number) +
+      scale_y_continuous(name = ylab, labels = .terradish_plot_number) +
+      labs(title = panel_name, x = NULL) +
+      .terradish_plot_theme()
+  })
+  names(plots) <- panel_labels
+  .finalize_panel_plots(plots)
 }

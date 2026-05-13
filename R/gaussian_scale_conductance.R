@@ -508,7 +508,10 @@
                                           plot_context,
                                           response_components = NULL,
                                           graph_data = NULL,
-                                          marginal_covariates = NULL)
+                                          marginal_covariates = NULL,
+                                          support_rows = NULL,
+                                          support_probs = c(0, 1),
+                                          clamp_vars = NULL)
 {
   theta <- c(theta)
   vcov <- as.matrix(vcov)
@@ -539,6 +542,40 @@
   plot_vars <- .select_marginal_covariates(marginal_covariates,
                                            plot_context$vars,
                                            labels = plot_labels)
+
+  if (!is.null(support_rows))
+  {
+    support_probs <- .normalize_support_probs(support_probs)
+    support_rows <- sort(unique(as.integer(support_rows)))
+    support_rows <- support_rows[is.finite(support_rows) &
+                                   support_rows >= 1L &
+                                   support_rows <= nrow(base_state$model)]
+    if (!length(support_rows))
+      stop("Could not resolve valid `support_rows` for Gaussian marginal plotting.",
+           call. = FALSE)
+
+    if (is.null(clamp_vars))
+      clamp_vars <- plot_context$vars
+    clamp_vars <- intersect(unique(as.character(clamp_vars)), plot_context$vars)
+    if (!length(clamp_vars))
+      stop("No `clamp_vars` matched Gaussian plot covariates.",
+           call. = FALSE)
+
+    for (nm in clamp_vars)
+    {
+      limits <- stats::quantile(base_state$model[[nm]][support_rows],
+                                probs = support_probs,
+                                na.rm = TRUE,
+                                names = FALSE)
+      if (any(!is.finite(limits)))
+        stop("Support bounds are non-finite for Gaussian covariate `", nm, "`.",
+             call. = FALSE)
+      limits <- sort(as.numeric(limits))
+      base_state$model[[nm]] <- pmin(pmax(base_state$model[[nm]], limits[1]),
+                                     limits[2])
+    }
+  }
+
   curves <- vector("list", length(plot_vars))
   rugs <- vector("list", length(plot_vars))
   names(curves) <- names(rugs) <- plot_vars
@@ -570,6 +607,10 @@
       else
       {
         conductance <- exp(eta)
+        conductance <- .validate_conductance_values(
+          conductance,
+          context = "gaussian_smoothed_loglinear_conductance()"
+        )
         df__dbeta_mat <- conductance * X
 
         solver_state <- .terradish_solver_setup(
@@ -618,7 +659,12 @@
       lower = pmin(lower, upper),
       upper = pmax(lower, upper)
     )
-    rugs[[nm]] <- data.frame(covariate = bt$label, x = bt$rug)
+    rug_model <- if (!is.null(support_rows))
+      base_state$model[[nm]][support_rows]
+    else
+      base_state$model[[nm]]
+    rugs[[nm]] <- data.frame(covariate = bt$label,
+                             x = bt$intercept + bt$slope * rug_model)
   }
 
   curve_data <- do.call(rbind, curves)
@@ -943,6 +989,10 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
 
       linpred <- as.vector(X %*% beta)
       conductance <- exp(linpred)
+      conductance <- .validate_conductance_values(
+        conductance,
+        context = "gaussian_smoothed_loglinear_conductance()"
+      )
 
       linpred_grad <- matrix(0, nrow = n, ncol = length(default))
       colnames(linpred_grad) <- names(default)

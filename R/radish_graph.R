@@ -299,6 +299,16 @@ conductance_surface <- function(covariates, coords, directions=4, saveStack=TRUE
 #' @param quantile Confidence level for the pointwise conductance interval.
 #'   The default \code{0.95} gives a 95% interval computed via the delta method
 #'   applied to the MLE of \code{theta} and its inverse Hessian.
+#' @param support Optional support constraint for conductance evaluation.
+#'   Use \code{"none"} (default) to evaluate the fitted conductance model over
+#'   the full graph covariate domain, or \code{"focal"} to clamp selected
+#'   covariates to focal-site support.
+#' @param support_probs Optional length-2 probability vector used with
+#'   \code{support = "focal"} to compute clamping bounds from focal-cell
+#'   quantiles. The default \code{c(0, 1)} uses the focal min/max.
+#' @param clamp_covariates Optional character vector of covariate names to
+#'   clamp when \code{support = "focal"}. Defaults to all numeric covariates in
+#'   \code{x$x}.
 #' @param ... Additional arguments passed to methods.
 #'
 #' @details
@@ -307,6 +317,11 @@ conductance_surface <- function(covariates, coords, directions=4, saveStack=TRUE
 #' intervals are asymptotic (delta method) and reflect only uncertainty in the
 #' conductance parameters \code{theta}; they do not account for uncertainty in
 #' the nuisance parameters \code{phi}.
+#'
+#' With \code{support = "focal"}, selected covariates are clamped to focal-site
+#' support before conductance is evaluated. This constrains prediction to
+#' empirical covariate support among \code{x$demes} and can stabilize extreme
+#' tails when focal sampling is sparse.
 #'
 #' The function requires the MLE to be in the interior of the parameter space
 #' (\code{fit$fit$boundary == FALSE}); if the MLE is on the boundary (no
@@ -355,19 +370,46 @@ conductance <- function(x, ...)
   UseMethod("conductance")
 }
 
-.conductance_graph_impl <- function(x, fit, quantile = 0.95, ...)
+.conductance_graph_impl <- function(x, fit, quantile = 0.95,
+                                    support = c("none", "focal"),
+                                    support_probs = c(0, 1),
+                                    clamp_covariates = NULL,
+                                    ...)
 {
+  support <- match.arg(support)
   stopifnot(inherits(fit, c("terradish", "radish")))
   stopifnot(!fit$fit$boundary && !is.null(fit$mle$theta))
 
-  conductance <- fit$submodels$f(fit$mle$theta)
+  graph_eval <- .clamp_graph_covariates(
+    data = x,
+    support = support,
+    support_probs = support_probs,
+    clamp_covariates = clamp_covariates
+  )
+
+  conductance_model <- fit$submodels$f
+  if (!identical(support, "none"))
+  {
+    conductance_factory <- fit$submodels$f_factory
+    if (!inherits(conductance_factory,
+                  c("terradish_conductance_model_factory",
+                    "radish_conductance_model_factory")))
+      stop("This `fit` does not store a reusable conductance-model factory for support-constrained prediction.",
+           " Refit the model with the current terradish version and retry.",
+           call. = FALSE)
+
+    rebuilt_internal <- conductance_factory(fit$formula, graph_eval$x)
+    conductance_model <- .externalize_conductance_model(rebuilt_internal)
+  }
+
+  conductance <- conductance_model(fit$mle$theta)
   ci <- conductance$confint(theta = fit$mle$theta, vcov = -solve(fit$mle$hessian), 
                             quantile = quantile, scale = "conductance")
   colnames(ci) <- paste0(c("lower", "upper"), round(100*quantile, 1))
 
-  if (!is.null(x$stack))
+  if (!is.null(graph_eval$stack))
   {
-    template <- x$stack[[1]]
+    template <- graph_eval$stack[[1]]
     template_values <- values(template, dataframe = FALSE)[,1]
     missing <- is.na(template_values)
     template_values[!missing] <- 1
@@ -395,17 +437,33 @@ conductance <- function(x, ...)
 #' @rdname conductance
 #' @method conductance terradish_graph
 #' @export
-conductance.terradish_graph <- function(x, fit, quantile = 0.95, ...)
+conductance.terradish_graph <- function(x, fit, quantile = 0.95,
+                                        support = c("none", "focal"),
+                                        support_probs = c(0, 1),
+                                        clamp_covariates = NULL,
+                                        ...)
 {
-  .conductance_graph_impl(x = x, fit = fit, quantile = quantile, ...)
+  .conductance_graph_impl(x = x, fit = fit, quantile = quantile,
+                          support = support,
+                          support_probs = support_probs,
+                          clamp_covariates = clamp_covariates,
+                          ...)
 }
 
 #' @rdname conductance
 #' @method conductance radish_graph
 #' @export
-conductance.radish_graph <- function(x, fit, quantile = 0.95, ...)
+conductance.radish_graph <- function(x, fit, quantile = 0.95,
+                                     support = c("none", "focal"),
+                                     support_probs = c(0, 1),
+                                     clamp_covariates = NULL,
+                                     ...)
 {
-  .conductance_graph_impl(x = x, fit = fit, quantile = quantile, ...)
+  .conductance_graph_impl(x = x, fit = fit, quantile = quantile,
+                          support = support,
+                          support_probs = support_probs,
+                          clamp_covariates = clamp_covariates,
+                          ...)
 }
 
 #for validation and debugging, generate a simple 1D lattice

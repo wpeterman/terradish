@@ -154,7 +154,9 @@
 #' @param AICc Should second-order AIC be used instead of AIC?
 #' @param BIC Should BIC be used instead of AIC?
 #' @param mod_names Optional model names. By default the right-hand side of
-#'   each fitted formula is used.
+#'   each fitted formula is used. For MLPE measurement models with additional
+#'   pairwise covariates, the default appends \code{[mlpe:n]}, where \code{n}
+#'   is the number of added pairwise covariate columns.
 #' @param verbose Should the table be printed to the console?
 #'
 #' @return A data frame containing model ranks, parameter counts, information
@@ -196,7 +198,7 @@ aic_table <- function(mod_list, AICc = FALSE, BIC = FALSE, mod_names = NULL, ver
     stop("Models must be fit to the same number of focal points and graph size")
 
   if (is.null(mod_names))
-    mod_names <- vapply(mod_list, function(x) as.character(x$formula)[2], character(1))
+    mod_names <- vapply(mod_list, .default_model_name, character(1))
 
   mod_loglik <- vapply(mod_list, function(x) x$loglik, numeric(1))
   mod_AIC <- vapply(mod_list, function(x) x$aic, numeric(1))
@@ -266,16 +268,73 @@ aic_table <- function(mod_list, AICc = FALSE, BIC = FALSE, mod_names = NULL, ver
 
 .cv_model_name <- function(mod)
 {
-  if (inherits(mod$formula, "formula") && length(mod$formula) >= 3L)
-    return(paste(deparse(mod$formula[[3]]), collapse = ""))
+  .default_model_name(mod)
+}
+
+.model_rhs_label <- function(model_formula)
+{
+  if (!inherits(model_formula, "formula"))
+    return(NULL)
+
+  if (length(model_formula) >= 3L)
+    return(paste(deparse(model_formula[[3]]), collapse = ""))
+  if (length(model_formula) == 2L)
+    return(paste(deparse(model_formula[[2]]), collapse = ""))
+
+  NULL
+}
+
+.model_formula_label <- function(mod)
+{
+  rhs <- .model_rhs_label(mod$formula)
+  if (!is.null(rhs))
+    return(rhs)
 
   call_formula <- mod$call$formula
-  if (inherits(call_formula, "formula") && length(call_formula) >= 3L)
-    return(paste(deparse(call_formula[[3]]), collapse = ""))
+  rhs <- .model_rhs_label(call_formula)
+  if (!is.null(rhs))
+    return(rhs)
+
   if (is.call(call_formula) && length(call_formula) >= 3L)
     return(paste(deparse(call_formula[[3]]), collapse = ""))
+  if (is.call(call_formula) && length(call_formula) == 2L)
+    return(paste(deparse(call_formula[[2]]), collapse = ""))
 
   "<unknown>"
+}
+
+.mlpe_covariate_count <- function(mod)
+{
+  measurement_model <- mod$submodels$g
+  if (!is.function(measurement_model))
+    return(0L)
+
+  pairwise_covariates <- attr(measurement_model, "pairwise_covariates",
+                              exact = TRUE)
+  if (is.null(pairwise_covariates))
+    return(0L)
+
+  pairwise_mat <- tryCatch(as.matrix(pairwise_covariates),
+                           error = function(e) NULL)
+  if (is.null(pairwise_mat))
+    return(0L)
+
+  n_covariates <- ncol(pairwise_mat)
+  if (!is.numeric(n_covariates) || length(n_covariates) != 1L ||
+      is.na(n_covariates) || n_covariates < 1)
+    return(0L)
+
+  as.integer(n_covariates)
+}
+
+.default_model_name <- function(mod)
+{
+  base <- .model_formula_label(mod)
+  n_mlpe <- .mlpe_covariate_count(mod)
+  if (n_mlpe > 0L)
+    paste0(base, " [mlpe:", n_mlpe, "]")
+  else
+    base
 }
 
 #' Inspect a saved terradish results directory

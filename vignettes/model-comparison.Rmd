@@ -61,14 +61,62 @@ surface <- conductance_surface(
   saveStack = TRUE
 )
 
+# Lightweight one-time assessment: reuse recommendations for all fits below.
+assessment <- terradish_assess_settings(
+  melip.Fst ~ forestcover + altitude,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe,
+  probe_maxit       = 1,
+  verbose           = FALSE
+)
+rec <- assessment$recommended
+
 # Full model: both covariates
 fit_full <- terradish(
   melip.Fst ~ forestcover + altitude,
   data              = surface,
   conductance_model = loglinear_conductance,
-  measurement_model = mlpe
+  measurement_model = mlpe,
+  optimizer         = rec$optimizer,
+  control           = rec$control,
+  solver            = rec$solver,
+  solver_control    = rec$solver_control,
+  approximation     = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 ```
+
+### A note on computational settings
+
+When fitting many candidate models — as this vignette does — it pays to profile
+the graph and identify the fastest optimizer/solver combination **once**, then
+reuse those settings for all fits. `terradish_assess_settings()` does this in a
+few short probe iterations:
+
+```{r assess-for-comparison, eval = FALSE}
+assessment <- terradish_assess_settings(
+  melip.Fst ~ forestcover + altitude,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe,
+  probe_maxit       = 2,
+  verbose           = FALSE
+)
+
+# One-line summary: did the assessment differ from defaults?
+cat(assessment$comparison$summary, "\n")
+
+# Extract recommended settings and reuse for every model in this vignette
+rec <- assessment$recommended
+```
+
+Then pass `rec$optimizer`, `rec$control`, `rec$solver`, and `rec$solver_control`
+to each `terradish()` call below. For the small *Melipona* graph the defaults
+are fine; the pattern becomes important for large landscapes where each function
+evaluation is expensive. See
+`vignette("getting-started", package = "terradish")` for a full explanation of
+the output and all available probe options.
 
 ---
 
@@ -91,7 +139,13 @@ fit_altitude_only <- terradish(
   melip.Fst ~ altitude,
   data              = surface,
   conductance_model = loglinear_conductance,
-  measurement_model = mlpe
+  measurement_model = mlpe,
+  optimizer         = rec$optimizer,
+  control           = rec$control,
+  solver            = rec$solver,
+  solver_control    = rec$solver_control,
+  approximation     = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 
 anova(fit_full, fit_altitude_only)
@@ -112,7 +166,13 @@ fit_ibd <- terradish(
   melip.Fst ~ 1,
   data              = surface,
   conductance_model = loglinear_conductance,
-  measurement_model = mlpe
+  measurement_model = mlpe,
+  optimizer         = rec$optimizer,
+  control           = rec$control,
+  solver            = rec$solver,
+  solver_control    = rec$solver_control,
+  approximation     = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 
 # Is the full model significantly better than pure IBD?
@@ -129,7 +189,13 @@ fit_interaction <- terradish(
   melip.Fst ~ forestcover * altitude,
   data              = surface,
   conductance_model = loglinear_conductance,
-  measurement_model = mlpe
+  measurement_model = mlpe,
+  optimizer         = rec$optimizer,
+  control           = rec$control,
+  solver            = rec$solver,
+  solver_control    = rec$solver_control,
+  approximation     = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 
 # Is the interaction term worth keeping?
@@ -153,7 +219,13 @@ fit_fc_only <- terradish(
   melip.Fst ~ forestcover,
   data              = surface,
   conductance_model = loglinear_conductance,
-  measurement_model = mlpe
+  measurement_model = mlpe,
+  optimizer         = rec$optimizer,
+  control           = rec$control,
+  solver            = rec$solver,
+  solver_control    = rec$solver_control,
+  approximation     = rec$approximation,
+  approximation_control = rec$approximation_control
 )
 ```
 
@@ -337,6 +409,36 @@ A rising curve means higher covariate values increase conductance (more
 permeable landscape); a declining curve indicates a barrier effect. Flat or
 wide-interval curves suggest that covariate adds little constraint beyond the
 other predictors already in the model.
+
+### Handling weakly supported tails
+
+When focal sites sparsely cover a covariate tail, unconstrained marginals can
+show unstable extremes that dominate interpretation. Use focal-support clamping
+to keep model comparison focused on supported covariate ranges:
+
+```{r support-clamp-marginal, eval = FALSE}
+plot(
+  fit_full,
+  type = "marginal",
+  data = surface,
+  support = "focal",
+  support_probs = c(0.01, 0.99),
+  clamp_covariates = c("altitude", "forestcover")
+)
+```
+
+The same options are available in `conductance()` when producing raster
+surfaces for map comparison:
+
+```{r support-clamp-conductance, eval = FALSE}
+cond_full_focal <- conductance(
+  surface,
+  fit_full,
+  support = "focal",
+  support_probs = c(0.01, 0.99),
+  clamp_covariates = c("altitude", "forestcover")
+)
+```
 
 ---
 

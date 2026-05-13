@@ -12,7 +12,7 @@ terradish(
   measurement_model = mlpe,
   nu = NULL,
   theta = NULL,
-  leverage = TRUE,
+  leverage = FALSE,
   nonnegative = TRUE,
   conductance = TRUE,
   optimizer = c("newton", "bfgs", "auto"),
@@ -88,7 +88,13 @@ information across nearby optimization steps when possible, and
 \code{reuse_preconditioner_max_age} to periodically rebuild a reused
 hierarchy. Direct supernodal factorizations can benefit from a threaded
 BLAS, but those thread counts are controlled by the external R/BLAS build
-rather than by \code{terradish()} itself.}
+rather than by \code{terradish()} itself.
+If a fit stops with a CHOLMOD or non-positive-definite reduced Laplacian
+message, the current conductance values made the graph numerically
+singular. Common fixes are to scale raster covariates, start conductance
+parameters closer to zero, check retained raster cells for missing or
+infinite values, and retry with \code{solver = "auto"} or
+\code{solver = "amg"} while diagnosing the problem.}
 
 \item{approximation}{Exploratory approximation used during optimization.
 \code{"none"} uses the full focal set throughout. \code{"landmark"}

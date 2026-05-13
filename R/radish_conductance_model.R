@@ -36,6 +36,17 @@ assemble_model_matrix <- function(formula, spdat)
   spdat
 }
 
+.validate_conductance_values <- function(conductance, context = "Conductance model")
+{
+  if (!all(is.finite(conductance)))
+    stop(context, " produced non-finite conductance values at the current parameters.",
+         call. = FALSE)
+  if (!all(conductance > 0))
+    stop(context, " requires strictly positive conductance values at the current parameters.",
+         call. = FALSE)
+  conductance
+}
+
 .smooth_loglinear_eval_arg <- function(arg, default, envir)
 {
   if (is.null(arg))
@@ -196,8 +207,10 @@ assemble_model_matrix <- function(formula, spdat)
     stopifnot(length(theta) == ncol(x))
 
     conductance <- as.vector(exp(x %*% theta))
-
-    stopifnot(all(conductance > 0))
+    conductance <- .validate_conductance_values(
+      conductance,
+      context = "smooth_loglinear_conductance()"
+    )
     df__dtheta_matrix <- conductance * x
 
     df__dx             <- function(k)    c(conductance * theta[k])
@@ -237,7 +250,8 @@ assemble_model_matrix <- function(formula, spdat)
     basis = basis,
     degree = degree,
     intercept = intercept,
-    columns = names(default)
+    columns = names(default),
+    smooth_specs = smooth_specs
   )
   attr(conductance_model, "plot_factory") <- .smooth_loglinear_factory(
     df = df,
@@ -348,8 +362,10 @@ loglinear_conductance <- function(formula, x)
     stopifnot(length(theta) == ncol(x))
 
     conductance        <- as.vector(exp(x %*% theta))
-
-    stopifnot(all(conductance > 0))
+    conductance        <- .validate_conductance_values(
+      conductance,
+      context = "loglinear_conductance()"
+    )
     df__dtheta_matrix  <- conductance * x
 
     # first- and second-order derivatives
@@ -582,8 +598,10 @@ linear_conductance <- function(formula, x)
     stopifnot(length(theta) == ncol(x))
 
     conductance        <- as.vector(x %*% theta)
-
-    stopifnot(all(conductance > 0))
+    conductance        <- .validate_conductance_values(
+      conductance,
+      context = "linear_conductance()"
+    )
 
     ones <- matrix(1, nrow(x), 1)
     df__dtheta_matrix <- x

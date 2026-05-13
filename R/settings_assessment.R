@@ -58,6 +58,13 @@
     }, error = function(e) FALSE)
   }
 
+  smooth_info <- attr(model, "smooth_loglinear_info", exact = TRUE)
+  smooth_specs <- smooth_info$smooth_specs
+  smooth_basis_columns <- if (length(smooth_specs))
+    sum(vapply(smooth_specs, function(spec) length(spec$columns), integer(1)))
+  else
+    0L
+
   list(
     n_vertices = nrow(data$x),
     n_edges = ncol(data$adj),
@@ -67,6 +74,9 @@
     parameter_names = names(default),
     has_stack = !is.null(data$stack),
     can_coarse_raster = isTRUE(can_coarse),
+    smooth_conductance = isTRUE(attr(model, "smooth_loglinear", exact = TRUE)),
+    n_smooth_terms = length(smooth_specs),
+    n_smooth_basis_columns = as.integer(smooth_basis_columns),
     rhs_formula = rhs_formula,
     conductance_model = model,
     theta_internal = theta_internal
@@ -255,6 +265,90 @@
   )
 }
 
+.terradish_assessment_line_search_name <- function(control)
+{
+  if (inherits(control, "terradish_armijo_control"))
+    "armijo"
+  else
+    "hager_zhang"
+}
+
+.terradish_assessment_default_settings <- function(profile,
+                                                   conductance_model_factory)
+{
+  list(
+    optimizer = .resolve_terradish_optimizer(
+      "auto",
+      profile$n_parameters,
+      conductance_model_factory = conductance_model_factory
+    ),
+    control = .terradish_assessment_control("hager_zhang"),
+    solver = "direct",
+    solver_control = NULL,
+    approximation = "none",
+    approximation_control = NULL
+  )
+}
+
+.terradish_assessment_compare_settings <- function(defaults, recommended)
+{
+  default_line_search <- .terradish_assessment_line_search_name(
+    defaults$control$ls.control
+  )
+  recommended_line_search <- .terradish_assessment_line_search_name(
+    recommended$control$ls.control
+  )
+
+  changes <- character()
+  if (!identical(defaults$optimizer, recommended$optimizer))
+    changes <- c(
+      changes,
+      paste0("optimizer `", defaults$optimizer, "` -> `",
+             recommended$optimizer, "`")
+    )
+  if (!identical(default_line_search, recommended_line_search))
+    changes <- c(
+      changes,
+      paste0("line search `", default_line_search, "` -> `",
+             recommended_line_search, "`")
+    )
+  if (!identical(defaults$solver, recommended$solver))
+    changes <- c(
+      changes,
+      paste0("solver `", defaults$solver, "` -> `",
+             recommended$solver, "`")
+    )
+  if (!identical(defaults$solver_control, recommended$solver_control))
+    changes <- c(changes, "solver_control tuned from terradish defaults")
+  if (!identical(defaults$approximation, recommended$approximation))
+    changes <- c(
+      changes,
+      paste0("approximation `", defaults$approximation, "` -> `",
+             recommended$approximation, "`")
+    )
+
+  differs <- length(changes) > 0L
+  summary <- if (differs)
+    paste0("Assessment differs from terradish defaults: ",
+           paste(changes, collapse = "; "), ".")
+  else
+    "Assessment matched terradish defaults."
+
+  list(
+    default_optimizer = defaults$optimizer,
+    recommended_optimizer = recommended$optimizer,
+    default_line_search = default_line_search,
+    recommended_line_search = recommended_line_search,
+    default_solver = defaults$solver,
+    recommended_solver = recommended$solver,
+    default_approximation = defaults$approximation,
+    recommended_approximation = recommended$approximation,
+    differs_from_defaults = differs,
+    changes = changes,
+    summary = summary
+  )
+}
+
 #' Assess terradish speed settings for a data set
 #'
 #' Profiles a \code{terradish} graph and, optionally, runs short probe
@@ -336,11 +430,17 @@
 #'   components:
 #' \describe{
 #'   \item{\code{profile}}{A list of graph statistics (number of vertices,
-#'     edges, focal sites, parameters, etc.).}
+#'     edges, focal sites, parameters, and, for
+#'     \code{\link{smooth_loglinear_conductance}}, spline-expansion counts.}
 #'   \item{\code{optimizer_benchmark}}{A data frame of optimizer probe results
 #'     (one row per candidate), or \code{NULL} if \code{optimizer_probe = FALSE}.}
 #'   \item{\code{solver_benchmark}}{A data frame of solver probe results, or
 #'     \code{NULL} if \code{solver_probe = FALSE}.}
+#'   \item{\code{defaults}}{The terradish defaults for the profiled model,
+#'     after resolving \code{optimizer = "auto"} on the expanded conductance
+#'     parameter count.}
+#'   \item{\code{comparison}}{A compact comparison between the recommended
+#'     settings and the terradish defaults, including a one-line summary.}
 #'   \item{\code{recommended}}{A named list of recommended settings:
 #'     \code{optimizer}, \code{control}, \code{solver}, \code{solver_control},
 #'     \code{approximation}, \code{approximation_control}.}
@@ -380,6 +480,15 @@
 #'   solver = assessment$recommended$solver,
 #'   solver_control = assessment$recommended$solver_control
 #' )
+#'
+#' smooth_assessment <- terradish_assess_settings(
+#'   melip.Fst ~ forestcover + s(altitude, df = 3),
+#'   data = surface,
+#'   conductance_model = smooth_loglinear_conductance,
+#'   measurement_model = mlpe,
+#'   probe_maxit = 1
+#' )
+#' smooth_assessment$comparison$summary
 #' }
 #'
 #' @export
@@ -436,6 +545,10 @@ terradish_assess_settings <- function(formula,
   fallback_optimizer <- .resolve_terradish_optimizer(
     "auto",
     profile$n_parameters,
+    conductance_model_factory = conductance_model
+  )
+  defaults <- .terradish_assessment_default_settings(
+    profile,
     conductance_model_factory = conductance_model
   )
 
@@ -609,11 +722,54 @@ terradish_assess_settings <- function(formula,
     else
       "coarse probe accepted"
   )
+  comparison <- .terradish_assessment_compare_settings(defaults, recommended)
+
+  if (isTRUE(profile$smooth_conductance))
+  {
+    notes <- c(
+      notes,
+      paste0(
+        "Smooth conductance formula expanded to ",
+        profile$n_parameters,
+        " conductance parameters across ",
+        profile$n_smooth_terms,
+        " smooth term",
+        if (identical(profile$n_smooth_terms, 1L)) "" else "s",
+        " (",
+        profile$n_smooth_basis_columns,
+        " spline basis columns)."
+      )
+    )
+
+    if (!is.null(fit_benchmark) && nrow(fit_benchmark))
+    {
+      failed <- fit_benchmark[fit_benchmark$status != "OK", , drop = FALSE]
+      if (nrow(failed))
+      {
+        notes <- c(
+          notes,
+          paste0(
+            "Some smooth-model probes hit optimizer or conductance guards: ",
+            paste(paste0(failed$label, " [", failed$status, "]"),
+                  collapse = "; "),
+            "."
+          )
+        )
+      }
+      else
+        notes <- c(
+          notes,
+          "Short smooth-model probes completed without additional optimizer or conductance guard failures."
+        )
+    }
+  }
 
   out <- list(
     call = match.call(),
     profile = profile[setdiff(names(profile),
                               c("conductance_model", "theta_internal"))],
+    defaults = defaults,
+    comparison = comparison,
     recommended = recommended,
     reasons = reasons,
     benchmarks = list(
@@ -658,6 +814,7 @@ print.terradish_setting_assessment <- function(x,
   }
   cat("  approximation: ", x$recommended$approximation,
       " (", x$reasons$approximation, ")\n\n", sep = "")
+  cat("Defaults comparison: ", x$comparison$summary, "\n\n", sep = "")
 
   if (!is.null(x$benchmarks$optimizer))
   {

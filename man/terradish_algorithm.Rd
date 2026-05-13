@@ -65,7 +65,13 @@ value to periodically rebuild the AMG hierarchy instead of reusing it
 indefinitely.
 Direct supernodal factorizations can benefit from a threaded BLAS, but the
 relevant thread counts are controlled by the external R/BLAS build rather
-than by \code{terradish_algorithm()}.}
+than by \code{terradish_algorithm()}.
+If the direct solver stops with a CHOLMOD or
+non-positive-definite reduced Laplacian message, the current conductance
+values made the graph numerically singular. Check for missing or infinite
+raster covariates, use scaled covariates and moderate starting values near
+zero, and try \code{solver = "auto"} or \code{solver = "amg"} while
+diagnosing the fit.}
 
 \item{solver_warm_start}{Optional initial guess for the reduced-system solve. This is primarily useful for iterative solvers when evaluating nearby parameter values.}
 

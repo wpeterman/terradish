@@ -99,11 +99,17 @@ An object of class \code{"terradish_setting_assessment"} with
   components:
 \describe{
   \item{\code{profile}}{A list of graph statistics (number of vertices,
-    edges, focal sites, parameters, etc.).}
+    edges, focal sites, parameters, and, for
+    \code{\link{smooth_loglinear_conductance}}, spline-expansion counts.}
   \item{\code{optimizer_benchmark}}{A data frame of optimizer probe results
     (one row per candidate), or \code{NULL} if \code{optimizer_probe = FALSE}.}
   \item{\code{solver_benchmark}}{A data frame of solver probe results, or
     \code{NULL} if \code{solver_probe = FALSE}.}
+  \item{\code{defaults}}{The terradish defaults for the profiled model,
+    after resolving \code{optimizer = "auto"} on the expanded conductance
+    parameter count.}
+  \item{\code{comparison}}{A compact comparison between the recommended
+    settings and the terradish defaults, including a one-line summary.}
   \item{\code{recommended}}{A named list of recommended settings:
     \code{optimizer}, \code{control}, \code{solver}, \code{solver_control},
     \code{approximation}, \code{approximation_control}.}
@@ -172,6 +178,15 @@ fit <- terradish(
   solver = assessment$recommended$solver,
   solver_control = assessment$recommended$solver_control
 )
+
+smooth_assessment <- terradish_assess_settings(
+  melip.Fst ~ forestcover + s(altitude, df = 3),
+  data = surface,
+  conductance_model = smooth_loglinear_conductance,
+  measurement_model = mlpe,
+  probe_maxit = 1
+)
+smooth_assessment$comparison$summary
 }
 
 }

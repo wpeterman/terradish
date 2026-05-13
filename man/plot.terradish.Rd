@@ -16,6 +16,9 @@
   distance_unit = NULL,
   quantile = 0.95,
   n = NULL,
+  support = c("none", "focal"),
+  support_probs = c(0, 1),
+  clamp_covariates = NULL,
   ...
 )
 
@@ -62,6 +65,22 @@ Defaults to \code{100} for \code{"marginal_response"} (each point
 requires a full Laplacian solve) and \code{200} for \code{"marginal"}.
 Supply an explicit integer to override.}
 
+\item{support}{Optional support constraint used for
+\code{type = "surface"}, \code{"marginal"}, and
+\code{"marginal_response"}. Use \code{"none"} (default) to evaluate over
+the full graph covariate domain, or \code{"focal"} to constrain selected
+covariates to the empirical support at focal sampling cells
+(\code{data$demes}).}
+
+\item{support_probs}{Optional length-2 probability vector used with
+\code{support = "focal"} to define clamping bounds from focal-cell
+quantiles. The default \code{c(0, 1)} uses the focal min/max; for robust
+trimming, values like \code{c(0.01, 0.99)} are often useful.}
+
+\item{clamp_covariates}{Optional character vector of covariate names to clamp
+when \code{support = "focal"}. Defaults to all numeric covariates used by
+each plot type.}
+
 \item{...}{Additional graphical parameters forwarded to
 \code{\link[graphics]{plot}} (for \code{"fit"}) or ignored for the other
 types.}
@@ -71,14 +90,10 @@ Invisibly:
 \itemize{
   \item \code{"fit"}: a \code{ggplot} object with observed-vs-fitted
     pairwise distances.
-  \item \code{"surface"}: a \code{ggplot} object with faceted conductance
-    estimate and interval maps.
-  \item \code{"marginal"}: a \code{ggplot} object with faceted marginal
-    conductance effects and pointwise confidence bands.
-  \item \code{"marginal_response"}: a \code{ggplot} object with faceted
-    response-scale marginal effects and predictive bands.
-  \item \code{"sigma"}: a \code{ggplot} object with faceted Gaussian kernel
-    weight curves and fitted effective distances for each scale parameter.
+  \item \code{"surface"}, \code{"marginal"}, \code{"marginal_response"},
+    and \code{"sigma"}: either a single \code{ggplot} object (one panel) or
+    a named list of \code{ggplot} objects (multiple panels), with one plot
+    per panel/covariate.
 }
 }
 \description{
@@ -116,6 +131,12 @@ Three plot types for objects returned by \code{\link{terradish}}:
     the one-dimensional kernel mass and a shaded interval from the Wald
     confidence interval of that effective distance.}
 }
+}
+\details{
+For \code{type = "surface"}, \code{"marginal"}, and
+\code{"marginal_response"}, optional support-constrained evaluation can be
+requested with \code{support = "focal"} to clamp selected covariates to
+empirical focal-site support before prediction.
 }
 \examples{
 \dontrun{

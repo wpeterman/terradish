@@ -220,7 +220,7 @@ surface_cropped <- conductance_surface(
 ```
 
 The buffer is measured in the raster's map units. In a projected raster this
-might be metres; in a longitude/latitude raster it is degrees. Cropping is a
+might be meters; in a longitude/latitude raster it is degrees. Cropping is a
 safe speed tool only when the cropped area still contains the landscape context
 needed to estimate resistance distances. A good habit is to try a few buffer
 widths and confirm that the fitted coefficients are stable.
@@ -253,37 +253,152 @@ fit_coarse <- terradish(
 With `exact_refine = TRUE`, the final reported model is still evaluated on the
 original graph. The coarse fits are only used to find better starting values.
 
-If you are unsure which speed settings to try first, use
-`terradish_assess_settings()`. The function profiles the graph and can run short
-probe fits to compare optimizers, line searches, and direct-solver settings.
-It is an advisory tool, not a model-selection procedure: use it to choose
-computational settings, then fit and interpret the final model normally.
+---
 
-```{r assess-settings-example, eval=FALSE}
-assessment <- terradish_assess_settings(
-  melip.Fst ~ forestcover + altitude,
-  data = surface_for_coarse,
-  conductance_model = loglinear_conductance,
-  measurement_model = mlpe,
-  probe_maxit = 2,
-  coarse_probe = TRUE
+## Checking computational settings
+
+For the small *Melipona* example the default settings run in seconds and no
+tuning is needed. For larger landscapes — say, a high-resolution raster with
+hundreds of thousands of graph vertices, or a spline conductance model that
+expands to many parameters — the right optimizer and solver can meaningfully
+reduce wall-clock time.
+
+`terradish_assess_settings()` is an **advisory tool** for this. It:
+
+1. **Profiles the graph** — counts vertices, edges, focal sites, and
+   conductance parameters, and reports those back without running any
+   optimization.
+2. **Benchmarks the direct solver** — times several combinations of Cholesky
+   factorization style and solve backend to find the fastest configuration for
+   your specific graph.
+3. **Runs short optimizer probes** — executes two Newton steps for each of
+   three optimizer/line-search combinations (Newton + Hager-Zhang, BFGS +
+   Hager-Zhang, BFGS + Armijo) and reports which was fastest.
+4. **Optionally probes coarse-raster warm-starts** — checks whether fitting on
+   an aggregated raster first produces an acceptable speedup.
+5. **Returns `$recommended`** — a named list of the best settings that can be
+   passed directly to `terradish()`.
+
+The function does **not** change any package defaults and does **not** affect
+parameter estimation; only the computational path differs.
+
+```{r assess-settings-demo, eval = FALSE}
+# saveStack = TRUE is required for the coarse-raster probe
+surface_for_assess <- conductance_surface(
+  covariates, melip.coords,
+  directions = 8, saveStack = TRUE
 )
 
-assessment
-
-fit_tuned <- terradish(
+assessment <- terradish_assess_settings(
   melip.Fst ~ forestcover + altitude,
-  data = surface_for_coarse,
+  data              = surface_for_assess,
   conductance_model = loglinear_conductance,
   measurement_model = mlpe,
-  optimizer = assessment$recommended$optimizer,
-  control = assessment$recommended$control,
-  solver = assessment$recommended$solver,
-  solver_control = assessment$recommended$solver_control,
-  approximation = assessment$recommended$approximation,
+  probe_maxit       = 2,      # keep small: probes compare early-iteration cost
+  coarse_probe      = TRUE,   # also time the coarse-raster warm-start path
+  verbose           = TRUE    # print progress as probes run
+)
+
+# Print a full summary: graph profile, probe results, recommended settings
+assessment
+```
+
+The printed output has three main parts:
+
+```
+terradish setting assessment
+Graph: 1234 vertices, 4802 edges, 34 focal sites
+Conductance parameters: 2
+
+Recommended settings:
+  optimizer:   newton  (fastest acceptable probe: newton_hager_zhang)
+  line search: HagerZhangControl
+  solver:      direct  (fastest direct solver probe: supernodal_ll + cholmod_cpp_cached)
+  approximation: none  (exact full-resolution fit)
+
+Defaults comparison: Assessment matched terradish defaults.
+```
+
+- **Graph profile** — tells you how large your problem is. A vertex count above
+  ~50 000 is where solver choice starts to matter; above ~500 000 it is often
+  the dominant cost.
+- **Recommended settings** — the fastest combination found by the probes.
+  `"(fastest acceptable probe: ...)"` shows which probe won and why.
+- **Defaults comparison** — a one-line summary of whether the assessment
+  recommends anything different from what `terradish()` would use by default.
+  If it says `"Assessment matched terradish defaults"`, just call `terradish()`
+  normally.
+
+### Using `$recommended` in the final fit
+
+The `$recommended` list maps directly onto `terradish()` arguments:
+
+```{r assess-use, eval = FALSE}
+fit_tuned <- terradish(
+  melip.Fst ~ forestcover + altitude,
+  data              = surface_for_assess,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe,
+  optimizer         = assessment$recommended$optimizer,
+  control           = assessment$recommended$control,
+  solver            = assessment$recommended$solver,
+  solver_control    = assessment$recommended$solver_control,
+  approximation     = assessment$recommended$approximation,
   approximation_control = assessment$recommended$approximation_control
 )
 ```
+
+You can also inspect and edit the list before using it. For example, to override
+the recommended `maxit` without losing the solver recommendation:
+
+```{r assess-edit, eval = FALSE}
+my_control <- assessment$recommended$control
+my_control$maxit <- 50          # allow more iterations than the probe default
+
+fit_tuned2 <- terradish(
+  melip.Fst ~ forestcover + altitude,
+  data    = surface_for_assess,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe,
+  optimizer      = assessment$recommended$optimizer,
+  control        = my_control,
+  solver         = assessment$recommended$solver,
+  solver_control = assessment$recommended$solver_control
+)
+```
+
+### When assessment is most useful
+
+| Situation | Assessment benefit |
+|---|---|
+| Graph < 10 000 vertices | Minimal — defaults usually converge in seconds |
+| Graph 10 000 – 100 000 vertices | Solver benchmark often helps |
+| Graph > 100 000 vertices | All three probes are worthwhile |
+| Spline conductance (`df ≥ 4`) | Parameter expansion can shift optimizer recommendation from Newton to BFGS |
+| Fitting many candidate models | Run assessment once, reuse `$recommended` for all fits |
+| Coarse-raster approximation desired | Set `coarse_probe = TRUE` to check whether warm-start pays off |
+
+### Troubleshooting direct-solver failures
+
+If a fit stops with a `CHOLMOD` warning or a
+`non-positive-definite reduced Laplacian` message, the direct sparse Cholesky
+solver could not factorize the graph at the current conductance values. This is
+usually a numerical or data-preparation problem rather than a genetic-distance
+model result.
+
+Immediate checks:
+
+- Confirm the raster layers used by the conductance model are finite on the
+  retained graph cells. Missing, infinite, or extremely large values can produce
+  unusable conductances after the exponential transform.
+- Scale continuous covariates with `scale_covariates()` and start conductance
+  parameters near zero. Very large positive or negative starts can make some
+  graph edges effectively infinite or zero.
+- Re-run `terradish_assess_settings(..., verbose = TRUE)` to inspect graph size,
+  direct-solver settings, and the optimizer path before launching a long fit.
+- While diagnosing the surface, try `solver = "auto"` or `solver = "amg"`.
+  These paths do not fix invalid conductance values, but they can help separate
+  a direct Cholesky factorization issue from a broader model setup problem.
 
 ---
 
@@ -530,6 +645,37 @@ uncertainty in θ, not residual variation. A rising curve means higher
 covariate values increase conductance (easier movement); a declining curve
 indicates a barrier effect.
 
+### Support-constrained prediction and plotting
+
+If a covariate has sparse focal support at one tail, marginal curves and
+conductance maps can be dominated by extrapolation. `terradish` now supports
+focal-support clamping directly in both `plot()` and `conductance()`:
+
+```{r support-clamp, eval = FALSE}
+# Clamp selected covariates to focal-site quantile support before plotting.
+plot(
+  fit_mlpe,
+  type = "marginal",
+  data = surface,
+  support = "focal",
+  support_probs = c(0.01, 0.99),
+  clamp_covariates = c("altitude", "forestcover")
+)
+
+# Apply the same support rule to raster conductance prediction.
+cond_focal <- conductance(
+  surface,
+  fit_mlpe,
+  support = "focal",
+  support_probs = c(0.01, 0.99),
+  clamp_covariates = c("altitude", "forestcover")
+)
+```
+
+Use `support = "none"` (default) for full-domain evaluation, and
+`support = "focal"` when you want inference constrained to focal sampling
+support.
+
 ---
 
 ## What comes next?
@@ -564,7 +710,20 @@ covariates <- c(melip.forestcover, melip.altitude)
 names(covariates) <- c("forestcover", "altitude")
 covariates <- scale_covariates(covariates)
 
-surface <- conductance_surface(covariates, melip.coords, directions = 8)
+surface <- conductance_surface(covariates, melip.coords,
+                               directions = 8, saveStack = TRUE)
+
+# 2b. (Optional) Profile graph and identify fastest settings
+#     Most useful for large graphs (> 10 000 vertices) or spline models.
+assessment <- terradish_assess_settings(
+  melip.Fst ~ forestcover + altitude,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = mlpe,
+  probe_maxit       = 2
+)
+cat(assessment$comparison$summary, "\n")  # one-line verdict
+rec <- assessment$recommended             # reuse for all fits below
 
 # 3. Fit model — choose a measurement model:
 #   leastsquares      : fast, independent errors (distance matrix)
@@ -574,14 +733,26 @@ surface <- conductance_surface(covariates, melip.coords, directions = 8)
 fit <- terradish(melip.Fst ~ forestcover + altitude,
                  data              = surface,
                  conductance_model = loglinear_conductance,
-                 measurement_model = mlpe)
+                 measurement_model = mlpe,
+                 optimizer         = rec$optimizer,
+                 control           = rec$control,
+                 solver            = rec$solver,
+                 solver_control    = rec$solver_control,
+                 approximation     = rec$approximation,
+                 approximation_control = rec$approximation_control)
 
 # generalized_wishart example (set nu to your actual marker count):
 fit_gw <- terradish(melip.Fst ~ forestcover + altitude,
                     data              = surface,
                     conductance_model = loglinear_conductance,
                     measurement_model = generalized_wishart,
-                    nu                = 1000)
+                    nu                = 1000,
+                    optimizer         = rec$optimizer,
+                    control           = rec$control,
+                    solver            = rec$solver,
+                    solver_control    = rec$solver_control,
+                    approximation     = rec$approximation,
+                    approximation_control = rec$approximation_control)
 
 # 4. Summarize and visualize
 summary(fit)
@@ -590,4 +761,13 @@ plot(fit, type = "fit")                                # observed vs. fitted sca
 plot(fit, type = "surface", data = surface)            # conductance map + 95% CI panels
 plot(fit, data = surface)                              # marginal effects on genetic distance (default)
 plot(fit, type = "marginal", data = surface)           # marginal effects on conductance scale
+
+# 5. Optional: focal-support clamping for robust tails
+plot(fit, type = "marginal", data = surface,
+     support = "focal", support_probs = c(0.01, 0.99),
+     clamp_covariates = c("forestcover", "altitude"))
+
+cond <- conductance(surface, fit,
+                    support = "focal", support_probs = c(0.01, 0.99),
+                    clamp_covariates = c("forestcover", "altitude"))
 ```

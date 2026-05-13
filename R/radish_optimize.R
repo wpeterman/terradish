@@ -553,6 +553,12 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   hierarchy. Direct supernodal factorizations can benefit from a threaded
 #'   BLAS, but those thread counts are controlled by the external R/BLAS build
 #'   rather than by \code{terradish()} itself.
+#'   If a fit stops with a CHOLMOD or non-positive-definite reduced Laplacian
+#'   message, the current conductance values made the graph numerically
+#'   singular. Common fixes are to scale raster covariates, start conductance
+#'   parameters closer to zero, check retained raster cells for missing or
+#'   infinite values, and retry with \code{solver = "auto"} or
+#'   \code{solver = "amg"} while diagnosing the problem.
 #' @param approximation Exploratory approximation used during optimization.
 #'   \code{"none"} uses the full focal set throughout. \code{"landmark"}
 #'   optimizes first on a space-filling subset of focal populations and then
@@ -736,7 +742,7 @@ terradish <- function(formula,
                    measurement_model = mlpe, 
                    nu = NULL, 
                    theta = NULL,
-                   leverage = TRUE, 
+                   leverage = FALSE, 
                    nonnegative = TRUE, 
                    conductance = TRUE, 
                    optimizer = c("newton", "bfgs", "auto"), 
@@ -1144,6 +1150,7 @@ terradish <- function(formula,
               diagnostics    = .terradish_diagnostics_snapshot(diagnostics),
               submodels      = list("f" = conductance_model_user,
                                     "f_internal" = conductance_model,
+                                    "f_factory" = conductance_model_factory,
                                     "g" = measurement_model),
               fit            = fit,
               loglik         = -fit$objective,

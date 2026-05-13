@@ -8,6 +8,46 @@ test_that("conductance_surface and conductance work with terra inputs", {
   cond <- conductance(fx$surface, fx$fit)
   expect_true(inherits(cond, "SpatRaster"))
   expect_equal(terra::nlyr(cond), 3)
+
+  focal <- unique(fx$surface$demes)
+  non_focal <- setdiff(seq_len(nrow(fx$surface$x)), focal)
+  expect_gt(length(non_focal), 0L)
+
+  surface_extreme <- fx$surface
+  surface_extreme$x$altitude[non_focal] <- min(surface_extreme$x$altitude[focal]) - 25
+  surface_extreme$stack <- NULL
+
+  cond_none <- suppressWarnings(
+    conductance(surface_extreme, fx$fit, support = "none")
+  )
+  cond_focal <- suppressWarnings(
+    conductance(surface_extreme, fx$fit, support = "focal",
+                clamp_covariates = "altitude")
+  )
+  cond_trim <- suppressWarnings(
+    conductance(surface_extreme, fx$fit, support = "focal",
+                support_probs = c(0.1, 0.9),
+                clamp_covariates = "altitude")
+  )
+
+  expect_true(is.matrix(cond_none))
+  expect_true(is.matrix(cond_focal))
+  expect_true(is.matrix(cond_trim))
+  expect_true(any(abs(cond_none[, "est"] - cond_focal[, "est"]) > 1e-8))
+  expect_true(any(abs(cond_focal[, "est"] - cond_trim[, "est"]) > 1e-8))
+
+  expect_error(
+    conductance(surface_extreme, fx$fit, support = "focal",
+                support_probs = c(1.1, 0.9)),
+    "support_probs"
+  )
+
+  fit_legacy <- fx$fit
+  fit_legacy$submodels$f_factory <- NULL
+  expect_error(
+    conductance(surface_extreme, fit_legacy, support = "focal"),
+    "reusable conductance-model factory"
+  )
 })
 
 test_that("utility helpers behave as expected", {

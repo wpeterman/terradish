@@ -337,6 +337,28 @@ measurement models such as `mlpe`. For covariance-response models, inspect the
 conductance-scale marginal effects alongside the observed-vs-fitted covariance
 plot above.
 
+If one covariate has weak focal support at its tails, apply focal-support
+clamping during plotting and surface prediction:
+
+```{r wishart-support-clamp, eval = FALSE}
+plot(
+  fit_wc,
+  type = "marginal",
+  data = surface,
+  support = "focal",
+  support_probs = c(0.01, 0.99),
+  clamp_covariates = c("forestcover", "altitude")
+)
+
+cond_wc_focal <- conductance(
+  surface,
+  fit_wc,
+  support = "focal",
+  support_probs = c(0.01, 0.99),
+  clamp_covariates = c("forestcover", "altitude")
+)
+```
+
 ---
 
 ## Compare with `generalized_wishart`

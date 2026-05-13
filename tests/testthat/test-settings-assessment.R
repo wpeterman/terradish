@@ -56,3 +56,30 @@ test_that("terradish_assess_settings can run an Armijo BFGS optimizer probe", {
   expect_gt(assessment$benchmarks$optimizer$line_search_objective_only_trials,
             0)
 })
+
+test_that("terradish_assess_settings reports smooth-model settings context", {
+  dat <- melip_fixture(1:6)
+  melip.Fst <- dat$melip.Fst
+  surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
+
+  assessment <- terradish_assess_settings(
+    melip.Fst ~ forestcover + s(altitude, df = 3),
+    data = surface,
+    conductance_model = smooth_loglinear_conductance,
+    measurement_model = leastsquares,
+    optimizer_probe = TRUE,
+    solver_probe = FALSE,
+    probe_maxit = 1L,
+    verbose = FALSE
+  )
+
+  expect_true(isTRUE(assessment$profile$smooth_conductance))
+  expect_equal(assessment$profile$n_smooth_terms, 1L)
+  expect_equal(assessment$profile$n_smooth_basis_columns, 3L)
+  expect_equal(assessment$defaults$optimizer, "bfgs")
+  expect_true(grepl("defaults", assessment$comparison$summary, fixed = TRUE))
+  expect_true(any(grepl("Smooth conductance formula expanded to",
+                        assessment$notes,
+                        fixed = TRUE)))
+  expect_true(all(assessment$benchmarks$optimizer$status == "OK"))
+})

@@ -93,6 +93,20 @@ test_that("compiled reduced-RHS products match explicit matrix multiplication", 
   )
 })
 
+test_that("direct solver setup surfaces non-positive-definite CHOLMOD failures", {
+  dat <- melip_fixture(1:8)
+  surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
+
+  expect_error(
+    terradish:::.terradish_solver_setup(
+      surface,
+      conductance = rep(0, nrow(surface$x)),
+      solver = "direct"
+    ),
+    "non-positive-definite reduced Laplacian"
+  )
+})
+
 test_that("adaptive AMG schedule stages early and final tolerances", {
   early <- terradish:::.terradish_solver_control_for_phase(
     solver = "amg",
