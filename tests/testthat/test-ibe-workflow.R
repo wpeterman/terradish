@@ -57,6 +57,56 @@ test_that("joint IBE + IBR MLPE models fit through terradish", {
   expect_true(any(grepl("absdiff_altitude_site", names(sm$phi))))
   expect_true("rho" %in% rownames(sm$phi_table))
   expect_true(all(is.finite(sm$phi_table[, "Std. Error"])))
+  expect_true(all(c("Lower 95%", "Upper 95%") %in% colnames(sm$phi_table)))
+
+  sm90 <- summary(fit, conf.level = 0.9)
+  expect_true(all(c("Lower 90%", "Upper 90%") %in% colnames(sm90$phi_table)))
+})
+
+test_that("MLPE response-scale changes summarize pairwise covariate effects", {
+  data(melip, package = "terradish")
+  melip.altitude <- terra::unwrap(melip.altitude)
+  melip.forestcover <- terra::unwrap(melip.forestcover)
+  melip.coords <- terra::unwrap(melip.coords)
+
+  keep <- 1:10
+  melip.Fst_small <- melip.Fst[keep, keep, drop = FALSE]
+  coords <- melip.coords[keep]
+
+  names(melip.altitude) <- "altitude_site"
+  covariates <- c(terra::scale(melip.altitude),
+                  terra::scale(melip.forestcover))
+  names(covariates) <- c("altitude", "forestcover")
+  surface <- conductance_surface(covariates, coords, directions = 8)
+
+  g_joint <- mlpe_covariates(melip.altitude, coords,
+                             transform = "absdiff",
+                             scale = TRUE)
+
+  fit <- terradish(melip.Fst_small ~ altitude + forestcover,
+                   data = surface,
+                   conductance_model = loglinear_conductance,
+                   measurement_model = g_joint,
+                   leverage = FALSE,
+                   control = NewtonRaphsonControl(maxit = 8, verbose = FALSE))
+
+  change <- mlpe_response_change(fit)
+  expect_s3_class(change, "data.frame")
+  expect_equal(change$covariate, "absdiff_altitude_site")
+  expect_true(all(c("low", "high", "contrast", "estimate",
+                    "conf.low", "conf.high") %in% names(change)))
+  expect_equal(change$contrast, change$high - change$low)
+  expect_true(is.finite(change$estimate))
+  expect_true(change$conf.low <= change$estimate)
+  expect_true(change$conf.high >= change$estimate)
+
+  explicit <- mlpe_response_change(fit,
+                                   covariate = "absdiff_altitude_site",
+                                   values = c(0, 2),
+                                   conf.level = 0.9)
+  gamma <- summary(fit)$phi_table["absdiff_altitude_site", "Estimate"]
+  expect_equal(explicit$estimate, gamma * 2)
+  expect_equal(explicit$conf.level, 0.9)
 })
 
 test_that("terradish_cv rebuilds MLPE endpoint-covariate models on splits", {

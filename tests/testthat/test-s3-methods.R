@@ -9,7 +9,8 @@ test_that("S3 methods for terradish objects return consistent outputs", {
   expect_s3_class(sm, "summary.radish")
   expect_gt(length(capture.output(print(sm))), 0)
   expect_true(is.matrix(sm$phi_table))
-  expect_equal(colnames(sm$phi_table), c("Estimate", "Std. Error"))
+  expect_equal(colnames(sm$phi_table),
+               c("Estimate", "Std. Error", "Lower 95%", "Upper 95%"))
   expect_equal(rownames(sm$phi_table), names(sm$phi))
   expect_true(is.matrix(sm$phi_vcov))
 

@@ -275,6 +275,35 @@ that sites with greater altitude differences are more genetically different,
 after accounting for the resistance distance between them. A negative γ (rarely
 biologically expected for IBE) would mean the opposite.
 
+The summary table also reports confidence intervals for the nuisance
+parameters, including the IBE coefficient. These intervals are conditional on
+the fitted conductance surface, so they should be interpreted as uncertainty in
+the MLPE regression layer after the IBR surface has been estimated.
+
+```{r gamma-ci}
+summary(fit_joint)$phi_table["absdiff_altitude", ]
+```
+
+Because γ is on the response scale, it is often easier to interpret as the
+expected change in genetic distance across a meaningful change in the pairwise
+covariate. `mlpe_response_change()` does this calculation using the pairwise
+covariates stored in the fitted measurement model. By default, it compares the
+90th and 10th percentiles:
+
+```{r response-scale-change}
+mlpe_response_change(fit_joint)
+```
+
+The `estimate` column is the expected change in pairwise genetic distance over
+that covariate contrast, after accounting for the fitted resistance distance.
+For a custom contrast, provide explicit low and high values:
+
+```{r response-scale-change-custom}
+mlpe_response_change(fit_joint,
+                     covariate = "absdiff_altitude",
+                     values = c(0, 2))
+```
+
 The other phi parameters (`alpha`, `beta`, `tau`, `rho`) are the MLPE
 regression nuisance parameters and are the same as in a plain `mlpe` fit:
 intercept, IBR slope, residual precision, and MLPE correlation.
@@ -286,6 +315,7 @@ intercept, IBR slope, residual precision, and MLPE correlation.
 | Conductance | θ | `coef(fit)` | How raster covariates affect landscape permeability |
 | IBR slope | β (`beta`) | `summary(fit)$phi` | How resistance distance predicts genetic distance |
 | IBE slope | γ (`absdiff_*`) | `summary(fit)$phi` | How environmental mismatch predicts genetic distance |
+| IBE response change | γ ΔZ | `mlpe_response_change(fit)` | Expected genetic-distance change across a pairwise-covariate contrast |
 | Intercept | α (`alpha`) | `summary(fit)$phi` | Baseline genetic distance at zero resistance |
 | Residual precision | exp(τ) (`tau`) | `summary(fit)$phi` | Inverse residual variance |
 | MLPE correlation | plogis(ρ)/2 (`rho`) | `summary(fit)$phi` | Shared-site correlation in pairwise residuals |
@@ -579,6 +609,7 @@ anova(fit_ibr,   fit_ibd)   # does IBR improve on IBD?
 # 5. Interpret theta (IBR) and gamma (IBE inside phi)
 coef(fit_joint)
 summary(fit_joint)$phi
+mlpe_response_change(fit_joint)
 
 # 6. Visualize
 plot(fit_joint, type = "fit")                       # observed vs. fitted

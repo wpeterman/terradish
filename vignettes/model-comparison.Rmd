@@ -440,6 +440,7 @@ A complete analysis typically uses all three approaches together:
 | `anova()` | Is covariate X significant? | Nested model comparisons |
 | `aic_table()` | Which model is best overall? | Any set of models on the same surface |
 | `terradish_cv()` / `cv_model_selection()` | Which model predicts new sites best? | Predictive rather than explanatory goals |
+| `mlpe_response_change()` | How large is an MLPE pairwise-covariate effect? | IBE terms fitted with `mlpe_covariates()` |
 
 When `anova()` gives a small p-value *and* AIC selects the same model *and*
 cross-validation confirms it has better held-out log-likelihood, you have strong
@@ -455,6 +456,7 @@ evidence that the included covariates genuinely predict landscape permeability.
 | `aic_table(list(...))` | Rank models by AIC, AICc, or BIC |
 | `terradish_grid()` | Evaluate log-likelihood on a parameter grid |
 | `conductance()` | Fitted conductance with confidence intervals |
+| `mlpe_response_change()` | Response-scale change and confidence interval for MLPE pairwise covariates |
 | `terradish_cv()` | Single train/test split cross-validation |
 | `terradish_cv_replicates()` | Repeated cross-validation across random splits |
 | `cv_model_selection()` | Combine CV log-likelihoods with an AIC table |

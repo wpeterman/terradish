@@ -102,17 +102,28 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
   tryCatch(solve(x), error = function(e) ginv(x))
 }
 
-.conditional_phi_table <- function(phi, phi_hessian)
+.conditional_phi_table <- function(phi, phi_hessian, conf.level = 0.95)
 {
   if (is.null(phi) || is.null(phi_hessian))
     return(NULL)
 
+  if (!is.numeric(conf.level) || length(conf.level) != 1L ||
+      is.na(conf.level) || conf.level <= 0 || conf.level >= 1)
+    stop("`conf.level` must be a single number between 0 and 1")
+
   phi <- c(phi)
   vcov <- .safe_hessian_inverse(phi_hessian)
   se <- sqrt(pmax(diag(vcov), 0))
+  z <- qnorm((1 + conf.level) / 2)
+  pct <- format(100 * conf.level, trim = TRUE, scientific = FALSE)
 
   table <- cbind("Estimate" = phi,
-                 "Std. Error" = se)
+                 "Std. Error" = se,
+                 phi - z * se,
+                 phi + z * se)
+  colnames(table) <- c("Estimate", "Std. Error",
+                       paste0("Lower ", pct, "%"),
+                       paste0("Upper ", pct, "%"))
   rownames(table) <- names(phi)
 
   list(table = table, vcov = vcov)
@@ -1180,6 +1191,9 @@ radish <- function(...)
 #' @param seed Optional random seed used by \code{simulate()}.
 #' @param k Penalty multiplier supplied to \code{AIC()}.
 #' @param method Simulation method.
+#' @param conf.level Confidence level for nuisance-parameter confidence
+#'   intervals reported by \code{summary()}.  These intervals are conditional on
+#'   the fitted conductance surface.
 #' @param ... Additional arguments passed through to generic methods.
 #'
 #' @return
@@ -1224,7 +1238,7 @@ print.radish <- function(x, digits = max(3L, getOption("digits") - 3L), ...)
 #' @rdname terradish_methods
 #' @method summary radish
 #' @export
-summary.radish <- function(object, ...)
+summary.radish <- function(object, conf.level = 0.95, ...)
 {
   x <- object
   tol <- sqrt(.Machine$double.eps) #for checking singularity
@@ -1272,7 +1286,8 @@ summary.radish <- function(object, ...)
               dim           = x$dim
               )
 
-  phi_summary <- .conditional_phi_table(x$fit$phi[,1], x$fit$phi_hessian)
+  phi_summary <- .conditional_phi_table(x$fit$phi[,1], x$fit$phi_hessian,
+                                        conf.level = conf.level)
   if (!is.null(phi_summary))
   {
     out$phi_table <- phi_summary$table

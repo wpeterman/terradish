@@ -1,3 +1,9 @@
+terradish 0.0.26
+---------
+* Added conditional confidence intervals for nuisance parameters in `summary()`
+* Added `mlpe_response_change()` to summarize MLPE pairwise-covariate effects on the genetic-distance response scale
+* Documented and demonstrated response-scale MLPE covariate interpretation in the IBE/IBR workflow
+
 terradish 0.0.25
 ---------
 * Added covariance-response marginal plots for `wishart_covariance` fits, including support for `smooth_loglinear_conductance`

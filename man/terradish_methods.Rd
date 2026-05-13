@@ -26,7 +26,7 @@
 \usage{
 \method{print}{radish}(x, digits = max(3L, getOption("digits") - 3L), ...)
 
-\method{summary}{radish}(object, ...)
+\method{summary}{radish}(object, conf.level = 0.95, ...)
 
 \method{print}{summary.radish}(
   x,
@@ -57,7 +57,7 @@
 
 \method{print}{terradish}(x, digits = max(3L, getOption("digits") - 3L), ...)
 
-\method{summary}{terradish}(object, ...)
+\method{summary}{terradish}(object, conf.level = 0.95, ...)
 
 \method{print}{summary.terradish}(
   x,
@@ -94,6 +94,10 @@
 \item{...}{Additional arguments passed through to generic methods.}
 
 \item{object, alternative}{Fitted \code{terradish} objects.}
+
+\item{conf.level}{Confidence level for nuisance-parameter confidence
+intervals reported by \code{summary()}.  These intervals are conditional on
+the fitted conductance surface.}
 
 \item{signif.stars}{Should significance stars be printed in coefficient
 tables?}
