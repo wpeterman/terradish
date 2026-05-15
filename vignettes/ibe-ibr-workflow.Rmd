@@ -20,6 +20,15 @@ knitr::opts_chunk$set(
   warning  = FALSE,
   message  = FALSE
 )
+
+show_terradish_plot <- function(x) {
+  if (inherits(x, "ggplot")) {
+    print(x)
+  } else if (is.list(x) && all(vapply(x, inherits, logical(1), "ggplot"))) {
+    invisible(lapply(x, print))
+  }
+  invisible(x)
+}
 ```
 
 ## What are IBE and IBR, and why fit them together?
@@ -113,8 +122,11 @@ helper `pairwise_endpoint_covariates()` computes this from site-level
 environmental values.
 
 ```{r ibe-covariates}
+ibe_altitude <- melip.altitude
+names(ibe_altitude) <- "altitude_site"
+
 z_ibe <- pairwise_endpoint_covariates(
-  melip.altitude,          # site-level environmental data (raster or matrix)
+  ibe_altitude,            # site-level environmental data (raster or matrix)
   coords    = melip.coords,# focal-point locations (used to extract from raster)
   transform = "absdiff",  # how to convert site values into pairwise values
   scale     = TRUE         # standardize site values first
@@ -270,10 +282,10 @@ parameters:
 summary(fit_joint)
 ```
 
-Look for the row named `absdiff_<layer>` in the phi table. A positive γ means
-that sites with greater altitude differences are more genetically different,
-after accounting for the resistance distance between them. A negative γ (rarely
-biologically expected for IBE) would mean the opposite.
+Look for the row named `absdiff_<layer>_site` in the phi table. A positive γ
+means that sites with greater altitude differences are more genetically
+different, after accounting for the resistance distance between them. A negative
+γ (rarely biologically expected for IBE) would mean the opposite.
 
 The summary table also reports confidence intervals for the nuisance
 parameters, including the IBE coefficient. These intervals are conditional on
@@ -281,7 +293,7 @@ the fitted conductance surface, so they should be interpreted as uncertainty in
 the MLPE regression layer after the IBR surface has been estimated.
 
 ```{r gamma-ci}
-summary(fit_joint)$phi_table["absdiff_altitude", ]
+summary(fit_joint)$phi_table["absdiff_altitude_site", ]
 ```
 
 Because γ is on the response scale, it is often easier to interpret as the
@@ -300,7 +312,7 @@ For a custom contrast, provide explicit low and high values:
 
 ```{r response-scale-change-custom}
 mlpe_response_change(fit_joint,
-                     covariate = "absdiff_altitude",
+                     covariate = "absdiff_altitude_site",
                      values = c(0, 2))
 ```
 
@@ -314,7 +326,7 @@ intercept, IBR slope, residual precision, and MLPE correlation.
 |-----------|--------|-----------------|-----------------|
 | Conductance | θ | `coef(fit)` | How raster covariates affect landscape permeability |
 | IBR slope | β (`beta`) | `summary(fit)$phi` | How resistance distance predicts genetic distance |
-| IBE slope | γ (`absdiff_*`) | `summary(fit)$phi` | How environmental mismatch predicts genetic distance |
+| IBE slope | γ (`absdiff_*_site`) | `summary(fit)$phi` | How environmental mismatch predicts genetic distance |
 | IBE response change | γ ΔZ | `mlpe_response_change(fit)` | Expected genetic-distance change across a pairwise-covariate contrast |
 | Intercept | α (`alpha`) | `summary(fit)$phi` | Baseline genetic distance at zero resistance |
 | Residual precision | exp(τ) (`tau`) | `summary(fit)$phi` | Inverse residual variance |
@@ -461,7 +473,7 @@ resistance distances implied by the fitted model, with a least-squares
 regression line:
 
 ```{r obs-vs-fitted, fig.cap = "***Observed vs. fitted pairwise genetic distances from the joint model.***"}
-plot(fit_joint, type = "fit")
+show_terradish_plot(plot(fit_joint, type = "fit"))
 ```
 
 ### Fitted conductance surface
@@ -472,7 +484,7 @@ does not change how permeable the landscape is estimated to be.
 95% confidence interval bounds in a single three-panel figure:
 
 ```{r conductance-surface, fig.cap = "***Estimated conductance surface from the joint IBE + IBR model.***"}
-plot(fit_joint, type = "surface", data = surface)
+show_terradish_plot(plot(fit_joint, type = "surface", data = surface))
 ```
 
 ### Marginal effects of landscape covariates
@@ -483,14 +495,14 @@ model. Because we used `scale_covariates()`, x-axes are back-transformed to
 the original units automatically:
 
 ```{r marginal-joint, fig.cap = "***Marginal conductance effects for the joint IBE + IBR model.***"}
-plot(fit_joint, type = "marginal", data = surface)
+show_terradish_plot(plot(fit_joint, type = "marginal", data = surface))
 ```
 
 Compare these curves to those from the IBR-only model to see whether adding
 the IBE term changes the estimated landscape permeability:
 
 ```{r marginal-ibr, fig.cap = "***Marginal conductance effects for the IBR-only model.***"}
-plot(fit_ibr, type = "marginal", data = surface)
+show_terradish_plot(plot(fit_ibr, type = "marginal", data = surface))
 ```
 
 ### Constraining inference to focal support

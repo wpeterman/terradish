@@ -1,3 +1,9 @@
+terradish 0.0.28
+---------
+* Updated vignettes so plots are explicitly printed under the silent plotting default
+* Fixed the IBE/IBR vignette to use a stable pairwise altitude covariate name
+* Render-checked all package vignettes to confirm plotting output appears as expected
+
 terradish 0.0.27
 ---------
 * Added package-native focal-support clamping controls for plotting and conductance prediction via `support`, `support_probs`, and `clamp_covariates`

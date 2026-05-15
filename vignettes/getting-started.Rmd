@@ -20,6 +20,15 @@ knitr::opts_chunk$set(
   warning  = FALSE,
   message  = FALSE
 )
+
+show_terradish_plot <- function(x) {
+  if (inherits(x, "ggplot")) {
+    print(x)
+  } else if (is.list(x) && all(vapply(x, inherits, logical(1), "ggplot"))) {
+    invisible(lapply(x, print))
+  }
+  invisible(x)
+}
 ```
 
 ## What is terradish for?
@@ -567,7 +576,7 @@ The `plot()` S3 method with `type = "fit"` produces an observed-vs-fitted
 scatter plot with a least-squares regression line:
 
 ```{r plot-fit, fig.cap = "***Observed vs. resistance-distance-fitted genetic distances.***"}
-plot(fit_mlpe, type = "fit")
+show_terradish_plot(plot(fit_mlpe, type = "fit"))
 ```
 
 ### Fitted conductance surface
@@ -577,7 +586,7 @@ lower and upper confidence interval bounds in a single three-panel figure. All
 panels share the same color scale so relative differences are easy to read:
 
 ```{r conductance-surface, fig.cap = "***Estimated conductance surface with 95% confidence interval bounds.***"}
-plot(fit_mlpe, type = "surface", data = surface)
+show_terradish_plot(plot(fit_mlpe, type = "surface", data = surface))
 ```
 
 Brighter cells are more conductive (easier to move through). Panels where the
@@ -593,7 +602,7 @@ genetic distance is what you measured and what the model ultimately explains,
 this is usually the most directly interpretable view.
 
 ```{r marginal-effects, fig.cap = "***Marginal effect of each covariate on predicted genetic distance with predictive bands.***"}
-plot(fit_mlpe, data = surface)
+show_terradish_plot(plot(fit_mlpe, data = surface))
 ```
 
 **How to read these plots**
@@ -636,7 +645,7 @@ residual variation in the band, and on the conductance rather than genetic
 distance scale), use `type = "marginal"`:
 
 ```{r marginal-conductance, fig.cap = "***Marginal effect of each covariate on conductance with 95% CI.***"}
-plot(fit_mlpe, type = "marginal", data = surface)
+show_terradish_plot(plot(fit_mlpe, type = "marginal", data = surface))
 ```
 
 Here the band is a **confidence interval** (delta-method, 95% pointwise) on

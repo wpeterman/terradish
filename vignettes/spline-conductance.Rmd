@@ -20,6 +20,15 @@ knitr::opts_chunk$set(
   warning   = FALSE,
   message   = FALSE
 )
+
+show_terradish_plot <- function(x) {
+  if (inherits(x, "ggplot")) {
+    print(x)
+  } else if (is.list(x) && all(vapply(x, inherits, logical(1), "ggplot"))) {
+    invisible(lapply(x, print))
+  }
+  invisible(x)
+}
 ```
 
 ## Why splines for conductance?
@@ -550,11 +559,12 @@ cond_ns_alt_focal <- conductance(
 ## Observed vs. fitted genetic distances
 
 ```{r obs-vs-fitted, fig.cap = "***Observed vs. fitted pairwise Fst for all candidate models.*** Each point is a pair of sampling sites. The diagonal (dashed) represents a perfect fit.", fig.height = 5}
-par(mfrow = c(2, 2))
-plot(fit_linear,  type = "fit", main = "Linear baseline")
-plot(fit_ns_alt,  type = "fit", main = "Altitude ns (df = 4)")
-plot(fit_ns_both, type = "fit", main = "Both ns (df = 4)")
-plot(fit_bs_alt,  type = "fit", main = "Altitude bs (k = 4)")
+p_fit_linear <- plot(fit_linear,  type = "fit", main = "Linear baseline")
+p_fit_ns_alt <- plot(fit_ns_alt,  type = "fit", main = "Altitude ns (df = 4)")
+p_fit_ns_both <- plot(fit_ns_both, type = "fit", main = "Both ns (df = 4)")
+p_fit_bs_alt <- plot(fit_bs_alt,  type = "fit", main = "Altitude bs (k = 4)")
+
+(p_fit_linear | p_fit_ns_alt) / (p_fit_ns_both | p_fit_bs_alt)
 ```
 
 All four panels should show a similar cloud pattern because all models use the

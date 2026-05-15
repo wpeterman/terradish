@@ -20,6 +20,15 @@ knitr::opts_chunk$set(
   warning   = FALSE,
   message   = FALSE
 )
+
+show_terradish_plot <- function(x) {
+  if (inherits(x, "ggplot")) {
+    print(x)
+  } else if (is.list(x) && all(vapply(x, inherits, logical(1), "ggplot"))) {
+    invisible(lapply(x, print))
+  }
+  invisible(x)
+}
 ```
 
 ## Why optimize sigma inside the model?
@@ -261,7 +270,7 @@ Each panel is also annotated with:
 - the corresponding confidence interval bounds
 
 ```{r sigma-plot, fig.cap = "***Fitted Gaussian kernel with uncertainty band. The dashed line marks the distance containing 90% of the one-dimensional kernel mass.***"}
-plot(fit_gaussian, type = "sigma")
+show_terradish_plot(plot(fit_gaussian, type = "sigma"))
 ```
 
 If you already know how to convert your map units into a more interpretable
@@ -270,12 +279,12 @@ unit corresponds to one metre, then multiplying by `0.001` reports distances
 in kilometres:
 
 ```{r sigma-plot-km, fig.cap = "***Fitted Gaussian kernel with x-axis relabelled in kilometres.***"}
-plot(
+show_terradish_plot(plot(
   fit_gaussian,
   type = "sigma",
   distance_per_map_unit = 0.001,
   distance_unit = "km"
-)
+))
 ```
 
 ### Step 5 — Compare against a standard fixed-raster fit
@@ -342,7 +351,7 @@ fitted_conductance
 And we can plot the fitted conductance layer directly:
 
 ```{r conductance-plot, fig.cap = "***Fitted conductance surface from the Gaussian scale-aware model, with sampling sites shown in red.***"}
-plot(fitted_conductance[[1]], main = "Fitted conductance")
+show_terradish_plot(plot(fitted_conductance[[1]], main = "Fitted conductance"))
 points(coords, pch = 19, col = "red")
 ```
 
