@@ -2,7 +2,6 @@
 % Please edit documentation in R/radish_grid.R
 \name{terradish_distance}
 \alias{terradish_distance}
-\alias{radish_distance}
 \title{Resistance distances from a parameterized conductance surface}
 \usage{
 terradish_distance(
@@ -14,8 +13,6 @@ terradish_distance(
   covariance = FALSE,
   cores = 1L
 )
-
-radish_distance(...)
 }
 \arguments{
 \item{theta}{A matrix of dimension (grid size) x (number of parameters)}
@@ -35,10 +32,6 @@ radish_distance(...)
 \item{covariance}{If \code{TRUE}, instead of a matrix of resistance distances, return the associated submatrix of the generalized inverse of graph Laplacian}
 
 \item{cores}{Number of worker processes to use. \code{1} evaluates the grid serially.}
-
-\item{...}{Arguments passed through the deprecated
-\code{radish_distance()} compatibility wrapper to
-\code{\link{terradish_distance}}.}
 }
 \value{
 An object of class \code{terradish_grid}

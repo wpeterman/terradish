@@ -2,17 +2,12 @@
 % Please edit documentation in R/radish_measurement_model.R
 \name{terradish_measurement_model}
 \alias{terradish_measurement_model}
-\alias{radish_measurement_model}
 \title{Measurement models}
 \usage{
 terradish_measurement_model
 }
 \description{
 Functions that fit a matrix observed genetic distances to a submatrix of the inverse graph Laplacian
-}
-\details{
-Legacy \code{"radish_measurement_model"} classes are retained for backward
-compatibility.
 }
 \seealso{
 \code{\link{leastsquares}}, \code{\link{mlpe}}, \code{\link{generalized_wishart}}

@@ -2,7 +2,6 @@
 % Please edit documentation in R/radish_cv.R
 \name{terradish_parameters}
 \alias{terradish_parameters}
-\alias{radish_parameters}
 \title{Extract parameter estimates from saved terradish results}
 \usage{
 terradish_parameters(
@@ -13,8 +12,6 @@ terradish_parameters(
   radish_model,
   ...
 )
-
-radish_parameters(...)
 }
 \arguments{
 \item{Results_dir}{Full path to the top-level results directory.}

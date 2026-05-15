@@ -2,16 +2,6 @@
 % Please edit documentation in R/radish_optimize.R
 \name{terradish_methods}
 \alias{terradish_methods}
-\alias{print.radish}
-\alias{summary.radish}
-\alias{print.summary.radish}
-\alias{coef.radish}
-\alias{fitted.radish}
-\alias{simulate.radish}
-\alias{anova.radish}
-\alias{logLik.radish}
-\alias{AIC.radish}
-\alias{residuals.radish}
 \alias{print.terradish}
 \alias{summary.terradish}
 \alias{print.summary.terradish}
@@ -24,37 +14,6 @@
 \alias{residuals.terradish}
 \title{Methods for fitted terradish models}
 \usage{
-\method{print}{radish}(x, digits = max(3L, getOption("digits") - 3L), ...)
-
-\method{summary}{radish}(object, conf.level = 0.95, ...)
-
-\method{print}{summary.radish}(
-  x,
-  digits = max(3L, getOption("digits") - 3L),
-  signif.stars = getOption("show.signif.stars"),
-  ...
-)
-
-\method{coef}{radish}(object, ...)
-
-\method{fitted}{radish}(object, type = c("response", "distance", "covariance"), ...)
-
-\method{simulate}{radish}(
-  object,
-  nsim = 1,
-  seed = NULL,
-  method = c("permutation", "parametric"),
-  ...
-)
-
-\method{anova}{radish}(object, ..., alternative = NULL)
-
-\method{logLik}{radish}(object, ...)
-
-\method{AIC}{radish}(object, ..., k = 2)
-
-\method{residuals}{radish}(object, ...)
-
 \method{print}{terradish}(x, digits = max(3L, getOption("digits") - 3L), ...)
 
 \method{summary}{terradish}(object, conf.level = 0.95, ...)

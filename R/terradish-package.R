@@ -2,6 +2,9 @@
 #'
 #' Gradient-based optimization of conductance and resistance surfaces.
 #'
+#' @details
+#' \figure{terradish-sticker.png}{options: style='float: right; width: 180px; margin-left: 12px;'}
+#'
 #' @keywords internal
 #' @importFrom Rcpp evalCpp
 #' @importFrom MASS ginv

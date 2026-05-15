@@ -450,7 +450,26 @@ conductance.terradish_graph <- function(x, fit, quantile = 0.95,
                           ...)
 }
 
-#' @rdname conductance
+#' Legacy radish graph conductance method
+#'
+#' Deprecated S3 method retained so legacy \code{"radish_graph"} objects still
+#' dispatch to \code{\link{conductance}}.
+#'
+#' @param x A legacy \code{radish_graph} object.
+#' @param fit A fitted model returned by \code{\link{terradish}}.
+#' @param quantile Confidence level for the pointwise conductance interval.
+#' @param support Optional support constraint for conductance evaluation.
+#' @param support_probs Optional length-2 probability vector used with
+#'   \code{support = "focal"} to compute clamping bounds from focal-cell
+#'   quantiles.
+#' @param clamp_covariates Optional character vector of covariate names to
+#'   clamp when \code{support = "focal"}.
+#' @param ... Additional arguments passed to methods.
+#' @name legacy_radish_graph_methods
+#' @keywords internal
+NULL
+
+#' @rdname legacy_radish_graph_methods
 #' @method conductance radish_graph
 #' @export
 conductance.radish_graph <- function(x, fit, quantile = 0.95,

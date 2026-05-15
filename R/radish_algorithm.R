@@ -915,10 +915,19 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
           ))
 }
 
-#' @rdname terradish_algorithm
+#' Legacy radish algorithm wrapper
+#'
+#' Deprecated compatibility wrapper retained for legacy code that still calls
+#' \code{radish_algorithm()} directly.
+#'
 #' @param ... Arguments passed through the deprecated
 #'   \code{radish_algorithm()} compatibility wrapper to
 #'   \code{\link{terradish_algorithm}}.
+#' @name legacy_radish_algorithm_wrapper
+#' @keywords internal
+NULL
+
+#' @rdname legacy_radish_algorithm_wrapper
 #' @export
 radish_algorithm <- function(...)
 {

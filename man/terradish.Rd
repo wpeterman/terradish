@@ -2,7 +2,6 @@
 % Please edit documentation in R/radish_optimize.R
 \name{terradish}
 \alias{terradish}
-\alias{radish}
 \title{Optimize a parameterized conductance surface}
 \usage{
 terradish(
@@ -24,8 +23,6 @@ terradish(
   approximation = c("none", "landmark", "coarse_raster"),
   approximation_control = NULL
 )
-
-radish(...)
 }
 \arguments{
 \item{formula}{A formula with a matrix of observed genetic distances on the lhs, and covariates used in the creation of \code{data} on the rhs}
@@ -125,9 +122,6 @@ full-resolution refinement; by default the main \code{control} is reused.
 For
 \code{measurement_model = leastsquares}, landmark exact-refinement is
 guarded and the approximation stage is skipped.}
-
-\item{...}{Arguments passed through the deprecated \code{radish()}
-compatibility wrapper to \code{\link{terradish}}.}
 }
 \value{
 An object of class \code{terradish} containing the fitted conductance
@@ -152,8 +146,7 @@ the (unknown, modeled) resistance distance to observed genetic dissimilarity
 via a probability model (referred to as the "measurement model" throughout
 this package).
 
-\code{radish()} is retained as a deprecated compatibility wrapper for
-\code{terradish()}.
+\figure{terradish-sticker.png}{options: style='float: right; width: 180px; margin-left: 12px;'}
 
 For example, a log-linear choice of conductance model is:
 

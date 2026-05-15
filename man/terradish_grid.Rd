@@ -2,7 +2,6 @@
 % Please edit documentation in R/radish_grid.R
 \name{terradish_grid}
 \alias{terradish_grid}
-\alias{radish_grid}
 \title{Evaluate likelihood of a parameterized conductance surface}
 \usage{
 terradish_grid(
@@ -19,8 +18,6 @@ terradish_grid(
   approximation = c("none", "landmark", "coarse_raster"),
   approximation_control = NULL
 )
-
-radish_grid(...)
 }
 \arguments{
 \item{theta}{A matrix of dimension (grid size) x (number of parameters)}
@@ -64,9 +61,6 @@ or coarse-raster approximation. For \code{"landmark"}, see
 positive integer or a vector such as \code{c(4, 2)}; grid likelihoods are
 evaluated on the coarsest requested approximation. Coarse-raster screening
 requires that \code{data} retain its original raster stack.}
-
-\item{...}{Arguments passed through the deprecated \code{radish_grid()}
-compatibility wrapper to \code{\link{terradish_grid}}.}
 }
 \value{
 An object of class \code{terradish_grid} with components

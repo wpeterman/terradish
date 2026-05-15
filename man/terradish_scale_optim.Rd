@@ -2,32 +2,9 @@
 % Please edit documentation in R/terradish_scale_optim.R
 \name{terradish_scale_optim}
 \alias{terradish_scale_optim}
-\alias{terra_radish_scale_optim}
 \title{Optimize raster scales of effect around a terradish fit}
 \usage{
 terradish_scale_optim(
-  formula,
-  covariates,
-  coords,
-  scales = NULL,
-  lower = NULL,
-  upper = NULL,
-  scale_grid = NULL,
-  search = c("coordinate", "grid"),
-  objective = c("aic", "logLik"),
-  grid_points = 5L,
-  maxit = 10L,
-  tol = 0.1,
-  scale_fun = NULL,
-  scale_args = NULL,
-  postprocess = scale_covariates,
-  directions = 8L,
-  theta = NULL,
-  verbose = TRUE,
-  ...
-)
-
-terra_radish_scale_optim(
   formula,
   covariates,
   coords,

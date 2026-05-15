@@ -98,7 +98,7 @@
 #' }
 #'
 #' @seealso \code{\link{terradish}}, \code{\link{conductance}},
-#'   \code{\link{fitted.radish}}, \code{\link{loglinear_conductance}},
+#'   \code{\link{fitted.terradish}}, \code{\link{loglinear_conductance}},
 #'   \code{\link{smooth_loglinear_conductance}}
 #'
 #' @examples
@@ -189,7 +189,18 @@ plot.terradish <- function(x,
   invisible(out)
 }
 
-#' @rdname plot.terradish
+#' Legacy radish plot method
+#'
+#' Deprecated S3 method retained so legacy \code{"radish"} fit objects still
+#' dispatch to \code{\link[graphics]{plot}}.
+#'
+#' @param x A fitted legacy \code{radish} object.
+#' @param ... Additional graphical parameters.
+#' @name legacy_radish_plot_method
+#' @keywords internal
+NULL
+
+#' @rdname legacy_radish_plot_method
 #' @method plot radish
 #' @export
 plot.radish <- function(x, ...) plot.terradish(x, ...)

@@ -483,6 +483,15 @@ terradish_scale_optim <- function(formula,
   out
 }
 
-#' @rdname terradish_scale_optim
+#' Legacy terradish scale-optimization alias
+#'
+#' Legacy alias retained for backward compatibility with older
+#' \code{terra_radish_scale_optim()} calls.
+#'
+#' @name legacy_terra_radish_scale_optim
+#' @keywords internal
+NULL
+
+#' @rdname legacy_terra_radish_scale_optim
 #' @export
 terra_radish_scale_optim <- terradish_scale_optim

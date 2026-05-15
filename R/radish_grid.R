@@ -572,9 +572,18 @@ terradish_grid <- function(theta,
   )
 }
 
-#' @rdname terradish_grid
+#' Legacy radish grid wrapper
+#'
+#' Deprecated compatibility wrapper retained for older code that still calls
+#' \code{radish_grid()}.
+#'
 #' @param ... Arguments passed through the deprecated \code{radish_grid()}
 #'   compatibility wrapper to \code{\link{terradish_grid}}.
+#' @name legacy_radish_grid_wrapper
+#' @keywords internal
+NULL
+
+#' @rdname legacy_radish_grid_wrapper
 #' @export
 radish_grid <- function(...)
 {
@@ -731,10 +740,19 @@ terradish_distance <- function(theta,
   df
 }
 
-#' @rdname terradish_distance
+#' Legacy radish distance wrapper
+#'
+#' Deprecated compatibility wrapper retained for older code that still calls
+#' \code{radish_distance()}.
+#'
 #' @param ... Arguments passed through the deprecated
 #'   \code{radish_distance()} compatibility wrapper to
 #'   \code{\link{terradish_distance}}.
+#' @name legacy_radish_distance_wrapper
+#' @keywords internal
+NULL
+
+#' @rdname legacy_radish_distance_wrapper
 #' @export
 radish_distance <- function(...)
 {

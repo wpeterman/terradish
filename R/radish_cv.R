@@ -463,7 +463,19 @@ terradish_parameters <- function(Results_dir,
   df
 }
 
-#' @rdname terradish_parameters
+#' Legacy radish parameter-extraction wrapper
+#'
+#' Deprecated compatibility wrapper retained for older code that still calls
+#' \code{radish_parameters()}.
+#'
+#' @param ... Arguments passed through the deprecated
+#'   \code{radish_parameters()} compatibility wrapper to
+#'   \code{\link{terradish_parameters}}.
+#' @name legacy_radish_parameters_wrapper
+#' @keywords internal
+NULL
+
+#' @rdname legacy_radish_parameters_wrapper
 #' @export
 radish_parameters <- function(...)
 {
@@ -856,7 +868,17 @@ print.summary.terradish_cv_replicates <- function(x, digits = max(3L, getOption(
   invisible(x)
 }
 
-#' @rdname terradish_cv
+#' Legacy radish cross-validation wrapper
+#'
+#' Deprecated compatibility wrapper retained for older code that still calls
+#' \code{radish_cv()}.
+#'
+#' @param ... Additional arguments passed to \code{\link{terradish}}.
+#' @name legacy_radish_cv_wrapper
+#' @keywords internal
+NULL
+
+#' @rdname legacy_radish_cv_wrapper
 #' @export
 radish_cv <- function(...)
 {

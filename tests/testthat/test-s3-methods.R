@@ -8,6 +8,14 @@ test_that("S3 methods for terradish objects return consistent outputs", {
   expect_s3_class(sm, "summary.terradish")
   expect_s3_class(sm, "summary.radish")
   expect_gt(length(capture.output(print(sm))), 0)
+  terradish_only <- fit
+  class(terradish_only) <- "terradish"
+  sm_terradish_only <- summary(terradish_only)
+  expect_s3_class(sm_terradish_only, "summary.terradish")
+  expect_match(capture.output(print(sm_terradish_only))[1],
+               "Conductance surface with")
+  expect_false(any(grepl("Length\\s+Class\\s+Mode",
+                         capture.output(print(sm_terradish_only)))))
   expect_true(is.matrix(sm$phi_table))
   expect_equal(colnames(sm$phi_table),
                c("Estimate", "Std. Error", "Lower 95%", "Upper 95%"))

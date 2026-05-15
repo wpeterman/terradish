@@ -2,7 +2,6 @@
 % Please edit documentation in R/radish_conductance_model.R
 \name{terradish_conductance_model_factory}
 \alias{terradish_conductance_model_factory}
-\alias{radish_conductance_model_factory}
 \title{Conductance model factories}
 \usage{
 terradish_conductance_model_factory
@@ -10,10 +9,6 @@ terradish_conductance_model_factory
 \description{
 Functions that generate objects of class \code{"terradish_conductance_model"}
 that represent mappings from spatial data (e.g. rasters) to conductance.
-}
-\details{
-Legacy \code{"radish_*"} class names are retained for backward
-compatibility.
 }
 \seealso{
 \code{\link{linear_conductance}}, \code{\link{loglinear_conductance}},

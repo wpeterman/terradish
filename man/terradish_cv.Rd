@@ -2,7 +2,6 @@
 % Please edit documentation in R/radish_cv.R
 \name{terradish_cv}
 \alias{terradish_cv}
-\alias{radish_cv}
 \title{Cross validation for terradish models}
 \usage{
 terradish_cv(
@@ -19,8 +18,6 @@ terradish_cv(
   cores = 1L,
   ...
 )
-
-radish_cv(...)
 }
 \arguments{
 \item{pts}{Focal point coordinates as a \code{terra::SpatVector}, matrix, or

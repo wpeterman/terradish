@@ -1,3 +1,9 @@
+terradish 0.0.29
+---------
+* Added the package sticker to the main terradish help pages
+* Moved legacy `radish*` wrapper documentation to internal help topics while preserving compatibility methods and aliases
+* Added a regression test confirming `summary()` still prints compact terradish summaries when legacy `radish` classes are absent
+
 terradish 0.0.28
 ---------
 * Updated vignettes so plots are explicitly printed under the silent plotting default

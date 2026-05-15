@@ -214,7 +214,17 @@ terradish_multiscale <- function(formula,
   out
 }
 
-#' @rdname terradish_multiscale
+#' Legacy radish multiscale wrapper
+#'
+#' Deprecated compatibility wrapper retained for older code that still calls
+#' \code{radish_multiscale()}.
+#'
+#' @param ... Additional arguments passed to \code{\link{terradish}}.
+#' @name legacy_radish_multiscale_wrapper
+#' @keywords internal
+NULL
+
+#' @rdname legacy_radish_multiscale_wrapper
 #' @export
 radish_multiscale <- function(...)
 {

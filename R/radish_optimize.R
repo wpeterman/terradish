@@ -597,8 +597,7 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' via a probability model (referred to as the "measurement model" throughout
 #' this package).
 #'
-#' \code{radish()} is retained as a deprecated compatibility wrapper for
-#' \code{terradish()}.
+#' \figure{terradish-sticker.png}{options: style='float: right; width: 180px; margin-left: 12px;'}
 #'
 #' For example, a log-linear choice of conductance model is:
 #'
@@ -1173,9 +1172,18 @@ terradish <- function(formula,
   out
 }
 
-#' @rdname terradish
+#' Legacy radish fit wrapper
+#'
+#' Deprecated compatibility wrapper retained for older code that still calls
+#' \code{radish()}.
+#'
 #' @param ... Arguments passed through the deprecated \code{radish()}
 #'   compatibility wrapper to \code{\link{terradish}}.
+#' @name legacy_radish_fit_wrapper
+#' @keywords internal
+NULL
+
+#' @rdname legacy_radish_fit_wrapper
 #' @export
 radish <- function(...)
 {
@@ -1221,7 +1229,30 @@ radish <- function(...)
 #' @name terradish_methods
 NULL
 
-#' @rdname terradish_methods
+#' Legacy radish S3 methods
+#'
+#' Deprecated S3 methods retained for legacy objects that still dispatch on the
+#' older \code{"radish"} class names.
+#'
+#' @param x A fitted legacy \code{radish} object.
+#' @param object,alternative Fitted legacy \code{radish} objects.
+#' @param digits Number of digits to print.
+#' @param signif.stars Should significance stars be printed in coefficient
+#'   tables?
+#' @param type Type of fitted values to return.
+#' @param nsim Number of simulated response matrices to generate.
+#' @param seed Optional random seed used by \code{simulate()}.
+#' @param k Penalty multiplier supplied to \code{AIC()}.
+#' @param method Simulation method.
+#' @param conf.level Confidence level for nuisance-parameter confidence
+#'   intervals reported by \code{summary()}. These intervals are conditional on
+#'   the fitted conductance surface.
+#' @param ... Additional arguments passed through to generic methods.
+#' @name legacy_radish_methods
+#' @keywords internal
+NULL
+
+#' @rdname legacy_radish_methods
 #' @method print radish
 #' @export
 print.radish <- function(x, digits = max(3L, getOption("digits") - 3L), ...)
@@ -1242,7 +1273,7 @@ print.radish <- function(x, digits = max(3L, getOption("digits") - 3L), ...)
   invisible(x)
 }
 
-#' @rdname terradish_methods
+#' @rdname legacy_radish_methods
 #' @method summary radish
 #' @export
 summary.radish <- function(object, conf.level = 0.95, ...)
@@ -1305,7 +1336,7 @@ summary.radish <- function(object, conf.level = 0.95, ...)
   out
 }
 
-#' @rdname terradish_methods
+#' @rdname legacy_radish_methods
 #' @method print summary.radish
 #' @export
 print.summary.radish <- function(x, digits = max(3L, getOption("digits") - 3L), signif.stars = getOption("show.signif.stars"), ...)
@@ -1351,7 +1382,7 @@ print.summary.radish <- function(x, digits = max(3L, getOption("digits") - 3L), 
   invisible(x)
 }
 
-#' @rdname terradish_methods
+#' @rdname legacy_radish_methods
 #' @method coef radish
 #' @export
 coef.radish <- function(object, ...)
@@ -1362,7 +1393,7 @@ coef.radish <- function(object, ...)
     return(c())
 }
 
-#' @rdname terradish_methods
+#' @rdname legacy_radish_methods
 #' @method fitted radish
 #' @export
 fitted.radish <- function(object, type = c("response", "distance", "covariance"), ...)
@@ -1376,7 +1407,7 @@ fitted.radish <- function(object, type = c("response", "distance", "covariance")
     as.matrix(object$fit$covariance)
 }
 
-#' @rdname terradish_methods
+#' @rdname legacy_radish_methods
 #' @method simulate radish
 #' @export
 simulate.radish <- function(object, nsim = 1, seed = NULL, method = c("permutation", "parametric"), ...)
@@ -1402,7 +1433,7 @@ simulate.radish <- function(object, nsim = 1, seed = NULL, method = c("permutati
   if (nsim == 1) sims[,,1] else sims
 }
 
-#' @rdname terradish_methods
+#' @rdname legacy_radish_methods
 #' @method anova radish
 #' @export
 anova.radish <- function(object, ..., alternative = NULL)
@@ -1447,7 +1478,7 @@ anova.radish <- function(object, ..., alternative = NULL)
   out
 }
 
-#' @rdname terradish_methods
+#' @rdname legacy_radish_methods
 #' @method logLik radish
 #' @export
 logLik.radish <- function(object, ...)
@@ -1458,7 +1489,7 @@ logLik.radish <- function(object, ...)
   val
 }
 
-#' @rdname terradish_methods
+#' @rdname legacy_radish_methods
 #' @method AIC radish
 #' @export
 AIC.radish <- function(object, ..., k = 2)
@@ -1466,7 +1497,7 @@ AIC.radish <- function(object, ..., k = 2)
   object$aic
 }
 
-#' @rdname terradish_methods
+#' @rdname legacy_radish_methods
 #' @method residuals radish
 #' @export
 residuals.radish <- function(object, ...)

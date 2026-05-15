@@ -2,7 +2,6 @@
 % Please edit documentation in R/radish_algorithm.R
 \name{terradish_algorithm}
 \alias{terradish_algorithm}
-\alias{radish_algorithm}
 \title{Likelihood of parameterized conductance surface}
 \usage{
 terradish_algorithm(
@@ -25,8 +24,6 @@ terradish_algorithm(
   solver_warm_start = NULL,
   solver_reuse_state = NULL
 )
-
-radish_algorithm(...)
 }
 \arguments{
 \item{f}{A function of class 'conductance_model'}
@@ -79,10 +76,6 @@ diagnosing the fit.}
 \code{terradish_algorithm()} call. This is used to reuse AMG hierarchy
 information or compatible direct CHOLMOD factorization state across nearby
 evaluations.}
-
-\item{...}{Arguments passed through the deprecated
-\code{radish_algorithm()} compatibility wrapper to
-\code{\link{terradish_algorithm}}.}
 }
 \value{
 A list containing at a minimum:

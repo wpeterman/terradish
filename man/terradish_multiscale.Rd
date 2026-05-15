@@ -2,7 +2,6 @@
 % Please edit documentation in R/radish_multiscale.R
 \name{terradish_multiscale}
 \alias{terradish_multiscale}
-\alias{radish_multiscale}
 \title{Coarse-to-fine optimization for large rasters}
 \usage{
 terradish_multiscale(
@@ -15,8 +14,6 @@ terradish_multiscale(
   save_surfaces = FALSE,
   ...
 )
-
-radish_multiscale(...)
 }
 \arguments{
 \item{formula}{A formula with a genetic-distance matrix on the left-hand

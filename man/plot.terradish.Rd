@@ -2,7 +2,6 @@
 % Please edit documentation in R/plot_terradish.R
 \name{plot.terradish}
 \alias{plot.terradish}
-\alias{plot.radish}
 \title{Plot methods for fitted terradish models}
 \usage{
 \method{plot}{terradish}(
@@ -21,8 +20,6 @@
   clamp_covariates = NULL,
   ...
 )
-
-\method{plot}{radish}(x, ...)
 }
 \arguments{
 \item{x}{A fitted \code{terradish} object.}
@@ -174,6 +171,6 @@ plot(fit, type = "marginal_response", data = surface)
 }
 \seealso{
 \code{\link{terradish}}, \code{\link{conductance}},
-  \code{\link{fitted.radish}}, \code{\link{loglinear_conductance}},
+  \code{\link{fitted.terradish}}, \code{\link{loglinear_conductance}},
   \code{\link{smooth_loglinear_conductance}}
 }

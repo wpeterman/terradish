@@ -3,22 +3,11 @@
 \name{conductance}
 \alias{conductance}
 \alias{conductance.terradish_graph}
-\alias{conductance.radish_graph}
 \title{Estimate conductance from a fitted model}
 \usage{
 conductance(x, ...)
 
 \method{conductance}{terradish_graph}(
-  x,
-  fit,
-  quantile = 0.95,
-  support = c("none", "focal"),
-  support_probs = c(0, 1),
-  clamp_covariates = NULL,
-  ...
-)
-
-\method{conductance}{radish_graph}(
   x,
   fit,
   quantile = 0.95,

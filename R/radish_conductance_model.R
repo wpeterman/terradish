@@ -268,14 +268,19 @@ assemble_model_matrix <- function(formula, spdat)
 #' Functions that generate objects of class \code{"terradish_conductance_model"}
 #' that represent mappings from spatial data (e.g. rasters) to conductance.
 #'
-#' Legacy \code{"radish_*"} class names are retained for backward
-#' compatibility.
-#'
 #' @name terradish_conductance_model_factory
-#' @aliases radish_conductance_model_factory
 #' @seealso \code{\link{linear_conductance}}, \code{\link{loglinear_conductance}},
 #'   \code{\link{smooth_loglinear_conductance}}
 terradish_conductance_model_factory <- NULL
+
+#' Legacy radish conductance-model class alias
+#'
+#' The legacy \code{"radish_conductance_model_factory"} class name is retained
+#' for backward compatibility with older objects and workflows.
+#'
+#' @name radish_conductance_model_factory
+#' @keywords internal
+NULL
 
 #' Log-link conductance model
 #'
