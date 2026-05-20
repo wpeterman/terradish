@@ -1,3 +1,9 @@
+terradish 0.0.30
+---------
+* Added `wishart_covariates()` for Wishart measurement models with nonnegative site-level covariance-kernel weights
+* Supported both `wishart_covariance` and `generalized_wishart` likelihoods through the new kernel-covariate measurement-model factory
+* Added focused tests for kernel construction, base Wishart equivalence, generalized Wishart support, subsetting, and optimizer integration
+
 terradish 0.0.29
 ---------
 * Added the package sticker to the main terradish help pages

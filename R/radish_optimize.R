@@ -229,6 +229,11 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
         identical(body(model), body(obj)))
       return(nm)
   }
+
+  base_model <- attr(model, "base_model", exact = TRUE)
+  if (is.character(base_model) && length(base_model) == 1L)
+    return(base_model)
+
   NULL
 }
 
