@@ -1,8 +1,11 @@
-#' Wishart measurement models with site-level covariance kernels
+#' Wishart measurement models with site-level environmental covariance kernels
 #'
-#' Creates a Wishart measurement model whose covariance structure includes the
-#' resistance-implied covariance plus one or more fixed positive semidefinite
-#' kernels built from site-level environmental covariates.
+#' Creates a Wishart measurement model whose fitted covariance includes the
+#' resistance-implied covariance plus one or more positive semidefinite kernels
+#' built from site-level environmental covariates.  Use this as the Wishart
+#' analogue of \code{\link{mlpe_covariates}} when your measurement model is
+#' \code{\link{generalized_wishart}} (distance-matrix responses) or
+#' \code{\link{wishart_covariance}} (covariance-matrix responses).
 #'
 #' @param x Site-level covariates.  Supported inputs are the same as
 #'   \code{\link{pairwise_endpoint_covariates}}: a numeric vector, matrix, data
@@ -10,56 +13,108 @@
 #' @param coords Required when \code{x} is a raster.  Focal-point coordinates
 #'   in the same projection as \code{x}; accepts the same inputs as
 #'   \code{\link{conductance_surface}}.
-#' @param model Which Wishart likelihood should be used?  Use
-#'   \code{"wishart_covariance"} for covariance-matrix responses and
-#'   \code{"generalized_wishart"} for distance-matrix responses.
-#' @param scale Logical.  Standardize site-level covariates before constructing
-#'   kernels?  Recommended when covariates use different units.
-#' @param normalize Logical.  If \code{TRUE}, rescale each kernel by its mean
-#'   diagonal so the estimated kernel weights are on comparable scales.
+#' @param model Which Wishart likelihood to use.
+#'   \code{"generalized_wishart"} is appropriate when the response \code{S} is
+#'   a pairwise \strong{distance} matrix (e.g. F\eqn{_{ST}}).
+#'   \code{"wishart_covariance"} is appropriate when \code{S} is a
+#'   \strong{covariance} matrix (e.g. from \code{\link{cov_from_genetic_data}}).
+#'   In both cases the same \eqn{\Sigma} parameterization is used; they differ
+#'   in how \eqn{\Sigma} is compared to the observed data.
+#' @param scale Logical.  Standardize site-level covariates to zero mean and
+#'   unit variance before constructing kernels?  Recommended when covariates
+#'   use different units or scales.
+#' @param normalize Logical.  If \code{TRUE}, rescale each kernel matrix by
+#'   its mean diagonal so that estimated kernel weights \eqn{\lambda_k} are on
+#'   comparable scales across covariates.
 #'
 #' @details
-#' \code{wishart_covariates()} is the Wishart analogue of adding endpoint
-#' covariates to an MLPE mean model, but the covariates enter differently.  The
-#' Wishart models are full-matrix likelihoods, so site-level covariates are
-#' represented as covariance components rather than pairwise regression terms.
-#' For each site covariate \eqn{z_k}, this helper centers the vector and builds
-#' the positive semidefinite kernel \eqn{K_k = z_k z_k^\top}.  The fitted
-#' covariance becomes
+#' \code{wishart_covariates()} is the Wishart analogue of
+#' \code{\link{mlpe_covariates}}, but environmental covariates enter the model
+#' differently because the Wishart likelihood is a full-matrix rather than a
+#' pairwise regression.  For each site covariate \eqn{z_k}, this helper centers
+#' the vector and constructs the positive semidefinite outer-product kernel
+#' \eqn{K_k = z_k z_k^\top}.  The fitted covariance is:
 #'
-#' \deqn{\Sigma = \tau E + \sum_k \lambda_k K_k + \exp(\sigma) I}
+#' \deqn{\Sigma = \tau E(\theta) + \sum_k \lambda_k K_k + \exp(\sigma) I}
 #'
-#' where \eqn{E} is the resistance-implied covariance, \eqn{\tau} is the
-#' resistance weight, \eqn{\lambda_k} are nonnegative kernel weights, and
-#' \eqn{\exp(\sigma)} is the nugget variance.  With
-#' \code{model = "generalized_wishart"}, the same \eqn{\Sigma} is projected to
-#' the implied distance matrix by the generalized Wishart likelihood.
+#' where \eqn{E(\theta)} is the resistance-implied covariance (generalized
+#' inverse of the graph Laplacian at conductance parameters \eqn{\theta}),
+#' \eqn{\tau} is the resistance weight (IBR signal), \eqn{\lambda_k \geq 0}
+#' are nonnegative kernel weights (IBE signal), and \eqn{\exp(\sigma)} is a
+#' nugget absorbing genetic variation not explained by IBR or IBE.
 #'
-#' This design keeps \eqn{\Sigma} positive definite when the nugget is positive
-#' and all covariance-component weights are nonnegative.  It is intentionally
-#' different from \code{\link{pairwise_endpoint_covariates}}, whose pairwise
-#' dissimilarities are regression covariates for \code{\link{mlpe_covariates}}
-#' rather than covariance kernels.
+#' The nuisance parameters estimated alongside \eqn{\theta} are:
+#' \describe{
+#'   \item{\code{tau}}{Nonnegative scale on the resistance-implied covariance
+#'     \eqn{E}.  A value near zero indicates no detectable IBR signal.}
+#'   \item{\code{lambda_<covariate>}}{Nonnegative weight on the outer-product
+#'     kernel for each environmental covariate.  A positive value indicates
+#'     that environmentally similar sites share more genetic covariance than
+#'     resistance distance alone predicts (IBE signal).}
+#'   \item{\code{sigma}}{Log-scale nugget: identity component added as
+#'     \eqn{\exp(\sigma) I}, absorbing genetic variation not explained by IBR
+#'     or IBE.}
+#' }
+#'
+#' This design naturally preserves positive definiteness of \eqn{\Sigma} when
+#' the nugget is positive and all kernel weights are nonnegative.  It is
+#' intentionally different from \code{\link{mlpe_covariates}}, which adds
+#' pairwise environmental dissimilarities as regression covariates in the MLPE
+#' mean structure.  Neither approach is universally preferable: use
+#' \code{wishart_covariates()} when you have a known marker count \code{nu} and
+#' want the principled Wishart likelihood; use \code{\link{mlpe_covariates}}
+#' when \code{nu} is unknown or when the simpler MLPE regression framework is
+#' preferred.
 #'
 #' @return A function of class \code{"terradish_measurement_model"} suitable
 #'   for the \code{measurement_model} argument of \code{\link{terradish}} and
-#'   \code{\link{terradish_grid}}.  The returned function stores the kernel
-#'   array in attribute \code{"kernel_covariates"} and supports site-subsetting
-#'   through \code{\link{terradish_cv}}.
+#'   \code{\link{terradish_grid}}.  The nuisance parameter vector \eqn{\phi}
+#'   estimated by \code{\link{terradish}} contains \code{tau}, one
+#'   \code{lambda_<covariate>} per environmental kernel, and \code{sigma} (in
+#'   that order).  The function stores the kernel array in attribute
+#'   \code{"kernel_covariates"} and supports site-subsetting for
+#'   cross-validation through \code{\link{terradish_cv}}.
 #'
-#' @seealso \code{\link{wishart_covariance}},
-#'   \code{\link{generalized_wishart}}, \code{\link{mlpe_covariates}}
+#' @seealso \code{\link{generalized_wishart}}, \code{\link{wishart_covariance}},
+#'   \code{\link{mlpe_covariates}}, \code{\link{pairwise_endpoint_covariates}},
+#'   \code{\link{terradish}}
+#'
+#' @references
+#' McCullagh P. 2009. Marginal likelihood for distance matrices. Statistica
+#' Sinica 19:23-41.
 #'
 #' @examples
 #' library(terra)
 #'
 #' data(melip)
-#' melip.altitude <- terra::unwrap(melip.altitude)
-#' melip.coords <- terra::unwrap(melip.coords)
+#' melip.altitude    <- terra::unwrap(melip.altitude)
+#' melip.forestcover <- terra::unwrap(melip.forestcover)
+#' melip.coords      <- terra::unwrap(melip.coords)
 #'
-#' g <- wishart_covariates(melip.altitude, coords = melip.coords,
-#'                         model = "generalized_wishart", scale = TRUE)
-#' inherits(g, "terradish_measurement_model")
+#' covariates <- c(melip.altitude, melip.forestcover)
+#' names(covariates) <- c("altitude", "forestcover")
+#' covariates <- scale_covariates(covariates)
+#' surface <- conductance_surface(covariates, melip.coords, directions = 8)
+#'
+#' # Build an altitude IBE kernel for use with generalized_wishart.
+#' # Use model = "generalized_wishart" because melip.Fst is a distance matrix.
+#' g_wc <- wishart_covariates(melip.altitude, coords = melip.coords,
+#'                            model = "generalized_wishart", scale = TRUE)
+#' inherits(g_wc, "terradish_measurement_model")  # TRUE
+#'
+#' # Fit a joint IBR + IBE model using the generalized Wishart likelihood.
+#' # nu is the number of genetic markers used to compute Fst.
+#' \dontrun{
+#' fit_joint_w <- terradish(
+#'   melip.Fst ~ altitude + forestcover,
+#'   data              = surface,
+#'   conductance_model = loglinear_conductance,
+#'   measurement_model = g_wc,
+#'   nu                = 1000
+#' )
+#' # phi table shows tau (IBR), lambda_altitude (IBE), and sigma (nugget)
+#' summary(fit_joint_w)
+#' }
 #'
 #' @export
 wishart_covariates <- function(x,
@@ -302,8 +357,8 @@ wishart_covariates <- function(x,
   SigmaInv <- solve(Sigma)
   SigInvOne <- SigmaInv %*% ones
   W <- I - ones %*% solve(t(ones) %*% SigInvOne) %*% t(SigInvOne)
-  SigInvW <- SigmaInv %*% W
-  eigSigW <- eigen(SigInvW)
+  SigInvW <- symm(SigmaInv %*% W)
+  eigSigW <- eigen(SigInvW, symmetric = TRUE)
   P <- eigSigW$vectors[, -nrow(Sigma)]
   D <- diag(eigSigW$values[-nrow(Sigma)])
 

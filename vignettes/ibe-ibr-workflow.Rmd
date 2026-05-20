@@ -21,14 +21,6 @@ knitr::opts_chunk$set(
   message  = FALSE
 )
 
-show_terradish_plot <- function(x) {
-  if (inherits(x, "ggplot")) {
-    print(x)
-  } else if (is.list(x) && all(vapply(x, inherits, logical(1), "ggplot"))) {
-    invisible(lapply(x, print))
-  }
-  invisible(x)
-}
 ```
 
 ## What are IBE and IBR, and why fit them together?
@@ -473,7 +465,7 @@ resistance distances implied by the fitted model, with a least-squares
 regression line:
 
 ```{r obs-vs-fitted, fig.cap = "***Observed vs. fitted pairwise genetic distances from the joint model.***"}
-show_terradish_plot(plot(fit_joint, type = "fit"))
+plot(fit_joint, type = "fit")
 ```
 
 ### Fitted conductance surface
@@ -484,7 +476,7 @@ does not change how permeable the landscape is estimated to be.
 95% confidence interval bounds in a single three-panel figure:
 
 ```{r conductance-surface, fig.cap = "***Estimated conductance surface from the joint IBE + IBR model.***"}
-show_terradish_plot(plot(fit_joint, type = "surface", data = surface))
+plot(fit_joint, type = "surface", data = surface)
 ```
 
 ### Marginal effects of landscape covariates
@@ -495,14 +487,14 @@ model. Because we used `scale_covariates()`, x-axes are back-transformed to
 the original units automatically:
 
 ```{r marginal-joint, fig.cap = "***Marginal conductance effects for the joint IBE + IBR model.***"}
-show_terradish_plot(plot(fit_joint, type = "marginal", data = surface))
+plot(fit_joint, type = "marginal", data = surface)
 ```
 
 Compare these curves to those from the IBR-only model to see whether adding
 the IBE term changes the estimated landscape permeability:
 
 ```{r marginal-ibr, fig.cap = "***Marginal conductance effects for the IBR-only model.***"}
-show_terradish_plot(plot(fit_ibr, type = "marginal", data = surface))
+plot(fit_ibr, type = "marginal", data = surface)
 ```
 
 ### Constraining inference to focal support
@@ -575,6 +567,163 @@ parameter_table
 
 ---
 
+## Alternative approach: Wishart-based IBE with `wishart_covariates()`
+
+The `mlpe_covariates()` approach in Steps 1–7 adds environmental terms to the
+**mean structure** of an MLPE regression. A conceptually different route adds
+environmental information to the **covariance structure** of a Wishart
+likelihood model. Use this alternative when:
+
+- You are using `generalized_wishart` (distance-matrix response with known
+  marker count) or `wishart_covariance` (covariance-matrix response).
+- You have a known number of genetic markers (`nu`) to supply as the Wishart
+  degrees-of-freedom parameter.
+- You want the principled full-matrix Wishart likelihood rather than an MLPE
+  regression.
+
+`wishart_covariates()` is the direct Wishart analogue of `mlpe_covariates()`.
+Instead of adding pairwise environmental dissimilarities as regression
+covariates, it builds an outer-product kernel
+\eqn{K_k = z_k z_k^\top} for each site-level environmental covariate and
+adds it to the fitted covariance matrix:
+
+$$\Sigma = \tau E(\theta) + \sum_k \lambda_k K_k + \exp(\sigma) I$$
+
+A positive \eqn{\lambda_k} indicates that environmentally similar sites share
+more genetic covariance than landscape resistance alone predicts — the Wishart
+analogue of a positive IBE slope \eqn{\gamma} in MLPE.
+
+### Building the Wishart IBE measurement model
+
+Because `melip.Fst` is a pairwise **distance** matrix, we set
+`model = "generalized_wishart"`. (Use `"wishart_covariance"` when the
+response is a covariance matrix from `cov_from_genetic_data()`.)
+
+```{r wishart-ibe-setup}
+# Altitude kernel for the generalized Wishart likelihood
+g_wishart_ibe <- wishart_covariates(
+  melip.altitude,
+  coords = melip.coords,
+  model  = "generalized_wishart",
+  scale  = TRUE        # standardize site values before forming the kernel
+)
+
+# phi starting values reveal the parameter names that will be estimated
+g_wishart_ibe(diag(nrow(melip.coords)),
+              matrix(0, nrow(melip.coords), nrow(melip.coords)))$phi
+```
+
+### Fitting the four Wishart candidate models
+
+Wishart models require the number of genetic markers `nu` as the
+Wishart degrees-of-freedom parameter. It is not estimated, but fixed at
+the value supplied to `terradish()`. Eight microsatellites underly estimated genetic distances.
+
+```{r wishart-fit-models}
+nu_approx <- 8
+
+# Wishart IBD: null conductance, no environmental kernels
+fit_w_ibd <- terradish(
+  melip.Fst ~ 1,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = generalized_wishart,
+  nu                = nu_approx,
+  leverage          = FALSE,
+  control           = ctrl
+)
+
+# Wishart IBE only: altitude kernel, uniform conductance
+fit_w_ibe <- terradish(
+  melip.Fst ~ 1,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = g_wishart_ibe,
+  nu                = nu_approx,
+  leverage          = FALSE,
+  control           = ctrl
+)
+
+# Wishart IBR only: landscape covariates, no environmental kernel
+fit_w_ibr <- terradish(
+  melip.Fst ~ altitude + forestcover,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = generalized_wishart,
+  nu                = nu_approx,
+  leverage          = FALSE,
+  control           = ctrl
+)
+
+# Wishart joint: landscape covariates + altitude IBE kernel
+fit_w_joint <- terradish(
+  melip.Fst ~ altitude + forestcover,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = g_wishart_ibe,
+  nu                = nu_approx,
+  leverage          = FALSE,
+  control           = ctrl
+)
+```
+
+### Interpreting the Wishart joint model
+
+```{r wishart-summary}
+summary(fit_w_joint)
+```
+
+The `phi` table contains three types of nuisance parameters that are quite different
+from the MLPE table:
+
+- **`tau`**: nonneg scale on the resistance-implied covariance (IBR signal).
+  Near zero → no detectable landscape effect.
+- **`lambda_altitude`**: nonneg weight on the altitude kernel (IBE signal).
+  Positive → environmentally similar sites share more genetic covariance
+  after accounting for resistance distance.
+- **`sigma`**: log-scale nugget (\eqn{\exp(\sigma) I} on the diagonal),
+  absorbing genetic variation not explained by IBR or IBE.
+
+There is no `alpha`, `beta`, or `rho` because the Wishart model does not have
+an MLPE regression layer. All variation is partitioned through the
+covariance decomposition.
+
+### Model comparison
+
+```{r wishart-aic}
+aic_table(
+  list(fit_w_ibd, fit_w_ibe, fit_w_ibr, fit_w_joint),
+  mod_names = c("Wishart IBD", "Wishart IBE", "Wishart IBR",
+                "Wishart IBE + IBR"),
+  AICc = TRUE
+)
+```
+
+Nested Wishart models (those that share the same response type and differ only
+in additional covariance components) can also be compared with `anova()`:
+
+```{r wishart-lrt}
+# Does adding the altitude IBE kernel improve on IBR alone?
+anova(fit_w_joint, fit_w_ibr)
+```
+
+### Choosing between `mlpe_covariates()` and `wishart_covariates()`
+
+| Aspect | `mlpe_covariates()` | `wishart_covariates()` |
+|--------|---------------------|------------------------|
+| Response | Distance matrix (`nu` not required) | Distance **or** covariance matrix; `nu` required |
+| Environmental term | Regression covariate in mean structure | Covariance-kernel component |
+| IBE parameter | γ (linear slope; any sign) | λ (kernel weight; ≥ 0) |
+| IBE interpretation | Environmental mismatch shifts mean distance | Environmental similarity increases shared covariance |
+| Requires marker count | No | Yes (`nu`) |
+| `anova()` applicable | Yes, for nested models | Yes, for nested Wishart models |
+
+If `nu` is known and you prefer a principled full-matrix likelihood, use
+`wishart_covariates()`. If `nu` is unknown or the MLPE regression framework
+is preferred, use `mlpe_covariates()`.
+
+---
+
 ## Putting it all together: a decision guide
 
 | Goal | Recommended approach |
@@ -599,6 +748,9 @@ adding explanatory power and the simpler IBR model is preferable.
 - **`vignette("model-comparison", package = "terradish")`** — likelihood
   ratio tests, AIC/AICc/BIC, likelihood surface visualization, and
   cross-validation in depth.
+- **`vignette("wishart-covariance", package = "terradish")`** — using
+  `wishart_covariance` and `wishart_covariates()` when raw genotype data
+  are available as a covariance matrix.
 
 ---
 
@@ -619,14 +771,14 @@ names(covariates) <- c("altitude", "forestcover")
 covariates <- scale_covariates(covariates)
 surface <- conductance_surface(covariates, melip.coords, directions = 8)
 
-# 2. Build IBE covariates and measurement model
+# 2a. MLPE approach: build IBE covariates and measurement model
 z_ibe <- pairwise_endpoint_covariates(
   melip.altitude, coords = melip.coords,
   transform = "absdiff", scale = TRUE
 )
 g_ibe <- mlpe_covariates(z_ibe)
 
-# 3. Fit IBD, IBE, IBR, and joint models
+# 3. Fit IBD, IBE, IBR, and joint models (MLPE)
 fit_ibd   <- terradish(melip.Fst ~ 1,
                        surface, loglinear_conductance, mlpe)
 fit_ibe   <- terradish(melip.Fst ~ 1,
@@ -651,4 +803,16 @@ mlpe_response_change(fit_joint)
 plot(fit_joint, type = "fit")                       # observed vs. fitted
 plot(fit_joint, type = "surface", data = surface)   # conductance map + CI panels
 plot(fit_joint, type = "marginal", data = surface)  # marginal covariate effects
+
+# 2b. Wishart alternative: IBE as a covariance kernel (requires nu)
+g_wishart_ibe <- wishart_covariates(
+  melip.altitude, coords = melip.coords,
+  model = "generalized_wishart", scale = TRUE
+)
+fit_w_joint <- terradish(
+  melip.Fst ~ altitude + forestcover,
+  data = surface, conductance_model = loglinear_conductance,
+  measurement_model = g_wishart_ibe, nu = 1000   # use actual marker count
+)
+summary(fit_w_joint)  # phi: tau (IBR), lambda_altitude (IBE), sigma (nugget)
 ```

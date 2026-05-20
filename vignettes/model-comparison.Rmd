@@ -21,14 +21,6 @@ knitr::opts_chunk$set(
   message  = FALSE
 )
 
-show_terradish_plot <- function(x) {
-  if (inherits(x, "ggplot")) {
-    print(x)
-  } else if (is.list(x) && all(vapply(x, inherits, logical(1), "ggplot"))) {
-    invisible(lapply(x, print))
-  }
-  invisible(x)
-}
 ```
 
 ## Overview
@@ -395,7 +387,7 @@ log-linear model via the delta method, and all panels share the same color
 scale:
 
 ```{r ci-conductance, fig.cap = "***Fitted conductance with 95% confidence bounds.***"}
-show_terradish_plot(plot(fit_full, type = "surface", data = surface))
+plot(fit_full, type = "surface", data = surface)
 ```
 
 Wide intervals in a region mean that the available genetic data provide little
@@ -411,7 +403,7 @@ is a 95% pointwise confidence band from the delta method. Because we used
 back-transformed to the original measurement units:
 
 ```{r marginal-conductance, fig.cap = "***Marginal effect of each covariate on conductance.***"}
-show_terradish_plot(plot(fit_full, type = "marginal", data = surface))
+plot(fit_full, type = "marginal", data = surface)
 ```
 
 A rising curve means higher covariate values increase conductance (more

@@ -21,14 +21,6 @@ knitr::opts_chunk$set(
   message  = FALSE
 )
 
-show_terradish_plot <- function(x) {
-  if (inherits(x, "ggplot")) {
-    print(x)
-  } else if (is.list(x) && all(vapply(x, inherits, logical(1), "ggplot"))) {
-    invisible(lapply(x, print))
-  }
-  invisible(x)
-}
 ```
 
 ## Overview
@@ -322,7 +314,7 @@ print(round(fit_wc$fit$phi, 3))
 ### Observed vs. fitted covariance
 
 ```{r plot-fit, fig.cap = "***Observed vs. fitted genetic covariance.***"}
-show_terradish_plot(plot(fit_wc, type = "fit"))
+plot(fit_wc, type = "fit")
 ```
 
 Each point represents a pair of sites. The x-axis is the fitted covariance from
@@ -332,13 +324,13 @@ near the diagonal indicate a good fit.
 ### Estimated conductance surface
 
 ```{r plot-surface, fig.cap = "***Estimated conductance surface with 95% CI bounds.***"}
-show_terradish_plot(plot(fit_wc, type = "surface", data = surface))
+plot(fit_wc, type = "surface", data = surface)
 ```
 
 ### Marginal effects on conductance
 
 ```{r plot-marginal, fig.cap = "***Marginal effects on the fitted conductance scale.***"}
-show_terradish_plot(plot(fit_wc, type = "marginal", data = surface))
+plot(fit_wc, type = "marginal", data = surface)
 ```
 
 Response-scale marginal plots are currently defined for regression-style

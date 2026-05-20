@@ -1,3 +1,9 @@
+terradish 0.0.31
+---------
+* Expanded vignette guidance for Wishart kernel covariates in joint IBR and IBE workflows
+* Stabilized generalized Wishart kernel-covariate fits by symmetrizing the projected inverse before eigendecomposition
+* Added a regression test for finite, real-valued generalized Wishart kernel-covariate fits
+
 terradish 0.0.30
 ---------
 * Added `wishart_covariates()` for Wishart measurement models with nonnegative site-level covariance-kernel weights

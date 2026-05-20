@@ -125,3 +125,26 @@ test_that("terradish can optimize covariance responses with Wishart covariates",
   expect_true(is.finite(fit$loglik))
   expect_true("lambda_altitude" %in% rownames(fit$fit$phi))
 })
+
+test_that("terradish can optimize distance responses with generalized Wishart covariates", {
+  dat <- melip_fixture(keep = 1:8)
+  surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
+  genetic_dist <- dat$melip.Fst
+
+  g <- wishart_covariates(dat$covariates[[1]], coords = dat$coords,
+                          model = "generalized_wishart", scale = TRUE)
+  fit <- suppressWarnings(
+    terradish(genetic_dist ~ altitude + forestcover,
+              data = surface,
+              conductance_model = loglinear_conductance,
+              measurement_model = g,
+              nu = 1000,
+              leverage = FALSE,
+              control = NewtonRaphsonControl(maxit = 1, verbose = FALSE))
+  )
+
+  expect_s3_class(fit, "terradish")
+  expect_true(is.finite(fit$loglik))
+  expect_false(is.complex(fit$loglik))
+  expect_true("lambda_altitude" %in% rownames(fit$fit$phi))
+})
