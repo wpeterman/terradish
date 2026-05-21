@@ -96,7 +96,9 @@ test_that("plot methods return expected objects", {
   }
   first_plot <- function(obj) if (inherits(obj, "ggplot")) obj else obj[[1]]
 
-  fit_tab <- plot(fx$fit, type = "fit")
+  fit_visible <- withVisible(plot(fx$fit, type = "fit"))
+  expect_true(fit_visible$visible)
+  fit_tab <- fit_visible$value
   expect_s3_class(fit_tab, "ggplot")
   expect_true(all(c("observed", "fitted") %in% names(fit_tab$data)))
   expect_gt(nrow(fit_tab$data), 0L)
@@ -106,8 +108,13 @@ test_that("plot methods return expected objects", {
   expect_equal(fit_tab$theme$axis.title$face, "bold")
   expect_equal(fit_tab$theme$axis.title$size - fit_tab$theme$axis.text$size, 2)
 
-  cond <- plot(fx$fit, type = "surface", data = fx$surface)
+  cond_visible <- withVisible(plot(fx$fit, type = "surface", data = fx$surface))
+  expect_true(cond_visible$visible)
+  cond <- cond_visible$value
   expect_true(inherits(cond, "ggplot") || is.list(cond))
+  if (is.list(cond))
+    expect_s3_class(cond, "terradish_plot_list")
+  expect_length(capture.output(print(cond)), 0L)
   cond_data <- collect_plot_data(cond)
   expect_true(all(c("x", "y", "conductance") %in% names(cond_data)))
 
@@ -148,6 +155,15 @@ test_that("plot methods return expected objects", {
   expect_gt(min(marg_response_data$upper - marg_response_data$lower), 1e-4)
   expect_equal(marg_response_first$scales$get_scales("y")$name,
                "Predicted genetic distance")
+})
+
+test_that("plot assignment suppresses auto-printing until explicit print", {
+  fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+  p <- NULL
+  assigned <- withVisible(p <- plot(fx$fit, type = "fit"))
+  expect_false(assigned$visible)
+  expect_s3_class(p, "ggplot")
+  expect_length(capture.output(print(p)), 0L)
 })
 
 test_that("marginal plots support covariate panel selection", {

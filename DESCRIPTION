@@ -5,16 +5,16 @@ Version: 0.0.31
 Date: 2026-05-20
 Authors@R: c(
   person(
-    given = c("Nathaniel", "S."),
-    family = "Pope",
-    role = "aut",
-    email = "nspope@utexas.edu"
-  ),
-  person(
     given = "Bill",
     family = "Peterman",
     role = c("aut", "cre"),
     email = "peterman.73@osu.edu"
+  ),
+  person(
+    given = c("Nathaniel", "S."),
+    family = "Pope",
+    role = "aut",
+    email = "nspope@utexas.edu"
   )
   )
 Description: Maximum likelihood estimation for parameterized conductance models

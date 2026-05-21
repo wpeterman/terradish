@@ -41,9 +41,9 @@ The workflow has four steps:
 4.  **Optimize**: parameters estimated by maximum likelihood using sparse Cholesky factorization and analytic gradients.
 
 ```         
-Raster covariates          Sampling locations
-(altitude, forestcover)    (GPS coordinates)
-        |                          |
+Raster covariates                   Sampling locations
+(altitude, forestcover)             (GPS coordinates)
+        |                                  |
         +-----> conductance_surface() <----+
                         |
                         v

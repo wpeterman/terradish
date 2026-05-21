@@ -87,7 +87,9 @@
 #'   \code{\link[graphics]{plot}} (for \code{"fit"}) or ignored for the other
 #'   types.
 #'
-#' @return Invisibly:
+#' @return
+#' A plot object that is returned visibly so base R auto-printing works as
+#' expected:
 #' \itemize{
 #'   \item \code{"fit"}: a \code{ggplot} object with observed-vs-fitted
 #'     pairwise distances.
@@ -186,7 +188,7 @@ plot.terradish <- function(x,
                                                              support_probs = support_probs,
                                                              clamp_covariates = clamp_covariates)
   )
-  invisible(out)
+  out
 }
 
 #' Legacy radish plot method
@@ -272,7 +274,24 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
   if (length(plots) == 1L)
     plots[[1L]]
   else
-    plots
+    structure(plots, class = c("terradish_plot_list", "list"))
+}
+
+#' Print terradish panel plot lists
+#'
+#' Internal helper used so multi-panel terradish plot objects auto-print to the
+#' active graphics device without printing list structure to the console.
+#'
+#' @param x A \code{terradish_plot_list} object.
+#' @param ... Unused.
+#' @keywords internal
+#' @method print terradish_plot_list
+#' @export
+print.terradish_plot_list <- function(x, ...)
+{
+  for (plot_i in unname(x))
+    print(plot_i)
+  invisible(x)
 }
 
 .normalize_support_probs <- function(support_probs)

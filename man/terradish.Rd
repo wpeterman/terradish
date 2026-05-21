@@ -137,6 +137,7 @@ and a function relating resistance distance (covariance) to genetic distance
 (a "measurement model").
 }
 \details{
+\figure{terradish-sticker.png}{options: style='float: right; width: 150px; margin-left: 12px;'}
 By "parameterized conductance surface", what is meant is a model
 where the per-vertex conductance (and thus resistance distance) is a function of
 spatial covariates. The choice of function is referred to in this package as
@@ -146,7 +147,6 @@ the (unknown, modeled) resistance distance to observed genetic dissimilarity
 via a probability model (referred to as the "measurement model" throughout
 this package).
 
-\figure{terradish-sticker.png}{options: style='float: right; width: 180px; margin-left: 12px;'}
 
 For example, a log-linear choice of conductance model is:
 

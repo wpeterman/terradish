@@ -54,9 +54,9 @@ model-comparison tools, and visualization helpers.
 Before writing any code, it helps to see how the pieces fit together:
 
 ```
-Raster covariates          Sampling locations
-(altitude, forestcover)    (GPS coordinates)
-        |                          |
+Raster covariates                   Sampling locations
+(altitude, forestcover)             (GPS coordinates)
+        |                                  |
         +-----> conductance_surface() <----+
                         |
                         |   (builds the weighted graph)
@@ -747,7 +747,7 @@ fit_gw <- terradish(melip.Fst ~ forestcover + altitude,
                     data              = surface,
                     conductance_model = loglinear_conductance,
                     measurement_model = generalized_wishart,
-                    nu                = 1000,
+                    nu                = 8,
                     optimizer         = rec$optimizer,
                     control           = rec$control,
                     solver            = rec$solver,

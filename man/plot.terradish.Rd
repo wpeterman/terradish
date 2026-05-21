@@ -83,7 +83,8 @@ each plot type.}
 types.}
 }
 \value{
-Invisibly:
+A plot object that is returned visibly so base R auto-printing works as
+expected:
 \itemize{
   \item \code{"fit"}: a \code{ggplot} object with observed-vs-fitted
     pairwise distances.

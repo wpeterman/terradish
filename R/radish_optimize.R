@@ -593,7 +593,9 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   \code{measurement_model = leastsquares}, landmark exact-refinement is
 #'   guarded and the approximation stage is skipped.
 #'
-#' @details By "parameterized conductance surface", what is meant is a model
+#' @details 
+#' \figure{terradish-sticker.png}{options: style='float: right; width: 150px; margin-left: 12px;'}
+#' By "parameterized conductance surface", what is meant is a model
 #' where the per-vertex conductance (and thus resistance distance) is a function of
 #' spatial covariates. The choice of function is referred to in this package as
 #' the "conductance model". The inverse problem (and the purpose of this
@@ -602,7 +604,6 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' via a probability model (referred to as the "measurement model" throughout
 #' this package).
 #'
-#' \figure{terradish-sticker.png}{options: style='float: right; width: 180px; margin-left: 12px;'}
 #'
 #' For example, a log-linear choice of conductance model is:
 #'
