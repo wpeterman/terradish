@@ -1,7 +1,9 @@
-terradish 0.0.32
+terradish 0.0.33
 ---------
-* Clarified that `pair_subset_measurement_model()` does not support full-matrix Wishart likelihoods
-* Pointed `generalized_wishart` and `wishart_covariance` users to `wishart_covariates()` for site-level covariance-kernel workflows
+* Restored base R visibility behavior for `plot.terradish()`, so top-level plotting calls auto-render while assigned calls remain quiet until explicit `print()`
+* Simplified plotting examples in the README and getting-started vignette to match the visible-return plotting contract
+* Added focused regression coverage for plotting visibility and explicit print behavior across returned plot objects
+* Added `covariance_response_power()` for Wishart covariance-response power screening across focal sample sizes and sampling strategies
 
 terradish 0.0.31
 ---------

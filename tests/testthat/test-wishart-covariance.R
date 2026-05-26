@@ -166,6 +166,47 @@ test_that("plot methods handle covariance responses and smooth conductance", {
                     marginal_response_data$upper))
 })
 
+test_that("Wishart fit plotting follows the May 21 visibility contract", {
+  dat <- melip_fixture(keep = 1:6)
+  surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
+  theta_true <- c(altitude = 0.15, forestcover = -0.2)
+
+  sim <- simulate_covariance_response(
+    theta = theta_true,
+    formula = ~ altitude + forestcover,
+    data = surface,
+    conductance_model = loglinear_conductance,
+    tau = 0.7,
+    sigma = 0.15,
+    nu = 40,
+    seed = 5
+  )
+  genetic_cov <- sim$covariance
+
+  fit <- suppressWarnings(
+    terradish(genetic_cov ~ altitude + forestcover,
+              data = surface,
+              conductance_model = loglinear_conductance,
+              measurement_model = wishart_covariance,
+              nu = 40,
+              leverage = FALSE,
+              control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+  )
+
+  expect_true(is.finite(fit$loglik))
+
+  direct <- withVisible(plot(fit, type = "fit"))
+  expect_true(direct$visible)
+  expect_s3_class(direct$value, "ggplot")
+
+  p <- NULL
+  assigned <- withVisible(p <- plot(fit, type = "fit"))
+  expect_false(assigned$visible)
+  expect_s3_class(p, "ggplot")
+
+  expect_length(capture.output(print(p)), 0L)
+})
+
 test_that("wishart_covariance supports leverage on full covariance responses", {
   dat <- melip_fixture(keep = 1:6)
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
