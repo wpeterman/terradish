@@ -726,11 +726,14 @@ assessment <- terradish_assess_settings(
 cat(assessment$comparison$summary, "\n")  # one-line verdict
 rec <- assessment$recommended             # reuse for all fits below
 
-# 3. Fit model — choose a measurement model:
+# 3. Fit model - choose a measurement model:
 #   leastsquares      : fast, independent errors (distance matrix)
 #   mlpe              : shared-site correlation correction (distance matrix)
 #   generalized_wishart: Wishart model, requires nu (distance matrix)
 #   wishart_covariance : Wishart model, requires nu (covariance matrix)
+#   For Wishart IBE or site-level environmental covariance kernels, use
+#   wishart_covariates(); pair_subset_measurement_model() is for pairwise
+#   regression rows and does not apply to the full-matrix Wishart likelihood.
 fit <- terradish(melip.Fst ~ forestcover + altitude,
                  data              = surface,
                  conductance_model = loglinear_conductance,

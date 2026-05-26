@@ -589,8 +589,14 @@ adds it to the fitted covariance matrix:
 
 $$\Sigma = \tau E(\theta) + \sum_k \lambda_k K_k + \exp(\sigma) I$$
 
+Do not use `pair_subset_measurement_model()` for this workflow. That helper
+selects pair rows for distance-regression models such as `leastsquares` and
+`mlpe`. Wishart models evaluate the full response matrix likelihood, so the
+environmental effect needs to enter as a full site-by-site kernel through
+`wishart_covariates()`.
+
 A positive \eqn{\lambda_k} indicates that environmentally similar sites share
-more genetic covariance than landscape resistance alone predicts — the Wishart
+more genetic covariance than landscape resistance alone predicts - the Wishart
 analogue of a positive IBE slope \eqn{\gamma} in MLPE.
 
 ### Building the Wishart IBE measurement model

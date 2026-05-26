@@ -20,7 +20,11 @@
 #' the MLPE incidence matrix from the selected pairs only. Pair subsetting is
 #' most natural for distance-regression measurement models; matrix-likelihood
 #' models such as \code{\link{generalized_wishart}} and
-#' \code{\link{wishart_covariance}} are intentionally not supported.
+#' \code{\link{wishart_covariance}} are intentionally not supported. Wishart
+#' models evaluate a full distance or covariance matrix likelihood, so dropping
+#' selected pair entries would change the model contract. For site-level
+#' environmental effects in Wishart models, use
+#' \code{\link{wishart_covariates}()} instead.
 #'
 #' @return A function of class \code{terradish_measurement_model}.
 #'
@@ -43,7 +47,15 @@ pair_subset_measurement_model <- function(measurement_model = mlpe, pairs)
     stop("`measurement_model` must be a terradish measurement model.", call. = FALSE)
 
   model_name <- .pair_subset_measurement_model_name(measurement_model)
-  if (!model_name %in% c("leastsquares", "mlpe"))
+  if (isTRUE(model_name %in% c("generalized_wishart", "wishart_covariance")))
+    stop("`pair_subset_measurement_model()` cannot wrap `", model_name, "`. ",
+         "Wishart models use a full-matrix likelihood, so selected pair rows ",
+         "cannot be dropped without changing the model contract. Use ",
+         "`wishart_covariates()` to add site-level covariance kernels for ",
+         "`generalized_wishart` or `wishart_covariance` workflows.",
+         call. = FALSE)
+
+  if (!isTRUE(model_name %in% c("leastsquares", "mlpe")))
     stop("Pair-subset measurement models currently support only `leastsquares` and `mlpe`.",
          call. = FALSE)
 
@@ -81,7 +93,8 @@ pair_subset_measurement_model <- function(measurement_model = mlpe, pairs)
 
 .pair_subset_measurement_model_name <- function(model)
 {
-  known <- c("leastsquares", "mlpe")
+  known <- c("leastsquares", "mlpe", "generalized_wishart",
+             "wishart_covariance")
   ns_env <- asNamespace("terradish")
   for (nm in known)
   {

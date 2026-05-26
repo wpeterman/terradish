@@ -1,3 +1,8 @@
+terradish 0.0.32
+---------
+* Clarified that `pair_subset_measurement_model()` does not support full-matrix Wishart likelihoods
+* Pointed `generalized_wishart` and `wishart_covariance` users to `wishart_covariates()` for site-level covariance-kernel workflows
+
 terradish 0.0.31
 ---------
 * Expanded vignette guidance for Wishart kernel covariates in joint IBR and IBE workflows

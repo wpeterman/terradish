@@ -95,3 +95,23 @@ test_that("pair-subset measurement model can be used in terradish fits", {
   expect_s3_class(fit, "terradish")
   expect_equal(dim(fitted(fit)), dim(melip.Fst))
 })
+
+test_that("pair-subset measurement model points Wishart users to wishart_covariates", {
+  pairs <- rbind(c(1, 2), c(1, 3))
+
+  expect_error(
+    pair_subset_measurement_model(generalized_wishart, pairs),
+    "full-matrix likelihood.*wishart_covariates\\(\\)"
+  )
+  expect_error(
+    pair_subset_measurement_model(wishart_covariance, pairs),
+    "full-matrix likelihood.*wishart_covariates\\(\\)"
+  )
+
+  wrapped <- generalized_wishart
+  attr(wrapped, "base_model") <- "generalized_wishart"
+  expect_error(
+    pair_subset_measurement_model(wrapped, pairs),
+    "generalized_wishart.*wishart_covariates\\(\\)"
+  )
+})
