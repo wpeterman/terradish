@@ -1,3 +1,7 @@
+terradish 0.0.34
+---------
+* Fixed `covariance_response_power()` so that scenarios in which every replicate failed to converge produce result rows with `NA` conductance correlations instead of aborting the entire cell with "no complete element pairs"; downstream summaries and parameter recovery tables now reflect the failed fits transparently
+
 terradish 0.0.33
 ---------
 * Restored base R visibility behavior for `plot.terradish()`, so top-level plotting calls auto-render while assigned calls remain quiet until explicit `print()`

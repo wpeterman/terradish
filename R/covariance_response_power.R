@@ -629,14 +629,20 @@ print.terradish_covariance_power <- function(x, ...)
   else
     rep(NA_real_, length(true_conductance))
 
-  conductance_cor <- suppressWarnings(
-    stats::cor(true_conductance, fitted_conductance,
-               use = "complete.obs")
-  )
-  conductance_spearman <- suppressWarnings(
-    stats::cor(true_conductance, fitted_conductance,
-               method = "spearman", use = "complete.obs")
-  )
+  # When the fit fails for every replicate in a cell, fitted_conductance is
+  # all NA and stats::cor(use = "complete.obs") raises "no complete element
+  # pairs". tryCatch demotes that to NA so a failed cell still produces a
+  # complete result row instead of aborting the entire scenario.
+  safe_cor <- function(x, y, method = "pearson") {
+    tryCatch(
+      suppressWarnings(stats::cor(x, y, use = "complete.obs",
+                                  method = method)),
+      error = function(e) NA_real_
+    )
+  }
+  conductance_cor      <- safe_cor(true_conductance, fitted_conductance)
+  conductance_spearman <- safe_cor(true_conductance, fitted_conductance,
+                                   method = "spearman")
 
   aicc <- if (ok && n_focal > fit$df + 1)
     -2 * fit$loglik + 2 * fit$df * (n_focal / (n_focal - fit$df - 1))
