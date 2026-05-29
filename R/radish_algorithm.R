@@ -633,7 +633,8 @@
 #' @param S A matrix of observed genetic distances
 #' @param theta Parameters for conductance surface (e.g. inputs to 'f')
 #' @param phi Optional warm-start values for the nuisance-parameter subproblem.
-#' @param nu Number of genetic markers (potentially used by 'g')
+#' @param nu Effective Wishart degrees of freedom, passed through to
+#'   measurement models that require it.
 #' @param objective Compute negative loglikelihood?
 #' @param gradient Compute gradient of negative loglikelihood wrt theta?
 #' @param hessian Compute Hessian matrix of negative loglikelihood wrt theta?

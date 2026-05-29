@@ -9,7 +9,7 @@ The central idea is **isolation by resistance (IBR)**: instead of assuming genet
 ## Key features
 
 -   Four **measurement models**: `leastsquares`, `mlpe`, `generalized_wishart`, `wishart_covariance`
--   Two **conductance models**: `loglinear_conductance` (standard log-linear), `gaussian_smoothed_loglinear_conductance` (with estimated spatial scale of effect)
+-   Three **conductance models**: `loglinear_conductance` (standard log-linear), `smooth_loglinear_conductance` (spline terms), and `gaussian_smoothed_loglinear_conductance` (with estimated spatial scale of effect)
 -   Support for **quadratic** (`I(x^2)`) and **interaction** (`x * z`) terms in conductance formulas
 -   Four **plot types**: observed-vs-fitted (`"fit"`), conductance surface with CI (`"surface"`), marginal effects on the genetic distance scale (`"marginal_response"`, default), and marginal effects on the conductance scale (`"marginal"`)
 -   **IBE + IBR** joint modeling via `pairwise_endpoint_covariates()` and `mlpe_covariates()`
@@ -148,6 +148,8 @@ correlation structure are evaluated only for the selected pair rows.
 
 **`wishart_covariance`** is the Wishart analogue for data supplied as a covariance matrix (e.g. from `cov_from_biallelic()`) rather than a distance matrix. It also requires `nu`.
 
+See `vignette("wishart-covariance", package = "terradish")` for a covariance-based workflow that starts from raw genotype data and fits with `wishart_covariance`.
+
 ``` r
 # Standard MLPE fit
 fit_mlpe <- terradish(
@@ -176,6 +178,8 @@ aic_table(
 ## Conductance models
 
 **`loglinear_conductance`** is the standard model: conductance at each cell = exp(θ₁·x₁ + θ₂·x₂ + ...). A positive θ for a covariate means that higher values increase conductance (easier movement) at higher levels; a negative θ means the covariate impedes movement at higher levels. The model supports `I(x^2)` and `x * z` interaction terms in the formula.
+
+**`smooth_loglinear_conductance`** extends the log-linear model with spline terms such as `s(altitude, df = 4)` for non-linear conductance responses.
 
 **`gaussian_smoothed_loglinear_conductance()`** jointly estimates conductance coefficients and the spatial scale of effect (σ) at which each covariate influences conductance. Rather than pre-smoothing rasters at fixed scales, this model optimizes σ inside the likelihood calculation using analytic gradients and BFGS.
 
@@ -215,7 +219,7 @@ fit_gaussian_coarse <- terradish(
 )
 ```
 
-See `vignette("gaussian-scale-optimization", package = "terradish")` for a staged workflow that fits single-raster scale-aware models, compares them to fixed-raster fits, and inspects `sigma` before adding additional landscape variables.
+See `vignette("spline-conductance", package = "terradish")` for spline conductance models and `vignette("gaussian-scale-optimization", package = "terradish")` for a staged workflow that fits single-raster scale-aware models, compares them to fixed-raster fits, and inspects `sigma` before adding additional landscape variables.
 
 ## Working with larger rasters
 
@@ -410,6 +414,8 @@ See `vignette("model-comparison", package = "terradish")` for a detailed walkthr
 | `vignette("getting-started", package = "terradish")` | Core workflow: fitting, interpreting, and visualizing |
 | `vignette("model-comparison", package = "terradish")` | LRT, AIC, cross-validation, likelihood surfaces |
 | `vignette("ibe-ibr-workflow", package = "terradish")` | Joint IBE + IBR fitting |
+| `vignette("wishart-covariance", package = "terradish")` | Covariance-based Wishart IBR from genotype data |
+| `vignette("spline-conductance", package = "terradish")` | Non-linear conductance responses with spline terms |
 | `vignette("gaussian-scale-optimization", package = "terradish")` | Gaussian scale-of-effect estimation |
 
 ## Attribution

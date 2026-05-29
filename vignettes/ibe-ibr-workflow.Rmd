@@ -575,9 +575,9 @@ environmental information to the **covariance structure** of a Wishart
 likelihood model. Use this alternative when:
 
 - You are using `generalized_wishart` (distance-matrix response with known
-  marker count) or `wishart_covariance` (covariance-matrix response).
-- You have a known number of genetic markers (`nu`) to supply as the Wishart
-  degrees-of-freedom parameter.
+  effective `nu`) or `wishart_covariance` (covariance-matrix response).
+- You have a known effective marker degrees-of-freedom value (`nu`) to supply
+  as the Wishart degrees-of-freedom parameter.
 - You want the principled full-matrix Wishart likelihood rather than an MLPE
   regression.
 
@@ -621,9 +621,13 @@ g_wishart_ibe(diag(nrow(melip.coords)),
 
 ### Fitting the four Wishart candidate models
 
-Wishart models require the number of genetic markers `nu` as the
-Wishart degrees-of-freedom parameter. It is not estimated, but fixed at
-the value supplied to `terradish()`. Eight microsatellites underly estimated genetic distances.
+Wishart models require `nu` as the Wishart degrees-of-freedom parameter. It is
+not estimated, but fixed at the value supplied to `terradish()`. For biallelic
+SNPs this is usually the retained SNP count. For microsatellites, use the
+independent allele-frequency count, approximately `sum(K_l - 1)` across loci,
+when allele counts by locus are available. The bundled `melip.Fst` matrix was
+estimated from 8 microsatellite loci, but the raw allele counts are not bundled,
+so the example below uses `nu = 8` as a conservative locus-count approximation.
 
 ```{r wishart-fit-models}
 nu_approx <- 8
@@ -721,11 +725,11 @@ anova(fit_w_joint, fit_w_ibr)
 | Environmental term | Regression covariate in mean structure | Covariance-kernel component |
 | IBE parameter | γ (linear slope; any sign) | λ (kernel weight; ≥ 0) |
 | IBE interpretation | Environmental mismatch shifts mean distance | Environmental similarity increases shared covariance |
-| Requires marker count | No | Yes (`nu`) |
+| Requires effective `nu` | No | Yes |
 | `anova()` applicable | Yes, for nested models | Yes, for nested Wishart models |
 
-If `nu` is known and you prefer a principled full-matrix likelihood, use
-`wishart_covariates()`. If `nu` is unknown or the MLPE regression framework
+If effective `nu` is known and you prefer a principled full-matrix likelihood,
+use `wishart_covariates()`. If `nu` is unknown or the MLPE regression framework
 is preferred, use `mlpe_covariates()`.
 
 ---
@@ -749,14 +753,18 @@ adding explanatory power and the simpler IBR model is preferable.
 
 ## What comes next?
 
-- **`vignette("getting-started", package = "terradish")`** — the core
+- **`vignette("getting-started", package = "terradish")`**: the core
   single-process workflow (load data, scale covariates, fit, visualize).
-- **`vignette("model-comparison", package = "terradish")`** — likelihood
+- **`vignette("model-comparison", package = "terradish")`**: likelihood
   ratio tests, AIC/AICc/BIC, likelihood surface visualization, and
   cross-validation in depth.
-- **`vignette("wishart-covariance", package = "terradish")`** — using
+- **`vignette("wishart-covariance", package = "terradish")`**: using
   `wishart_covariance` and `wishart_covariates()` when raw genotype data
   are available as a covariance matrix.
+- **`vignette("spline-conductance", package = "terradish")`**: modeling
+  non-linear conductance responses with spline-expanded raster covariates.
+- **`vignette("gaussian-scale-optimization", package = "terradish")`**:
+  estimating raster scale of effect inside the conductance model.
 
 ---
 
@@ -810,7 +818,7 @@ plot(fit_joint, type = "fit")                       # observed vs. fitted
 plot(fit_joint, type = "surface", data = surface)   # conductance map + CI panels
 plot(fit_joint, type = "marginal", data = surface)  # marginal covariate effects
 
-# 2b. Wishart alternative: IBE as a covariance kernel (requires nu)
+# 2b. Wishart alternative: IBE as a covariance kernel (requires effective nu)
 g_wishart_ibe <- wishart_covariates(
   melip.altitude, coords = melip.coords,
   model = "generalized_wishart", scale = TRUE
@@ -818,7 +826,7 @@ g_wishart_ibe <- wishart_covariates(
 fit_w_joint <- terradish(
   melip.Fst ~ altitude + forestcover,
   data = surface, conductance_model = loglinear_conductance,
-  measurement_model = g_wishart_ibe, nu = 1000   # use actual marker count
+  measurement_model = g_wishart_ibe, nu = 1000   # use effective nu
 )
 summary(fit_w_joint)  # phi: tau (IBR), lambda_altitude (IBE), sigma (nugget)
 ```

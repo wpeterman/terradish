@@ -272,6 +272,15 @@ cov_from_biallelic <- function(Y,
 #' Missing allele calls are imputed to the modal observed allele within each
 #' locus, with a message reporting the number of imputed calls.
 #'
+#' For Wishart models, the \code{nu} argument is the effective degrees of
+#' freedom in the empirical covariance, not necessarily the biological locus
+#' count.  With biallelic SNPs, each retained SNP contributes one independent
+#' frequency column, so \code{nu} is usually the retained SNP count.  With
+#' microsatellites, a locus with \eqn{K_l} observed alleles contributes
+#' approximately \eqn{K_l - 1} independent allele frequencies because allele
+#' frequencies sum to a constant within the locus.  A useful microsatellite
+#' choice is therefore \eqn{nu = \sum_l (K_l - 1)}.
+#'
 #' If \code{groups = NULL}, rows of the processed feature matrix are used
 #' directly and squared Euclidean distances among individuals are transformed to
 #' a covariance matrix by Gower double-centering. This produces a positive
@@ -683,7 +692,10 @@ dist_from_biallelic <- function(Y, N)
 #' @param tau Nonnegative scaling applied to the conductance-implied covariance
 #'   matrix.
 #' @param sigma Nonnegative nugget variance added to the diagonal.
-#' @param nu Effective number of loci (Wishart degrees of freedom).
+#' @param nu Effective Wishart degrees of freedom.  For biallelic SNP-like
+#'   simulations this is usually the number of retained SNPs.  For
+#'   microsatellite-like panels, use approximately \eqn{\sum_l (K_l - 1)}
+#'   where \eqn{K_l} is the number of observed alleles at locus \eqn{l}.
 #' @param nsim Number of covariance matrices to simulate.
 #' @param seed Optional random seed.
 #' @param cores Number of cores passed to \code{\link{terradish_distance}}.

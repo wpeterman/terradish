@@ -35,7 +35,11 @@ terradish_grid(
 \code{terradish_measurement_model} (see
 \code{\link{terradish_measurement_model}})}
 
-\item{nu}{Number of genetic markers (potentially used by \code{measurement_model})}
+\item{nu}{Effective Wishart degrees of freedom passed to measurement models
+that require it.  For biallelic SNPs this is usually the number of
+retained SNPs; for microsatellites use approximately
+\eqn{\sum_l (K_l - 1)} where \eqn{K_l} is the number of observed alleles at
+locus \eqn{l}.}
 
 \item{nonnegative}{Force regression-like \code{measurement_model} to have nonnegative slope?}
 

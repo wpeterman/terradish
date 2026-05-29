@@ -89,10 +89,10 @@ the nugget is positive and all kernel weights are nonnegative.  It is
 intentionally different from \code{\link{mlpe_covariates}}, which adds
 pairwise environmental dissimilarities as regression covariates in the MLPE
 mean structure.  Neither approach is universally preferable: use
-\code{wishart_covariates()} when you have a known marker count \code{nu} and
-want the principled Wishart likelihood; use \code{\link{mlpe_covariates}}
-when \code{nu} is unknown or when the simpler MLPE regression framework is
-preferred.
+\code{wishart_covariates()} when you have a known effective Wishart
+degrees-of-freedom value \code{nu} and want the principled Wishart
+likelihood; use \code{\link{mlpe_covariates}} when \code{nu} is unknown or
+when the simpler MLPE regression framework is preferred.
 }
 \examples{
 library(terra)
@@ -114,7 +114,7 @@ g_wc <- wishart_covariates(melip.altitude, coords = melip.coords,
 inherits(g_wc, "terradish_measurement_model")  # TRUE
 
 # Fit a joint IBR + IBE model using the generalized Wishart likelihood.
-# nu is the number of genetic markers used to compute Fst.
+# nu is the effective Wishart degrees of freedom for the genetic response.
 \dontrun{
 fit_joint_w <- terradish(
   melip.Fst ~ altitude + forestcover,

@@ -95,6 +95,15 @@ converted to allele dosage columns, one column per locus-allele combination.
 Missing allele calls are imputed to the modal observed allele within each
 locus, with a message reporting the number of imputed calls.
 
+For Wishart models, the \code{nu} argument is the effective degrees of
+freedom in the empirical covariance, not necessarily the biological locus
+count.  With biallelic SNPs, each retained SNP contributes one independent
+frequency column, so \code{nu} is usually the retained SNP count.  With
+microsatellites, a locus with \eqn{K_l} observed alleles contributes
+approximately \eqn{K_l - 1} independent allele frequencies because allele
+frequencies sum to a constant within the locus.  A useful microsatellite
+choice is therefore \eqn{nu = \sum_l (K_l - 1)}.
+
 If \code{groups = NULL}, rows of the processed feature matrix are used
 directly and squared Euclidean distances among individuals are transformed to
 a covariance matrix by Gower double-centering. This produces a positive

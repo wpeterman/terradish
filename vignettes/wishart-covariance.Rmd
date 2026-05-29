@@ -36,8 +36,8 @@ distance model, you can:
 
 1. Summarize the genetic data as a **covariance matrix** between populations.
 2. Fit the resistance model with `wishart_covariance`, which evaluates the full
-   Wishart likelihood on that covariance matrix using the number of markers as
-   the degrees-of-freedom parameter `nu`.
+   Wishart likelihood on that covariance matrix using the effective marker
+   degrees of freedom as the parameter `nu`.
 
 This approach retains more information than a distance matrix: every off-diagonal
 element of the covariance matrix, together with the diagonal, contributes to the
@@ -120,7 +120,9 @@ round(S_pca, 3)
 Setting `normalize = "features"` divides the covariance by the number of
 retained features; this puts the scale on a per-feature basis rather than
 summed across all features, which can make `tau` estimates easier to interpret
-across datasets with different numbers of markers.
+across datasets with different numbers of markers. This normalization changes
+the scale of `S`; it does not automatically determine the best `nu` for every
+genotyping system.
 
 ### Microsatellite allele calls: `cov_from_genetic_data()` with `input = "allele_calls"`
 
@@ -138,15 +140,48 @@ alleles <- data.frame(
   loc2_b = c(202, 202, 204, 204, 204, 200, 202, 200, 204)
 )
 groups_ms <- rep(c("popA", "popB", "popC"), each = 3)
+loci_ms <- c("loc1", "loc1", "loc2", "loc2")
 
 S_ms <- cov_from_genetic_data(
   alleles,
   groups  = groups_ms,
   input   = "allele_calls",
-  loci    = c("loc1", "loc1", "loc2", "loc2")
+  loci    = loci_ms
 )
 round(S_ms, 3)
 ```
+
+## Choosing `nu`
+
+Wishart models treat `nu` as the degrees of freedom in the empirical covariance
+matrix. It is fixed by the genetic data used to build `S`, and it is not
+estimated by `terradish`.
+
+For biallelic SNPs, the biological marker count and the statistical degrees of
+freedom are usually the same: each retained SNP contributes one independent
+standardized allele-frequency column. In that case, use the number of retained
+polymorphic SNPs.
+
+For microsatellites, do not automatically use the raw number of loci. A
+microsatellite locus with `K_l` observed alleles contributes about `K_l - 1`
+independent allele frequencies because the allele frequencies within a locus
+sum to a constant. A practical effective value is:
+
+```{r microsatellite-nu}
+msat_nu <- sum(vapply(split(seq_along(loci_ms), loci_ms), function(j) {
+  alleles_l <- unlist(alleles[, j, drop = FALSE], use.names = FALSE)
+  length(unique(alleles_l[!is.na(alleles_l)])) - 1L
+}, integer(1)))
+
+msat_nu
+```
+
+This value is larger than the number of microsatellite loci but smaller than
+the total number of expanded allele columns. For a 10 to 15 locus panel with 4
+to 6 alleles per locus, `nu` will often be roughly 30 to 75. If only a published
+distance matrix is available and allele counts by locus are unavailable, the
+locus count can be used as a conservative lower-bound approximation, but report
+that choice clearly.
 
 ### Key arguments
 
@@ -254,7 +289,7 @@ The only differences from a standard `terradish` call are:
 
 - Pass the **covariance matrix** `S_cov` as the left-hand side of the formula.
 - Set `measurement_model = wishart_covariance`.
-- Supply `nu` (the number of genetic markers used to compute `S_cov`).
+- Supply `nu` (the effective Wishart degrees of freedom for `S_cov`).
 
 ```{r fit-wishart-covariance}
 fit_wc <- terradish(
@@ -430,7 +465,7 @@ covariates <- scale_covariates(covariates)
 surface <- conductance_surface(covariates, melip.coords, directions = 8)
 
 # 2. Prepare the genetic covariance matrix from raw genotype data
-#    (replace with your actual data and nu)
+#    (replace with your actual data and effective nu)
 
 # Option A: biallelic SNPs (Y = derived allele counts, N = haploid totals)
 S <- cov_from_biallelic(Y, N)
@@ -444,7 +479,7 @@ S <- cov_from_genetic_data(allele_df, groups = pop_vector,
                             input = "allele_calls",
                             loci  = locus_id_vector)
 
-nu <- 500  # number of genetic markers used to compute S
+nu <- 500  # effective Wishart degrees of freedom for S
 
 # 3. Fit with wishart_covariance
 fit <- terradish(

@@ -35,7 +35,10 @@ matrix.}
 
 \item{sigma}{Nonnegative nugget variance added to the diagonal.}
 
-\item{nu}{Effective number of loci (Wishart degrees of freedom).}
+\item{nu}{Effective Wishart degrees of freedom.  For biallelic SNP-like
+simulations this is usually the number of retained SNPs.  For
+microsatellite-like panels, use approximately \eqn{\sum_l (K_l - 1)}
+where \eqn{K_l} is the number of observed alleles at locus \eqn{l}.}
 
 \item{nsim}{Number of covariance matrices to simulate.}
 

@@ -68,8 +68,11 @@ matrix during simulation.}
 \item{sigma}{Nonnegative nugget variance added to the covariance diagonal
 during simulation.}
 
-\item{nu}{Effective number of loci, passed to both simulation and
-\code{\link{wishart_covariance}} fitting.}
+\item{nu}{Effective Wishart degrees of freedom, passed to both simulation
+and \code{\link{wishart_covariance}} fitting.  For biallelic SNPs this is
+usually the number of retained SNPs; for microsatellites use approximately
+\eqn{\sum_l (K_l - 1)} where \eqn{K_l} is the number of observed alleles at
+locus \eqn{l}.}
 
 \item{nsim}{Number of covariance-response simulations per sampling design.}
 

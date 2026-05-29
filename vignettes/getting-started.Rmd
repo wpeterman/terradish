@@ -486,13 +486,17 @@ underestimates standard errors because it ignores the shared-site correlation.
 
 `mlpe` corrects for the non-independence that arises because every pair (A–B)
 and (A–C) both involve site A. It is the default recommendation for
-distance-matrix data when the number of genetic markers is not recorded.
+distance-matrix data when the effective marker degrees of freedom are not
+recorded.
 
 `generalized_wishart` models the observed distance matrix as arising from a
 generalized Wishart distribution (McCullagh 2009, Peterson et al. 2019). It
-requires `nu`, the number of genetic markers used to compute `S`, and is the
-principled choice when that count is available. Like `mlpe` it accepts a
-pairwise distance matrix (e.g. F~ST~).
+requires `nu`, the effective Wishart degrees of freedom for `S`, and is the
+principled choice when that value is available. For biallelic SNPs this is
+usually the retained SNP count. For microsatellites, use the independent
+allele-frequency count, approximately `sum(K_l - 1)` across loci, rather than
+the raw number of microsatellite loci. Like `mlpe` it accepts a pairwise
+distance matrix (e.g. F~ST~).
 
 `wishart_covariance` is the Wishart analogue for data supplied as a
 **covariance** matrix (e.g. from `cov_from_biallelic()`) rather than a
@@ -501,8 +505,8 @@ distance matrix. It also requires `nu`.
 ### Fitting with `generalized_wishart`
 
 ```{r fit-wishart}
-# nu is the number of genetic markers used to calculate melip.Fst.
-# 8 in the original data set
+# melip.Fst was estimated from 8 microsatellite loci. The allele counts are not
+# bundled here, so nu = 8 is a conservative locus-count approximation.
 fit_gw <- terradish(
   melip.Fst ~ forestcover + altitude,
   data              = surface,
@@ -681,16 +685,21 @@ support.
 
 ## What comes next?
 
-This vignette covered the core workflow. Three companion vignettes go further:
+This vignette covered the core workflow. Companion vignettes go further:
 
-- **`vignette("model-comparison", package = "terradish")`** — testing and
+- **`vignette("model-comparison", package = "terradish")`**: testing and
   comparing models (likelihood ratio tests, AIC, cross-validation, likelihood
   surface visualization).
-- **`vignette("ibe-ibr-workflow", package = "terradish")`** — fitting
+- **`vignette("ibe-ibr-workflow", package = "terradish")`**: fitting
   isolation-by-environment (IBE) and IBR simultaneously in the same model.
-- **`vignette("wishart-covariance", package = "terradish")`** — preparing a
+- **`vignette("wishart-covariance", package = "terradish")`**: preparing a
   genetic covariance matrix from raw genotype data with `cov_from_genetic_data()`
   and fitting with the `wishart_covariance` measurement model.
+- **`vignette("spline-conductance", package = "terradish")`**: fitting
+  non-linear conductance responses with spline terms such as
+  `s(altitude, df = 4)`.
+- **`vignette("gaussian-scale-optimization", package = "terradish")`**:
+  estimating the spatial scale of effect for raster covariates.
 
 ---
 
@@ -745,7 +754,7 @@ fit <- terradish(melip.Fst ~ forestcover + altitude,
                  approximation     = rec$approximation,
                  approximation_control = rec$approximation_control)
 
-# generalized_wishart example (set nu to your actual marker count):
+# generalized_wishart example (set nu to the effective Wishart degrees of freedom):
 fit_gw <- terradish(melip.Fst ~ forestcover + altitude,
                     data              = surface,
                     conductance_model = loglinear_conductance,

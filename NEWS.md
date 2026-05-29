@@ -1,3 +1,8 @@
+terradish 0.0.35
+---------
+* Clarified that Wishart `nu` is an effective degrees-of-freedom value, with SNP and microsatellite guidance across help pages, README, and vignettes
+* Expanded vignette cross-links for Wishart covariance, spline conductance, and Gaussian scale-of-effect workflows
+
 terradish 0.0.34
 ---------
 * Fixed `covariance_response_power()` so that scenarios in which every replicate failed to converge produce result rows with `NA` conductance correlations instead of aborting the entire cell with "no complete element pairs"; downstream summaries and parameter recovery tables now reflect the failed fits transparently

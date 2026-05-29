@@ -27,10 +27,14 @@ automatically by the optimizer.}
 \item{phi}{Named numeric vector of nuisance parameters \code{(tau, sigma)}.
 Omit to obtain default starting values \code{c(1, 0)}.}
 
-\item{nu}{Positive integer.  The number of genetic markers (loci) used to
-compute \code{S}.  This is the Wishart degrees-of-freedom parameter and
-must be supplied; it is not estimated.  Pass it via the \code{nu} argument
-of \code{\link{terradish}}.}
+\item{nu}{Positive integer.  Effective Wishart degrees of freedom for
+\code{S}.  For biallelic SNPs this is usually the number of retained SNPs.
+For microsatellites, use the independent allele-frequency count,
+approximately \eqn{\sum_l (K_l - 1)} where \eqn{K_l} is the number of
+observed alleles at locus \eqn{l}; this is usually larger than the number
+of microsatellite loci and smaller than the total expanded allele-column
+count.  Must be supplied; it is not estimated.  Pass it via the \code{nu}
+argument of \code{\link{terradish}}.}
 
 \item{gradient}{Logical. Compute gradient of the negative log-likelihood
 with respect to \code{phi}?}
@@ -64,8 +68,8 @@ When \code{phi} is missing, a list with elements \code{phi}
 A function of class \code{"terradish_measurement_model"} that evaluates the
 generalized Wishart likelihood for an observed pairwise genetic distance
 matrix.  This is the principled Wishart-based model when data are available
-as distances (e.g. F\eqn{_{ST}}) and the number of genetic markers is
-known.  For covariance-matrix data use \code{\link{wishart_covariance}}.
+as distances (e.g. F\eqn{_{ST}}) and the effective marker degrees of freedom
+are known.  For covariance-matrix data use \code{\link{wishart_covariance}}.
 }
 \details{
 The nuisance parameters are:

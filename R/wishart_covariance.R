@@ -17,10 +17,14 @@
 #'   \code{E} and should be positive (semi-)definite.
 #' @param phi Named numeric vector of nuisance parameters \code{(tau, sigma)}.
 #'   Omit to obtain least-squares starting values.
-#' @param nu Positive integer.  The number of genetic markers used to compute
-#'   \code{S}, which acts as the Wishart degrees-of-freedom parameter.  Must be
-#'   supplied; it is not estimated.  Pass via the \code{nu} argument of
-#'   \code{\link{terradish}}.
+#' @param nu Positive integer.  Effective Wishart degrees of freedom for the
+#'   genetic covariance \code{S}.  For biallelic SNPs this is usually the
+#'   number of retained SNPs.  For microsatellites, use the independent
+#'   allele-frequency count, approximately \eqn{\sum_l (K_l - 1)} where
+#'   \eqn{K_l} is the number of observed alleles at locus \eqn{l}; this is
+#'   usually larger than the number of microsatellite loci and smaller than
+#'   the total expanded allele-column count.  Must be supplied; it is not
+#'   estimated.  Pass via the \code{nu} argument of \code{\link{terradish}}.
 #' @param gradient Logical. Compute gradient of the negative log-likelihood
 #'   with respect to \code{phi}?
 #' @param hessian Logical. Compute Hessian with respect to \code{phi}?
@@ -54,9 +58,10 @@
 #' \enumerate{
 #'   \item Compute \code{S} from raw genotypes:
 #'     \code{S <- cov_from_genetic_data(dosage_matrix, groups = pop_vector)}.
-#'   \item Set \code{nu} to the number of retained markers
-#'     (\code{attr(S, "normalizer")} if \code{normalize = "features"}, or the
-#'     column count of the feature matrix).
+#'   \item Set \code{nu} to the effective marker degrees of freedom.  For
+#'     biallelic SNPs this is the number of retained SNP columns.  For
+#'     microsatellite allele calls this is approximately
+#'     \eqn{\sum_l (K_l - 1)}, not the raw number of loci.
 #'   \item Fit:
 #'     \code{terradish(S ~ ..., measurement_model = wishart_covariance, nu = nu)}.
 #' }

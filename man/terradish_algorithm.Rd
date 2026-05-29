@@ -36,7 +36,8 @@ terradish_algorithm(
 
 \item{theta}{Parameters for conductance surface (e.g. inputs to 'f')}
 
-\item{nu}{Number of genetic markers (potentially used by 'g')}
+\item{nu}{Effective Wishart degrees of freedom, passed through to
+measurement models that require it.}
 
 \item{phi}{Optional warm-start values for the nuisance-parameter subproblem.}
 

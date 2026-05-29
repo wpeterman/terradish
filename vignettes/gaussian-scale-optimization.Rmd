@@ -459,12 +459,17 @@ parameters compete in an over-complex first model.
 
 ## Companion vignettes
 
-- **`vignette("getting-started", package = "terradish")`** — the core
+- **`vignette("getting-started", package = "terradish")`**: the core
   `terradish` workflow: scaling covariates, building a conductance surface,
   fitting and interpreting models, and the four plot types.
-- **`vignette("model-comparison", package = "terradish")`** — likelihood ratio
+- **`vignette("model-comparison", package = "terradish")`**: likelihood ratio
   tests, AIC/AICc/BIC tables, likelihood surface visualization, and
   cross-validation.
-- **`vignette("ibe-ibr-workflow", package = "terradish")`** — fitting isolation
+- **`vignette("ibe-ibr-workflow", package = "terradish")`**: fitting isolation
   by environment (IBE) and isolation by resistance (IBR) simultaneously in the
   same model.
+- **`vignette("spline-conductance", package = "terradish")`**: fitting
+  non-linear conductance responses with spline terms when the response shape is
+  flexible but the raster scale is fixed.
+- **`vignette("wishart-covariance", package = "terradish")`**: fitting
+  covariance-based Wishart IBR models when raw genotype data are available.

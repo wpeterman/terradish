@@ -363,9 +363,12 @@
 #'   \code{\link{loglinear_conductance}}).
 #' @param measurement_model Measurement model used during optimizer probes.
 #'   Should match the model you plan to use for the final fit.
-#' @param nu Number of genetic markers passed to measurement models that
-#'   require it (\code{\link{generalized_wishart}},
-#'   \code{\link{wishart_covariance}}).  Ignored by \code{\link{mlpe}} and
+#' @param nu Effective Wishart degrees of freedom passed to measurement models
+#'   that require it (\code{\link{generalized_wishart}},
+#'   \code{\link{wishart_covariance}}).  For biallelic SNPs this is usually the
+#'   number of retained SNPs; for microsatellites use approximately
+#'   \eqn{\sum_l (K_l - 1)} where \eqn{K_l} is the number of observed alleles at
+#'   locus \eqn{l}.  Ignored by \code{\link{mlpe}} and
 #'   \code{\link{leastsquares}}.
 #' @param theta Optional starting conductance parameter values.  If
 #'   \code{NULL}, the default all-zero start is used.

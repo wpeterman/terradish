@@ -461,7 +461,11 @@
 #' @param measurement_model A function of class
 #'   \code{terradish_measurement_model} (see
 #'   \code{\link{terradish_measurement_model}})
-#' @param nu Number of genetic markers (potentially used by \code{measurement_model})
+#' @param nu Effective Wishart degrees of freedom passed to measurement models
+#'   that require it.  For biallelic SNPs this is usually the number of
+#'   retained SNPs; for microsatellites use approximately
+#'   \eqn{\sum_l (K_l - 1)} where \eqn{K_l} is the number of observed alleles at
+#'   locus \eqn{l}.
 #' @param nonnegative Force regression-like \code{measurement_model} to have nonnegative slope?
 #' @param conductance Retained for backward compatibility. Only
 #'   \code{conductance = TRUE} is currently implemented.

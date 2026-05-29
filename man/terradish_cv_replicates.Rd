@@ -33,7 +33,11 @@ evaluate to a genetic distance matrix in the calling environment.}
 \item{model}{Measurement model, either as a function or one of
 \code{"mlpe"}, \code{"wishart"}, or \code{"ls"}.}
 
-\item{nu}{Number of genetic markers, passed to the measurement model.}
+\item{nu}{Effective Wishart degrees of freedom, passed to measurement models
+that require it.  For biallelic SNPs this is usually the number of
+retained SNPs; for microsatellites use approximately
+\eqn{\sum_l (K_l - 1)} where \eqn{K_l} is the number of observed alleles at
+locus \eqn{l}.}
 
 \item{prop_train}{Proportion of focal points assigned to the training set.}
 

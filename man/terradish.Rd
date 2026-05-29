@@ -38,7 +38,13 @@ terradish(
 \code{terradish_measurement_model} (see
 \code{\link{terradish_measurement_model}})}
 
-\item{nu}{Number of genetic markers (potentially used by \code{measurement_model})}
+\item{nu}{Effective Wishart degrees of freedom passed to measurement models
+that require it, such as \code{\link{generalized_wishart}} and
+\code{\link{wishart_covariance}}.  For biallelic SNPs this is usually the
+number of retained SNPs.  For microsatellites, use the independent
+allele-frequency count, approximately \eqn{\sum_l (K_l - 1)} where
+\eqn{K_l} is the number of observed alleles at locus \eqn{l}.  Ignored by
+non-Wishart measurement models.}
 
 \item{theta}{Starting values for optimization}
 
