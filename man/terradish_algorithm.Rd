@@ -115,6 +115,3 @@ terradish_algorithm(conductance_model, terradish::leastsquares,
                  nu = 1000, theta = c(-0.3, 0.3))
 
 }
-\references{
-Pope NS. In prep. Fast gradient-based optimization of resistance surfaces.
-}

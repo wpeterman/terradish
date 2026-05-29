@@ -26,8 +26,8 @@ knitr::opts_chunk$set(
 ## Overview
 
 The standard `terradish` workflow uses a pre-computed **distance matrix** (e.g.
-F~ST~) as the genetic response. Two measurement models — `leastsquares` and
-`mlpe` — accept such matrices and differ only in how they handle the
+F~ST~) as the genetic response. Two measurement models, `leastsquares` and
+`mlpe`, accept such matrices and differ only in how they handle the
 non-independence of pairwise observations.
 
 When raw individual-level genotype data are available, a more principled route
@@ -67,8 +67,8 @@ This vignette covers:
 `terradish` provides two functions for turning raw genotype data into a
 covariance matrix:
 
-- **`cov_from_biallelic(Y, N)`** — fast path for biallelic SNP count matrices.
-- **`cov_from_genetic_data(x, ...)`** — flexible path that handles biallelic
+- **`cov_from_biallelic(Y, N)`**: fast path for biallelic SNP count matrices.
+- **`cov_from_genetic_data(x, ...)`**: flexible path that handles biallelic
   dosage, multiallelic SNPs, microsatellite allele calls, PCA scores, or any
   other numeric encoding.
 
@@ -209,7 +209,7 @@ all(ev > 0)  # TRUE → positive definite; FALSE → semi-definite or indefinite
 ## Set up the landscape
 
 The rest of this vignette uses the bundled *Melipona* bee data from the
-getting-started vignette. Steps are identical to those already covered there —
+getting-started vignette. Steps are identical to those already covered there:
 see `vignette("getting-started", package = "terradish")` for explanations.
 
 ```{r landscape-setup}
@@ -313,7 +313,7 @@ The `wishart_covariance` measurement model fits two nuisance parameters (`phi`):
   strongly predicts genetic covariance.
 - **`sigma`** (log-scale): a scalar nugget added as `exp(sigma) * I` to the
   fitted covariance matrix. This absorbs genetic variation that is not explained
-  by landscape resistance — e.g. genetic drift, population-size differences, or
+  by landscape resistance, e.g. genetic drift, population-size differences, or
   loci under local selection.
 
 The fitted covariance model is:
@@ -321,6 +321,79 @@ The fitted covariance model is:
 
 where `E(theta)` is the generalized inverse of the graph Laplacian evaluated at
 the estimated conductance parameters `theta`.
+
+---
+
+## The role of `nu`: an effective sample size
+
+`nu` is the most consequential setting in a covariance-based fit, and it
+behaves in a way that surprises most users. The entire Wishart negative
+log-likelihood is multiplied by `nu / 2`, so `nu` is a global multiplier of the
+objective surface. That single fact has three separate consequences.
+
+**1. Point estimates do not depend on `nu`.** Scaling an objective by a positive
+constant does not move its optimum, so the estimated conductance parameters
+`theta` (and the nuisance parameters `tau`, `sigma`) are *identical* for any
+`nu`. We can verify this directly:
+
+```{r nu-invariance}
+fit_nu <- function(nu) {
+  f <- terradish(
+    S_cov ~ forestcover + altitude,
+    data              = surface,
+    conductance_model = loglinear_conductance,
+    measurement_model = wishart_covariance,
+    nu                = nu
+  )
+  list(theta = coef(f),
+       se    = sqrt(diag(solve(f$fit$hessian))))
+}
+
+f100   <- fit_nu(100)
+f1000  <- fit_nu(1000)
+f10000 <- fit_nu(10000)
+
+# Point estimates are byte-for-byte identical across three orders of magnitude
+rbind(`nu=100`   = f100$theta,
+      `nu=1000`  = f1000$theta,
+      `nu=10000` = f10000$theta)
+```
+
+**2. Standard errors scale as 1 / sqrt(`nu`).** The Hessian scales with `nu`, so
+the asymptotic covariance scales with 1 / `nu` and every standard error scales
+with 1 / sqrt(`nu`). More markers carry more information and produce tighter
+intervals, exactly as they should:
+
+```{r nu-se}
+rbind(`nu=100`   = f100$se,
+      `nu=1000`  = f1000$se,
+      `nu=10000` = f10000$se)
+
+# Ratio confirms the 1/sqrt(nu) scaling: a 10x increase in nu
+# shrinks SEs by sqrt(10) ~ 3.16
+f100$se / f1000$se
+```
+
+**3. Model selection and hypothesis tests depend strongly on `nu`.** The
+log-likelihood scales linearly with `nu`, but the AIC/BIC complexity penalty
+(and the chi-squared reference distribution for a likelihood-ratio test) does
+not. With large `nu` the penalty becomes negligible and extra covariates are
+almost always retained; with small `nu`, parsimony dominates. The *same data*
+can favor a simpler or a more complex model purely through the choice of `nu`.
+
+The practical upshot: **`nu` is an effective sample size.** It does not change
+*what* the data say about the shape of the conductance surface, but it controls
+*how strongly* the data speak. Choose it carefully:
+
+- For biallelic SNPs, use the number of retained (polymorphic) SNPs.
+- For microsatellites, use approximately the number of independent allele
+  frequencies, sum over loci of (alleles - 1), not the raw number of loci.
+- Markers in strong linkage disequilibrium are not independent, so the
+  effective `nu` is **smaller** than the raw marker count. Thin to roughly
+  unlinked loci, or use a deliberately conservative value.
+- When `nu` is uncertain, report a brief sensitivity analysis: refit across a
+  plausible range and check whether your conclusions (significance, model
+  ranking) are stable.
 
 ---
 
@@ -435,7 +508,7 @@ parameter estimates and their standard errors are directly comparable.
 
 | Consideration | `wishart_covariance` | `generalized_wishart` |
 |---|---|---|
-| Raw genotype data available | **Preferred** — use `cov_from_genetic_data()` | Requires an extra distance-conversion step |
+| Raw genotype data available | **Preferred**: use `cov_from_genetic_data()` | Requires an extra distance-conversion step |
 | Only a pre-computed distance matrix is available | Requires converting to covariance (not always reversible) | **Preferred** |
 | Population-size differences matter | `diagonal = "within"` can encode within-population spread | Not directly available |
 | Goal is a Dyer-style population graph | Diagonal from within-population variance is natural | Less natural |

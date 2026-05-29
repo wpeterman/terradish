@@ -85,7 +85,7 @@ The nuisance parameters are:
 The fitted covariance is \eqn{\Sigma = \tau E + \exp(\sigma) I}.  The model
 evaluates the generalized Wishart log-likelihood for the observed
 squared-distance matrix \code{S} after projecting out the grand mean, as
-described in McCullagh (2009) and Peterson et al. (2019).
+described in McCullagh (2009).
 
 \code{generalized_wishart} and \code{\link{wishart_covariance}} share the
 same \eqn{\Sigma} parameterization but differ in what \code{S} represents:
@@ -93,6 +93,30 @@ this function takes a \strong{distance} matrix; \code{wishart_covariance}
 takes a \strong{covariance} matrix.  When the covariance and its implied
 distance matrix carry the same information (i.e. no information is lost in
 the conversion), the two models give identical likelihoods up to a constant.
+
+\strong{The role of \code{nu} (read this before choosing a value).}
+The generalized Wishart log-likelihood scales linearly with \code{nu}, so
+\code{nu} acts as an \emph{effective sample size} rather than as an ordinary
+model parameter:
+\itemize{
+  \item \strong{Point estimates do not depend on \code{nu}.}  The maximizing
+    conductance parameters \eqn{\theta} and nuisance parameters
+    \eqn{(\tau, \sigma)} are invariant to \code{nu}, because scaling the
+    objective by a positive constant does not move its optimum.
+  \item \strong{Standard errors scale as} \eqn{1/\sqrt{\nu}}: more markers
+    give tighter confidence intervals.
+  \item \strong{Model selection and likelihood-ratio tests depend strongly
+    on \code{nu}.}  Because the log-likelihood scales with \code{nu} while
+    the AIC/BIC penalty (and the \eqn{\chi^2} reference distribution) does
+    not, the same data can favor a simpler or a more complex model purely
+    through the choice of \code{nu}.
+}
+Set \code{nu} to the number of approximately independent markers behind
+\code{S}.  When markers are in linkage disequilibrium, the effective
+\code{nu} is smaller than the raw count; thin to roughly independent loci or
+use a conservative value, and consider reporting a sensitivity analysis
+across a plausible range of \code{nu}.  See \code{\link{wishart_covariance}}
+for the same discussion in the covariance-response setting.
 }
 \examples{
 
@@ -119,11 +143,7 @@ generalized_wishart(laplacian_inv, melip.Fst, nu = 1000, phi = c(0.1, -0.1))
 }
 \references{
 McCullagh P. 2009. Marginal likelihood for distance matrices. Statistica
-Sinica 19:23-41.
-
-Peterson EK, Peterman WE, Pope NS. 2019. resist_ga: An R package for
-landscape genetic resistance surface optimization using genetic algorithms.
-Methods in Ecology and Evolution 10(9):1502-1509.
+Sinica 19:631-649.
 }
 \seealso{
 \code{\link{wishart_covariance}}, \code{\link{mlpe}},

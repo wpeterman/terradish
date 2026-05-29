@@ -71,7 +71,7 @@ This is the first step of every \code{terradish} workflow.
 \strong{Missing values:} \code{NA} is propagated uniformly across all
 layers so every cell is either complete or entirely missing.  A warning is
 issued if some cells are \code{NA} in only a subset of layers, because this
-indicates that different covariates cover different areas — model comparison
+indicates that different covariates cover different areas; model comparison
 across raster stacks with different \code{NA} patterns is problematic since
 the graph vertices differ.  Always compare models using the same
 \code{terradish_graph} object.
@@ -136,7 +136,4 @@ levels(melip.forestcover_cat) <- RAT
 covariates_cat <- c(melip.forestcover_cat, melip.altitude)
 names(covariates_cat) <- c("forestcover", "altitude")
 
-}
-\references{
-Pope NS. In prep. Fast gradient-based optimization of resistance surfaces.
 }

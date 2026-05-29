@@ -113,6 +113,12 @@ fst_from_biallelic <- function(Y, N)
 #' \code{\link{dist_from_cov}}.  For non-biallelic or multiallelic data, use
 #' \code{\link{cov_from_genetic_data}}.
 #'
+#' @references
+#' Yang J, Benyamin B, McEvoy BP, Gordon S, Henders AK, Nyholt DR,
+#' Madden PA, Heath AC, Martin NG, Montgomery GW, Goddard ME, Visscher PM.
+#' 2010. Common SNPs explain a large proportion of the heritability for human
+#' height. Nature Genetics 42(7):565-569.
+#'
 #' @return A symmetric positive-semidefinite numeric matrix of pairwise
 #'   genetic covariances.  Row and column names match those of \code{Y} when
 #'   present.
@@ -279,7 +285,13 @@ cov_from_biallelic <- function(Y,
 #' microsatellites, a locus with \eqn{K_l} observed alleles contributes
 #' approximately \eqn{K_l - 1} independent allele frequencies because allele
 #' frequencies sum to a constant within the locus.  A useful microsatellite
-#' choice is therefore \eqn{nu = \sum_l (K_l - 1)}.
+#' choice is therefore \eqn{nu = \sum_l (K_l - 1)}.  Markers in strong linkage
+#' disequilibrium are not independent, so the effective \code{nu} is smaller
+#' than the raw count; thinning to roughly unlinked loci gives a more honest
+#' value.  Because \code{nu} controls the precision of every downstream Wishart
+#' fit (it scales standard errors and model-selection statistics but leaves
+#' point estimates unchanged), see \code{\link{wishart_covariance}} for the
+#' full explanation before settling on a value.
 #'
 #' If \code{groups = NULL}, rows of the processed feature matrix are used
 #' directly and squared Euclidean distances among individuals are transformed to
@@ -692,10 +704,16 @@ dist_from_biallelic <- function(Y, N)
 #' @param tau Nonnegative scaling applied to the conductance-implied covariance
 #'   matrix.
 #' @param sigma Nonnegative nugget variance added to the diagonal.
-#' @param nu Effective Wishart degrees of freedom.  For biallelic SNP-like
-#'   simulations this is usually the number of retained SNPs.  For
-#'   microsatellite-like panels, use approximately \eqn{\sum_l (K_l - 1)}
-#'   where \eqn{K_l} is the number of observed alleles at locus \eqn{l}.
+#' @param nu Effective Wishart degrees of freedom: the number of
+#'   (approximately independent) genetic markers the simulated \code{S} should
+#'   represent.  This controls the amount of sampling noise in the simulated
+#'   covariance: larger \code{nu} gives tighter draws around \code{Sigma}.  For
+#'   biallelic SNP-like simulations this is usually the number of retained
+#'   SNPs; for microsatellite-like panels, use approximately
+#'   \eqn{\sum_l (K_l - 1)} where \eqn{K_l} is the number of observed alleles at
+#'   locus \eqn{l}.  See \code{\link{wishart_covariance}} for how \code{nu}
+#'   propagates into estimation (it scales standard errors and model-selection
+#'   statistics but not point estimates).
 #' @param nsim Number of covariance matrices to simulate.
 #' @param seed Optional random seed.
 #' @param cores Number of cores passed to \code{\link{terradish_distance}}.

@@ -102,7 +102,13 @@ frequency column, so \code{nu} is usually the retained SNP count.  With
 microsatellites, a locus with \eqn{K_l} observed alleles contributes
 approximately \eqn{K_l - 1} independent allele frequencies because allele
 frequencies sum to a constant within the locus.  A useful microsatellite
-choice is therefore \eqn{nu = \sum_l (K_l - 1)}.
+choice is therefore \eqn{nu = \sum_l (K_l - 1)}.  Markers in strong linkage
+disequilibrium are not independent, so the effective \code{nu} is smaller
+than the raw count; thinning to roughly unlinked loci gives a more honest
+value.  Because \code{nu} controls the precision of every downstream Wishart
+fit (it scales standard errors and model-selection statistics but leaves
+point estimates unchanged), see \code{\link{wishart_covariance}} for the
+full explanation before settling on a value.
 
 If \code{groups = NULL}, rows of the processed feature matrix are used
 directly and squared Euclidean distances among individuals are transformed to

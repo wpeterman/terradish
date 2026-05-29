@@ -81,7 +81,7 @@
 #'
 #' @references
 #' McCullagh P. 2009. Marginal likelihood for distance matrices. Statistica
-#' Sinica 19:23-41.
+#' Sinica 19:631-649.
 #'
 #' @examples
 #' library(terra)

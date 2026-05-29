@@ -144,7 +144,7 @@ correlation structure are evaluated only for the selected pair rows.
 
 **`mlpe`** ("maximum likelihood population effects") corrects for the non-independence that arises because every pair (A–B) and (A–C) both involve site A. This is the recommended default for distance-matrix data when the number of genetic markers is not recorded.
 
-**`generalized_wishart`** models the observed distance matrix as arising from a generalized Wishart distribution (McCullagh 2009, Peterson et al. 2019). It requires `nu`, the number of genetic markers used to compute `S`. This is the principled choice when that count is available.
+**`generalized_wishart`** models the observed distance matrix as arising from a generalized Wishart distribution (McCullagh 2009). It requires `nu`, the number of genetic markers used to compute `S`. This is the principled choice when that count is available.
 
 **`wishart_covariance`** is the Wishart analogue for data supplied as a covariance matrix (e.g. from `cov_from_biallelic()`) rather than a distance matrix. It also requires `nu`.
 

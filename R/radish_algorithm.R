@@ -674,10 +674,6 @@
 #'  \item{partial_X}{(if 'partial') Jacobian of the gradient with respect to the spatial covariates}
 #'  \item{partial_S}{(if 'partial') Jacobian of the gradient with respect to the observed genetic distances}
 #'
-#' @references
-#'
-#' Pope NS. In prep. Fast gradient-based optimization of resistance surfaces.
-#'
 #' @examples
 #' library(terra)
 #'

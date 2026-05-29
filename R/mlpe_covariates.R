@@ -145,6 +145,12 @@ pairwise_endpoint_covariates <- function(x,
 #' @seealso \code{\link{mlpe}}, \code{\link{pairwise_endpoint_covariates}},
 #'   \code{\link{terradish_cv}}
 #'
+#' @references
+#' Clarke RT, Rothery P, Raybould AF. 2002. Confidence limits for regression
+#' relationships between distance matrices: estimating gene flow with distance.
+#' Journal of Agricultural, Biological, and Environmental Statistics
+#' 7(3):361-372.
+#'
 #' @examples
 #' library(terra)
 #'

@@ -72,7 +72,11 @@ during simulation.}
 and \code{\link{wishart_covariance}} fitting.  For biallelic SNPs this is
 usually the number of retained SNPs; for microsatellites use approximately
 \eqn{\sum_l (K_l - 1)} where \eqn{K_l} is the number of observed alleles at
-locus \eqn{l}.}
+locus \eqn{l}.  Because \code{nu} acts as an effective sample size, it is a
+primary lever for power: hold the sampling design fixed and vary \code{nu}
+to see how many markers are needed to recover an effect.  See
+\code{\link{wishart_covariance}} for details on how \code{nu} scales
+inference.}
 
 \item{nsim}{Number of covariance-response simulations per sampling design.}
 

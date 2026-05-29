@@ -490,7 +490,7 @@ distance-matrix data when the effective marker degrees of freedom are not
 recorded.
 
 `generalized_wishart` models the observed distance matrix as arising from a
-generalized Wishart distribution (McCullagh 2009, Peterson et al. 2019). It
+generalized Wishart distribution (McCullagh 2009). It
 requires `nu`, the effective Wishart degrees of freedom for `S`, and is the
 principled choice when that value is available. For biallelic SNPs this is
 usually the retained SNP count. For microsatellites, use the independent

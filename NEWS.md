@@ -1,3 +1,8 @@
+terradish 0.0.36
+---------
+* Removed unsupported and unverifiable formal references from package documentation and vignettes
+* Corrected the McCullagh generalized Wishart citation and added formal references for already-cited MLPE and genomic relationship methods
+
 terradish 0.0.35
 ---------
 * Clarified that Wishart `nu` is an effective degrees-of-freedom value, with SNP and microsatellite guidance across help pages, README, and vignettes

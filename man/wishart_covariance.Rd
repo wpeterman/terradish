@@ -30,14 +30,13 @@ or \code{\link{cov_from_biallelic}}.  Must have the same dimensions as
 \item{phi}{Named numeric vector of nuisance parameters \code{(tau, sigma)}.
 Omit to obtain least-squares starting values.}
 
-\item{nu}{Positive integer.  Effective Wishart degrees of freedom for the
-genetic covariance \code{S}.  For biallelic SNPs this is usually the
-number of retained SNPs.  For microsatellites, use the independent
-allele-frequency count, approximately \eqn{\sum_l (K_l - 1)} where
-\eqn{K_l} is the number of observed alleles at locus \eqn{l}; this is
-usually larger than the number of microsatellite loci and smaller than
-the total expanded allele-column count.  Must be supplied; it is not
-estimated.  Pass via the \code{nu} argument of \code{\link{terradish}}.}
+\item{nu}{Positive number.  Effective Wishart degrees of freedom for the
+genetic covariance \code{S}: the number of (approximately) independent
+genetic markers that went into computing \code{S}.  Must be supplied; it
+is not estimated.  Pass via the \code{nu} argument of
+\code{\link{terradish}}.  See the \dQuote{The role of \code{nu}} section
+below; choosing \code{nu} is consequential and is explained in detail
+there.}
 
 \item{gradient}{Logical. Compute gradient of the negative log-likelihood
 with respect to \code{phi}?}
@@ -93,7 +92,47 @@ negative log-likelihood is:
 \deqn{-\ell = \frac{\nu}{2} \left[ \log|\Sigma| + \mathrm{tr}(\Sigma^{-1} S) \right]}
 
 treating \code{S} as a sample covariance with \eqn{\nu} degrees of freedom
-(i.e. a Wishart distribution scaled by \eqn{1/\nu}).
+(i.e. \eqn{\nu S} follows a Wishart distribution with \eqn{\nu} degrees of
+freedom and scale matrix \eqn{\Sigma}).
+
+\strong{The role of \code{nu} (read this before choosing a value).}
+\code{nu} is the single most consequential setting in a covariance-based
+fit, yet it behaves in a way that surprises many users.  Because the entire
+negative log-likelihood above is multiplied by \eqn{\nu/2}, \code{nu}
+enters as a global multiplier of the objective surface.  This has three
+distinct consequences:
+\itemize{
+  \item \strong{Point estimates do not depend on \code{nu}.}  The maximizing
+    conductance parameters \eqn{\theta} and nuisance parameters
+    \eqn{(\tau, \sigma)} are completely invariant to \code{nu}: scaling the
+    objective by a positive constant does not move its optimum.  You can
+    change \code{nu} by orders of magnitude and the estimated surface is
+    identical.
+  \item \strong{Standard errors and confidence intervals scale as}
+    \eqn{1/\sqrt{\nu}}.  The Hessian scales with \code{nu}, so the
+    asymptotic covariance scales with \eqn{1/\nu}.  Doubling \code{nu}
+    shrinks every standard error by a factor of \eqn{\sqrt{2}}.  This is the
+    correct behavior: more markers carry more information and should yield
+    tighter intervals.
+  \item \strong{Model selection and likelihood-ratio tests depend strongly
+    on \code{nu}.}  The log-likelihood scales linearly with \code{nu}, but
+    the AIC/BIC complexity penalty (and the \eqn{\chi^2} reference
+    distribution for an LRT) does not.  With large \code{nu} the penalty
+    becomes negligible and extra covariates are almost always
+    \dQuote{selected}; with small \code{nu} parsimony dominates.  The same
+    data can therefore favor a simpler or a more complex model purely
+    through the choice of \code{nu}.
+}
+In short, \code{nu} is an \emph{effective sample size}: it does not change
+what the data say about the shape of the conductance surface, but it
+determines how strongly the data speak.  Mis-specifying \code{nu} (for
+example, passing the number of allele-copy columns rather than the number of
+independent markers, or treating tightly linked SNPs as independent)
+produces over- or under-confident inference.  When markers are correlated
+(linkage disequilibrium), the effective \code{nu} is smaller than the raw
+marker count; consider thinning to approximately independent loci or using a
+deliberately conservative value.  When in doubt, report a sensitivity
+analysis across a plausible range of \code{nu}.
 
 \strong{Typical workflow:}
 \enumerate{

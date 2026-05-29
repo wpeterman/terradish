@@ -130,7 +130,7 @@ summary(fit_joint_w)
 }
 \references{
 McCullagh P. 2009. Marginal likelihood for distance matrices. Statistica
-Sinica 19:23-41.
+Sinica 19:631-649.
 }
 \seealso{
 \code{\link{generalized_wishart}}, \code{\link{wishart_covariance}},

@@ -84,6 +84,12 @@ N2 <- matrix(c(20, 20, 10,
 cov_from_biallelic(Y2, N = N2)
 
 }
+\references{
+Yang J, Benyamin B, McEvoy BP, Gordon S, Henders AK, Nyholt DR,
+Madden PA, Heath AC, Martin NG, Montgomery GW, Goddard ME, Visscher PM.
+2010. Common SNPs explain a large proportion of the heritability for human
+height. Nature Genetics 42(7):565-569.
+}
 \seealso{
 \code{\link{cov_from_genetic_data}}, \code{\link{fst_from_biallelic}},
   \code{\link{dist_from_biallelic}}, \code{\link{dist_from_cov}},
