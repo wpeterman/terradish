@@ -1,3 +1,7 @@
+terradish 0.0.37
+---------
+* Refined settings assessment guidance and related optimizer documentation, expanded simulation-design vignette support files, and updated vignette cross-links while excluding `vignettes/precompute.R` from package builds
+
 terradish 0.0.36
 ---------
 * Removed unsupported and unverifiable formal references from package documentation and vignettes

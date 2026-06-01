@@ -83,3 +83,31 @@ test_that("terradish_assess_settings reports smooth-model settings context", {
                         fixed = TRUE)))
   expect_true(all(assessment$benchmarks$optimizer$status == "OK"))
 })
+
+test_that("settings comparison reports tuned diagnostic controls", {
+  defaults <- list(
+    optimizer = "newton",
+    control = terradish:::.terradish_assessment_control("hager_zhang"),
+    solver = "direct",
+    solver_control = NULL,
+    approximation = "none",
+    approximation_control = NULL
+  )
+  recommended <- defaults
+  recommended$solver_control <- list(
+    factorization = "simplicial_ll",
+    solve_backend = "matrix"
+  )
+  recommended$approximation_control <- list(factor = 2L)
+
+  comparison <- terradish:::.terradish_assessment_compare_settings(
+    defaults,
+    recommended
+  )
+
+  expect_true(comparison$differs_from_defaults)
+  expect_true("solver_control tuned from terradish defaults" %in%
+                comparison$changes)
+  expect_true("approximation_control tuned from terradish defaults" %in%
+                comparison$changes)
+})

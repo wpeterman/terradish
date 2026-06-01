@@ -83,7 +83,7 @@ have not yet read
 
 ---
 
-## Set up: data and scaled covariates
+## Set up — data and scaled covariates
 
 ```{r load}
 library(terradish)
@@ -236,8 +236,8 @@ fit_joint <- terradish(
 > **Note on `leverage = FALSE`:** By default, `terradish()` computes
 > influence/leverage diagnostics for each observation, which requires
 > additional linear-algebra work. Setting `leverage = FALSE` skips this step
-> to reduce run time. For a final analysis where you want diagnostics, omit
-> this argument or set it to `TRUE`.
+> to reduce run time. For a final analysis where you want diagnostics, 
+> set this argument to `TRUE`.
 
 ---
 

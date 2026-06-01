@@ -781,7 +781,7 @@ terradish <- function(formula,
   terms    <- terms(formula)
   vars     <- as.character(attr(terms, "variables"))[-1]
   response <- attr(terms, "response")
-  S        <- if(response) get(vars[attr(terms, "response")], parent.frame())
+  S        <- if(response) eval(attr(terms, "variables")[[response + 1L]], parent.frame())
               else stop("'formula' must have genetic distance matrix on lhs")
   is_ibd   <- length(vars) == 1
   formula  <- if (!is_ibd) reformulate(attr(terms, "term.labels"))
@@ -1121,6 +1121,9 @@ terradish <- function(formula,
   fit$gradient <- .conductance_model_gradient_to_external(fit$gradient, conductance_model)
   fit$hessian <- .conductance_model_hessian_to_external(fit$hessian, conductance_model)
   theta_external <- .conductance_model_to_external(theta, conductance_model)
+  # attach parameter names so users can index hessian by name
+  if (!is.null(names(theta_external)))
+    dimnames(fit$hessian) <- list(names(theta_external), names(theta_external))
 
   if (fit$boundary)
     warning("Optimum for subproblem is on boundary (e.g. no spatial genetic structure): cannot optimize theta.\nTry different starting values.")

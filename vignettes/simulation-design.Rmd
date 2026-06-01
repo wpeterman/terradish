@@ -25,10 +25,10 @@ knitr::opts_chunk$set(
 ## Why simulate before you sample?
 
 Landscape-genetic studies are expensive: every additional sampling site means
-field time, and every additional genetic marker means sequencing cost. Before
+field time and cost. Before
 committing to a design it is worth asking, in advance:
 
-- **How many sampling sites** do I need to detect the landscape effect I expect?
+- **How many sampling sites** do I need to detect the landscape effect I predict?
 - **How many genetic markers** (the `nu` parameter) do I need?
 - **Where should the sites go**: spread evenly across the landscape, or placed
   some other way?
@@ -135,7 +135,7 @@ sim <- simulate_covariance_response(
   conductance_model = loglinear_conductance,
   tau               = tau_true,
   sigma             = sigma_true,
-  nu                = 500,     # pretend we genotyped ~500 independent markers
+  nu                = 500,     # pretend we genotyped 500 independent markers
   seed              = 1
 )
 
@@ -170,7 +170,7 @@ and higher power. We can see this directly by simulating and refitting many
 times at each of several `nu` values, then asking how often the altitude effect
 is detected (a Wald test that its coefficient differs from zero).
 
-```{r nu-power}
+```{r nu-power, eval = FALSE}
 detect_rate <- function(nu, nsim = 30, seed = 100) {
   set.seed(seed)
   hits <- logical(nsim)
@@ -194,6 +194,14 @@ detect_rate <- function(nu, nsim = 30, seed = 100) {
 
 nu_grid <- c(50, 100, 250, 500, 1000)
 power_by_nu <- sapply(nu_grid, detect_rate)
+data.frame(nu = nu_grid, power = power_by_nu)
+```
+
+```{r nu-power-load, echo = FALSE}
+# Load pre-computed results (see vignettes/precompute.R to regenerate)
+.art <- readRDS("vignette-nu-power.rds")
+nu_grid     <- .art$nu_grid
+power_by_nu <- .art$power_by_nu
 data.frame(nu = nu_grid, power = power_by_nu)
 ```
 
@@ -225,7 +233,7 @@ two candidate models per replicate: the true two-covariate model and a reduced
 altitude-only model. This lets us measure both **parameter recovery** and
 **model-selection** performance.
 
-```{r power-run}
+```{r power-run, eval = FALSE}
 power <- covariance_response_power(
   theta             = theta_true,
   formula           = ~ forestcover + altitude,
@@ -246,6 +254,12 @@ power <- covariance_response_power(
   control    = NewtonRaphsonControl(maxit = 10, verbose = FALSE)
 )
 
+power
+```
+
+```{r power-run-load, echo = FALSE}
+# Load pre-computed results (see vignettes/precompute.R to regenerate)
+power <- readRDS("vignette-power.rds")
 power
 ```
 
@@ -331,7 +345,7 @@ A design assessment usually answers one of three questions:
 
 A few practical notes:
 
-- **Increase `nsim`.** This vignette uses small `nsim` so it builds quickly.
+- **Increase `nsim`.** This vignette uses small `nsim` so it builds relatively quickly.
   For a real assessment use at least 100-500 simulations per design so that
   power and coverage estimates are stable.
 - **Match the simulation to your expectations.** The answer depends on

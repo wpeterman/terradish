@@ -1,9 +1,11 @@
-#' terradish package
+#' @title terradish
 #'
-#' Gradient-based optimization of conductance and resistance surfaces.
+#' @description Gradient-based optimization of conductance and resistance surfaces.
 #'
 #' @details
-#' \figure{terradish-sticker.png}{options: style='float: right; width: 180px; margin-left: 12px;'}
+#' \if{html}{
+#' \figure{terradish-sticker.png}{options: width=150 alt='Package logo''}
+#'}
 #'
 #' @keywords internal
 #' @importFrom Rcpp evalCpp
@@ -22,6 +24,7 @@
 #' @importFrom utils globalVariables modifyList write.csv
 #' @importFrom grDevices terrain.colors
 #' @useDynLib terradish, .registration = TRUE
+#' @md
 "_PACKAGE"
 
 globalVariables(c(

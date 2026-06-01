@@ -326,6 +326,9 @@
       paste0("approximation `", defaults$approximation, "` -> `",
              recommended$approximation, "`")
     )
+  if (!identical(defaults$approximation_control,
+                 recommended$approximation_control))
+    changes <- c(changes, "approximation_control tuned from terradish defaults")
 
   differs <- length(changes) > 0L
   summary <- if (differs)

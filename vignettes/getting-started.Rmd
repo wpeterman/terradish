@@ -91,12 +91,10 @@ most use-cases:
 
 ```{r, eval = FALSE}
 # Install from local source (recommended while the package is in development)
-devtools::install()
-# or
-remotes::install_local(".")
+remotes::install_github("wpeterman/terradish")
 
-# corMLPE is also required (not on CRAN)
-devtools::install_github("nspope/corMLPE")
+# corMLPE is also required (not on CRAN, yet)
+remotes::install_github("wpeterman/corMLPE")
 ```
 
 ---
@@ -108,8 +106,7 @@ library(terradish)
 library(terra)
 ```
 
-`terradish` ships with example data from a study of *Melipona* bees in
-Mexico. Load everything with one call:
+`terradish` ships with example data from a study of *Melipona* bees in Brazil. Load everything with one call:
 
 ```{r data}
 data(melip)
@@ -259,9 +256,9 @@ original graph. The coarse fits are only used to find better starting values.
 ## Checking computational settings
 
 For the small *Melipona* example the default settings run in seconds and no
-tuning is needed. For larger landscapes — say, a high-resolution raster with
+tuning is needed. For larger landscapes (e.g., a high-resolution raster with
 hundreds of thousands of graph vertices, or a spline conductance model that
-expands to many parameters — the right optimizer and solver can meaningfully
+expands to many parameters), the right optimizer and solver can meaningfully
 reduce wall-clock time.
 
 `terradish_assess_settings()` is an **advisory tool** for this. It:

@@ -9,6 +9,7 @@
 ^README\.Rmd$
 ^inst/extdata/.*\.RData$
 ^vignettes/build_vignettes\.R$
+^vignettes/precompute\.R$
 ^AGENTS\.Rmd$
 ^AGENTS\.md$
 ^src/.*\.gcno$
