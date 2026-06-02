@@ -74,3 +74,28 @@ test_that("covariance_response_power accepts Gaussian theta on external scale", 
   expect_equal(power$results$model, "truth")
   expect_equal(power$summary$sample_size, 5)
 })
+
+test_that("covariance_response_power counts boundary fits as non-detections", {
+  dat <- melip_fixture(keep = 1:6)
+  surface <- conductance_surface(dat$covariates[["altitude"]], dat$coords,
+                                 directions = 8)
+
+  power <- covariance_response_power(
+    theta = c(altitude = 0.2),
+    formula = ~ altitude,
+    data = surface,
+    sample_sizes = 6,
+    strategies = "spacefill",
+    tau = 0,
+    sigma = 1,
+    nu = 100000,
+    nsim = 1,
+    seed = 103,
+    control = NewtonRaphsonControl(maxit = 1, verbose = FALSE)
+  )
+
+  expect_false(power$results$fit_ok)
+  expect_equal(nrow(power$parameter_summary), 1)
+  expect_equal(power$parameter_summary$fit_rate, 0)
+  expect_equal(power$parameter_summary$power, 0)
+})

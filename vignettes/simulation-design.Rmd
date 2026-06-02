@@ -55,7 +55,7 @@ A covariance-based `terradish` fit (see
 genetic covariance matrix `S` is a noisy realization of a structured
 covariance:
 
-$$\Sigma = \tau \, E(\theta) + \exp(\sigma)\, I, \qquad
+$$\Sigma = \tau \, E(\theta) + \sigma\, I, \qquad
   \nu\, S \sim \mathrm{Wishart}(\nu, \Sigma)$$
 
 where:
@@ -64,7 +64,7 @@ where:
   inverse of the graph Laplacian at conductance parameters $\theta$. This is
   the part that carries the landscape signal.
 - $\tau \ge 0$ scales that signal.
-- $\exp(\sigma)$ is a **nugget** absorbing drift and other non-landscape
+- $\sigma \ge 0$ is a **nugget** absorbing drift and other non-landscape
   variation.
 - $\nu$ is the **effective number of genetic markers**. It controls the amount
   of sampling noise: large $\nu$ gives draws tightly clustered around $\Sigma$;
@@ -72,7 +72,15 @@ where:
 
 `simulate_covariance_response()` draws from exactly this model, and
 `covariance_response_power()` automates the simulate-refit-summarize loop across
-many designs.
+many designs. Fitted `wishart_covariance()` models store the nugget internally
+on the log scale, but both simulation helpers accept $\sigma$ as the
+nonnegative variance added to the diagonal.
+
+For a fixed landscape template, $\tau / \sigma$ is a convenient
+**signal-to-nugget ratio**. Larger values place more weight on the
+landscape-implied covariance relative to diagonal noise. The ratio should be
+interpreted within a fixed template because rescaling $E(\theta)$ also changes
+its meaning.
 
 > **Keep `nu` front of mind.** As explained in
 > `vignette("wishart-covariance", package = "terradish")`, `nu` acts as an
@@ -112,11 +120,15 @@ cat("Candidate focal sites:", length(surface$demes), "\n")
 
 We also fix the **truth** we want to recover: a moderate positive forest-cover
 effect and a moderate negative altitude effect on conductance.
+These are illustrative simulation settings, not estimates from the bundled
+*Melipona* genetic response. The bundled rasters provide a realistic landscape
+template, while the synthetic covariance response is generated from the values
+below.
 
 ```{r truth}
-theta_true <- c(forestcover = 0.8, altitude = -0.5)
-tau_true   <- 1.0   # strength of the landscape signal
-sigma_true <- 0.3   # nugget (non-landscape variance)
+theta_true <- c(forestcover = 0.6, altitude = -0.4)
+tau_true   <- 2   # strength of the landscape signal
+sigma_true <- 1   # nugget (non-landscape variance)
 ```
 
 ---
@@ -135,7 +147,7 @@ sim <- simulate_covariance_response(
   conductance_model = loglinear_conductance,
   tau               = tau_true,
   sigma             = sigma_true,
-  nu                = 500,     # pretend we genotyped 500 independent markers
+  nu                = 100,     # pretend we genotyped 100 independent markers
   seed              = 1
 )
 
@@ -151,7 +163,7 @@ fit <- terradish(
   data              = surface,
   conductance_model = loglinear_conductance,
   measurement_model = wishart_covariance,
-  nu                = 500
+  nu                = 100
 )
 
 rbind(true      = theta_true,
@@ -166,61 +178,134 @@ design you must repeat the draw many times.
 ## The role of markers (`nu`) in statistical power
 
 Holding the sampling design fixed, more markers means more precise estimates
-and higher power. We can see this directly by simulating and refitting many
-times at each of several `nu` values, then asking how often the altitude effect
-is detected (a Wald test that its coefficient differs from zero).
+and higher power. The amount of landscape signal also matters. To make both
+effects easy to see, we temporarily isolate a modest altitude effect and vary
+the signal-to-nugget ratio while holding the landscape template fixed.
 
 ```{r nu-power, eval = FALSE}
-detect_rate <- function(nu, nsim = 30, seed = 100) {
-  set.seed(seed)
-  hits <- logical(nsim)
-  for (i in seq_len(nsim)) {
-    s <- simulate_covariance_response(
-      theta = theta_true, formula = ~ forestcover + altitude,
-      data = surface, tau = tau_true, sigma = sigma_true, nu = nu
-    )
-    f <- terradish(
-      s$covariance ~ forestcover + altitude, data = surface,
-      conductance_model = loglinear_conductance,
-      measurement_model = wishart_covariance, nu = nu,
-      control = NewtonRaphsonControl(maxit = 10, verbose = FALSE)
-    )
-    est <- coef(f)["altitude"]
-    se  <- sqrt(diag(solve(f$fit$hessian)))["altitude"]
-    hits[i] <- abs(est / se) > 1.96    # detected at alpha = 0.05
-  }
-  mean(hits)
+altitude_surface <- conductance_surface(
+  covariates[["altitude"]], melip.coords,
+  directions = 8, saveStack = TRUE
+)
+
+screen_theta  <- c(altitude = -0.25)
+screen_sigma  <- 1
+signal_ratios <- c(0.5, 1, 2, 4)
+
+screen_power <- function(sample_size, nu, signal_ratio,
+                         nsim = 10, seed = 100) {
+  assessment <- covariance_response_power(
+    theta        = screen_theta,
+    formula      = ~ altitude,
+    data         = altitude_surface,
+    sample_sizes = sample_size,
+    strategies   = "spacefill",
+    tau          = signal_ratio * screen_sigma,
+    sigma        = screen_sigma,
+    nu           = nu,
+    nsim         = nsim,
+    seed         = seed,
+    control      = NewtonRaphsonControl(maxit = 10, verbose = FALSE)
+  )
+  out <- assessment$parameter_summary
+  data.frame(sample_size, nu, signal_ratio,
+             fit_rate = out$fit_rate, power = out$power)
 }
 
-nu_grid <- c(50, 100, 250, 500, 1000)
-power_by_nu <- sapply(nu_grid, detect_rate)
-data.frame(nu = nu_grid, power = power_by_nu)
+screen_grid <- function(sample_sizes, nu_values, seed) {
+  grid <- expand.grid(sample_size = sample_sizes, nu = nu_values,
+                      signal_ratio = signal_ratios)
+  do.call(rbind, Map(screen_power,
+                     sample_size = grid$sample_size,
+                     nu = grid$nu,
+                     signal_ratio = grid$signal_ratio,
+                     seed = seed + seq_len(nrow(grid))))
+}
+
+marker_power <- screen_grid(sample_sizes = 20,
+                            nu_values = c(20, 50, 100, 200),
+                            seed = 100)
+marker_power
 ```
 
 ```{r nu-power-load, echo = FALSE}
 # Load pre-computed results (see vignettes/precompute.R to regenerate)
 .art <- readRDS("vignette-nu-power.rds")
-nu_grid     <- .art$nu_grid
-power_by_nu <- .art$power_by_nu
-data.frame(nu = nu_grid, power = power_by_nu)
+marker_power  <- .art$marker_power
+site_power    <- .art$site_power
+signal_ratios <- .art$signal_ratios
+screen_nsim   <- .art$screen_nsim
+marker_power
 ```
 
-```{r nu-power-plot, fig.cap = "***Power to detect the altitude effect rises with the number of markers (nu).*** Each point is the proportion of 30 simulated data sets in which the altitude coefficient was significant at alpha = 0.05."}
-plot(nu_grid, power_by_nu, type = "b", pch = 19,
+```{r nu-power-plot, fig.cap = "***Power responds to marker count and the tau / sigma signal ratio.*** Each point is the proportion of 10 simulated data sets in which the altitude coefficient had the correct sign and was significant at alpha = 0.05. The 20 sampling sites are held fixed. The small demonstration grid leaves visible Monte Carlo variation."}
+cols <- setNames(c("#7570b3", "#1b9e77", "#d95f02", "#e7298a"),
+                 signal_ratios)
+plot(NA, xlim = range(marker_power$nu), ylim = c(0, 1), log = "x",
      xlab = "Number of markers (nu)", ylab = "Power to detect altitude",
-     ylim = c(0, 1), log = "x", main = "Power vs. marker count")
+     main = "Power vs. marker count")
+for (signal_ratio in signal_ratios) {
+  sub <- marker_power[marker_power$signal_ratio == signal_ratio, ]
+  lines(sub$nu, sub$power, type = "b", pch = 19,
+        col = cols[as.character(signal_ratio)])
+}
 abline(h = 0.8, lty = 2, col = "grey50")
-text(min(nu_grid), 0.82, "80% power", pos = 4, col = "grey40", cex = 0.8)
+legend("bottomright", legend = paste("tau / sigma =", signal_ratios),
+       col = cols, lty = 1, pch = 19, bty = "n")
 ```
 
-The curve makes the cost-benefit tradeoff explicit: below some marker count the
-study is underpowered, and beyond some point extra markers buy little. The
-exact location of that elbow depends on the effect size (`theta`), the nugget
-(`sigma`), and the sampling design.
+The curves make the cost-benefit tradeoff explicit. Extra markers help, but
+they cannot fully rescue a weak landscape signal. Conversely, stronger
+landscape signal reduces the marker count needed to reach useful power.
+
+For covariance simulation, use `nu` values at least as large as the number of
+sampled sites. `simulate_covariance_response()` uses `stats::rWishart()`, which
+requires the Wishart degrees of freedom to be at least the covariance-matrix
+dimension.
 
 ---
 
-## Sample size and sampling strategy
+## The role of sample size in statistical power
+
+Now hold marker count fixed at `nu = 100` and vary the number of sampling
+sites. Each curve again represents a different $\tau / \sigma$ ratio.
+
+```{r site-power, eval = FALSE}
+sample_grid <- c(8, 12, 20, 34)
+site_power <- screen_grid(sample_sizes = sample_grid,
+                          nu_values = 100,
+                          seed = 200)
+site_power
+```
+
+```{r site-power-load, echo = FALSE}
+site_power
+```
+
+```{r site-power-plot, fig.cap = "***Power responds to sampling sites and the tau / sigma signal ratio.*** Each point is the proportion of 10 simulated data sets in which the altitude coefficient had the correct sign and was significant at alpha = 0.05. Marker count is held fixed at nu = 100. The small demonstration grid leaves visible Monte Carlo variation."}
+plot(NA, xlim = range(site_power$sample_size), ylim = c(0, 1),
+     xlab = "Number of sampling sites", ylab = "Power to detect altitude",
+     main = "Power vs. sample size")
+for (signal_ratio in signal_ratios) {
+  sub <- site_power[site_power$signal_ratio == signal_ratio, ]
+  lines(sub$sample_size, sub$power, type = "b", pch = 19,
+        col = cols[as.character(signal_ratio)])
+}
+abline(h = 0.8, lty = 2, col = "grey50")
+legend("bottomright", legend = paste("tau / sigma =", signal_ratios),
+       col = cols, lty = 1, pch = 19, bty = "n")
+```
+
+Across repeated assessments, more sites generally improve power because the
+fitted covariance structure is informed by a larger sample from the landscape.
+The ten-replicate teaching grid is intentionally small, so its curves are not
+perfectly monotone. Site placement also matters. Real assessments should use
+more replicates and compare plausible placement strategies rather than treat
+sample count as the only design decision.
+
+---
+
+## Comparing sampling strategies and candidate models
 
 `covariance_response_power()` automates the same loop across **sampling
 designs**: it subsets the focal sites in the surface to a target sample size,
@@ -247,8 +332,8 @@ power <- covariance_response_power(
   ),
   tau        = tau_true,
   sigma      = sigma_true,
-  nu         = 500,
-  nsim       = 15,    # increase for smoother estimates in a real study
+  nu         = 100,
+  nsim       = 20,    # increase for smoother estimates in a real study
   n_designs  = 2,     # random designs evaluated per sample size
   seed       = 1,
   control    = NewtonRaphsonControl(maxit = 10, verbose = FALSE)
@@ -339,7 +424,7 @@ A design assessment usually answers one of three questions:
 | Question | Column(s) to read | Decision rule |
 |----------|-------------------|---------------|
 | Enough sites? | `parameter_summary$power`, `conductance_power` | Pick the smallest sample size with power $\ge 0.8$ for the effects you care about. |
-| Enough markers? | power-vs-`nu` curve | Pick the smallest `nu` past the power elbow. |
+| Enough markers? | power-vs-`nu` curves | Pick the smallest `nu` past the power elbow under a conservative $\tau / \sigma$ ratio. |
 | Which site placement? | compare `strategy` rows | Prefer the strategy with higher power / surface correlation at equal cost. |
 | Trustworthy intervals? | `parameter_summary$coverage` | Require coverage near 0.95 before trusting reported CIs. |
 
@@ -350,7 +435,8 @@ A few practical notes:
   power and coverage estimates are stable.
 - **Match the simulation to your expectations.** The answer depends on
   `theta`, `tau`, and `sigma`. If you are unsure, run the assessment across a
-  grid of plausible effect sizes and report the range.
+  grid of plausible effect sizes and $\tau / \sigma$ ratios, then report the
+  range.
 - **Use a conservative `nu`.** Markers in linkage disequilibrium are not
   independent, so the effective `nu` is smaller than the raw marker count.
   Planning with an optimistic `nu` overstates power.
@@ -373,22 +459,22 @@ surface <- conductance_surface(covariates, coords,
 
 # 2. One simulated covariance matrix from a known truth
 sim <- simulate_covariance_response(
-  theta = c(x1 = 0.8, x2 = -0.5), formula = ~ x1 + x2,
-  data = surface, tau = 1, sigma = 0.3, nu = 500, seed = 1
+  theta = c(x1 = 0.6, x2 = -0.4), formula = ~ x1 + x2,
+  data = surface, tau = 2, sigma = 1, nu = 100, seed = 1
 )
 
 # 3. Refit to check recovery
 fit <- terradish(sim$covariance ~ x1 + x2, data = surface,
                  conductance_model = loglinear_conductance,
-                 measurement_model = wishart_covariance, nu = 500)
+                 measurement_model = wishart_covariance, nu = 100)
 coef(fit)
 
 # 4. Full design assessment across sample sizes / strategies / models
 power <- covariance_response_power(
-  theta = c(x1 = 0.8, x2 = -0.5), formula = ~ x1 + x2,
+  theta = c(x1 = 0.6, x2 = -0.4), formula = ~ x1 + x2,
   data = surface, sample_sizes = c(10, 20, 30),
   strategies = c("spacefill", "random"),
-  tau = 1, sigma = 0.3, nu = 500, nsim = 200, seed = 1
+  tau = 2, sigma = 1, nu = 100, nsim = 200, seed = 1
 )
 power$summary            # fit rate, surface recovery, model selection
 power$parameter_summary  # power, bias, RMSE, coverage per coefficient

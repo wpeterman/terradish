@@ -68,6 +68,10 @@
 #' right-hand-side columns, so all candidate designs share the same graph,
 #' covariate matrix, and conductance-model basis expansion.
 #'
+#' Fits that land on the no-signal boundary are retained as non-detections in
+#' parameter-level power summaries. Their coefficient estimates and standard
+#' errors are reported as \code{NA}, matching explicit fitting failures.
+#'
 #' For spline conductance models, individual basis coefficients are not usually
 #' the most interpretable recovery target. Inspect \code{parameter_summary} for
 #' basis-level behavior, but prefer \code{summary$conductance_power},
@@ -388,6 +392,29 @@ covariance_response_power <- function(theta,
               conductance_cor_threshold = conductance_cor_threshold
             )
             fit_rows[[model_name]] <- fit_row
+
+            if (!fit_row$fit_ok)
+            {
+              common_parameters <- intersect(effect_parameters,
+                                             spec$parameter_names)
+              if (length(common_parameters))
+              {
+                for (parameter in common_parameters)
+                {
+                  parameter_i <- parameter_i + 1L
+                  parameter_results[[parameter_i]] <-
+                    .covariance_power_parameter_row(
+                      fit_row = fit_row,
+                      parameter = parameter,
+                      true = theta_external[[parameter]],
+                      estimate = NA_real_,
+                      se = NA_real_,
+                      alpha = alpha
+                    )
+                }
+              }
+              next
+            }
 
             coef_fit <- coef(fit)
             se_fit <- .covariance_power_se(fit)

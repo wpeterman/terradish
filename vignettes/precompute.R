@@ -26,38 +26,76 @@ covariates <- scale_covariates(covariates)
 surface <- conductance_surface(covariates, melip.coords,
                                directions = 8, saveStack = TRUE)
 
-theta_true <- c(forestcover = 0.8, altitude = -0.5)
-tau_true   <- 1.0
-sigma_true <- 0.3
+theta_true <- c(forestcover = 0.6, altitude = -0.4)
+tau_true   <- 2
+sigma_true <- 1
 
-# ---- nu-power artifact --------------------------------------------------- #
+# ---- planning-screen artifact ------------------------------------------- #
 
-detect_rate <- function(nu, nsim = 20, seed = 100) {
-  set.seed(seed)
-  hits <- logical(nsim)
-  for (i in seq_len(nsim)) {
-    s <- simulate_covariance_response(
-      theta = theta_true, formula = ~ forestcover + altitude,
-      data = surface, tau = tau_true, sigma = sigma_true, nu = nu
-    )
-    f <- terradish(
-      s$covariance ~ forestcover + altitude, data = surface,
-      conductance_model = loglinear_conductance,
-      measurement_model = wishart_covariance, nu = nu,
-      control = NewtonRaphsonControl(maxit = 10, verbose = FALSE)
-    )
-    est <- coef(f)["altitude"]
-    se  <- sqrt(diag(solve(f$fit$hessian)))["altitude"]
-    hits[i] <- abs(est / se) > 1.96
-  }
-  mean(hits)
+altitude_surface <- conductance_surface(
+  covariates[["altitude"]], melip.coords,
+  directions = 8, saveStack = TRUE
+)
+
+screen_theta   <- c(altitude = -0.25)
+screen_sigma   <- 1
+signal_ratios  <- c(0.5, 1, 2, 4)
+screen_nsim    <- 10
+
+screen_power <- function(sample_size, nu, signal_ratio, seed) {
+  assessment <- covariance_response_power(
+    theta             = screen_theta,
+    formula           = ~ altitude,
+    data              = altitude_surface,
+    sample_sizes      = sample_size,
+    strategies        = "spacefill",
+    tau               = signal_ratio * screen_sigma,
+    sigma             = screen_sigma,
+    nu                = nu,
+    nsim              = screen_nsim,
+    seed              = seed,
+    control           = NewtonRaphsonControl(maxit = 10, verbose = FALSE)
+  )
+  out <- assessment$parameter_summary
+  stopifnot(nrow(out) == 1L, out$parameter == "altitude")
+  data.frame(
+    sample_size = sample_size,
+    nu = nu,
+    signal_ratio = signal_ratio,
+    fit_rate = out$fit_rate,
+    power = out$power
+  )
 }
 
-nu_grid     <- c(50, 100, 250, 500, 1000)
-power_by_nu <- sapply(nu_grid, detect_rate)
+screen_grid <- function(sample_sizes, nu_values, seed) {
+  grid <- expand.grid(
+    sample_size = sample_sizes,
+    nu = nu_values,
+    signal_ratio = signal_ratios
+  )
+  do.call(
+    rbind,
+    Map(
+      screen_power,
+      sample_size = grid$sample_size,
+      nu = grid$nu,
+      signal_ratio = grid$signal_ratio,
+      seed = seed + seq_len(nrow(grid))
+    )
+  )
+}
 
+marker_power <- screen_grid(sample_sizes = 20, nu_values = c(20, 50, 100, 200),
+                            seed = 100)
+site_power <- screen_grid(sample_sizes = c(8, 12, 20, 34), nu_values = 100,
+                          seed = 200)
 saveRDS(
-  list(nu_grid = nu_grid, power_by_nu = power_by_nu),
+  list(
+    marker_power = marker_power,
+    site_power = site_power,
+    signal_ratios = signal_ratios,
+    screen_nsim = screen_nsim
+  ),
   "vignettes/vignette-nu-power.rds"
 )
 cat("Saved vignettes/vignette-nu-power.rds\n")
@@ -77,8 +115,8 @@ power <- covariance_response_power(
   ),
   tau        = tau_true,
   sigma      = sigma_true,
-  nu         = 500,
-  nsim       = 10,
+  nu         = 100,
+  nsim       = 20,
   n_designs  = 2,
   seed       = 1,
   control    = NewtonRaphsonControl(maxit = 10, verbose = FALSE)

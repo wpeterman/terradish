@@ -4,7 +4,7 @@
 #'
 #' @details
 #' \if{html}{
-#' \figure{terradish-sticker.png}{options: width=150 alt='Package logo''}
+#' \figure{terradish-sticker.png}{options: width=150 alt='Package logo'}
 #'}
 #'
 #' @keywords internal

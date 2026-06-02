@@ -3,12 +3,14 @@
 \docType{package}
 \name{terradish-package}
 \alias{terradish-package}
-\title{terradish package}
+\title{terradish}
 \description{
 Gradient-based optimization of conductance and resistance surfaces.
 }
 \details{
-\figure{terradish-sticker.png}{options: style='float: right; width: 180px; margin-left: 12px;'}
+\if{html}{
+\figure{terradish-sticker.png}{options: width=150 alt='Package logo'}
+}
 }
 \author{
 \strong{Maintainer}: Bill Peterman \email{peterman.73@osu.edu}

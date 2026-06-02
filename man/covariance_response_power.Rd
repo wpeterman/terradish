@@ -134,6 +134,10 @@ each sample size. The helper subsets \code{data$demes} and the corresponding
 right-hand-side columns, so all candidate designs share the same graph,
 covariate matrix, and conductance-model basis expansion.
 
+Fits that land on the no-signal boundary are retained as non-detections in
+parameter-level power summaries. Their coefficient estimates and standard
+errors are reported as \code{NA}, matching explicit fitting failures.
+
 For spline conductance models, individual basis coefficients are not usually
 the most interpretable recovery target. Inspect \code{parameter_summary} for
 basis-level behavior, but prefer \code{summary$conductance_power},

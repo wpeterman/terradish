@@ -1,3 +1,7 @@
+terradish 0.0.38
+---------
+* Fixed covariance-response power summaries so no-signal boundary fits count as parameter non-detections, and revised the simulation-design vignette to demonstrate how marker count, site count, and the `tau / sigma` signal ratio affect power
+
 terradish 0.0.37
 ---------
 * Refined settings assessment guidance and related optimizer documentation, expanded simulation-design vignette support files, and updated vignette cross-links while excluding `vignettes/precompute.R` from package builds
