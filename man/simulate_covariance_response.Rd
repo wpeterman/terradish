@@ -35,14 +35,15 @@ matrix.}
 
 \item{sigma}{Nonnegative nugget variance added to the diagonal.}
 
-\item{nu}{Effective Wishart degrees of freedom: the number of
-(approximately independent) genetic markers the simulated \code{S} should
-represent.  This controls the amount of sampling noise in the simulated
-covariance: larger \code{nu} gives tighter draws around \code{Sigma}.  For
-biallelic SNP-like simulations this is usually the number of retained
-SNPs; for microsatellite-like panels, use approximately
-\eqn{\sum_l (K_l - 1)} where \eqn{K_l} is the number of observed alleles at
-locus \eqn{l}.  See \code{\link{wishart_covariance}} for how \code{nu}
+\item{nu}{Effective Wishart degrees of freedom: controls the amount of
+sampling noise in the simulated covariance: larger \code{nu} gives tighter
+draws around \code{Sigma}.  Choose a value that matches what you would use
+when fitting the model to real data.  For biallelic SNP-like simulations
+use the number of retained polymorphic SNPs.  For microsatellite-like
+panels, use the number of loci as the conservative default; the true
+effective degrees of freedom is likely between the locus count \eqn{L} and
+\eqn{\sum_l (K_l - 1)}, where \eqn{K_l} is the number of observed alleles
+at locus \eqn{l}.  See \code{\link{wishart_covariance}} for how \code{nu}
 propagates into estimation (it scales standard errors and model-selection
 statistics but not point estimates).}
 

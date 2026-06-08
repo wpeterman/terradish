@@ -584,7 +584,7 @@ likelihood model. Use this alternative when:
 `wishart_covariates()` is the direct Wishart analogue of `mlpe_covariates()`.
 Instead of adding pairwise environmental dissimilarities as regression
 covariates, it builds an outer-product kernel
-\eqn{K_k = z_k z_k^\top} for each site-level environmental covariate and
+${K_k = z_k z_k^\top}$ for each site-level environmental covariate and
 adds it to the fitted covariance matrix:
 
 $$\Sigma = \tau E(\theta) + \sum_k \lambda_k K_k + \exp(\sigma) I$$
@@ -595,9 +595,9 @@ selects pair rows for distance-regression models such as `leastsquares` and
 environmental effect needs to enter as a full site-by-site kernel through
 `wishart_covariates()`.
 
-A positive \eqn{\lambda_k} indicates that environmentally similar sites share
+A positive ${\lambda_k}$ indicates that environmentally similar sites share
 more genetic covariance than landscape resistance alone predicts - the Wishart
-analogue of a positive IBE slope \eqn{\gamma} in MLPE.
+analogue of a positive IBE slope ${\gamma}$ in MLPE.
 
 ### Building the Wishart IBE measurement model
 
@@ -624,10 +624,13 @@ g_wishart_ibe(diag(nrow(melip.coords)),
 Wishart models require `nu` as the Wishart degrees-of-freedom parameter. It is
 not estimated, but fixed at the value supplied to `terradish()`. For biallelic
 SNPs this is usually the retained SNP count. For microsatellites, use the
-independent allele-frequency count, approximately `sum(K_l - 1)` across loci,
-when allele counts by locus are available. The bundled `melip.Fst` matrix was
-estimated from 8 microsatellite loci, but the raw allele counts are not bundled,
-so the example below uses `nu = 8` as a conservative locus-count approximation.
+number of loci as the conservative default. The upper-bound calculation
+`sum(K_l - 1)` is useful for sensitivity analysis when allele counts by locus
+are available, but it should not be treated as the primary value unless you have
+strong justification for treating within-locus alleles as independent. The
+bundled `melip.Fst` matrix was estimated from 8 microsatellite loci, but the raw
+allele counts are not bundled, so the example below uses `nu = 8` as a
+conservative locus-count approximation.
 
 ```{r wishart-fit-models}
 nu_approx <- 8
@@ -686,12 +689,12 @@ summary(fit_w_joint)
 The `phi` table contains three types of nuisance parameters that are quite different
 from the MLPE table:
 
-- **`tau`**: nonneg scale on the resistance-implied covariance (IBR signal).
+- **`tau`**: non-negative scale on the resistance-implied covariance (IBR signal).
   Near zero → no detectable landscape effect.
-- **`lambda_altitude`**: nonneg weight on the altitude kernel (IBE signal).
+- **`lambda_altitude`**: non-negative weight on the altitude kernel (IBE signal).
   Positive → environmentally similar sites share more genetic covariance
   after accounting for resistance distance.
-- **`sigma`**: log-scale nugget (\eqn{\exp(\sigma) I} on the diagonal),
+- **`sigma`**: log-scale nugget (${\exp(\sigma) I}$ on the diagonal),
   absorbing genetic variation not explained by IBR or IBE.
 
 There is no `alpha`, `beta`, or `rho` because the Wishart model does not have

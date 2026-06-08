@@ -15,9 +15,14 @@ aic_table(
 \arguments{
 \item{mod_list}{List of fitted \code{terradish} models.}
 
-\item{AICc}{Should second-order AIC be used instead of AIC?}
+\item{AICc}{Should second-order AIC (Akaike's information criterion with
+small-sample correction) be used instead of AIC?  When \code{TRUE}, the
+correction uses \eqn{n} = number of focal sampling sites (not the number
+of pairwise observations).  A common guideline is to prefer AICc over AIC
+when \eqn{n / K < 40}, where \eqn{K} is the number of estimated parameters.}
 
-\item{BIC}{Should BIC be used instead of AIC?}
+\item{BIC}{Should BIC be used instead of AIC?  BIC uses
+\eqn{n} = number of pairwise observations.}
 
 \item{mod_names}{Optional model names. By default the right-hand side of
 each fitted formula is used. For MLPE measurement models with additional
@@ -34,6 +39,16 @@ A data frame containing model ranks, parameter counts, information
 \description{
 Creates a model-selection table from fitted \code{terradish} models using
 AIC, AICc, or BIC.
+}
+\details{
+AIC comparison is valid only for models that share the same likelihood
+family.  In \pkg{terradish} the Gaussian-based models (\code{\link{leastsquares}}
+and \code{\link{mlpe}}) can be compared with one another, and the
+Wishart-based models (\code{\link{generalized_wishart}} and
+\code{\link{wishart_covariance}}) can be compared with one another, but
+cross-family comparisons (e.g. \code{mlpe} vs. \code{generalized_wishart})
+produce AIC differences that have no straightforward probabilistic
+interpretation.
 }
 \examples{
 library(terra)

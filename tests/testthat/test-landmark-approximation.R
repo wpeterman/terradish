@@ -217,3 +217,26 @@ test_that("auto optimizer resolves to BFGS above three parameters and BFGS repor
   expect_gt(fit_bfgs$diagnostics$line_search_trials, 0L)
   expect_gt(fit_bfgs$diagnostics$line_search_gradient_trials, 0L)
 })
+
+test_that("terradish supports non-symbol formula responses and named Hessians", {
+  dat <- melip_fixture(1:8)
+  data_holder <- list(melip.Fst = dat$melip.Fst)
+  surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
+
+  fit <- suppressWarnings(
+    terradish(
+      data_holder$melip.Fst ~ altitude + forestcover,
+      data = surface,
+      conductance_model = loglinear_conductance,
+      measurement_model = leastsquares,
+      optimizer = "bfgs",
+      control = NewtonRaphsonControl(maxit = 2, verbose = FALSE),
+      solver = "direct"
+    )
+  )
+
+  expect_s3_class(fit, "terradish")
+  expect_equal(names(fit$mle$theta), c("altitude", "forestcover"))
+  expect_equal(dimnames(fit$fit$hessian),
+               list(names(fit$mle$theta), names(fit$mle$theta)))
+})

@@ -1,3 +1,8 @@
+terradish 0.0.39
+---------
+* Clarified Wishart `nu` guidance for microsatellite workflows, AIC/AICc/BIC model-comparison guidance, and CRAN installation text for `corMLPE`
+* Added focused regression coverage for non-symbol formula responses and named Hessian output
+
 terradish 0.0.38
 ---------
 * Fixed covariance-response power summaries so no-signal boundary fits count as parameter non-detections, and revised the simulation-design vignette to demonstrate how marker count, site count, and the `tau / sigma` signal ratio affect power

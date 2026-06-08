@@ -129,8 +129,9 @@ improve the model fit? The test statistic is:
 > 2 × (log-likelihood of larger model − log-likelihood of smaller model)
 
 Under the null hypothesis that the extra parameter does not help, this statistic
-follows a χ² distribution with degrees of freedom equal to the number of extra
-parameters.
+follows asymptotically a χ² distribution with degrees of freedom equal to the
+number of extra parameters.  This approximation improves as sample size
+(number of focal sites) increases.
 
 `terradish` provides `anova()` for this:
 
@@ -263,14 +264,19 @@ aic_table(
 )
 ```
 
-As a rule of thumb, prefer AICc over AIC when the effective sample size
-(number of independent pairwise observations) is less than about 40 times the
-number of parameters.
+The AICc correction implemented here uses `n` = number of focal sampling sites
+(not number of pairwise observations).  As a rule of thumb, prefer AICc over
+AIC when `n` is small relative to the number of conductance parameters `K`;
+a common guideline is `n / K < 40`.
 
 ### BIC for stricter parsimony
 
 BIC penalizes complexity more heavily than AIC and tends to favor simpler
-models:
+models. The implementation here uses the number of pairwise observations
+(`n = n_sites * (n_sites - 1) / 2`) as the BIC sample size, whereas AICc uses
+the number of focal sites.  Which count is the most appropriate `n` for
+landscape-genetic data is debated; treat BIC values as one input among several
+rather than a single definitive arbiter of model choice:
 
 ```{r bic-table}
 aic_table(
@@ -294,7 +300,7 @@ map how the log-likelihood changes across parameter space. This reveals:
 
 `terradish_grid()` evaluates the model at every point on a parameter grid:
 
-```{r likelihood-grid, cache = TRUE}
+```{r likelihood-grid}
 # Define a 21 x 21 grid of (forestcover, altitude) combinations
 theta_grid <- as.matrix(
   expand.grid(

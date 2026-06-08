@@ -84,23 +84,28 @@
 #' }
 #' In short, \code{nu} is an \emph{effective sample size}: it does not change
 #' what the data say about the shape of the conductance surface, but it
-#' determines how strongly the data speak.  Mis-specifying \code{nu} (for
-#' example, passing the number of allele-copy columns rather than the number of
-#' independent markers, or treating tightly linked SNPs as independent)
-#' produces over- or under-confident inference.  When markers are correlated
-#' (linkage disequilibrium), the effective \code{nu} is smaller than the raw
-#' marker count; consider thinning to approximately independent loci or using a
-#' deliberately conservative value.  When in doubt, report a sensitivity
-#' analysis across a plausible range of \code{nu}.
+#' determines how strongly the data speak.  Choosing \code{nu} requires care:
+#' \itemize{
+#'   \item \emph{Biallelic SNPs:} use the number of retained polymorphic SNPs.
+#'     Reduce for linkage disequilibrium if markers are not independent.
+#'   \item \emph{Microsatellites:} use the number of loci \eqn{L} as the
+#'     conservative default.  Allele frequencies within a locus are correlated
+#'     (they sum to a constant), so the locus is the natural unit of
+#'     information.  \eqn{\sum_l (K_l - 1)}, where \eqn{K_l} is the number of
+#'     observed alleles at locus \eqn{l}, is an upper bound that would only be
+#'     correct if alleles within a locus were independent; they are not.
+#'     Using it can produce confidence intervals that are too narrow and
+#'     model-selection statistics that are too large.  The true effective
+#'     \eqn{\nu} lies between \eqn{L} and \eqn{\sum_l (K_l - 1)}.  Report
+#'     the value used and conduct a sensitivity analysis across that range.
+#' }
 #'
 #' \strong{Typical workflow:}
 #' \enumerate{
 #'   \item Compute \code{S} from raw genotypes:
 #'     \code{S <- cov_from_genetic_data(dosage_matrix, groups = pop_vector)}.
-#'   \item Set \code{nu} to the effective marker degrees of freedom.  For
-#'     biallelic SNPs this is the number of retained SNP columns.  For
-#'     microsatellite allele calls this is approximately
-#'     \eqn{\sum_l (K_l - 1)}, not the raw number of loci.
+#'   \item Set \code{nu}: for biallelic SNPs use the retained SNP count; for
+#'     microsatellites use the number of loci as the conservative starting point.
 #'   \item Fit:
 #'     \code{terradish(S ~ ..., measurement_model = wishart_covariance, nu = nu)}.
 #' }

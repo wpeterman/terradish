@@ -160,28 +160,53 @@ estimated by `terradish`.
 For biallelic SNPs, the biological marker count and the statistical degrees of
 freedom are usually the same: each retained SNP contributes one independent
 standardized allele-frequency column. In that case, use the number of retained
-polymorphic SNPs.
+polymorphic SNPs (reduced if markers are in linkage disequilibrium).
 
-For microsatellites, do not automatically use the raw number of loci. A
-microsatellite locus with `K_l` observed alleles contributes about `K_l - 1`
-independent allele frequencies because the allele frequencies within a locus
-sum to a constant. A practical effective value is:
+For microsatellites, **use the number of loci as the conservative default.**
+Allele frequencies within a locus are correlated because they sum to a constant
+equal to the ploidy, so the locus, not the individual allele, is the natural unit of
+information in population genetics. A 10-locus panel contributes at most 10
+independent observations in this sense, regardless of how many alleles each
+locus has.
+
+A common alternative formula, `sum(K_l - 1)` where `K_l` is the number of
+observed alleles at locus `l`, is an **upper bound** that would only be correct
+if the alleles within each locus were mutually independent after removing the
+sum constraint. In practice they are not: populations that are high in one allele
+tend to be predictably low in others through drift and selection. Using
+`sum(K_l - 1)` as `nu` can produce confidence intervals that are too narrow and
+model-selection statistics that are inflated.
+
+The true effective `nu` for microsatellite data is likely somewhere between the
+locus count `L` and `sum(K_l - 1)`. You can compute the upper bound to bracket
+the plausible range:
 
 ```{r microsatellite-nu}
-msat_nu <- sum(vapply(split(seq_along(loci_ms), loci_ms), function(j) {
+# Upper bound: sum(K_l - 1) across loci
+msat_nu_upper <- sum(vapply(split(seq_along(loci_ms), loci_ms), function(j) {
   alleles_l <- unlist(alleles[, j, drop = FALSE], use.names = FALSE)
   length(unique(alleles_l[!is.na(alleles_l)])) - 1L
 }, integer(1)))
 
-msat_nu
+n_loci <- length(unique(loci_ms))   # conservative lower bound: number of loci
+
+cat("Conservative lower bound (number of loci):  nu =", n_loci, "\n")
+cat("Upper bound (sum of alleles - 1 per locus): nu =", msat_nu_upper, "\n")
 ```
 
-This value is larger than the number of microsatellite loci but smaller than
-the total number of expanded allele columns. For a 10 to 15 locus panel with 4
-to 6 alleles per locus, `nu` will often be roughly 30 to 75. If only a published
-distance matrix is available and allele counts by locus are unavailable, the
-locus count can be used as a conservative lower-bound approximation, but report
-that choice clearly.
+**Recommended practice:**
+
+1. Set `nu = n_loci` for your primary analysis.
+2. Report this choice in your methods section.
+3. Repeat the key inference steps (confidence intervals and model comparison)
+   with `nu = msat_nu_upper` to show how sensitive your conclusions are to the
+   choice.
+4. If the model rankings and qualitative conclusions are stable across the range,
+   you can report that the results are robust to the specific choice of `nu`.
+
+If only a published F~ST~ matrix is available and allele counts by locus are
+unavailable, the locus count is the only reasonable option and is straightforwardly
+conservative.
 
 ### Key arguments
 
@@ -409,10 +434,17 @@ cat("  forestcover:", 1.0, "  altitude:", -0.5, "\n\n")
 cat("Estimated conductance parameters:\n")
 print(round(coef(fit_wc), 3))
 
-cat("\nTrue nuisance parameters:  tau =", sim$tau,
-    "  sigma =", sim$sigma, "\n")
-cat("Estimated nuisance parameters:\n")
-print(round(fit_wc$fit$phi, 3))
+cat("\nTrue nuisance parameters (on the variance scale):\n")
+cat("  tau   =", sim$tau, "\n")
+cat("  sigma =", sim$sigma, " (nugget variance; fitted model stores log(sigma))\n\n")
+
+cat("Estimated nuisance parameters (phi vector, log scale for sigma):\n")
+phi_est <- round(fit_wc$fit$phi, 3)
+print(phi_est)
+
+cat("\nFor comparison, exp(phi['sigma']) =",
+    round(exp(fit_wc$fit$phi["sigma"]), 3),
+    " vs. true sigma =", sim$sigma, "\n")
 ```
 
 ---

@@ -93,8 +93,8 @@ most use-cases:
 # Install from local source (recommended while the package is in development)
 remotes::install_github("wpeterman/terradish")
 
-# corMLPE is also required (not on CRAN, yet)
-remotes::install_github("wpeterman/corMLPE")
+# corMLPE is available from CRAN
+install.packages("corMLPE")
 ```
 
 ---
@@ -487,13 +487,14 @@ distance-matrix data when the effective marker degrees of freedom are not
 recorded.
 
 `generalized_wishart` models the observed distance matrix as arising from a
-generalized Wishart distribution (McCullagh 2009). It
-requires `nu`, the effective Wishart degrees of freedom for `S`, and is the
-principled choice when that value is available. For biallelic SNPs this is
-usually the retained SNP count. For microsatellites, use the independent
-allele-frequency count, approximately `sum(K_l - 1)` across loci, rather than
-the raw number of microsatellite loci. Like `mlpe` it accepts a pairwise
-distance matrix (e.g. F~ST~).
+generalized Wishart distribution (McCullagh 2009). It requires `nu`, the
+effective Wishart degrees of freedom for `S`. For biallelic SNPs this is usually
+the retained polymorphic SNP count (reduced for linkage disequilibrium). For
+microsatellites, use the **number of loci** as the conservative default; the
+within-locus allele correlations mean that `sum(K_l - 1)` overstates the true
+degrees of freedom and is better treated as an upper bound; see
+`vignette("wishart-covariance", package = "terradish")` for a full discussion.
+Like `mlpe` it accepts a pairwise distance matrix (e.g. F~ST~).
 
 `wishart_covariance` is the Wishart analogue for data supplied as a
 **covariance** matrix (e.g. from `cov_from_biallelic()`) rather than a
@@ -520,16 +521,21 @@ the resistance-distance covariance) and `sigma` (a log-scale identity
 component that absorbs sampling noise not explained by landscape resistance).
 A `tau` estimate near zero indicates no detectable resistance-distance signal.
 
-You can compare models fitted with different measurement models using
-`aic_table()`. Note that AIC is only meaningful across measurement models when
-the response data `S` is identical and the likelihoods are on the same scale;
-all three models here use the same `melip.Fst` distance matrix, so the
-comparison is valid.
+You can compare models that use the **same likelihood family** with
+`aic_table()`.  `leastsquares` and `mlpe` both model pairwise distances with
+a Gaussian likelihood, so they are directly comparable.  `generalized_wishart`
+evaluates a Wishart likelihood on the same distance matrix, which has a
+different functional form and different normalizing constants; its AIC values
+are not directly comparable to those of `leastsquares` or `mlpe`.  Use
+`aic_table()` to rank models within a family (e.g., all `mlpe` fits differing
+in their conductance formula, or all `generalized_wishart` fits differing in
+their conductance formula).
 
 ```{r compare-measurement-models}
+# Valid: both use a Gaussian likelihood on pairwise distances.
 aic_table(
-  list(fit_ls, fit_mlpe, fit_gw),
-  mod_names = c("leastsquares", "mlpe", "generalized_wishart")
+  list(fit_ls, fit_mlpe),
+  mod_names = c("leastsquares", "mlpe")
 )
 ```
 

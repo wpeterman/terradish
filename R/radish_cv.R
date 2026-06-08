@@ -151,13 +151,28 @@
 #' AIC, AICc, or BIC.
 #'
 #' @param mod_list List of fitted \code{terradish} models.
-#' @param AICc Should second-order AIC be used instead of AIC?
-#' @param BIC Should BIC be used instead of AIC?
+#' @param AICc Should second-order AIC (Akaike's information criterion with
+#'   small-sample correction) be used instead of AIC?  When \code{TRUE}, the
+#'   correction uses \eqn{n} = number of focal sampling sites (not the number
+#'   of pairwise observations).  A common guideline is to prefer AICc over AIC
+#'   when \eqn{n / K < 40}, where \eqn{K} is the number of estimated parameters.
+#' @param BIC Should BIC be used instead of AIC?  BIC uses
+#'   \eqn{n} = number of pairwise observations.
 #' @param mod_names Optional model names. By default the right-hand side of
 #'   each fitted formula is used. For MLPE measurement models with additional
 #'   pairwise covariates, the default appends \code{[mlpe:n]}, where \code{n}
 #'   is the number of added pairwise covariate columns.
 #' @param verbose Should the table be printed to the console?
+#'
+#' @details
+#' AIC comparison is valid only for models that share the same likelihood
+#' family.  In \pkg{terradish} the Gaussian-based models (\code{\link{leastsquares}}
+#' and \code{\link{mlpe}}) can be compared with one another, and the
+#' Wishart-based models (\code{\link{generalized_wishart}} and
+#' \code{\link{wishart_covariance}}) can be compared with one another, but
+#' cross-family comparisons (e.g. \code{mlpe} vs. \code{generalized_wishart})
+#' produce AIC differences that have no straightforward probabilistic
+#' interpretation.
 #'
 #' @return A data frame containing model ranks, parameter counts, information
 #'   criterion values, delta values, weights, cumulative weights, and

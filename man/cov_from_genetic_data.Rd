@@ -96,19 +96,20 @@ Missing allele calls are imputed to the modal observed allele within each
 locus, with a message reporting the number of imputed calls.
 
 For Wishart models, the \code{nu} argument is the effective degrees of
-freedom in the empirical covariance, not necessarily the biological locus
-count.  With biallelic SNPs, each retained SNP contributes one independent
-frequency column, so \code{nu} is usually the retained SNP count.  With
-microsatellites, a locus with \eqn{K_l} observed alleles contributes
-approximately \eqn{K_l - 1} independent allele frequencies because allele
-frequencies sum to a constant within the locus.  A useful microsatellite
-choice is therefore \eqn{nu = \sum_l (K_l - 1)}.  Markers in strong linkage
-disequilibrium are not independent, so the effective \code{nu} is smaller
-than the raw count; thinning to roughly unlinked loci gives a more honest
-value.  Because \code{nu} controls the precision of every downstream Wishart
-fit (it scales standard errors and model-selection statistics but leaves
-point estimates unchanged), see \code{\link{wishart_covariance}} for the
-full explanation before settling on a value.
+freedom in the empirical covariance.  With biallelic SNPs, each retained
+polymorphic SNP contributes one independent standardized allele-frequency
+column, so \code{nu} is usually the retained SNP count (reduced for linkage
+disequilibrium).  With microsatellites, use the number of loci \eqn{L} as
+the conservative default: allele frequencies within a locus are correlated
+(they sum to a constant), so the locus is the natural unit of information in
+population genetics.  \eqn{\sum_l (K_l - 1)}, where \eqn{K_l} is the
+number of observed alleles at locus \eqn{l}, is an upper bound that assumes
+within-locus alleles are independent; this assumption is not generally
+satisfied, and using it can yield over-confident standard errors and
+model-selection statistics.  The true effective \eqn{\nu} for microsatellite
+data lies somewhere between \eqn{L} and \eqn{\sum_l (K_l - 1)}.  Report the
+value used and conduct a sensitivity analysis across that range.  See
+\code{\link{wishart_covariance}} for the full explanation.
 
 If \code{groups = NULL}, rows of the processed feature matrix are used
 directly and squared Euclidean distances among individuals are transformed to

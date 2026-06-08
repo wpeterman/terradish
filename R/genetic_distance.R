@@ -279,19 +279,20 @@ cov_from_biallelic <- function(Y,
 #' locus, with a message reporting the number of imputed calls.
 #'
 #' For Wishart models, the \code{nu} argument is the effective degrees of
-#' freedom in the empirical covariance, not necessarily the biological locus
-#' count.  With biallelic SNPs, each retained SNP contributes one independent
-#' frequency column, so \code{nu} is usually the retained SNP count.  With
-#' microsatellites, a locus with \eqn{K_l} observed alleles contributes
-#' approximately \eqn{K_l - 1} independent allele frequencies because allele
-#' frequencies sum to a constant within the locus.  A useful microsatellite
-#' choice is therefore \eqn{nu = \sum_l (K_l - 1)}.  Markers in strong linkage
-#' disequilibrium are not independent, so the effective \code{nu} is smaller
-#' than the raw count; thinning to roughly unlinked loci gives a more honest
-#' value.  Because \code{nu} controls the precision of every downstream Wishart
-#' fit (it scales standard errors and model-selection statistics but leaves
-#' point estimates unchanged), see \code{\link{wishart_covariance}} for the
-#' full explanation before settling on a value.
+#' freedom in the empirical covariance.  With biallelic SNPs, each retained
+#' polymorphic SNP contributes one independent standardized allele-frequency
+#' column, so \code{nu} is usually the retained SNP count (reduced for linkage
+#' disequilibrium).  With microsatellites, use the number of loci \eqn{L} as
+#' the conservative default: allele frequencies within a locus are correlated
+#' (they sum to a constant), so the locus is the natural unit of information in
+#' population genetics.  \eqn{\sum_l (K_l - 1)}, where \eqn{K_l} is the
+#' number of observed alleles at locus \eqn{l}, is an upper bound that assumes
+#' within-locus alleles are independent; this assumption is not generally
+#' satisfied, and using it can yield over-confident standard errors and
+#' model-selection statistics.  The true effective \eqn{\nu} for microsatellite
+#' data lies somewhere between \eqn{L} and \eqn{\sum_l (K_l - 1)}.  Report the
+#' value used and conduct a sensitivity analysis across that range.  See
+#' \code{\link{wishart_covariance}} for the full explanation.
 #'
 #' If \code{groups = NULL}, rows of the processed feature matrix are used
 #' directly and squared Euclidean distances among individuals are transformed to
@@ -704,14 +705,15 @@ dist_from_biallelic <- function(Y, N)
 #' @param tau Nonnegative scaling applied to the conductance-implied covariance
 #'   matrix.
 #' @param sigma Nonnegative nugget variance added to the diagonal.
-#' @param nu Effective Wishart degrees of freedom: the number of
-#'   (approximately independent) genetic markers the simulated \code{S} should
-#'   represent.  This controls the amount of sampling noise in the simulated
-#'   covariance: larger \code{nu} gives tighter draws around \code{Sigma}.  For
-#'   biallelic SNP-like simulations this is usually the number of retained
-#'   SNPs; for microsatellite-like panels, use approximately
-#'   \eqn{\sum_l (K_l - 1)} where \eqn{K_l} is the number of observed alleles at
-#'   locus \eqn{l}.  See \code{\link{wishart_covariance}} for how \code{nu}
+#' @param nu Effective Wishart degrees of freedom: controls the amount of
+#'   sampling noise in the simulated covariance: larger \code{nu} gives tighter
+#'   draws around \code{Sigma}.  Choose a value that matches what you would use
+#'   when fitting the model to real data.  For biallelic SNP-like simulations
+#'   use the number of retained polymorphic SNPs.  For microsatellite-like
+#'   panels, use the number of loci as the conservative default; the true
+#'   effective degrees of freedom is likely between the locus count \eqn{L} and
+#'   \eqn{\sum_l (K_l - 1)}, where \eqn{K_l} is the number of observed alleles
+#'   at locus \eqn{l}.  See \code{\link{wishart_covariance}} for how \code{nu}
 #'   propagates into estimation (it scales standard errors and model-selection
 #'   statistics but not point estimates).
 #' @param nsim Number of covariance matrices to simulate.

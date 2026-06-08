@@ -13,14 +13,22 @@
 #'   (e.g. F\eqn{_{ST}}). Must have the same dimensions as \code{E}.
 #' @param phi Named numeric vector of nuisance parameters \code{(tau, sigma)}.
 #'   Omit to obtain default starting values \code{c(1, 0)}.
-#' @param nu Positive integer.  Effective Wishart degrees of freedom for
-#'   \code{S}.  For biallelic SNPs this is usually the number of retained SNPs.
-#'   For microsatellites, use the independent allele-frequency count,
-#'   approximately \eqn{\sum_l (K_l - 1)} where \eqn{K_l} is the number of
-#'   observed alleles at locus \eqn{l}; this is usually larger than the number
-#'   of microsatellite loci and smaller than the total expanded allele-column
-#'   count.  Must be supplied; it is not estimated.  Pass it via the \code{nu}
+#' @param nu Positive number.  Effective Wishart degrees of freedom for
+#'   \code{S}.  Must be supplied; it is not estimated.  Pass via the \code{nu}
 #'   argument of \code{\link{terradish}}.
+#'
+#'   \emph{For biallelic SNPs:} use the number of retained polymorphic SNPs
+#'   (reduced for linkage disequilibrium if markers are not independent).
+#'
+#'   \emph{For microsatellites:} use the number of loci as the conservative
+#'   default.  Allele frequencies within a locus are correlated because they
+#'   sum to a constant, so individual alleles are not independent observations in the
+#'   Wishart sense.  The locus count \eqn{L} is a well-defined lower bound: the
+#'   true effective \eqn{\nu} is likely somewhere between \eqn{L} and
+#'   \eqn{\sum_l (K_l - 1)}, where \eqn{K_l} is the number of observed alleles
+#'   at locus \eqn{l}, but the within-locus correlations make \eqn{L} the more
+#'   defensible primary choice.  Report the value used, and conduct a
+#'   sensitivity analysis across the plausible range \eqn{[L, \sum_l (K_l-1)]}.
 #' @param gradient Logical. Compute gradient of the negative log-likelihood
 #'   with respect to \code{phi}?
 #' @param hessian Logical. Compute Hessian with respect to \code{phi}?
@@ -70,11 +78,13 @@
 #'     not, the same data can favor a simpler or a more complex model purely
 #'     through the choice of \code{nu}.
 #' }
-#' Set \code{nu} to the number of approximately independent markers behind
-#' \code{S}.  When markers are in linkage disequilibrium, the effective
-#' \code{nu} is smaller than the raw count; thin to roughly independent loci or
-#' use a conservative value, and consider reporting a sensitivity analysis
-#' across a plausible range of \code{nu}.  See \code{\link{wishart_covariance}}
+#' For biallelic SNPs, set \code{nu} to the retained polymorphic SNP count,
+#' reduced for linkage disequilibrium.  For microsatellites, use the number of
+#' loci \eqn{L} as a conservative default: within-locus allele frequencies are
+#' correlated, so \eqn{\sum_l (K_l - 1)} overstates the true degrees of freedom
+#' and can yield over-confident inference.  The true effective \eqn{\nu} is
+#' likely between \eqn{L} and \eqn{\sum_l (K_l - 1)}, and a sensitivity
+#' analysis across that range is recommended.  See \code{\link{wishart_covariance}}
 #' for the same discussion in the covariance-response setting.
 #'
 #' @references
