@@ -166,6 +166,7 @@ wishart_covariance(E, S, phi = c(0.8, log(0.2)), nu = 20)
 }
 \seealso{
 \code{\link{cov_from_genetic_data}}, \code{\link{cov_from_biallelic}},
-  \code{\link{generalized_wishart}}, \code{\link{simulate_covariance_response}},
-  \code{\link{terradish}}
+  \code{\link{generalized_wishart}}, \code{\link{wishart_covariates}},
+  \code{\link{wishart_drift_covariates}},
+  \code{\link{simulate_covariance_response}}, \code{\link{terradish}}
 }

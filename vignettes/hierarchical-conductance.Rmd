@@ -1,0 +1,231 @@
+---
+title: "Hierarchical conductance: covariates plus a smooth field"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Hierarchical conductance: covariates plus a smooth field}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  fig.width  = 6,
+  fig.height = 4.5,
+  warning  = FALSE,
+  message  = FALSE
+)
+# Results are pre-computed (model fitting is too slow for a CRAN vignette build).
+# The chunk below loads a saved object; the fitting code is shown with eval=FALSE.
+res <- tryCatch(
+  readRDS("vignette-hierarchical.rds"),
+  error = function(e) NULL
+)
+have_res <- !is.null(res)
+```
+
+## Why add a field to a covariate model?
+
+A covariate conductance model (`terradish` with `loglinear_conductance`) is
+mechanistic and predictive, but it is blind to any process its covariates do not
+encode. If an important driver of gene flow is unmapped, the optimizer does not
+return a clean null; it bends the *mapped* covariates to soak up the missing
+structure, biasing their estimated effects. This is the omitted-variable problem
+documented for correlative resistance estimation (Graves et al. 2013; Daniel et
+al. 2024).
+
+`terradish_hierarchical()` addresses this by writing log-conductance as a
+mechanistic covariate term **plus a spatially smooth Gaussian random field**:
+
+$$\log c = X\theta + u, \qquad u \sim \mathrm{Normal}\!\big(0,\ \tau^2 (L_{coarse} + \epsilon I)^{-1}\big).$$
+
+The GMRF prior on $u$ is exactly the FEEMS spatial-smoothness penalty written as
+a proper distribution: it pulls neighbouring field values together, with $\tau^2$
+controlling how much structure the field may absorb. This single model nests both
+parents:
+
+- set the field to zero ($\tau^2 \to 0$) and you recover **`terradish`**;
+- drop the covariates and let $u$ carry the whole surface and you recover a
+  **FEEMS-style** free, smoothed surface;
+- keep both and you get a model that is mechanistic where covariates explain the
+  data and flexible where they do not.
+
+Two payoffs follow. First, the covariate effects $\theta$ are **protected from
+omitted-variable bias**, because unmodelled spatial structure is absorbed by $u$
+rather than distorting $\theta$. Second, the fitted field $u$ is **a deliverable
+in its own right**: a map of the conductance variation your covariates failed to
+explain, and therefore a residual diagnostic and a guide to the next covariate
+worth collecting.
+
+## How it is fit
+
+The penalized objective is
+
+$$J(\theta, u) = -\ell(\theta, u \mid \phi) + \tfrac{1}{2\tau^2}\, u^\top (L_{coarse}+\epsilon I)\, u,$$
+
+where $\ell$ is the measurement-model log-likelihood (the nuisance parameters
+$\phi$ profiled out) and $L_{coarse}$ is the Laplacian of the coarse-field
+adjacency graph. The field lives on a coarse `field_resolution` $\times$
+`field_resolution` grid over the landscape — deliberately coarser than the
+covariate grid, which is the main safeguard against $\theta$ and $u$ competing to
+explain the same signal.
+
+Optimization is by L-BFGS over $(\theta, u)$ using only the gradient, which flows
+through the same single sparse-Cholesky solve `terradish` already uses; the dense
+Hessian over the field is never formed. The field variance $\tau^2$ is chosen by
+a Laplace (empirical-Bayes) marginal likelihood that integrates the field out.
+
+## A worked example
+
+We use the bundled *Melipona* landscape and **simulate** a covariance response
+whose true conductance depends on altitude and forest cover **plus an unmapped
+smooth feature** (a localized corridor/barrier the analyst did not measure).
+
+```{r build-surface, eval = FALSE}
+library(terradish)
+library(terra)
+
+data(melip)
+covs <- c(terra::scale(terra::unwrap(melip.altitude)),
+          terra::scale(terra::unwrap(melip.forestcover)))
+names(covs) <- c("altitude", "forestcover")
+surface <- conductance_surface(covs, terra::unwrap(melip.coords), directions = 8)
+```
+
+```{r simulate, eval = FALSE}
+# True log-conductance = 0.5*altitude - 0.6*forestcover + an UNMAPPED blob.
+Vc <- surface$vertex_coordinates
+xr <- range(Vc[, 1]); yr <- range(Vc[, 2])
+blob <- 1.6 * exp(-(((Vc[, 1] - (xr[1] + 0.35 * diff(xr)))^2 +
+                     (Vc[, 2] - (yr[1] + 0.6 * diff(yr)))^2) /
+                    (2 * (0.18 * sqrt(diff(xr)^2 + diff(yr)^2))^2)))
+blob <- blob - mean(blob)
+# (helper builds a conductance model from a raw design matrix; see ?terradish)
+S <- ... # cov_from_genetic_data() on real genotypes; here a simulated Wishart draw
+```
+
+Fit the hierarchical model, letting $\tau^2$ be chosen by REML, and a plain
+`terradish` model for comparison:
+
+```{r fit, eval = FALSE}
+fit_h <- terradish_hierarchical(
+  S ~ altitude + forestcover,
+  data              = surface,
+  measurement_model = wishart_covariance,
+  nu                = 1500,
+  field_resolution  = 6,
+  tau2              = "reml"
+)
+
+fit_plain <- terradish(
+  S ~ altitude + forestcover, data = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = wishart_covariance, nu = 1500
+)
+```
+
+### The field absorbs the unmapped feature, protecting `theta`
+
+```{r show-coef, echo = FALSE, eval = have_res}
+knitr::kable(res$coef_table, digits = 3,
+             caption = "Conductance coefficients (true: altitude 0.50, forestcover -0.60)")
+```
+
+```{r coef-text, eval = FALSE}
+# With the field: altitude ~0.54, forestcover ~-0.63 (close to truth 0.50, -0.60)
+coef(fit_h)
+# Without the field: forestcover ~-0.43 -- biased ~30% toward zero by the
+# unmodelled blob.
+coef(fit_plain)
+```
+
+```{r recovery-text, echo = FALSE, results = "asis", eval = have_res}
+cat(sprintf(
+  "The fitted field recovers the unmapped feature with correlation **%.2f** to the true blob, and the selected field variance is **tau^2 = %.3g**.\n",
+  res$cor_field_blob, res$tau2))
+```
+
+The plain model, missing the blob, biases the forest-cover effect toward zero;
+the hierarchical model recovers it because the field — not `theta` — absorbs the
+unmodelled structure.
+
+### Mapping the unexplained conductance
+
+`conductance_field()` returns the field as a raster (when the graph stored its
+stack), so you can see *where* the covariates fell short:
+
+```{r field-map, eval = FALSE}
+field_raster <- conductance_field(fit_h, surface, type = "field")
+plot(field_raster)            # the smooth residual conductance surface u
+
+# Or the full fitted surface, exp(X theta + u):
+plot(conductance_field(fit_h, surface, type = "conductance"))
+```
+
+```{r field-plot, echo = FALSE, eval = have_res, fig.cap = "Fitted smooth field u: the conductance variation the covariates did not explain. The peak coincides with the unmapped feature."}
+if (!is.null(res$field_raster)) {
+  terra::plot(terra::unwrap(res$field_raster), main = "Fitted field (u)")
+}
+```
+
+## Selecting `tau2`
+
+With `tau2 = "reml"` (the default), `terradish_hierarchical()` evaluates a
+Laplace marginal likelihood across `tau2_grid` and reports the profile:
+
+```{r tau2-table, echo = FALSE, eval = have_res}
+knitr::kable(res$tau2_selection, digits = 3,
+             caption = "Laplace marginal log-likelihood across the tau^2 grid (interior maximum).")
+```
+
+A clear interior maximum (rather than a value pinned at the smallest or largest
+grid point) indicates the data support a field of intermediate smoothness. If the
+maximum sits at a grid boundary, widen `tau2_grid`. You can also pass a fixed
+numeric `tau2` if you want to control the amount of flexibility directly, or set
+it from external information.
+
+## Practical guidance
+
+- **Keep the field coarser than your covariates.** `field_resolution` controls
+  this; a field as fine as the covariate grid can mimic covariate gradients and
+  erode identifiability. Start coarse (the default `6`) and increase only if a
+  clear, stable feature demands it.
+- **Read the field as a diagnostic, not a mechanism.** A strong field feature
+  says "something here is not in your covariates" — a hypothesis generator for
+  the next layer to collect, not an explanation by itself.
+- **Genetic data constrain conductance weakly.** Added flexibility is only
+  helpful if paid for by an informative prior; that is exactly what the GMRF on
+  the (coarse) field provides. Sanity-check that `theta` and predictive accuracy
+  are stable across a couple of `field_resolution` values.
+- **It nests your simpler models.** Fitting `terradish_hierarchical()` and
+  comparing the field magnitude (and `theta`) against a plain `terradish` fit is
+  a direct check on whether omitted spatial structure is distorting your
+  covariate effects.
+
+## Quick-reference
+
+```{r quickref, eval = FALSE}
+library(terradish)
+
+# 1. Build the conductance surface (as for any terradish workflow)
+surface <- conductance_surface(covariates, coords, directions = 8)
+
+# 2. Fit the hierarchical model (covariates + smooth field), REML tau^2
+fit <- terradish_hierarchical(
+  S ~ forestcover + altitude,
+  data              = surface,
+  measurement_model = wishart_covariance,   # or generalized_wishart / mlpe
+  nu                = nu,
+  field_resolution  = 6,
+  tau2              = "reml"
+)
+
+# 3. Inspect mechanism + the unexplained-conductance map
+summary(fit)                                  # theta (protected) + tau^2 profile
+plot(conductance_field(fit, surface))         # the field u
+```

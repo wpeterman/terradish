@@ -411,8 +411,12 @@ The practical upshot: **`nu` is an effective sample size.** It does not change
 *how strongly* the data speak. Choose it carefully:
 
 - For biallelic SNPs, use the number of retained (polymorphic) SNPs.
-- For microsatellites, use approximately the number of independent allele
-  frequencies, sum over loci of (alleles - 1), not the raw number of loci.
+- For microsatellites, use the **number of loci** as a conservative default.
+  Alleles within a locus are correlated (they sum to a constant), so
+  `sum(K_l - 1)` over loci is an *upper* bound that assumes within-locus
+  independence and tends to overstate the true degrees of freedom; the
+  defensible value lies between the locus count and that upper bound (see the
+  "Choosing `nu`" section above).
 - Markers in strong linkage disequilibrium are not independent, so the
   effective `nu` is **smaller** than the raw marker count. Thin to roughly
   unlinked loci, or use a deliberately conservative value.
@@ -499,6 +503,118 @@ cond_wc_focal <- conductance(
   clamp_covariates = c("forestcover", "altitude")
 )
 ```
+
+---
+
+## Modeling a drift / effective-size surface
+
+The `sigma` nugget above is a **single scalar**: every site is assumed to carry
+the same amount of within-site variance. But conductance conflates two distinct
+biological quantities, how readily an organism moves through a place and how many
+organisms a place supports, and resistance distance alone cannot separate them.
+A low-similarity region caused by a movement barrier calls for a different
+management action than one caused by a local effective-size (density) trough.
+
+`wishart_drift_covariates()` replaces the scalar nugget with a **per-site
+diagonal driven by site-level covariates**, turning the nugget into an
+interpretable drift / effective-size surface:
+
+> **Sigma = tau · E(theta) + diag(exp(Z gamma))**
+
+where `Z` is a site design matrix (an intercept plus one column per drift
+covariate). The off-diagonal structure (`tau`, `theta`) still describes movement
+(isolation by resistance); the new diagonal (`gamma`) describes local drift.
+Because the nugget is `exp(Z gamma)`, it is always positive and `Sigma` stays
+positive definite. With no drift covariates (intercept only) the model reduces
+**exactly** to `wishart_covariance`.
+
+To demonstrate, we simulate a covariance matrix whose within-site variance
+varies along a site covariate. Larger covariate values give larger effective
+size, hence *less* drift and a *smaller* nugget, so the true drift slope is
+negative.
+
+```{r drift-simulate}
+# A site-level covariate hypothesized to track local effective size.
+# In practice use a density proxy, habitat quality, or sampled census size;
+# here we use a smooth gradient across the focal sites for illustration.
+n_site <- length(surface$demes)
+site_drift <- scale(seq_len(n_site))[, 1]
+
+# True conductance-implied covariance E at the conductance truth used above.
+E_true <- as.matrix(terradish_algorithm(
+  loglinear_conductance(~ forestcover + altitude, surface$x),
+  leastsquares, surface, S = diag(n_site),
+  theta = c(forestcover = 1.0, altitude = -0.5),
+  objective = FALSE, gradient = FALSE, hessian = FALSE, partial = FALSE
+)$covariance)
+
+# Per-site nugget: baseline exp(log(0.2)), slope -0.6 on the (centered) covariate.
+Z <- cbind(1, scale(site_drift, scale = FALSE))
+gamma_true <- c(log(0.2), -0.6)
+nugget     <- as.vector(exp(Z %*% gamma_true))
+Sigma_true <- 1.0 * E_true + diag(nugget)
+
+set.seed(123)
+nu_demo <- 500
+S_drift <- rWishart(1, df = nu_demo, Sigma = Sigma_true / nu_demo)[, , 1]
+```
+
+Fit the drift surface and, for comparison, the scalar-nugget model:
+
+```{r drift-fit}
+g_drift <- wishart_drift_covariates(site_drift, model = "wishart_covariance")
+
+fit_drift <- terradish(
+  S_drift ~ forestcover + altitude,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = g_drift,
+  nu                = nu_demo
+)
+
+fit_scalar <- terradish(
+  S_drift ~ forestcover + altitude,
+  data              = surface,
+  conductance_model = loglinear_conductance,
+  measurement_model = wishart_covariance,
+  nu                = nu_demo
+)
+
+summary(fit_drift)
+```
+
+The `phi` table now contains `tau`, `sigma` (the baseline log-nugget, identical
+in meaning to the scalar model's `sigma`), and `gamma_var1`, the slope of the
+log-nugget on the drift covariate.
+
+```{r drift-interpret}
+# Recovered drift slope (true value -0.6)
+fit_drift$fit$phi["gamma_var1", 1]
+
+# Does the drift surface improve the fit? (AIC; same nu for both)
+aic <- function(f) -2 * f$loglik + 2 * (length(coef(f)) + nrow(f$fit$phi))
+c(drift = aic(fit_drift), scalar = aic(fit_scalar))
+```
+
+A negative `gamma_var1` confirms the expected relationship: sites with larger
+covariate values have larger effective size, less drift, and a smaller nugget.
+Reading the sign in terms of effective size, the implied local effective size
+scales as `Ne ∝ 1 / exp(Z gamma)`, so a negative slope means `Ne` *increases*
+with the covariate.
+
+A few practical notes:
+
+- The drift covariate is **site-level** (one value per focal site), supplied as
+  a vector, data frame, or `terra::SpatRaster` plus `coords`, just like
+  `wishart_covariates()`.
+- `gamma` is on the **log-nugget** scale and is unconstrained in sign; only
+  `tau` is constrained to be nonnegative.
+- Because adding drift covariates changes only the diagonal, the conductance
+  estimates `theta` are protected from absorbing effective-size structure that is
+  really about local drift rather than movement.
+- This is the diagonal (within-site) companion to `wishart_covariates()`, which
+  adds off-diagonal isolation-by-environment kernels. The two address different
+  parts of `Sigma` and can be motivated by the same data.
 
 ---
 

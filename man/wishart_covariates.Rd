@@ -134,6 +134,6 @@ Sinica 19:631-649.
 }
 \seealso{
 \code{\link{generalized_wishart}}, \code{\link{wishart_covariance}},
-  \code{\link{mlpe_covariates}}, \code{\link{pairwise_endpoint_covariates}},
-  \code{\link{terradish}}
+  \code{\link{wishart_drift_covariates}}, \code{\link{mlpe_covariates}},
+  \code{\link{pairwise_endpoint_covariates}}, \code{\link{terradish}}
 }

@@ -76,8 +76,8 @@
 #'   cross-validation through \code{\link{terradish_cv}}.
 #'
 #' @seealso \code{\link{generalized_wishart}}, \code{\link{wishart_covariance}},
-#'   \code{\link{mlpe_covariates}}, \code{\link{pairwise_endpoint_covariates}},
-#'   \code{\link{terradish}}
+#'   \code{\link{wishart_drift_covariates}}, \code{\link{mlpe_covariates}},
+#'   \code{\link{pairwise_endpoint_covariates}}, \code{\link{terradish}}
 #'
 #' @references
 #' McCullagh P. 2009. Marginal likelihood for distance matrices. Statistica
@@ -314,7 +314,8 @@ wishart_covariates <- function(x,
 
 .wishart_covariate_covariance <- function(E, S, phi, nu, Sigma, B, tau,
                                           gradient, hessian, partial,
-                                          nonnegative, validate)
+                                          nonnegative, validate,
+                                          curvature = NULL)
 {
   symm <- function(X) (X + t(X)) / 2
   A <- solve(Sigma)
@@ -344,12 +345,14 @@ wishart_covariates <- function(x,
                             jacobian_S_factor = -nu / 2,
                             A_left = A, A_right = A,
                             jacobian_S_left = A,
-                            jacobian_S_right = A)
+                            jacobian_S_right = A,
+                            curvature = curvature)
 }
 
 .wishart_covariate_generalized <- function(E, S, phi, nu, Sigma, B, tau,
                                            sigma, gradient, hessian, partial,
-                                           nonnegative, validate)
+                                           nonnegative, validate,
+                                           curvature = NULL)
 {
   symm <- function(X) (X + t(X)) / 2
   ones <- matrix(1, nrow(S), 1)
@@ -398,7 +401,8 @@ wishart_covariates <- function(x,
                             jacobian_S_factor = -nu / 4,
                             A_left = SigInvW, A_right = t(SigInvW),
                             jacobian_S_left = t(SigInvW),
-                            jacobian_S_right = SigInvW)
+                            jacobian_S_right = SigInvW,
+                            curvature = curvature)
 }
 
 .wishart_covariate_finish <- function(objective, fitted, grad_Sigma,
@@ -406,7 +410,8 @@ wishart_covariates <- function(x,
                                       sigma_sign, gradient, hessian, partial,
                                       nonnegative, validate, jacobian_S_factor,
                                       A_left, A_right,
-                                      jacobian_S_left, jacobian_S_right)
+                                      jacobian_S_left, jacobian_S_right,
+                                      curvature = NULL)
 {
   p <- length(phi)
   dPhi <- matrix(0, p, 1, dimnames = list(names(phi), NULL))
@@ -428,7 +433,16 @@ wishart_covariates <- function(x,
       for (i in names(phi))
         for (j in names(phi))
           ddPhi[i, j] <- sum(B[[i]] * dgrad[[j]])
-      ddPhi["sigma", "sigma"] <- ddPhi["sigma", "sigma"] + dPhi["sigma", ]
+      # Second-order ("curvature") term: the contribution of the second
+      # derivative of Sigma with respect to phi, sum(grad_Sigma * d2Sigma/dphi_i dphi_j).
+      # For the additive-kernel model only the log-scale nugget is curved
+      # (d2Sigma/dsigma^2 = exp(sigma) I), giving the historical special case.
+      # A caller (e.g. the drift surface) may supply a full p x p curvature
+      # matrix via `curvature(grad_Sigma)`.
+      if (is.null(curvature))
+        ddPhi["sigma", "sigma"] <- ddPhi["sigma", "sigma"] + dPhi["sigma", ]
+      else
+        ddPhi <- ddPhi + curvature(grad_Sigma)
       ddPhi <- (ddPhi + t(ddPhi)) / 2
 
       if (partial)

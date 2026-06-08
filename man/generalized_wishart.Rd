@@ -156,6 +156,7 @@ McCullagh P. 2009. Marginal likelihood for distance matrices. Statistica
 Sinica 19:631-649.
 }
 \seealso{
-\code{\link{wishart_covariance}}, \code{\link{mlpe}},
+\code{\link{wishart_covariance}}, \code{\link{wishart_covariates}},
+  \code{\link{wishart_drift_covariates}}, \code{\link{mlpe}},
   \code{\link{terradish}}
 }

@@ -115,8 +115,9 @@
 #' inspect eigenvalues before fitting.
 #'
 #' @seealso \code{\link{cov_from_genetic_data}}, \code{\link{cov_from_biallelic}},
-#'   \code{\link{generalized_wishart}}, \code{\link{simulate_covariance_response}},
-#'   \code{\link{terradish}}
+#'   \code{\link{generalized_wishart}}, \code{\link{wishart_covariates}},
+#'   \code{\link{wishart_drift_covariates}},
+#'   \code{\link{simulate_covariance_response}}, \code{\link{terradish}}
 #'
 #' @return When \code{phi} is missing, a list with elements \code{phi}
 #'   (least-squares starting values for \code{(tau, sigma)}), \code{lower}
