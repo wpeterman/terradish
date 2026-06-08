@@ -1,0 +1,71 @@
+// =====================================================================
+// Scenario 1 (tree-sequence version): WF 2D stepping-stone whose deme sizes
+// (local Ne / drift) vary along a gradient, uniform neighbour migration.
+// Records a tree sequence (mutation rate 0); deep history + neutral mutations
+// are added in Python via pyslim.recapitate + msprime.sim_mutations. This
+// eliminates the young-mutation / high-Fst artifact of forward-only sims and
+// runs fast (no mutation registry), so only a short spatial-equilibration
+// burn-in is needed.
+//
+// CLI: slim -seed 1 -d "OUTPRE='dev/slim/scen1ts'" dev/slim/scen1_ts.slim
+// =====================================================================
+initialize() {
+    initializeTreeSeq();
+    if (!exists("DIM"))    defineConstant("DIM", 5);
+    if (!exists("N0"))     defineConstant("N0", 200);
+    if (!exists("BETA"))   defineConstant("BETA", 0.7);     // log deme-size gradient
+    if (!exists("MIG"))    defineConstant("MIG", 0.03);
+    if (!exists("RHO"))    defineConstant("RHO", 1e-8);
+    if (!exists("L"))      defineConstant("L", 1000000);
+    if (!exists("BURNIN")) defineConstant("BURNIN", 1500);  // spatial equilibration only
+    if (!exists("OUTPRE")) defineConstant("OUTPRE", "scen1ts");
+
+    initializeMutationRate(0);
+    initializeMutationType("m1", 0.5, "f", 0.0);
+    initializeGenomicElementType("g1", m1, 1.0);
+    initializeGenomicElement(g1, 0, asInteger(L) - 1);
+    initializeRecombinationRate(RHO);
+}
+
+1 early() {
+    ndeme = DIM * DIM;
+    gx = float(ndeme); gy = float(ndeme);
+    for (i in 0:(ndeme - 1)) {
+        gx[i] = i % DIM;
+        gy[i] = (i - (i % DIM)) / DIM;
+    }
+    cov = (gx - mean(gx)) / sd(gx);
+    defineConstant("GX", gx);
+    defineConstant("GY", gy);
+    defineConstant("COV", cov);
+    sizes = asInteger(round(N0 * exp(BETA * cov)));
+    sizes = pmax(sizes, 20);
+    defineConstant("SIZES", sizes);
+
+    for (i in 0:(ndeme - 1))
+        sim.addSubpop(i, sizes[i]);
+
+    for (i in 0:(ndeme - 1)) {
+        cx = i % DIM; cy = (i - (i % DIM)) / DIM;
+        srcs = integer(0);
+        if (cx > 0)        srcs = c(srcs, i - 1);
+        if (cx < DIM - 1)  srcs = c(srcs, i + 1);
+        if (cy > 0)        srcs = c(srcs, i - DIM);
+        if (cy < DIM - 1)  srcs = c(srcs, i + DIM);
+        sim.subpopulations[i].setMigrationRates(srcs, rep(MIG, size(srcs)));
+    }
+    community.rescheduleScriptBlock(s1, BURNIN, BURNIN);
+}
+
+s1 2 late() {
+    ndeme = DIM * DIM;
+    sim.treeSeqOutput(OUTPRE + ".trees");
+
+    dmeta = "deme,gx,gy,cov,size";
+    for (i in 0:(ndeme - 1))
+        dmeta = c(dmeta, i + "," + GX[i] + "," + GY[i] + "," + COV[i] + "," + SIZES[i]);
+    writeFile(OUTPRE + "_demes.csv", dmeta);
+
+    catn("scenario 1 (tree-seq) done: " + ndeme + " demes, total N = " + sum(SIZES));
+    sim.simulationFinished();
+}

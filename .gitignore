@@ -14,3 +14,7 @@ future_dev_ideas
 future_dev_ideas.md
 /doc/
 /Meta/
+
+# Generated SLiM / recapitation pipeline data artifacts (regenerable from scripts)
+dev/slim/*.trees
+dev/slim/*.csv

@@ -1,0 +1,145 @@
+// =====================================================================
+// Tier 1 validation, Scenario 2: continuous-space nonWF population whose
+// LOCAL DENSITY (hence local effective size / drift) is driven by a smooth
+// habitat gradient, with spatially limited (but habitat-independent)
+// dispersal.
+//
+// Purpose: a realistic, continuous-space test of the terradish drift surface
+//   Sigma = tau E + diag(exp(Z gamma)).  Habitat increases left->right, so
+//   local Ne increases with x, drift decreases with x, and the drift slope on
+//   the habitat covariate should be NEGATIVE.
+//
+// Output (read by run_scen2.R): per-focal-site derived-allele frequencies on a
+//   grid of sampling points (Voronoi assignment of individuals to the nearest
+//   focal point), plus a focal meta CSV (x, y, habitat covariate, n sampled).
+//   Self-contained: forward neutral mutations + direct frequency output, no
+//   Python / tree-sequence dependency.  (With pyslim/msprime available this
+//   would instead use tree-seq recording + recapitation; see roadmap.)
+//
+// CLI: slim -seed 1 -d "OUTPRE='dev/slim/scen2'" dev/slim/scen2_continuous_space.slim
+// =====================================================================
+initialize() {
+    initializeSLiMModelType("nonWF");
+    initializeSLiMOptions(dimensionality = "xy");
+
+    if (!exists("K"))       defineConstant("K", 1800);     // density scale
+    if (!exists("SIGMA_C")) defineConstant("SIGMA_C", 0.08);  // competition radius
+    if (!exists("SIGMA_M")) defineConstant("SIGMA_M", 0.10);  // mate radius
+    if (!exists("SIGMA_D")) defineConstant("SIGMA_D", 0.05);  // dispersal sd
+    if (!exists("MU"))      defineConstant("MU", 1e-7);
+    if (!exists("RHO"))     defineConstant("RHO", 1e-8);
+    if (!exists("L"))       defineConstant("L", 1000000);
+    if (!exists("FGRID"))   defineConstant("FGRID", 5);    // FGRID x FGRID focal pts
+    if (!exists("NSAMP"))   defineConstant("NSAMP", 25);   // diploids / focal pt
+    if (!exists("BURNIN"))  defineConstant("BURNIN", 2500);
+    if (!exists("HAB0"))    defineConstant("HAB0", 0.25);  // habitat intercept
+    if (!exists("HABSLOPE"))defineConstant("HABSLOPE", 0.6); // habitat slope on x
+    if (!exists("OUTPRE"))  defineConstant("OUTPRE", "scen2");
+
+    initializeMutationRate(MU);
+    initializeMutationType("m1", 0.5, "f", 0.0);
+    m1.convertToSubstitution = T;
+    initializeGenomicElementType("g1", m1, 1.0);
+    initializeGenomicElement(g1, 0, asInteger(L) - 1);
+    initializeRecombinationRate(RHO);
+
+    initializeInteractionType(1, "xy", reciprocal = T, maxDistance = SIGMA_C * 3);
+    i1.setInteractionFunction("n", 1.0, SIGMA_C);
+    initializeInteractionType(2, "xy", reciprocal = T, maxDistance = SIGMA_M * 3);
+    i2.setInteractionFunction("n", 1.0, SIGMA_M);
+}
+
+reproduction() {
+    mate = i2.nearestNeighbors(individual, 1);
+    if (mate.size()) {
+        off = subpop.addCrossed(individual, mate);
+        pos = p1.pointDeviated(1, individual.spatialPosition, "reprising", INF, "n", SIGMA_D);
+        off.setSpatialPosition(pos);
+    }
+}
+
+1 first() {
+    sim.addSubpop("p1", asInteger(K * (HAB0 + HABSLOPE * 0.5)));
+    p1.setSpatialBounds(c(0, 0, 1, 1));
+    p1.individuals.setSpatialPosition(p1.pointUniform(p1.individualCount));
+    community.rescheduleScriptBlock(s1, BURNIN, BURNIN);
+}
+
+first() {
+    i2.evaluate(p1);
+}
+
+early() {
+    i1.evaluate(p1);
+    inds = p1.individuals;
+    habitat = HAB0 + HABSLOPE * inds.x;          // increases left -> right
+    competition = i1.localPopulationDensity(inds);
+    inds.fitnessScaling = (K * habitat) / (competition + 1e-9);
+}
+
+s1 2 late() {
+    inds = p1.individuals;
+    nind = inds.size();
+    xs = inds.x; ys = inds.y;
+
+    // focal grid coordinates kept in the INTERIOR (0.2..0.8) so truncated
+    // neighbourhoods at the spatial boundary do not inflate drift at the edges.
+    fcoord = 0.2 + 0.6 * (seq(1, FGRID) - 1) / (FGRID - 1);  // 0.2,0.35,0.5,0.65,0.8
+    nfoc = FGRID * FGRID;
+    fx = float(nfoc); fy = float(nfoc);
+    for (i in 0:(nfoc - 1)) {
+        fx[i] = fcoord[asInteger(i % FGRID)];
+        fy[i] = fcoord[asInteger((i - (i % FGRID)) / FGRID)];
+    }
+
+    // Voronoi assignment: each individual -> nearest focal point
+    nearestF = rep(-1, nind);
+    bestD = rep(INF, nind);
+    for (f in 0:(nfoc - 1)) {
+        df = sqrt((xs - fx[f]) ^ 2 + (ys - fy[f]) ^ 2);
+        closer = df < bestD;
+        nearestF[closer] = f;
+        bestD[closer] = df[closer];
+    }
+
+    // sample up to NSAMP individuals per focal point into a focal subpopulation
+    muts = sim.mutations;
+    nmut = size(muts);
+    Fmat = float(nmut * nfoc);
+    nsamp_deme = integer(nfoc);
+    for (f in 0:(nfoc - 1)) {
+        members = inds[nearestF == f];
+        ns = min(NSAMP, members.size());
+        nsamp_deme[f] = ns;
+        if (ns > 0) {
+            s = sample(members, ns);
+            pf = sim.addSubpop(1000 + f, 0);
+            pf.takeMigrants(s);
+            fr = sim.mutationFrequencies(pf, muts);
+            for (k in 0:(nmut - 1))
+                Fmat[f * nmut + k] = fr[k];
+        }
+    }
+
+    // write loci x focal frequency table
+    lines = "locus,pos," + paste("deme" + 0:(nfoc - 1), sep = ",");
+    pos = muts.position;
+    for (k in 0:(nmut - 1)) {
+        vals = float(nfoc);
+        for (f in 0:(nfoc - 1))
+            vals[f] = Fmat[f * nmut + k];
+        lines = c(lines, k + "," + pos[k] + "," + paste(vals, sep = ","));
+    }
+    writeFile(OUTPRE + "_freq.csv", lines);
+
+    // focal meta: covariate = habitat at the focal x, plus n sampled
+    dmeta = "deme,fx,fy,habitat,nsamp";
+    for (f in 0:(nfoc - 1))
+        dmeta = c(dmeta, f + "," + fx[f] + "," + fy[f] + "," +
+                  (HAB0 + HABSLOPE * fx[f]) + "," + nsamp_deme[f]);
+    writeFile(OUTPRE + "_demes.csv", dmeta);
+
+    catn("scenario 2 done: N=" + nind + ", " + nfoc + " focal points, " +
+         nmut + " segregating mutations");
+    sim.simulationFinished();
+}

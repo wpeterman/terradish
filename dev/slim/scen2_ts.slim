@@ -1,0 +1,83 @@
+// =====================================================================
+// Scenario 2 (tree-sequence version): continuous-space nonWF population whose
+// local density (local Ne / drift) is driven by a habitat gradient. Records a
+// tree sequence; deep ancestry + neutral mutations are added in Python. Focal
+// sampling (Voronoi to an interior grid) is done in Python from the recorded
+// individual locations.
+//
+// CLI: slim -seed 1 -d "OUTPRE='dev/slim/scen2ts'" dev/slim/scen2_ts.slim
+// =====================================================================
+initialize() {
+    initializeSLiMModelType("nonWF");
+    initializeSLiMOptions(dimensionality = "xy");
+    initializeTreeSeq();
+
+    if (!exists("K"))        defineConstant("K", 2800);
+    if (!exists("SIGMA_C"))  defineConstant("SIGMA_C", 0.10);
+    if (!exists("SIGMA_M"))  defineConstant("SIGMA_M", 0.12);
+    if (!exists("SIGMA_D"))  defineConstant("SIGMA_D", 0.12);
+    if (!exists("RHO"))      defineConstant("RHO", 1e-8);
+    if (!exists("L"))        defineConstant("L", 1000000);
+    if (!exists("FGRID"))    defineConstant("FGRID", 5);
+    if (!exists("BURNIN"))   defineConstant("BURNIN", 1500);
+    if (!exists("HAB0"))     defineConstant("HAB0", 0.15);
+    if (!exists("HABSLOPE")) defineConstant("HABSLOPE", 0.85);
+    if (!exists("OUTPRE"))   defineConstant("OUTPRE", "scen2ts");
+
+    initializeMutationRate(0);
+    initializeMutationType("m1", 0.5, "f", 0.0);
+    initializeGenomicElementType("g1", m1, 1.0);
+    initializeGenomicElement(g1, 0, asInteger(L) - 1);
+    initializeRecombinationRate(RHO);
+
+    initializeInteractionType(1, "xy", reciprocal = T, maxDistance = SIGMA_C * 3);
+    i1.setInteractionFunction("n", 1.0, SIGMA_C);
+    initializeInteractionType(2, "xy", reciprocal = T, maxDistance = SIGMA_M * 3);
+    i2.setInteractionFunction("n", 1.0, SIGMA_M);
+}
+
+reproduction() {
+    mate = i2.nearestNeighbors(individual, 1);
+    if (mate.size()) {
+        off = subpop.addCrossed(individual, mate);
+        pos = p1.pointDeviated(1, individual.spatialPosition, "reprising", INF, "n", SIGMA_D);
+        off.setSpatialPosition(pos);
+    }
+}
+
+1 first() {
+    sim.addSubpop("p1", asInteger(K * (HAB0 + HABSLOPE * 0.5)));
+    p1.setSpatialBounds(c(0, 0, 1, 1));
+    p1.individuals.setSpatialPosition(p1.pointUniform(p1.individualCount));
+    community.rescheduleScriptBlock(s1, BURNIN, BURNIN);
+}
+
+first() { i2.evaluate(p1); }
+
+early() {
+    i1.evaluate(p1);
+    inds = p1.individuals;
+    habitat = HAB0 + HABSLOPE * inds.x;
+    competition = i1.localPopulationDensity(inds);
+    inds.fitnessScaling = (K * habitat) / (competition + 1e-9);
+}
+
+s1 2 late() {
+    sim.treeSeqOutput(OUTPRE + ".trees");
+
+    fcoord = 0.2 + 0.6 * (seq(1, FGRID) - 1) / (FGRID - 1);   // interior 0.2..0.8
+    nfoc = FGRID * FGRID;
+    fxy = "fx,fy";
+    dmeta = "deme,fx,fy,habitat";
+    for (i in 0:(nfoc - 1)) {
+        fx = fcoord[asInteger(i % FGRID)];
+        fy = fcoord[asInteger((i - (i % FGRID)) / FGRID)];
+        fxy = c(fxy, fx + "," + fy);
+        dmeta = c(dmeta, i + "," + fx + "," + fy + "," + (HAB0 + HABSLOPE * fx));
+    }
+    writeFile(OUTPRE + "_focal.csv", fxy);
+    writeFile(OUTPRE + "_demes.csv", dmeta);
+
+    catn("scenario 2 (tree-seq) done: N=" + p1.individualCount + ", " + nfoc + " focal points");
+    sim.simulationFinished();
+}

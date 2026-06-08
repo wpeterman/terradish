@@ -1,0 +1,105 @@
+// =====================================================================
+// Tier 1 validation, Scenario 1: WF 2D stepping-stone metapopulation
+// whose deme sizes (hence local effective size / drift) vary along a
+// spatial gradient, with UNIFORM neighbour migration.
+//
+// Purpose: a clean, self-contained test of the terradish drift surface
+//   Sigma = tau E + diag(exp(Z gamma)).  Because migration is uniform,
+//   the only landscape signal is the Ne (drift) gradient, which should be
+//   recovered by the diagonal drift term, not by the conductance (IBR) term.
+//
+// Output (read by run_scen1.R): a single VCF of NSAMP diploids sampled per
+//   deme (in deme order) plus a meta CSV (deme, grid coords, covariate,
+//   deme size).  No Python / tree-sequence dependency.
+//
+// CLI:  slim -seed 1 -d "OUTPRE='dev/slim/scen1'" dev/slim/scen1_stepping_stone.slim
+// =====================================================================
+initialize() {
+    if (!exists("DIM"))    defineConstant("DIM", 5);        // DIM x DIM demes
+    if (!exists("N0"))     defineConstant("N0", 250);       // baseline deme size
+    if (!exists("BETA"))   defineConstant("BETA", 0.6);     // log deme-size gradient
+    if (!exists("MIG"))    defineConstant("MIG", 0.02);     // per-edge migration rate
+    if (!exists("MU"))     defineConstant("MU", 1e-6);      // mutation rate per bp
+    if (!exists("RHO"))    defineConstant("RHO", 1e-8);     // recombination rate
+    if (!exists("L"))      defineConstant("L", 1000000);    // genome length (bp)
+    if (!exists("NSAMP"))  defineConstant("NSAMP", 20);     // diploids sampled / deme
+    if (!exists("BURNIN")) defineConstant("BURNIN", 3000);  // generations
+    if (!exists("OUTPRE")) defineConstant("OUTPRE", "scen1");
+
+    initializeMutationRate(MU);
+    initializeMutationType("m1", 0.5, "f", 0.0);
+    m1.convertToSubstitution = T;
+    initializeGenomicElementType("g1", m1, 1.0);
+    initializeGenomicElement(g1, 0, asInteger(L) - 1);
+    initializeRecombinationRate(RHO);
+}
+
+1 early() {
+    ndeme = DIM * DIM;
+
+    // grid coordinates and a standardized x-gradient covariate
+    gx = float(ndeme); gy = float(ndeme);
+    for (i in 0:(ndeme - 1)) {
+        gx[i] = i % DIM;
+        gy[i] = (i - (i % DIM)) / DIM;
+    }
+    cov = (gx - mean(gx)) / sd(gx);
+    defineConstant("GX", gx);
+    defineConstant("GY", gy);
+    defineConstant("COV", cov);
+
+    // deme sizes follow the gradient: larger cov -> larger deme -> larger Ne
+    sizes = asInteger(round(N0 * exp(BETA * cov)));
+    sizes = pmax(sizes, 20);
+    defineConstant("SIZES", sizes);
+
+    for (i in 0:(ndeme - 1))
+        sim.addSubpop(i, sizes[i]);
+
+    // uniform per-edge rook migration
+    for (i in 0:(ndeme - 1)) {
+        cx = i % DIM; cy = (i - (i % DIM)) / DIM;
+        srcs = integer(0);
+        if (cx > 0)        srcs = c(srcs, i - 1);
+        if (cx < DIM - 1)  srcs = c(srcs, i + 1);
+        if (cy > 0)        srcs = c(srcs, i - DIM);
+        if (cy < DIM - 1)  srcs = c(srcs, i + DIM);
+        sim.subpopulations[i].setMigrationRates(srcs, rep(MIG, size(srcs)));
+    }
+
+    community.rescheduleScriptBlock(s1, BURNIN, BURNIN);
+}
+
+s1 2 late() {
+    ndeme = DIM * DIM;
+    muts = sim.mutations;
+    nmut = size(muts);
+    pos = muts.position;
+
+    // per-deme derived-allele frequency matrix (flattened: deme*nmut + locus)
+    Fmat = float(nmut * ndeme);
+    for (d in 0:(ndeme - 1)) {
+        fd = sim.mutationFrequencies(sim.subpopulations[d], muts);
+        for (k in 0:(nmut - 1))
+            Fmat[d * nmut + k] = fd[k];
+    }
+
+    // write loci x deme frequency table
+    lines = "locus,pos," + paste("deme" + 0:(ndeme - 1), sep = ",");
+    for (k in 0:(nmut - 1)) {
+        vals = float(ndeme);
+        for (d in 0:(ndeme - 1))
+            vals[d] = Fmat[d * nmut + k];
+        lines = c(lines, k + "," + pos[k] + "," + paste(vals, sep = ","));
+    }
+    writeFile(OUTPRE + "_freq.csv", lines);
+
+    // per-deme covariate / size meta
+    dmeta = "deme,gx,gy,cov,size";
+    for (i in 0:(ndeme - 1))
+        dmeta = c(dmeta, i + "," + GX[i] + "," + GY[i] + "," + COV[i] + "," + SIZES[i]);
+    writeFile(OUTPRE + "_demes.csv", dmeta);
+
+    catn("scenario 1 done: " + ndeme + " demes, " + nmut + " segregating mutations");
+    sim.simulationFinished();
+}
