@@ -293,7 +293,26 @@ ride the F2 Hessian path; likely a new fitting routine beside
 `terradish_algorithm()` / `terradish_optimize` that alternates `θ` (dense) and
 `u` (sparse), with τ² in an outer loop.
 
-### Tier 3 — Directional, non-reversible generator (covariate-driven)  **[status: design APPROVED; Phase-0 gate PASSED; building Phases 1–5]**
+### Tier 3 — Directional, non-reversible generator (covariate-driven)  **[status: R ENGINE built + validated + full S3 suite; C++ (Phase 2b) + SLiM scen3 (Phase 4) + docs (Phase 5) remain]**
+
+> **Phase 1-2 (R engine) DONE & validated.** `R/directed_conductance.R`:
+> `edge_gradient()`, `terradish_directed_algorithm()` (forward hitting->commute-time
+> E + reverse-mode TRANSPOSE-solve adjoint), `terradish_directed()` (BFGS fit,
+> SE via Jacobian of the analytic gradient), `.directed_generator()`. Adjoint
+> validated vs numDeriv to **3e-8** on well-conditioned graphs (`dev/debug_tier3.R`);
+> recovery exact (θ̂,γ̂); γ=0 reduces to a reversible generator.
+> **Numerical caveat confirmed:** the per-absorber R solver ill-conditions under
+> strongly heterogeneous rates (wide covariate range -> exp blow-up); on the full
+> 22k-node melip raster a *fit* is impractically slow + ill-conditioned. Fine on
+> small/coarse graphs (incl. SLiM stepping-stone validation); full-resolution
+> fitting needs the **C++ Eigen::SparseLU backend (Phase 2b)** for speed +
+> conditioning.
+> **Full S3 suite added** (Tier 3 + Tier 2): print/summary/coef/logLik/AIC/vcov/
+> confint/plot; Tier 1 drift fits inherit the base terradish S3. Hierarchical AIC
+> uses the field's effective df. Tests: `tests/testthat/test-directed-conductance.R`.
+> **Phase 4 drafted:** `dev/slim/scen3_ts.slim` (asymmetric/downstream migration)
+> + `run_scen3_recap.R` (directed vs reversible LRT on coalescent data).
+
 
 > **Phase-0 gate PASSED (`dev/proto_tier3_phase0.R`)**: directional flow IS
 > identifiable from symmetric commute-time distances on a bounded lattice (sign +
