@@ -293,7 +293,17 @@ ride the F2 Hessian path; likely a new fitting routine beside
 `terradish_algorithm()` / `terradish_optimize` that alternates `θ` (dense) and
 `u` (sparse), with τ² in an outer loop.
 
-### Tier 3 — Directional, non-reversible generator (covariate-driven)  **[status: DESIGN written — `dev/TIER3_DESIGN.md` — awaiting review before build]**
+### Tier 3 — Directional, non-reversible generator (covariate-driven)  **[status: design APPROVED; Phase-0 gate PASSED; building Phases 1–5]**
+
+> **Phase-0 gate PASSED (`dev/proto_tier3_phase0.R`)**: directional flow IS
+> identifiable from symmetric commute-time distances on a bounded lattice (sign +
+> magnitude; γ̂ sign correct 6/6 under noise). Build justified. Numerical caveat:
+> strong |γ| → exponential against-flow hitting times → ill-conditioned solves;
+> use moderate-γ regime / log-scale / iterative fallback. Next: Phase 1 (directed
+> generator model + edge-gradient helper), Phase 2 (Eigen::SparseLU engine +
+> transpose adjoint), Phase 3 (API), Phase 4 (SLiM scen3 + identifiability sweep
+> on coalescent data), Phase 5 (docs).
+
 
 > Full design in **`dev/TIER3_DESIGN.md`**: directed generator
 > `G_{a→b}=exp(s_{ab}ᵀθ + d_{ab}ᵀγ_dir)` → symmetric **commute time** (so the

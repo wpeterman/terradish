@@ -247,6 +247,28 @@ Either way the result is a genuine contribution: a tractable directional model
 *and* a clear statement of when symmetric genetic data can and cannot resolve
 direction.
 
+### Phase-0 GATE RESULT (2026-06-08): PASSED — direction is identifiable
+
+`dev/proto_tier3_phase0.R` (pure-R directed generator + commute time on a 7×7
+lattice with an elevation-gradient directional covariate):
+- **Sign is NOT lost.** `R^dir(+γ)` and `R^dir(−γ)` are anti-correlated
+  (Spearman ≈ −0.4..−0.6; sign-diff 1.4–1.6). The sign-blindness that holds for
+  symmetric/periodic geometry is broken by landscape **boundaries**, so direction
+  leaks into the *symmetric* commute time.
+- **Pattern identifiability:** Spearman-argmax lands exactly on `γ_true` (tested
+  0.4, 0.8) with `ρ(−γ_true) < 0` — the wrong sign is strongly disfavoured.
+- **Noisy recovery:** `γ̂` recovered to ≈truth with **sign correct 6/6** at noise
+  levels 0.05 and 0.20 (leastsquares on log-commute-time).
+- **Numerical caveat for the build:** at strong asymmetry (|γ|≳1.5) against-flow
+  hitting times grow exponentially → ill-conditioned solves. Realistic γ is mild,
+  but the engine must handle conditioning (moderate-γ regime, scaling, or the
+  iterative fallback). Work on `log` commute time to tame dynamic range.
+- **Still to confirm at Phase 4:** identifiability on *coalescent* (SLiM) data, not
+  just simulate-from-model — the real test of whether genetic data carry the
+  signal.
+
+**Verdict: proceed to the build (Phases 1–5).**
+
 ---
 
 ## 7. SLiM validation design (question 4)
