@@ -83,7 +83,7 @@ have not yet read
 
 ---
 
-## Set up — data and scaled covariates
+## Set up: data and scaled covariates
 
 ```{r load}
 library(terradish)
@@ -106,7 +106,7 @@ surface <- conductance_surface(covariates, melip.coords, directions = 8)
 
 ---
 
-## Step 1 — Construct IBE covariates
+## Step 1: Construct IBE covariates
 
 IBE operates at the level of pairs of sites. For each pair (i, j) we need a
 number that quantifies how environmentally different those two sites are. The
@@ -165,7 +165,7 @@ and interpretable.
 
 ---
 
-## Step 2 — Build the joint measurement model
+## Step 2: Build the joint measurement model
 
 `mlpe_covariates()` wraps the pairwise covariates into an MLPE measurement
 model. The resulting object (`g_ibe`) can be passed anywhere that `mlpe` can:
@@ -181,7 +181,7 @@ call `terradish()`.
 
 ---
 
-## Step 3 — Fit the four candidate models
+## Step 3: Fit the four candidate models
 
 To understand the unique contributions of IBR and IBE, fit all four
 combinations and compare them.
@@ -241,7 +241,7 @@ fit_joint <- terradish(
 
 ---
 
-## Step 4 — Interpret the joint model
+## Step 4: Interpret the joint model
 
 ### Conductance parameters (theta)
 
@@ -326,7 +326,7 @@ intercept, IBR slope, residual precision, and MLPE correlation.
 
 ---
 
-## Step 5 — Compare the model set
+## Step 5: Compare the model set
 
 ### Information criteria
 
@@ -456,7 +456,7 @@ summary(cv_joint_reps)
 
 ---
 
-## Step 6 — Visualize the joint model
+## Step 6: Visualize the joint model
 
 ### Observed vs. fitted genetic distances
 
@@ -523,7 +523,7 @@ cond_joint_focal <- conductance(
 
 ---
 
-## Step 7 — Saved-results utilities
+## Step 7: Saved-results utilities
 
 Some workflows fit `terradish` models once, save them to disk, and later
 extract summaries. Two helpers support this pattern.
@@ -569,7 +569,7 @@ parameter_table
 
 ## Alternative approach: Wishart-based IBE with `wishart_covariates()`
 
-The `mlpe_covariates()` approach in Steps 1–7 adds environmental terms to the
+The `mlpe_covariates()` approach in Steps 1-7 adds environmental terms to the
 **mean structure** of an MLPE regression. A conceptually different route adds
 environmental information to the **covariance structure** of a Wishart
 likelihood model. Use this alternative when:

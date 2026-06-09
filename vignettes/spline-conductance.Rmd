@@ -32,7 +32,7 @@ $$C_i = \exp(\theta_1 x_{i1} + \theta_2 x_{i2} + \cdots)$$
 This model asks a simple binary question for each landscape covariate: does
 conductance go up or down as the covariate increases? That is exactly the right
 question for many problems. Forest cover, for example, often has a monotone
-positive effect on connectivity for forest-dependent species — higher cover,
+positive effect on connectivity for forest-dependent species: higher cover,
 higher conductance, end of story.
 
 But ecological responses to landscape features are often more complex. Consider:
@@ -60,7 +60,7 @@ $$C_i = \exp(B_i \boldsymbol{\theta})$$
 where $B_i$ is a row of the **expanded design matrix** for raster cell $i$. For
 covariates not wrapped in `s()`, $B_i$ contains the raw value. For covariates
 wrapped in `s()`, $B_i$ contains several basis-function evaluations instead of
-one raw value. The optimizer still sees an ordinary log-linear model — the
+one raw value. The optimizer still sees an ordinary log-linear model; the
 splines live entirely inside the design matrix, which is computed once and then
 treated as fixed.
 
@@ -204,7 +204,7 @@ models for an additional reason beyond raw graph size: **spline formulas expand
 the conductance parameter count**. A formula with `s(altitude, df = 4)` has four
 basis coefficients for altitude alone, plus any other terms. With enough
 parameters, Newton-Raphson can become slower than BFGS per iteration. The
-assessment handles this automatically — it probes the expanded model, not the
+assessment handles this automatically; it probes the expanded model, not the
 raw formula, and reports the smooth-term expansion in the `$profile` and in its
 notes.
 
@@ -276,11 +276,11 @@ real code while staying fast.
 
 We fit four candidate models, moving from most constrained to most flexible:
 
-1. **Linear baseline** — one parameter per covariate, standard log-linear
-2. **Altitude spline (ns)** — altitude enters as a natural spline; forest cover
+1. **Linear baseline**: one parameter per covariate, standard log-linear
+2. **Altitude spline (ns)**: altitude enters as a natural spline; forest cover
    remains linear
-3. **Both splines (ns)** — both covariates enter as natural splines
-4. **Altitude spline (bs)** — altitude as a B-spline; forest cover linear (for
+3. **Both splines (ns)**: both covariates enter as natural splines
+4. **Altitude spline (bs)**: altitude as a B-spline; forest cover linear (for
    comparison with model 2)
 
 We use a small `maxit` to keep the vignette fast; for real analyses, allow more
@@ -429,7 +429,7 @@ Interpret this table as a first-pass diagnostic, not a definitive verdict:
 
 - **ΔAICc < 2** from the top model: models that are empirically indistinguishable
   given the data. Do not over-interpret small differences.
-- **ΔAICc 2–7**: Some support for the simpler model; spline flexibility is not
+- **ΔAICc 2-7**: Some support for the simpler model; spline flexibility is not
   clearly warranted.
 - **ΔAICc > 7**: Strong support for the better model.
 
@@ -456,11 +456,11 @@ library(ggplot2)
 
 p_ns <- plot(fit_ns_alt, type = "marginal", data = surface, n = 80,
              marginal_covariates = "altitude") +
-  ggtitle("Altitude — ns (df = 4)")
+  ggtitle("Altitude: ns (df = 4)")
 
 p_bs <- plot(fit_bs_alt, type = "marginal", data = surface, n = 80,
              marginal_covariates = "altitude") +
-  ggtitle("Altitude — bs (k = 4)")
+  ggtitle("Altitude: bs (k = 4)")
 
 p_ns | p_bs
 ```
@@ -487,7 +487,7 @@ p_ns_a  <- plot(fit_ns_alt,  type = "marginal", data = surface, n = 80,
 
 p_ns_b  <- plot(fit_ns_both, type = "marginal", data = surface, n = 80,
                 marginal_covariates = "altitude") +
-  ggtitle("Both ns (df = 4) — altitude panel")
+  ggtitle("Both ns (df = 4): altitude panel")
 
 p_bs_a  <- plot(fit_bs_alt,  type = "marginal", data = surface, n = 80,
                 marginal_covariates = "altitude") +
@@ -511,11 +511,11 @@ has genuine support; if they diverge, the spline is likely fitting noise.
 ```{r marginal-response, fig.cap = "***Marginal response-scale effects from the altitude natural-spline model.*** Shaded bands are approximate pointwise 95% predictive intervals. Left: natural spline. Right: B-spline.", fig.height = 4.5}
 p_resp_ns <- plot(fit_ns_alt, type = "marginal_response", data = surface,
                   n = 80, marginal_covariates = "altitude") +
-  ggtitle("ns (df = 4) — response scale")
+  ggtitle("ns (df = 4): response scale")
 
 p_resp_bs <- plot(fit_bs_alt, type = "marginal_response", data = surface,
                   n = 80, marginal_covariates = "altitude") +
-  ggtitle("bs (k = 4) — response scale")
+  ggtitle("bs (k = 4): response scale")
 
 p_resp_ns | p_resp_bs
 ```
@@ -783,7 +783,7 @@ p_fc  <- plot(fit_mixed, type = "marginal", data = surface, n = 80,
 
 p_alt <- plot(fit_mixed, type = "marginal", data = surface, n = 80,
               marginal_covariates = "altitude") +
-  ggtitle("Altitude — ns (df = 3)")
+  ggtitle("Altitude: ns (df = 3)")
 
 p_fc | p_alt
 ```
@@ -818,29 +818,28 @@ aic_table(
 
 Use `smooth_loglinear_conductance()` when:
 
-1. **There is a prior ecological reason** to expect a non-linear landscape effect
-   — e.g. an intermediate optimum, a threshold, or a well-documented hump-shaped
+1. **There is a prior ecological reason** to expect a non-linear landscape effect, e.g. an intermediate optimum, a threshold, or a well-documented hump-shaped
    response in the literature.
-2. **The linear model's marginal effect is implausible** — e.g. a strong
+2. **The linear model's marginal effect is implausible**: e.g. a strong
    negative altitude coefficient that would predict near-zero conductance at
    high elevations where sampling actually occurs.
 3. **The data are dense enough** to support the extra parameters. As a rough
-   guide, you need at least 5–10 site-pairs per estimated parameter. With 34
+   guide, you need at least 5-10 site-pairs per estimated parameter. With 34
    sites (561 pairs) and df = 4, the spline adds 3 parameters over the linear
-   model — a modest increase that is usually well-supported.
+   model, a modest increase that is usually well-supported.
 
 ### When to stay with the linear model
 
 - Small datasets (fewer than ~20 sampling sites).
-- No prior hypothesis about a non-linear effect — treat splines as exploratory
+- No prior hypothesis about a non-linear effect; treat splines as exploratory
   rather than confirmatory.
-- The spline and linear models give similar AICc — parsimony favors the simpler
+- The spline and linear models give similar AICc; parsimony favors the simpler
   model.
 
 ### Suggested workflow
 
 ```{r workflow, eval = FALSE}
-# Step 1: Fit a linear baseline — this is your reference
+# Step 1: Fit a linear baseline: this is your reference
 assessment <- terradish_assess_settings(
   S ~ covar2 + s(covar1, df = 3),
   data              = surface,
@@ -926,7 +925,7 @@ Even when AICc improves, inspect these warning signs:
   the edges of the covariate range.
 - **Very large basis coefficients** relative to their standard errors.
 - **Near-singular design matrix** or optimizer warnings about convergence.
-- **Large discrepancy between ns and bs** at the same df/k — if the two spline
+- **Large discrepancy between ns and bs** at the same df/k: if the two spline
   families give qualitatively different shapes, neither has strong support.
 
 ```{r overfit-check, eval = FALSE}

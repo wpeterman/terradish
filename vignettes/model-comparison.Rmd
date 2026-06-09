@@ -90,7 +90,7 @@ fit_full <- terradish(
 
 ### A note on computational settings
 
-When fitting many candidate models — as this vignette does — it pays to profile
+When fitting many candidate models (as this vignette does), it pays to profile
 the graph and identify the fastest optimizer/solver combination **once**, then
 reuse those settings for all fits. `terradish_assess_settings()` does this in a
 few short probe iterations:

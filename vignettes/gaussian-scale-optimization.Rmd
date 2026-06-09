@@ -124,7 +124,7 @@ melip.Fst <- melip.Fst[keep, keep, drop = FALSE]
 coords <- melip.coords[keep]
 ```
 
-### Step 1 — Build a conductance surface with the original raster
+### Step 1: Build a conductance surface with the original raster
 
 Unlike the standard fixed-raster workflow, we do **not** pre-scale the raster
 with `scale_covariates()` here. The Gaussian conductance model smooths the raw
@@ -150,7 +150,7 @@ Two details matter here:
 - We are fitting the scale of effect for the raster itself, so the original
   raster values need to be available.
 
-### Step 2 — Create the Gaussian scale-aware conductance model
+### Step 2: Create the Gaussian scale-aware conductance model
 
 ```{r gaussian-model}
 gaussian_model <- gaussian_smoothed_loglinear_conductance(surface)
@@ -165,7 +165,7 @@ The same mechanism also supports interactions and polynomial terms after
 smoothing, but it is usually better to start with the simplest one-raster model
 you can justify.
 
-### Step 3 — Fit the one-raster Gaussian scale model
+### Step 3: Fit the one-raster Gaussian scale model
 
 `optimizer = "auto"` currently resolves to BFGS for this conductance model.
 That is intentional: the native Gaussian scale path supports analytic
@@ -186,7 +186,7 @@ fit_gaussian <- terradish(
 fit_gaussian
 ```
 
-### Optional speed-up — coarse-raster warm starts
+### Optional speed-up: coarse-raster warm starts
 
 Gaussian scale optimization can be expensive because every likelihood
 evaluation has two costly pieces:
@@ -220,7 +220,7 @@ coarse-stage `sigma` is still interpreted in the original map units. With
 `exact_refine = TRUE`, the final model is not a coarse approximation; it is the
 full-resolution fit initialized from the coarse result.
 
-### Step 4 — Inspect the fitted one-raster scale
+### Step 4: Inspect the fitted one-raster scale
 
 ```{r coef}
 coef(fit_gaussian)
@@ -279,7 +279,7 @@ plot(
 )
 ```
 
-### Step 5 — Compare against a standard fixed-raster fit
+### Step 5: Compare against a standard fixed-raster fit
 
 The scale-aware fit is easiest to interpret when it is compared directly to the
 same model without an estimated `sigma`.
@@ -317,7 +317,7 @@ useful question is:
 
 If the answer is yes, then adding another raster is more defensible.
 
-### Step 6 — Summarize the one-raster fit
+### Step 6: Summarize the one-raster fit
 
 ```{r summary}
 summary(fit_gaussian)
@@ -331,7 +331,7 @@ For this conductance model, the coefficient table includes both:
 So the scale parameter is treated just like any other model parameter in the
 joint optimization.
 
-### Step 7 — Recover the fitted conductance surface
+### Step 7: Recover the fitted conductance surface
 
 Once the model is fitted, the usual conductance helper still works.
 
@@ -362,7 +362,7 @@ fitted_conductance_focal <- conductance(
 
 ---
 
-## Stage 2 — Add a second raster only after sigma looks sensible
+## Stage 2: Add a second raster only after sigma looks sensible
 
 Once the one-raster scale parameter looks stable enough to trust, we can add a
 second raster and inspect whether the scale estimates remain interpretable.

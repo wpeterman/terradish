@@ -121,7 +121,7 @@ melip.coords      <- terra::unwrap(melip.coords)
 What do we have?
 
 - **`melip.altitude`**: a raster of elevation (meters) across the study area.
-- **`melip.forestcover`**: a raster of forest cover proportion (0–1).
+- **`melip.forestcover`**: a raster of forest cover proportion (0-1).
 - **`melip.coords`**: 34 sampling locations as a `SpatVector`.
 - **`melip.Fst`**: a 34 × 34 matrix of pairwise F~ST~ (a standard measure
   of genetic differentiation; larger values mean more differentiation).
@@ -263,18 +263,18 @@ reduce wall-clock time.
 
 `terradish_assess_settings()` is an **advisory tool** for this. It:
 
-1. **Profiles the graph** — counts vertices, edges, focal sites, and
+1. **Profiles the graph**: counts vertices, edges, focal sites, and
    conductance parameters, and reports those back without running any
    optimization.
-2. **Benchmarks the direct solver** — times several combinations of Cholesky
+2. **Benchmarks the direct solver**: times several combinations of Cholesky
    factorization style and solve backend to find the fastest configuration for
    your specific graph.
-3. **Runs short optimizer probes** — executes two Newton steps for each of
+3. **Runs short optimizer probes**: executes two Newton steps for each of
    three optimizer/line-search combinations (Newton + Hager-Zhang, BFGS +
    Hager-Zhang, BFGS + Armijo) and reports which was fastest.
-4. **Optionally probes coarse-raster warm-starts** — checks whether fitting on
+4. **Optionally probes coarse-raster warm-starts**: checks whether fitting on
    an aggregated raster first produces an acceptable speedup.
-5. **Returns `$recommended`** — a named list of the best settings that can be
+5. **Returns `$recommended`**: a named list of the best settings that can be
    passed directly to `terradish()`.
 
 The function does **not** change any package defaults and does **not** affect
@@ -317,12 +317,12 @@ Recommended settings:
 Defaults comparison: Assessment matched terradish defaults.
 ```
 
-- **Graph profile** — tells you how large your problem is. A vertex count above
+- **Graph profile**: tells you how large your problem is. A vertex count above
   ~50 000 is where solver choice starts to matter; above ~500 000 it is often
   the dominant cost.
-- **Recommended settings** — the fastest combination found by the probes.
+- **Recommended settings**: the fastest combination found by the probes.
   `"(fastest acceptable probe: ...)"` shows which probe won and why.
-- **Defaults comparison** — a one-line summary of whether the assessment
+- **Defaults comparison**: a one-line summary of whether the assessment
   recommends anything different from what `terradish()` would use by default.
   If it says `"Assessment matched terradish defaults"`, just call `terradish()`
   normally.
@@ -369,8 +369,8 @@ fit_tuned2 <- terradish(
 
 | Situation | Assessment benefit |
 |---|---|
-| Graph < 10 000 vertices | Minimal — defaults usually converge in seconds |
-| Graph 10 000 – 100 000 vertices | Solver benchmark often helps |
+| Graph < 10 000 vertices | Minimal; defaults usually converge in seconds |
+| Graph 10 000 to 100 000 vertices | Solver benchmark often helps |
 | Graph > 100 000 vertices | All three probes are worthwhile |
 | Spline conductance (`df ≥ 4`) | Parameter expansion can shift optimizer recommendation from Newton to BFGS |
 | Fitting many candidate models | Run assessment once, reuse `$recommended` for all fits |
@@ -443,8 +443,8 @@ summary(fit_ls)
 
 ## Upgrade to the MLPE measurement model
 
-Pairwise genetic distances are not independent: the distance between sites A–B
-and A–C both involve site A. `mlpe` ("maximum likelihood population effects")
+Pairwise genetic distances are not independent: the distance between sites A-B
+and A-C both involve site A. `mlpe` ("maximum likelihood population effects")
 accounts for this correlation structure and is the recommended choice for
 inference.
 
@@ -481,8 +481,8 @@ of pairwise observations.
 `leastsquares` is the fastest and simplest. It is a reasonable first pass but
 underestimates standard errors because it ignores the shared-site correlation.
 
-`mlpe` corrects for the non-independence that arises because every pair (A–B)
-and (A–C) both involve site A. It is the default recommendation for
+`mlpe` corrects for the non-independence that arises because every pair (A-B)
+and (A-C) both involve site A. It is the default recommendation for
 distance-matrix data when the effective marker degrees of freedom are not
 recorded.
 
