@@ -4,7 +4,7 @@
 # log-conductance, so the model is mechanistic where covariates explain the
 # data and flexible where they do not. Nests terradish (tau^2 -> 0) and the
 # FEEMS-style free surface (no covariates). Fit by penalized L-BFGS over
-# (theta, u) -- gradient-only, reusing terradish_algorithm's adjoint -- which
+# (theta, u), gradient-only, reusing terradish_algorithm's adjoint, which
 # avoids forming the dense Hessian over the field. The field variance tau^2 is
 # selected by a Laplace (empirical-Bayes) marginal likelihood.
 # =====================================================================
@@ -170,7 +170,7 @@
 #'   value) or \code{"reml"} (default), which selects \eqn{\tau^2} by maximizing
 #'   a Laplace empirical-Bayes marginal likelihood over \code{tau2_grid}.
 #' @param tau2_grid Candidate \eqn{\tau^2} values used when \code{tau2 = "reml"}.
-#'   Defaults to a log-spaced grid spanning \code{1e-2}–\code{1e2}.
+#'   Defaults to a log-spaced grid spanning \code{1e-2} to \code{1e2}.
 #' @param eps Ridge added to the field GMRF precision (\eqn{L_{coarse} + \epsilon I})
 #'   so the prior is proper.  Default \code{1e-3}.
 #' @param theta Optional starting values for the covariate parameters.

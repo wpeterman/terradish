@@ -22,8 +22,8 @@ have_res <- !is.null(res)
 
 Standard isolation-by-resistance treats movement as **symmetric**: the cost of
 moving from cell *a* to cell *b* equals the cost from *b* to *a*. But gene flow is
-frequently **directional** — downstream in a riverscape, downhill, downwind, or
-along a source–sink gradient. Accounting for asymmetric movement is one of the
+frequently **directional**: downstream in a riverscape, downhill, downwind, or
+along a source-sink gradient. Accounting for asymmetric movement is one of the
 most-requested capabilities in landscape genetics, and symmetric resistance
 distance cannot represent it (Lundgren & Ralph 2019; Thomaz et al. 2019).
 
@@ -74,7 +74,7 @@ fit <- terradish_directed(
 summary(fit)        # theta (symmetric) + gamma (directional), z-tests, AIC
 ```
 
-The fitted object carries the full S3 suite — `print`, `summary`, `coef`,
+The fitted object carries the full S3 suite: `print`, `summary`, `coef`,
 `logLik`, `AIC`, `vcov`, `confint`, and `plot` (the symmetric conductance
 surface). A likelihood-ratio test of the directional effect compares the model
 against its reversible (\eqn{\gamma = 0}) special case:
@@ -110,7 +110,7 @@ cat(sprintf("The reverse-mode (transpose-solve) gradient matches numerical diffe
 This is the central question, and the honest answer has two parts.
 
 **In principle: yes.** The genetic response (a distance/covariance) is symmetric,
-so only a symmetric function of the directed generator — the commute time — is
+so only a symmetric function of the directed generator (the commute time) is
 observable. One might fear this erases direction. It does for perfectly
 symmetric/periodic geometry, but **landscape boundaries break that symmetry**, so
 direction *does* leave a signature in the symmetric commute time. On a bounded
@@ -124,8 +124,8 @@ the directional component is a perturbation on top of (much larger) symmetric
 isolation by distance. Detecting \eqn{\gamma} therefore needs:
 
 - **strong differentiation** (low effective migration / high \eqn{F_{ST}}); when
-  populations are well mixed the spatial signal — and with it any directional
-  signal — is weak, and the resistance scale itself collapses
+  populations are well mixed the spatial signal, and with it any directional
+  signal, is weak, and the resistance scale itself collapses
   (\eqn{\tau \to 0});
 - **many markers and sites**, since the directional signature is second-order.
 
@@ -134,7 +134,7 @@ directionality," and report \eqn{\gamma} with its uncertainty and a sensitivity
 check. Where direction is the primary question and differentiation is modest,
 data summaries that carry directional information directly (allele-frequency
 clines, identity-by-descent asymmetries) are more powerful than any symmetric
-distance — a fundamental limit, not a limitation of this implementation.
+distance. This is a fundamental limit, not a limitation of this implementation.
 
 ## Performance and scope
 

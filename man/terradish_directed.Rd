@@ -50,8 +50,8 @@ An object of class \code{"terradish_directed"} with the symmetric
 }
 \description{
 Fits a conductance surface in which gene flow can be \strong{directional}:
-the movement rate from cell \eqn{a} to neighbour \eqn{b} need not equal the
-reverse rate.  Movement is modelled as a covariate-parameterized continuous-
+the movement rate from cell \eqn{a} to neighbor \eqn{b} need not equal the
+reverse rate.  Movement is modeled as a covariate-parameterized continuous-
 time Markov generator
 \deqn{\log G_{a\to b} = \tfrac12(\eta_a + \eta_b) + d_{ab}^\top \gamma,\quad \eta_k = x_k^\top\theta,}
 where \eqn{\theta} are the usual (symmetric) conductance effects and

@@ -52,7 +52,7 @@ value) or \code{"reml"} (default), which selects \eqn{\tau^2} by maximizing
 a Laplace empirical-Bayes marginal likelihood over \code{tau2_grid}.}
 
 \item{tau2_grid}{Candidate \eqn{\tau^2} values used when \code{tau2 = "reml"}.
-Defaults to a log-spaced grid spanning \code{1e-2}–\code{1e2}.}
+Defaults to a log-spaced grid spanning \code{1e-2} to \code{1e2}.}
 
 \item{eps}{Ridge added to the field GMRF precision (\eqn{L_{coarse} + \epsilon I})
 so the prior is proper.  Default \code{1e-3}.}

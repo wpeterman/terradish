@@ -45,7 +45,7 @@ mechanistic covariate term **plus a spatially smooth Gaussian random field**:
 $$\log c = X\theta + u, \qquad u \sim \mathrm{Normal}\!\big(0,\ \tau^2 (L_{coarse} + \epsilon I)^{-1}\big).$$
 
 The GMRF prior on $u$ is exactly the FEEMS spatial-smoothness penalty written as
-a proper distribution: it pulls neighbouring field values together, with $\tau^2$
+a proper distribution: it pulls neighboring field values together, with $\tau^2$
 controlling how much structure the field may absorb. This single model nests both
 parents:
 
@@ -56,7 +56,7 @@ parents:
   data and flexible where they do not.
 
 Two payoffs follow. First, the covariate effects $\theta$ are **protected from
-omitted-variable bias**, because unmodelled spatial structure is absorbed by $u$
+omitted-variable bias**, because unmodeled spatial structure is absorbed by $u$
 rather than distorting $\theta$. Second, the fitted field $u$ is **a deliverable
 in its own right**: a map of the conductance variation your covariates failed to
 explain, and therefore a residual diagnostic and a guide to the next covariate
@@ -71,7 +71,7 @@ $$J(\theta, u) = -\ell(\theta, u \mid \phi) + \tfrac{1}{2\tau^2}\, u^\top (L_{co
 where $\ell$ is the measurement-model log-likelihood (the nuisance parameters
 $\phi$ profiled out) and $L_{coarse}$ is the Laplacian of the coarse-field
 adjacency graph. The field lives on a coarse `field_resolution` $\times$
-`field_resolution` grid over the landscape — deliberately coarser than the
+`field_resolution` grid over the landscape, deliberately coarser than the
 covariate grid, which is the main safeguard against $\theta$ and $u$ competing to
 explain the same signal.
 
@@ -139,8 +139,8 @@ knitr::kable(res$coef_table, digits = 3,
 ```{r coef-text, eval = FALSE}
 # With the field: altitude ~0.54, forestcover ~-0.63 (close to truth 0.50, -0.60)
 coef(fit_h)
-# Without the field: forestcover ~-0.43 -- biased ~30% toward zero by the
-# unmodelled blob.
+# Without the field: forestcover ~-0.43, biased ~30% toward zero by the
+# unmodeled blob.
 coef(fit_plain)
 ```
 
@@ -151,8 +151,8 @@ cat(sprintf(
 ```
 
 The plain model, missing the blob, biases the forest-cover effect toward zero;
-the hierarchical model recovers it because the field — not `theta` — absorbs the
-unmodelled structure.
+the hierarchical model recovers it because the field, not `theta`, absorbs the
+unmodeled structure.
 
 ### Mapping the unexplained conductance
 
@@ -196,7 +196,7 @@ it from external information.
   erode identifiability. Start coarse (the default `6`) and increase only if a
   clear, stable feature demands it.
 - **Read the field as a diagnostic, not a mechanism.** A strong field feature
-  says "something here is not in your covariates" — a hypothesis generator for
+  says "something here is not in your covariates", a hypothesis generator for
   the next layer to collect, not an explanation by itself.
 - **Genetic data constrain conductance weakly.** Added flexibility is only
   helpful if paid for by an informative prior; that is exactly what the GMRF on
