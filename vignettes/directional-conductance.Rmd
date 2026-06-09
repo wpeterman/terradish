@@ -1,0 +1,162 @@
+---
+title: "Directional gene flow: non-reversible conductance"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Directional gene flow: non-reversible conductance}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
+                      fig.width = 6, fig.height = 4.5, warning = FALSE, message = FALSE)
+res <- tryCatch(readRDS("vignette-directional.rds"), error = function(e) NULL)
+have_res <- !is.null(res)
+```
+
+## Why directional conductance?
+
+Standard isolation-by-resistance treats movement as **symmetric**: the cost of
+moving from cell *a* to cell *b* equals the cost from *b* to *a*. But gene flow is
+frequently **directional** — downstream in a riverscape, downhill, downwind, or
+along a source–sink gradient. Accounting for asymmetric movement is one of the
+most-requested capabilities in landscape genetics, and symmetric resistance
+distance cannot represent it (Lundgren & Ralph 2019; Thomaz et al. 2019).
+
+`terradish_directed()` models movement as a **directed, non-reversible** Markov
+generator whose edge rates depend on directional covariates:
+
+\deqn{\log G_{a\to b} = \tfrac12(\eta_a + \eta_b) + d_{ab}^\top \gamma, \qquad \eta_k = x_k^\top \theta,}
+
+where \eqn{\theta} are the usual (symmetric) conductance effects and \eqn{\gamma}
+are directional effects on **antisymmetric** edge covariates \eqn{d_{ab} = -d_{ba}}
+(elevation drop, flow accumulation, wind). The genetic data are linked through the
+**commute time** of the chain, which is symmetric, so every `terradish`
+measurement model is used unchanged. With \eqn{\gamma = 0} the generator is
+reversible and the model reduces to isolation by resistance.
+
+> **Scope.** This is the tractable directional model (a directed commute time
+> reducing to resistance distance when reversible), not the full structured
+> coalescent (intractable on fine rasters). It is also a deme/coarse-graph tool
+> in its current pure-R form (see "Performance and scope" below).
+
+## Directional edge covariates
+
+`edge_gradient()` turns a spatial layer (e.g. elevation) into the antisymmetric
+per-directed-edge covariate \eqn{d_{ab} = x_a - x_b}:
+
+```{r edges, eval = FALSE}
+library(terradish)
+library(terra)
+
+# A coarse/deme-scale conductance surface (directional fitting is for small or
+# coarse graphs in the current R engine; see Performance and scope).
+surface <- conductance_surface(covariates, coords, directions = 8)
+
+# Directional covariate from an elevation layer (downhill = positive drop)
+dir_cov <- edge_gradient(elevation, surface)
+```
+
+## Fitting a directional model
+
+```{r fit, eval = FALSE}
+fit <- terradish_directed(
+  S ~ habitat,                    # symmetric conductance covariate(s)
+  data              = surface,
+  directional       = dir_cov,    # directional covariate(s)
+  measurement_model = wishart_covariance,   # or generalized_wishart / mlpe
+  nu                = nu
+)
+summary(fit)        # theta (symmetric) + gamma (directional), z-tests, AIC
+```
+
+The fitted object carries the full S3 suite — `print`, `summary`, `coef`,
+`logLik`, `AIC`, `vcov`, `confint`, and `plot` (the symmetric conductance
+surface). A likelihood-ratio test of the directional effect compares the model
+against its reversible (\eqn{\gamma = 0}) special case:
+
+```{r lrt, eval = FALSE}
+# directed vs reversible (gamma = 0) on the same commute-time engine
+AIC(fit)            # vs the reversible reduced fit
+```
+
+### Worked example (simulated from the directed model)
+
+To show the machinery recovering a known directional effect, we simulate a
+covariance response from the directed model on a small lattice with a positive
+(downhill-biased) \eqn{\gamma} and refit:
+
+```{r recovery-show, eval = FALSE}
+fit <- terradish_directed(S ~ v1, data = surface, directional = dir_cov,
+                          measurement_model = generalized_wishart, nu = nu)
+coef(fit)           # theta (~truth) and gamma (~truth, positive)
+```
+
+```{r recovery-table, echo = FALSE, eval = have_res}
+knitr::kable(res$coef_table, digits = 3,
+             caption = "Directed-model recovery on simulated data (true theta = 0.5, gamma = 0.6).")
+```
+
+```{r grad-check, echo = FALSE, results = "asis", eval = have_res}
+cat(sprintf("The reverse-mode (transpose-solve) gradient matches numerical differentiation to **%.0e**, and gamma is recovered with the correct (positive) sign.\n", res$grad_err))
+```
+
+## Identifiability: can direction be recovered from symmetric data?
+
+This is the central question, and the honest answer has two parts.
+
+**In principle: yes.** The genetic response (a distance/covariance) is symmetric,
+so only a symmetric function of the directed generator — the commute time — is
+observable. One might fear this erases direction. It does for perfectly
+symmetric/periodic geometry, but **landscape boundaries break that symmetry**, so
+direction *does* leave a signature in the symmetric commute time. On a bounded
+lattice the commute-time pattern at \eqn{+\gamma} and \eqn{-\gamma} are
+distinguishable, and \eqn{\gamma} (sign and magnitude) is recovered from
+model-simulated data.
+
+**In practice: it is hard, and requires strong spatial structure.** Real genetic
+data are generated by a coalescent process, not by the commute-time model, and
+the directional component is a perturbation on top of (much larger) symmetric
+isolation by distance. Detecting \eqn{\gamma} therefore needs:
+
+- **strong differentiation** (low effective migration / high \eqn{F_{ST}}); when
+  populations are well mixed the spatial signal — and with it any directional
+  signal — is weak, and the resistance scale itself collapses
+  (\eqn{\tau \to 0});
+- **many markers and sites**, since the directional signature is second-order.
+
+Treat a non-significant \eqn{\gamma} as "not detectable here," not "no
+directionality," and report \eqn{\gamma} with its uncertainty and a sensitivity
+check. Where direction is the primary question and differentiation is modest,
+data summaries that carry directional information directly (allele-frequency
+clines, identity-by-descent asymmetries) are more powerful than any symmetric
+distance — a fundamental limit, not a limitation of this implementation.
+
+## Performance and scope
+
+The current engine factorizes one sub-generator per focal site per likelihood
+evaluation. This is exact and fine for **small or coarse graphs** (deme-scale
+analyses, coarsened rasters), but a *fit* on a full-resolution raster (hundreds of
+thousands of cells) is slow, and strongly heterogeneous rates can ill-condition
+the solves. A non-symmetric sparse-LU C++ backend (one factorization reused for
+the forward and transpose solves) is planned for full-resolution use. Until then:
+
+- coarsen the raster (`terra::aggregate`) or work at the deme scale;
+- keep covariates scaled and directional effects moderate;
+- check that estimates are stable across resolutions.
+
+## Quick-reference
+
+```{r quickref, eval = FALSE}
+library(terradish)
+surface <- conductance_surface(covariates, coords, directions = 8)  # coarse/deme-scale
+dir_cov <- edge_gradient(elevation, surface)                        # directional covariate
+fit <- terradish_directed(S ~ habitat, data = surface, directional = dir_cov,
+                          measurement_model = wishart_covariance, nu = nu)
+summary(fit)                       # theta (symmetric) + gamma (directional)
+plot(fit, data = surface)          # symmetric conductance surface
+```
