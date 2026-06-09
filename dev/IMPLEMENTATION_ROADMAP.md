@@ -293,7 +293,17 @@ ride the F2 Hessian path; likely a new fitting routine beside
 `terradish_algorithm()` / `terradish_optimize` that alternates `θ` (dense) and
 `u` (sparse), with τ² in an outer loop.
 
-### Tier 3 — Directional, non-reversible generator (covariate-driven)  **[status: not started]**
+### Tier 3 — Directional, non-reversible generator (covariate-driven)  **[status: DESIGN written — `dev/TIER3_DESIGN.md` — awaiting review before build]**
+
+> Full design in **`dev/TIER3_DESIGN.md`**: directed generator
+> `G_{a→b}=exp(s_{ab}ᵀθ + d_{ab}ᵀγ_dir)` → symmetric **commute time** (so the
+> measurement models need NO change — the genetic response is symmetric) →
+> `Eigen::SparseLU` (already a dependency) for the non-symmetric forward +
+> transpose-adjoint solves, as a separate `terradish_directed_algorithm()` engine.
+> Validated via SLiM Scenario 3 (asymmetric migration) on the recapitation
+> pipeline. Central risk is *scientific* (is direction identifiable from symmetric
+> distances?), so the plan gates the C++ build behind a cheap Phase-0 R prototype.
+
 
 **Goal.** Represent directional gene flow (downstream/downhill/downwind,
 source–sink) — the field's highest-demand feature.
