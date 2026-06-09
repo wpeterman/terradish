@@ -428,6 +428,19 @@ conda env: `C:\Users\peterman.73\AppData\Local\anaconda3\envs\slim\python.exe`
 
 ## 6. Progress log (append-only)
 
+- **2026-06-09 (Tier 3 engine + S3 + Scenario 3)** — Tier 3 directed engine
+  (`R/directed_conductance.R`) committed (`4c6fdaf`): forward commute-time +
+  transpose-solve adjoint (numDeriv 3e-8), `terradish_directed()`/`edge_gradient()`,
+  full S3 suite for both new classes (print/summary/coef/logLik/AIC/vcov/confint/
+  plot; hierarchical AIC uses field effective df). Directed SE via Jacobian of the
+  analytic gradient (fixed earlier test timeout). Vignette
+  `vignettes/directional-conductance.Rmd` + precompute (model-based recovery:
+  theta 0.505/0.50, gamma 0.600/0.60). **Scenario 3 (asymmetric migration) honest
+  finding:** engine + in-principle identifiability sound, but recapitated
+  coalescent data drives the Wishart to tau=0 (no recovery of direction) — a
+  second-order signal on weakly-detected IBR; documented in VALIDATION_SUMMARY +
+  vignette. **Remaining: Phase 2b C++ Eigen::SparseLU backend (full-resolution
+  speed/conditioning) — the only un-built part of Tier 3.**
 - **2026-06-08 (Tier 2 + recapitation, latest)** — Tier 2
   `terradish_hierarchical()` hardened/tested(13)/validated/documented. Recapitation
   pipeline built on conda `envs/slim`; drift surface validated on realistic

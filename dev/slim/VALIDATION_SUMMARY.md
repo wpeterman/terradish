@@ -96,6 +96,34 @@ sampling) → R (`run_scen1_recap.R`, `run_scen2_recap.R`). Built and functional
   conductance(migration) gradient distinct from the size(drift) gradient — a
   richer future scenario; not required to validate the new feature.
 
+## Scenario 3 — asymmetric (directional) migration  → **engine sound; coalescent detection hard (honest finding)**
+
+WF stepping-stone with downstream-biased migration (uniform deme sizes; signal is
+directional, not drift); `scen3_ts.slim` + `run_scen3_recap.R`; recapitated.
+
+- **Engine + identifiability are sound.** The directed transpose-solve adjoint
+  matches numDeriv to **3e-8** (`dev/proto_tier3_engine.R`, `debug_tier3.R`), and
+  on data *simulated from the directed model* `terradish_directed()` recovers both
+  theta and gamma essentially exactly (e.g. theta 0.505 vs 0.50, gamma 0.600 vs
+  0.60). Phase-0 separately proved direction is identifiable in principle from the
+  symmetric commute time on a bounded lattice.
+- **On recapitated COALESCENT data it does not recover direction.** At base
+  migration 0.02 and 0.004 (the latter with clear structure, `diag(S)` ~48-79),
+  the Wishart-covariance fit goes to the **tau = 0 boundary** (no IBR scale) so
+  the conductance gradient is zero and theta=gamma=0 (`dev/diag_scen3.R`: the
+  commute-time E correlates with S — off-diag 0.37, diag 0.54 — yet the Wishart
+  MLE still prefers tau=0). `generalized_wishart` on the distance representation
+  is numerically fragile with the large-scale commute-time E (eigendecomposition
+  segfault).
+- **Interpretation (real, not a bug).** The directional effect is a second-order
+  perturbation on top of symmetric IBR that is itself weakly detected from
+  recapitated coalescent covariance (the same tau=0 difficulty seen in Tier 1's
+  recapitated runs). Detecting flow *direction* from a *symmetric* genetic summary
+  is at/beyond the edge of feasibility here; directional data summaries
+  (allele-frequency clines, IBD asymmetries) are the powerful route (feasibility
+  review, Directions 4/6/7; design doc identifiability section). This is an honest
+  scope statement, documented in the directional vignette.
+
 ## Bottom line
 
 The drift / effective-size surface is **validated for deme-structured data**:

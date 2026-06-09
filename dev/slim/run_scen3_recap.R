@@ -19,8 +19,8 @@ force <- isTRUE(as.logical(Sys.getenv("SLIM_FORCE", "FALSE")))
 if (force || !file.exists(paste0(OUTPRE, "_Y.csv"))) {
   cat("1) SLiM tree-seq (asymmetric migration) ...\n")
   system2(SLIM, c("-seed", SEED, "-d", paste0("DIM=", DIM), "-d", paste0("N0=", N0),
-                  "-d", "MIG=0.02", "-d", paste0("BETA_DIR=", BETA_DIR),
-                  "-d", "RHO=1e-8", "-d", "L=1000000", "-d", "BURNIN=4000",
+                  "-d", "MIG=0.004", "-d", paste0("BETA_DIR=", BETA_DIR),
+                  "-d", "RHO=1e-8", "-d", "L=1000000", "-d", "BURNIN=6000",
                   "-d", paste0("OUTPRE='", OUTPRE, "'"), "dev/slim/scen3_ts.slim"),
           stdout = TRUE, stderr = TRUE) |> tail(2) |> cat(sep = "\n"); cat("\n")
   anc <- DIM * DIM * N0
@@ -43,6 +43,8 @@ MAF <- 0.05
 fr <- colSums(Y) / sum(N); Y <- Y[, pmin(fr, 1 - fr) >= MAF, drop = FALSE]
 S <- cov_from_biallelic(Y, N = N)
 cat(sprintf("demes=%d, loci(MAF>=%.2f)=%d\n", nrow(Y), MAF, ncol(Y)))
+cat(sprintf("diag(S) range [%.2f, %.2f]; mean|off-diag| %.3f\n",
+            min(diag(S)), max(diag(S)), mean(abs(S[lower.tri(S)]))))
 
 ## terradish surface (small lattice) + elevation directional covariate
 r <- rast(nrows = DIM, ncols = DIM, xmin = -0.5, xmax = DIM - 0.5, ymin = -0.5, ymax = DIM - 0.5)
@@ -68,7 +70,9 @@ lrt <- 2 * (llf - llr); pval <- pchisq(lrt, df = 1, lower.tail = FALSE)
 
 cat("\n========= RESULTS (Scenario 3: asymmetric migration) =========\n")
 print(fit_dir)
-cat(sprintf("\ngamma_hat (directional) = %.3f  (expect POSITIVE: downhill-biased)\n", fit_dir$gamma[1]))
+cat(sprintf("\ntau (IBR scale) = %.3f  (0 => no spatial signal detected)\n",
+            fit_dir$phi["tau"]))
+cat(sprintf("gamma_hat (directional) = %.3f  (expect POSITIVE: downhill-biased)\n", fit_dir$gamma[1]))
 cat(sprintf("LRT directed vs reversible: 2dLL=%.2f  df=1  p=%.4g  (small p => direction detected)\n",
             lrt, pval))
 cat("==============================================================\n")
