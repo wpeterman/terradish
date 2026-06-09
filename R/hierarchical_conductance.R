@@ -330,6 +330,20 @@ terradish_hierarchical <- function(formula, data,
                                      S, nu, uidx, field$Q, nonnegative, solver,
                                      solver_control)
 
+  # Effective degrees of freedom of the (penalized) field: trace of the
+  # smoother "hat" on the u-block, edf = tr[(H_lik + Q/tau2)^-1 H_lik]. Total df
+  # counts covariates + nuisance phi + tau2 + the field's effective df (so AIC
+  # treats the smooth field honestly, as in a GAM / mixed model).
+  Huu_lik <- hres$hessian[uidx, uidx, drop = FALSE]
+  edf_field <- tryCatch(
+    sum(diag(solve(H_pen[uidx, uidx, drop = FALSE], Huu_lik))),
+    error = function(e) NA_real_)
+  n_phi <- length(fit$phi)
+  df <- p + n_phi + 1 + edf_field          # +1 for tau2
+  vcov_theta <- if (p) vcov_full[seq_len(p), seq_len(p), drop = FALSE] else
+    matrix(numeric(0), 0, 0)
+  if (p) dimnames(vcov_theta) <- list(theta_names, theta_names)
+
   out <- list(
     call = match.call(),
     formula = formula,
@@ -342,7 +356,11 @@ terradish_hierarchical <- function(formula, data,
     phi = fit$phi,
     loglik = loglik,
     logML = logml_final,
-    vcov = vcov_full,
+    df = df,
+    edf_field = edf_field,
+    aic = -2 * loglik + 2 * df,
+    vcov = vcov_theta,
+    vcov_full = vcov_full,
     convergence = fit$convergence,
     npar_covariate = p,
     npar_field = m,
@@ -411,14 +429,55 @@ print.terradish_hierarchical <- function(x, ...)
               if (is.null(x$nu)) "" else sprintf("  (nu = %g)", x$nu)))
   cat(sprintf("  covariate params: %d   field cells: %d (%dx%d coarse grid)\n",
               x$npar_covariate, x$npar_field, x$field$G, x$field$G))
-  cat(sprintf("  tau^2 = %.4g   field sd = %.3f\n", x$tau2, sd(x$u)))
+  cat(sprintf("  tau^2 = %.4g   field sd = %.3f   field edf = %.2f\n",
+              x$tau2, sd(x$u), x$edf_field))
   cat(sprintf("  loglik = %.3f   marginal loglik = %.3f\n", x$loglik, x$logML))
+  cat(sprintf("  df = %.2f   AIC = %.2f\n", x$df, x$aic))
   if (x$npar_covariate) {
     cat("\nConductance coefficients:\n")
-    tab <- cbind(Estimate = x$theta, `Std. Error` = x$theta_se)
-    print(round(tab, 4))
+    z <- x$theta / x$theta_se
+    tab <- cbind(Estimate = x$theta, `Std. Error` = x$theta_se,
+                 `z value` = z, `Pr(>|z|)` = pmin(2 * (1 - pnorm(abs(z))), 1))
+    printCoefmat(tab, digits = 4, signif.stars = getOption("show.signif.stars"))
   }
   invisible(x)
+}
+
+#' @export
+logLik.terradish_hierarchical <- function(object, ...) {
+  val <- object$loglik; attr(val, "df") <- object$df; class(val) <- "logLik"; val
+}
+
+#' @export
+AIC.terradish_hierarchical <- function(object, ..., k = 2) {
+  if (identical(k, 2)) return(object$aic)
+  -2 * object$loglik + k * object$df
+}
+
+#' @export
+vcov.terradish_hierarchical <- function(object, ...) object$vcov
+
+#' @export
+confint.terradish_hierarchical <- function(object, parm, level = 0.95, ...) {
+  if (!object$npar_covariate)
+    return(matrix(numeric(0), 0, 2))
+  z <- qnorm(1 - (1 - level) / 2)
+  ci <- cbind(object$theta - z * object$theta_se, object$theta + z * object$theta_se)
+  colnames(ci) <- paste0(round(100 * c((1 - level) / 2, 1 - (1 - level) / 2), 1), "%")
+  rownames(ci) <- names(object$theta)
+  if (!missing(parm)) ci <- ci[parm, , drop = FALSE]
+  ci
+}
+
+#' @export
+plot.terradish_hierarchical <- function(x, data, type = c("field", "conductance", "logconductance"), ...) {
+  type <- match.arg(type)
+  r <- conductance_field(x, data, type = type)
+  if (inherits(r, "SpatRaster"))
+    terra::plot(r, main = paste0("Hierarchical conductance: ", type), ...)
+  else
+    stop("No raster stack in `data`; conductance_field() returned a vector.", call. = FALSE)
+  invisible(r)
 }
 
 #' @export
