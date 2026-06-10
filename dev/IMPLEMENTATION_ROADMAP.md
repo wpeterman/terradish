@@ -293,7 +293,7 @@ ride the F2 Hessian path; likely a new fitting routine beside
 `terradish_algorithm()` / `terradish_optimize` that alternates `θ` (dense) and
 `u` (sparse), with τ² in an outer loop.
 
-### Tier 3 — Directional, non-reversible generator (covariate-driven)  **[status: R ENGINE built + validated + full S3 suite; C++ (Phase 2b) + SLiM scen3 (Phase 4) + docs (Phase 5) remain]**
+### Tier 3 — Directional, non-reversible generator (covariate-driven)  **[status: v1 SHIPPED. R engine built + validated + full S3 suite + docs; SLiM scen3 = honest scope finding; C++ (Phase 2b) DEFERRED by decision 2026-06-09, see TIER3_DESIGN.md §11]**
 
 > **Phase 1-2 (R engine) DONE & validated.** `R/directed_conductance.R`:
 > `edge_gradient()`, `terradish_directed_algorithm()` (forward hitting->commute-time
@@ -428,6 +428,25 @@ conda env: `C:\Users\peterman.73\AppData\Local\anaconda3\envs\slim\python.exe`
 
 ## 6. Progress log (append-only)
 
+- **2026-06-09 (Phase 2b DECISION: C++ backend DEFERRED; Tier 3 v1 shipped)** —
+  After laying out the two C++ targets (per-absorber Eigen port = constant-factor;
+  group-inverse single-factorization = the real ~100x full-resolution speedup but
+  new math + adjoint), the user chose to **defer the C++ backend and ship the R
+  engine as v1**, given (a) the large effort of the efficient version and (b) the
+  uncertain payoff (Scenario 3: direction is hard to recover from coalescent data;
+  the symmetric case at full resolution is already served by the SPD engine;
+  directional fitting is most defensible at deme/coarse scale, which the R engine
+  handles). **Full decision record + resume guide written to `TIER3_DESIGN.md §11`**
+  (the two targets, the group-inverse math via Kemeny-Snell mean-first-passage,
+  the adjoint pointer, the validation protocol, and the "build only when a use case
+  warrants it" trigger). Task #9 closed as DEFERRED+documented; Tier 1-3 are all
+  shipped as v1. **All new docs written to house style (no em-dashes).**
+  - **Open item (separate from tiers): full-run test instability.** `devtools::test()`
+    over ALL files in one session dies silently on this Windows box (0 processes,
+    empty log), while filtered single-file runs pass. Validation has been per-file
+    (`devtools::test(filter=...)`) throughout. Worth isolating later (likely a
+    segfault in one heavier existing test when state accumulates across files);
+    new-tier suites (drift 31, hierarchical 13, directed) all pass filtered.
 - **2026-06-09 (Tier 3 engine + S3 + Scenario 3)** — Tier 3 directed engine
   (`R/directed_conductance.R`) committed (`4c6fdaf`): forward commute-time +
   transpose-solve adjoint (numDeriv 3e-8), `terradish_directed()`/`edge_gradient()`,

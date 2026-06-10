@@ -361,6 +361,88 @@ the covariate-driven `γ_dir` keeps it identifiable-in-principle and parsimoniou
 (question 2), `Eigen::SparseLU` supplies the non-symmetric forward+transpose
 solves with no new dependency (question 1), and the recapitation pipeline gives a
 ready asymmetric-migration validation (question 4). The dominant risk is
-*scientific, not engineering* — whether direction is recoverable from symmetric
-genetic distances — so the plan gates the invasive C++ build behind a cheap R
+*scientific, not engineering* (whether direction is recoverable from symmetric
+genetic distances), so the plan gates the invasive C++ build behind a cheap R
 identifiability prototype (Phase 0).
+
+---
+
+## 11. Phase 2b (C++ backend): DEFERRED. Decision record and resume guide
+
+**Decision (2026-06-09): defer the C++ backend; ship the R engine as v1.** The
+reasons, so a future session can re-decide with the same information:
+
+1. **Effort is large and the efficient version needs new math.** There are two
+   genuinely different C++ targets (see below). The cheap one gives only a
+   constant-factor speedup; the one that actually enables full-resolution
+   directional fitting requires a new derivation (group inverse plus stationary
+   distribution) and, harder, a new reverse-mode adjoint.
+2. **The payoff is uncertain.** Scenario 3 (see `dev/slim/VALIDATION_SUMMARY.md`)
+   showed that recovering flow *direction* from recapitated coalescent data is at
+   or beyond the edge of feasibility: the symmetric Wishart drives `tau` to 0
+   because the directional effect is a second-order signal on weakly detected
+   IBR. The reversible/symmetric case at full resolution is already served by the
+   existing SPD engine, and directional fitting is most defensible at the
+   deme/coarse scale, which the R engine already handles.
+3. **The R engine is a complete, validated v1 for that scope.** It is exact
+   (adjoint matches numDeriv to 3e-8), recovers `theta`/`gamma` on model data,
+   carries the full S3 suite, and is documented (with its scope) in the
+   directional vignette. Good enough for deme/coarse-scale directional analyses.
+
+### The two C++ targets (for whoever resumes)
+
+Reference implementation to validate against: `R/directed_conductance.R`
+(`terradish_directed_algorithm`), which computes the symmetric commute time among
+focal sites and its reverse-mode gradient. `dev/debug_tier3.R` is the harness
+that checks the adjoint against `numDeriv` on small, well-conditioned lattices.
+
+**Target A: per-absorber `Eigen::SparseLU` port (constant-factor, low risk).**
+The R engine, for each focal absorber `j`, removes node `j` and calls
+`Matrix::solve(Q_j, .)` for the forward hitting times and `Matrix::solve(t(Q_j), .)`
+for the adjoint (two factorizations). Replace with one `Eigen::SparseLU`
+factorization of `Q_j` reused for `.solve()` (forward) and
+`.transpose().solve()` (adjoint). Expected ~5-10x. It is still `n_focal`
+factorizations per likelihood evaluation, so a 22k-node, ~37-site fit stays
+minutes per evaluation. Where it plugs in: a new C++ function (cf.
+`src/radish.cpp::assemble_reduced_laplacian`) building the non-symmetric
+sub-generator from directed edge rates, plus the forward and transpose solves;
+called from the per-absorber loop in `terradish_directed_algorithm`. Lowest risk;
+establishes the Eigen/Rcpp plumbing.
+
+**Target B: group-inverse single-factorization (the real speedup, higher math).**
+Mirror what the symmetric engine does (all focal contrasts from one factorization
+of the reduced Laplacian). For the directed chain, get all pairwise commute times
+from one factorization via the generator group inverse:
+- Stationary distribution `pi`: solve `pi^T G = 0` (one solve, normalize).
+- Fundamental/deviation matrix `Z` (group inverse of `-G`): one factorization of a
+  deflated/bordered generator.
+- Mean first-passage times (Kemeny-Snell): `M_ij = (Z_jj - Z_ij) / pi_j`; commute
+  time `C_ij = M_ij + M_ji`; covariance `E = -1/2 J C J` on the focal block.
+- Adjoint (the hard part): reverse-mode through `Z` and `pi` with respect to the
+  edge rates, then chain to `(theta, gamma)` via `d rate/d theta = rate * s_ab`
+  and `d rate/d gamma = rate * d_ab`. Derive carefully and validate against the R
+  engine's analytic gradient and `numDeriv` on small lattices before scaling.
+Expected ~100x+ for full resolution (one factorization per evaluation instead of
+`n_focal`). This is the design worth building if full-resolution directional
+fitting is ever needed.
+
+### Engineering notes for the resume
+
+- **No new dependency:** RcppEigen is already linked (`src/` uses Eigen); use
+  `Eigen::SparseLU`. For very large or ill-conditioned graphs, an iterative
+  fallback (`Eigen::BiCGSTAB` with `IncompleteLUT`) is the next option.
+- **Conditioning:** strong asymmetry makes against-flow hitting times grow
+  exponentially and the solves ill-conditioned (the R engine hits this on
+  full-resolution rasters with wide covariate ranges). Keep covariates scaled,
+  effects moderate, and rely on `SparseLU` ordering/pivoting; budget for a
+  conditioning guard.
+- **Validation protocol:** (1) match the C++ commute-time `E` and the
+  `(theta, gamma)` gradient to the R engine and to `numDeriv` to ~1e-6 on small
+  lattices (`dev/debug_tier3.R`); (2) parameter recovery on data simulated from
+  the directed model; (3) a full-resolution timing benchmark; (4) the SLiM
+  Scenario 3 path (`dev/slim/run_scen3_recap.R`) once a strong-structure regime
+  is chosen.
+- **Build only when a use case warrants it:** a concrete dataset with strong
+  spatial structure where direction is plausibly recoverable, or a need to fit
+  the reversible engine at full raster resolution through this code path. Absent
+  that, the deme/coarse-scale R engine is the right tool.
