@@ -18,6 +18,7 @@ terradish(
   control = NewtonRaphsonControl(verbose = TRUE, ctol = 1e-06, ftol = 1e-06),
   validate = FALSE,
   cores = 1L,
+  curvature = c("exact", "gauss_newton"),
   solver = c("direct", "auto", "amg", "pcg", "pcg_jacobi"),
   solver_control = NULL,
   approximation = c("none", "landmark", "coarse_raster"),
@@ -70,6 +71,16 @@ summaries use the same final derivative machinery.}
 \item{validate}{Numerical validation of leverage via package \code{numDeriv} (very slow, use for debugging small examples)}
 
 \item{cores}{Number of worker processes to use for Hessian and leverage calculations. \code{1} evaluates serially.}
+
+\item{curvature}{Curvature used for optimization steps and for the returned
+covariance matrix. \code{"exact"} (default) uses the exact Hessian.
+\code{"gauss_newton"} uses the Gauss-Newton / Fisher-information approximation,
+which equals the Fisher information at the optimum (where it is positive
+semidefinite, giving a well-defined \code{vcov}), requires only first
+derivatives of the conductance model, and equals the exact Hessian at a
+well-fitting optimum. Standard errors from \code{summary()} are then the
+asymptotic information-based errors. With \code{leverage = TRUE} the leverage
+diagnostics inherit the same approximation.}
 
 \item{solver}{Linear-system solver used for the reduced Laplacian. \code{"direct"} uses sparse Cholesky updates; \code{"auto"} conservatively chooses between the direct and AMG backends based on graph size and right-hand-side count; \code{"amg"} uses smoothed-aggregation AMG-preconditioned conjugate gradients; \code{"pcg"} uses incomplete-Cholesky preconditioned conjugate gradients; \code{"pcg_jacobi"} keeps the older Jacobi-preconditioned prototype.}
 

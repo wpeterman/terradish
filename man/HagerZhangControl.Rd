@@ -88,7 +88,7 @@ opt_ctrl <- NewtonRaphsonControl(
 
 }
 \references{
-Hager WW, Zhang H. 2006. Algorithm 851: CG\_DESCENT, a conjugate gradient
+Hager WW, Zhang H. 2006. Algorithm 851: \code{CG_DESCENT}, a conjugate gradient
 method with guaranteed descent. ACM Transactions on Mathematical Software
 32(1):113-137.
 }

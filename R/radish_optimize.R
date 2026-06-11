@@ -544,6 +544,16 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' @param control A list containing options for the optimization routine (see \code{\link{NewtonRaphsonControl}} for list)
 #' @param validate Numerical validation of leverage via package \code{numDeriv} (very slow, use for debugging small examples)
 #' @param cores Number of worker processes to use for Hessian and leverage calculations. \code{1} evaluates serially.
+#' @param curvature Curvature used for optimization steps and for the returned
+#'   covariance matrix. \code{"exact"} (default) uses the exact Hessian.
+#'   \code{"gauss_newton"} uses the Gauss-Newton / Fisher-information
+#'   approximation, which equals the Fisher information at the optimum (where it
+#'   is positive semidefinite, giving a well-defined \code{vcov}), requires only
+#'   first derivatives of the conductance model, and equals the exact Hessian at
+#'   a well-fitting optimum.
+#'   Standard errors from \code{summary()} are then the asymptotic
+#'   information-based errors. With \code{leverage = TRUE} the leverage
+#'   diagnostics inherit the same approximation.
 #' @param solver Linear-system solver used for the reduced Laplacian. \code{"direct"} uses sparse Cholesky updates; \code{"auto"} conservatively chooses between the direct and AMG backends based on graph size and right-hand-side count; \code{"amg"} uses smoothed-aggregation AMG-preconditioned conjugate gradients; \code{"pcg"} uses incomplete-Cholesky preconditioned conjugate gradients; \code{"pcg_jacobi"} keeps the older Jacobi-preconditioned prototype.
 #' @param solver_control Optional named list of solver settings passed to
 #'   \code{\link{terradish_algorithm}}. For \code{solver = "direct"}, supported
@@ -760,7 +770,8 @@ terradish <- function(formula,
                    control = NewtonRaphsonControl(verbose = TRUE, ctol = 1e-6, ftol = 1e-6), 
                    validate = FALSE,
                    cores = 1L,
-                   solver = c("direct", "auto", "amg", "pcg", "pcg_jacobi"),
+                   curvature = c("exact", "gauss_newton"),
+                   solver = c("direct", "auto", "amg", "pcg", "pcg_jacobi", "block_cg"),
                    solver_control = NULL,
                    approximation = c("none", "landmark", "coarse_raster"),
                    approximation_control = NULL)
@@ -775,6 +786,7 @@ terradish <- function(formula,
   if (!isTRUE(conductance))
     stop("`conductance = FALSE` is not currently supported.", call. = FALSE)
   solver <- match.arg(solver)
+  curvature <- match.arg(curvature)
   approximation <- match.arg(approximation)
 
   # get response, remove lhs from formula
@@ -864,6 +876,7 @@ terradish <- function(formula,
                               partial = FALSE,
                               nonnegative = nonnegative,
                               cores = cores,
+                              curvature = curvature,
                               solver = solver,
                               solver_control = current_solver_control,
                               solver_warm_start = solver_state$warm_start,
@@ -1101,6 +1114,7 @@ terradish <- function(formula,
                           s = data, S = S, nu = nu, theta = theta, phi = exact_phi_state$value,
                           gradient = TRUE, hessian = TRUE, partial = leverage,
                           nonnegative = nonnegative, cores = cores,
+                          curvature = curvature,
                           solver = solver, solver_control = final_solver_control,
                           solver_warm_start = exact_solver_state$warm_start,
                           solver_reuse_state = exact_solver_state$reuse_state)

@@ -1,0 +1,16 @@
+{
+  "scenario": "corridor",
+  "nx": 64,
+  "ny": 64,
+  "names": [
+    "gradient",
+    "corridor"
+  ],
+  "theta_true": {
+    "gradient": 0.3,
+    "corridor": 2.0
+  },
+  "n_focal": 20,
+  "hab_min": 0.08,
+  "png": true
+}

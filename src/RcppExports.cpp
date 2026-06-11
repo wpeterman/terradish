@@ -218,6 +218,22 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// block_cg_reduced_laplacian
+Rcpp::List block_cg_reduced_laplacian(const arma::mat& rhs, const arma::vec& conductance, const arma::umat& edge_pairs, Rcpp::Nullable<arma::mat> x0, const double tol, const int maxit);
+RcppExport SEXP _terradish_block_cg_reduced_laplacian(SEXP rhsSEXP, SEXP conductanceSEXP, SEXP edge_pairsSEXP, SEXP x0SEXP, SEXP tolSEXP, SEXP maxitSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::mat& >::type rhs(rhsSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type conductance(conductanceSEXP);
+    Rcpp::traits::input_parameter< const arma::umat& >::type edge_pairs(edge_pairsSEXP);
+    Rcpp::traits::input_parameter< Rcpp::Nullable<arma::mat> >::type x0(x0SEXP);
+    Rcpp::traits::input_parameter< const double >::type tol(tolSEXP);
+    Rcpp::traits::input_parameter< const int >::type maxit(maxitSEXP);
+    rcpp_result_gen = Rcpp::wrap(block_cg_reduced_laplacian(rhs, conductance, edge_pairs, x0, tol, maxit));
+    return rcpp_result_gen;
+END_RCPP
+}
 
 static const R_CallMethodDef CallEntries[] = {
     {"_terradish_amg_reduced_laplacian_create", (DL_FUNC) &_terradish_amg_reduced_laplacian_create, 11},
@@ -235,6 +251,7 @@ static const R_CallMethodDef CallEntries[] = {
     {"_terradish_laplacian_derivative_matrix_product", (DL_FUNC) &_terradish_laplacian_derivative_matrix_product, 3},
     {"_terradish_graph_rhs_matrix_product", (DL_FUNC) &_terradish_graph_rhs_matrix_product, 3},
     {"_terradish_graph_rhs_crossprod", (DL_FUNC) &_terradish_graph_rhs_crossprod, 3},
+    {"_terradish_block_cg_reduced_laplacian", (DL_FUNC) &_terradish_block_cg_reduced_laplacian, 6},
     {NULL, NULL, 0}
 };
 

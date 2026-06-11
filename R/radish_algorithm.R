@@ -23,7 +23,9 @@
       state$s$demes,
       state$N,
       dgrad__dE
-    ) - 2 * dgrad__ddl_dQnG %*% state$dl_dE
+    )
+    if (!isTRUE(state$gauss_newton))
+      rhs_blocks[[m]] <- rhs_blocks[[m]] - 2 * dgrad__ddl_dQnG %*% state$dl_dE
   }
 
   rhs_block <- if (length(rhs_blocks) == 1L) rhs_blocks[[1]] else do.call(cbind, rhs_blocks)
@@ -39,9 +41,10 @@
     dgrad__dC <- backpropagate_laplacian_to_conductance(dgrad__dQnG, state$tG, state$s$adj)
 
     hess_row <- c(crossprod(state$df__dtheta_matrix, c(dgrad__dC)))
-    for (l in seq_along(state$theta))
-      hess_row[l] <- hess_row[l] +
-        c(state$dl_dC) %*% state$C$d2f__dtheta_dtheta(k, l)
+    if (!isTRUE(state$gauss_newton))
+      for (l in seq_along(state$theta))
+        hess_row[l] <- hess_row[l] +
+          c(state$dl_dC) %*% state$C$d2f__dtheta_dtheta(k, l)
 
     partial_X_k <- NULL
     partial_S_k <- NULL
@@ -299,6 +302,7 @@
                                 reuse_preconditioner_max_age = Inf),
                      pcg_jacobi = list(tol = 1e-8, maxit = 1000L),
                      pcg = list(tol = 1e-8, maxit = 1000L),
+                     block_cg = list(tol = 1e-8, maxit = 1000L),
                      stop("Unknown solver: ", solver))
 
   if (identical(solver, "amg") && !is.null(solver_control))
@@ -326,7 +330,7 @@
 
 .terradish_solver_setup <- function(s, conductance, solver, solver_control = NULL, solver_reuse_state = NULL)
 {
-  requested_solver <- match.arg(solver, c("direct", "auto", "amg", "pcg", "pcg_jacobi"))
+  requested_solver <- match.arg(solver, c("direct", "auto", "amg", "pcg", "pcg_jacobi", "block_cg"))
   resolution <- .terradish_resolve_solver(s, requested_solver, length(conductance), solver_control = solver_control)
   solver <- resolution$type
   control <- .normalize_solver_control(solver, resolution$solver_control)
@@ -563,6 +567,7 @@
   solver_fun <- switch(solver_state$type,
                        pcg = pcg_reduced_laplacian_ic,
                        pcg_jacobi = pcg_reduced_laplacian,
+                       block_cg = block_cg_reduced_laplacian,
                        stop("Unknown solver type: ", solver_state$type))
   out <- solver_fun(rhs,
                     solver_state$conductance,
@@ -642,6 +647,20 @@
 #' @param nonnegative Force regression-like 'measurement_model' to have nonnegative slope?
 #' @param validate Numerical validation via 'numDeriv' (very slow, use for debugging small examples)
 #' @param cores Number of worker processes to use for per-parameter derivative calculations. \code{1} evaluates serially.
+#' @param curvature Which curvature to return in \code{hessian}. \code{"exact"}
+#'   (default) returns the exact Hessian of the negative log-likelihood.
+#'   \code{"gauss_newton"} returns the Gauss-Newton / Fisher-information
+#'   approximation, obtained by dropping the two residual-weighted
+#'   second-derivative terms (the second derivative of the resistance covariance
+#'   \eqn{E} and of conductance with respect to \code{theta}). The Gauss-Newton
+#'   curvature equals the Fisher information at the optimum, where it is positive
+#'   semidefinite and yields a well-defined \code{vcov} (away from the optimum
+#'   the measurement model's observed curvature can be indefinite). It equals the
+#'   exact Hessian at a well-fitting optimum, and the gap between them measures
+#'   model misspecification. It also requires only first derivatives of the
+#'   conductance model, which is useful for Gaussian scale-aware and spline
+#'   conductance models whose second derivatives are expensive or unstable. The
+#'   number of linear solves is the same as for the exact Hessian.
 #' @param solver Linear-system solver used for the reduced Laplacian. \code{"direct"} uses the cached sparse Cholesky factorization, \code{"auto"} conservatively chooses between the direct and AMG backends based on graph size and right-hand-side count, \code{"amg"} uses smoothed-aggregation algebraic multigrid preconditioned conjugate gradients, \code{"pcg"} uses incomplete-Cholesky preconditioned conjugate gradients, and \code{"pcg_jacobi"} keeps the older Jacobi-preconditioned prototype.
 #' @param solver_control Optional named list of solver settings. For \code{solver = "direct"}, supported entries include \code{factorization} (\code{"auto"}, \code{"simplicial_ldl"}, \code{"simplicial_ll"}, or \code{"supernodal_ll"}), \code{solve_backend} (\code{"matrix"} or the experimental \code{"cholmod_cpp"} and \code{"cholmod_cpp_cached"} backends), \code{supernodal_min_vertices}, \code{supernodal_max_rhs}, and \code{perm}. For \code{solver = "auto"}, supported selection entries include \code{auto_direct_max_vertices}, \code{auto_amg_min_vertices}, and \code{auto_direct_max_rhs}. For \code{solver = "amg"}, supported entries include \code{tol}, \code{maxit}, \code{coarse_enough}, \code{npre}, \code{npost}, \code{sa_relax}, \code{aggr_eps_strong}, \code{estimate_spectral_radius}, \code{power_iters}, and \code{reuse_preconditioner}. For \code{solver = "pcg"} or \code{"pcg_jacobi"}, supported entries are \code{tol} and \code{maxit}.
 #'   \code{reuse_preconditioner_max_age} can be set to a finite nonnegative
@@ -692,7 +711,7 @@
 #'                  nu = 1000, theta = c(-0.3, 0.3))
 #'
 #' @export
-terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, objective = TRUE, gradient = TRUE, hessian = TRUE, partial = TRUE, nonnegative = TRUE, validate = FALSE, cores = 1L, solver = c("direct", "auto", "amg", "pcg", "pcg_jacobi"), solver_control = NULL, solver_warm_start = NULL, solver_reuse_state = NULL)
+terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, objective = TRUE, gradient = TRUE, hessian = TRUE, partial = TRUE, nonnegative = TRUE, validate = FALSE, cores = 1L, curvature = c("exact", "gauss_newton"), solver = c("direct", "auto", "amg", "pcg", "pcg_jacobi", "block_cg"), solver_control = NULL, solver_warm_start = NULL, solver_reuse_state = NULL)
 {
   stopifnot(inherits(f, c("terradish_conductance_model",
                           "radish_conductance_model")))
@@ -706,6 +725,8 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
   stopifnot(length(s$demes) == nrow(S)  )
   stopifnot(        nrow(S) == ncol(S)  )
   solver <- match.arg(solver)
+  curvature <- match.arg(curvature)
+  gauss_newton <- identical(curvature, "gauss_newton")
 
   symm <- function(X) (X + t(X))/2
 
@@ -779,6 +800,7 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
                                    dl_dC = dl_dC,
                                    theta = theta,
                                    partial = partial,
+                                   gauss_newton = gauss_newton,
                                    N = N)
           derivative_results <- .terradish_algorithm_derivative_results(
             idx = idx,
@@ -801,6 +823,7 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
                                    dl_dC = dl_dC,
                                    theta = theta,
                                    partial = partial,
+                                   gauss_newton = gauss_newton,
                                    N = N)
     derivative_results <- .terradish_algorithm_derivative_chunk(idx, derivative_state)
         }
@@ -818,6 +841,8 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
             partial_S[, , k] <- res$partial_S_k
           }
         }
+        if (gauss_newton)
+          hess <- symm(hess)
       }
     }
   }

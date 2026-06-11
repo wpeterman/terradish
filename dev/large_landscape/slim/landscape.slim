@@ -1,0 +1,76 @@
+// landscape.slim — spatial nonWF continuous-space model for landscape-genetics
+// validation of terradish. Based on the user's template; adapted/tested for
+// SLiM 5.2 (also runs on SLiM 4.x with the same syntax).
+//
+// Gene flow is impeded by a habitat/conductance map: low-habitat cells carry
+// low local carrying capacity, so they are sparsely occupied and act as
+// resistance to dispersal. Tree sequences are recorded with mutation rate 0;
+// neutral mutations are overlaid afterward in Python (process_trees.py).
+//
+// Required -d constants (see run_scenario.sh):
+//   MAP   : path to habitat PNG (grayscale, [0,1] via Image().floatK)
+//   K     : target individuals per unit area (carrying-capacity scaler)
+//   SIGMA_C : competition interaction distance
+//   SIGMA_M : mate-choice distance
+//   SIGMA_D : Gaussian dispersal SD (in unit [0,1] space)
+//   NTICKS  : number of ticks to run before tree-seq output
+//   OUTPATH : path for the .trees output
+//   L       : genome length (bp)
+
+initialize() {
+    initializeSLiMModelType("nonWF");
+    initializeSLiMOptions(dimensionality="xy");
+    initializeTreeSeq();                       // record genealogies; overlay mutations later
+    initializeMutationRate(0);
+    initializeMutationType("m1", 0.5, "f", 0.0);
+    initializeGenomicElementType("g1", m1, 1.0);
+    initializeGenomicElement(g1, 0, L - 1);
+    initializeRecombinationRate(1e-8);
+    // spatial competition (Gaussian), reciprocal
+    initializeInteractionType(1, "xy", reciprocal=T, maxDistance=SIGMA_C * 3);
+    i1.setInteractionFunction("n", 1.0, SIGMA_C);
+    // mate choice (Gaussian), reciprocal
+    initializeInteractionType(2, "xy", reciprocal=T, maxDistance=SIGMA_M * 3);
+    i2.setInteractionFunction("n", 1.0, SIGMA_M);
+}
+
+reproduction() {
+    mate = i2.nearestNeighbors(individual, 1);
+    if (mate.size())
+        subpop.addCrossed(individual, mate);
+}
+
+1 first() {
+    sim.addSubpop("p1", asInteger(K));
+    p1.setSpatialBounds(c(0.0, 0.0, 1.0, 1.0));
+    p1.individuals.setSpatialPosition(p1.pointUniform(p1.individualCount));
+    // habitat map from grayscale image; rows top->bottom mapped to y
+    img = Image(MAP);
+    p1.defineSpatialMap("habitat", "xy", img.floatK,
+                        interpolate=T, valueRange=c(0.0, 1.0),
+                        colors=c("black", "green"));
+}
+
+first() {
+    i2.evaluate(p1);
+}
+
+early() {
+    i1.evaluate(p1);
+    inds = p1.individuals;
+    habitat = p1.spatialMapValue("habitat", inds.spatialPosition);
+    competition = i1.localPopulationDensity(inds);     // edge-corrected density
+    // density-dependent fitness scaled by local habitat (carrying capacity)
+    inds.fitnessScaling = (K * habitat) / (competition + 1e-9);
+}
+
+late() {
+    // Gaussian dispersal with reflecting ("reprising") boundaries
+    p1.deviatePositions(NULL, "reprising", INF, "n", SIGMA_D);
+}
+
+NTICKS late() {
+    sim.treeSeqOutput(OUTPATH);
+    catn("DONE ticks=" + community.tick + " N=" + p1.individualCount);
+    sim.simulationFinished();
+}

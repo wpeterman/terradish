@@ -513,3 +513,98 @@ arma::mat graph_rhs_crossprod(const arma::uvec& demes,
 
   return out;
 }
+
+namespace {
+
+arma::vec block_cg_diagonal(const arma::vec& conductance, const arma::umat& edge_pairs)
+{
+  const arma::uword Nred = conductance.n_elem - 1;
+  arma::vec d(Nred, arma::fill::zeros);
+  for (arma::uword e = 0; e < edge_pairs.n_rows; ++e)
+  {
+    const arma::uword i = edge_pairs(e, 0) - 1, j = edge_pairs(e, 1) - 1;
+    const double w = conductance.at(i) + conductance.at(j);
+    if (i < Nred) d.at(i) += w;
+    if (j < Nred) d.at(j) += w;
+  }
+  return d;
+}
+
+arma::mat block_cg_matmat(const arma::vec& conductance, const arma::umat& edge_pairs,
+                          const arma::mat& X)
+{
+  const arma::uword Nred = conductance.n_elem - 1;
+  arma::mat Y(Nred, X.n_cols, arma::fill::zeros);
+  for (arma::uword e = 0; e < edge_pairs.n_rows; ++e)
+  {
+    const arma::uword i = edge_pairs(e, 0) - 1, j = edge_pairs(e, 1) - 1;
+    const double w = conductance.at(i) + conductance.at(j);
+    if (i < Nred) Y.row(i) += w * X.row(i);
+    if (j < Nred) Y.row(j) += w * X.row(j);
+    if (i < Nred && j < Nred) { Y.row(i) -= w * X.row(j); Y.row(j) -= w * X.row(i); }
+  }
+  return Y;
+}
+
+} // namespace
+
+// [[Rcpp::export]]
+Rcpp::List block_cg_reduced_laplacian(const arma::mat& rhs,
+                                      const arma::vec& conductance,
+                                      const arma::umat& edge_pairs,
+                                      Rcpp::Nullable<arma::mat> x0 = R_NilValue,
+                                      const double tol = 1e-8,
+                                      const int maxit = 1000)
+{
+  validate_edge_pairs(conductance, edge_pairs);
+
+  const arma::uword Nred = conductance.n_elem - 1, s = rhs.n_cols;
+  if (rhs.n_rows != Nred)
+    Rcpp::stop("[block_cg_reduced_laplacian] rhs has incompatible number of rows");
+
+  arma::vec d = block_cg_diagonal(conductance, edge_pairs);
+  if (arma::any(d <= 0))
+    Rcpp::stop("[block_cg_reduced_laplacian] non-positive diagonal encountered");
+
+  arma::mat X = x0.isNotNull() ? Rcpp::as<arma::mat>(x0)
+                               : arma::mat(Nred, s, arma::fill::zeros);
+  if (X.n_rows != Nred || X.n_cols != s)
+    Rcpp::stop("[block_cg_reduced_laplacian] x0 must match rhs dimensions");
+
+  arma::mat R = rhs - block_cg_matmat(conductance, edge_pairs, X);
+  arma::mat Z = R.each_col() / d;
+  arma::mat P = Z;
+  arma::mat RtZ = R.t() * Z;
+  arma::vec bnorm = arma::sqrt(arma::sum(arma::square(rhs), 0)).t();
+  bnorm.transform([](double v){ return std::max(v, 1.0); });
+
+  int iter = 0;
+  arma::vec rnorm = arma::sqrt(arma::sum(arma::square(R), 0)).t();
+  for (iter = 0; iter < maxit; ++iter)
+  {
+    arma::mat Q = block_cg_matmat(conductance, edge_pairs, P);
+    // pseudo-inverse for the small s x s systems: as RHS columns converge the
+    // residual block loses rank (classic block-CG breakdown); pinv is stable.
+    arma::mat alpha = arma::pinv(arma::mat(P.t() * Q)) * RtZ;
+    X += P * alpha;
+    R -= Q * alpha;
+    rnorm = arma::sqrt(arma::sum(arma::square(R), 0)).t();
+    if (arma::all(rnorm <= tol * bnorm)) { ++iter; break; }
+    arma::mat Znew = R.each_col() / d;
+    arma::mat RtZnew = R.t() * Znew;
+    arma::mat beta = arma::pinv(RtZ) * RtZnew;
+    P = Znew + P * beta;
+    Z = Znew;
+    RtZ = RtZnew;
+  }
+
+  Rcpp::LogicalVector converged(s);
+  for (arma::uword k = 0; k < s; ++k)
+    converged[k] = rnorm(k) <= tol * bnorm(k);
+
+  return Rcpp::List::create(
+    Rcpp::Named("solution") = X,
+    Rcpp::Named("iterations") = iter,
+    Rcpp::Named("converged") = converged,
+    Rcpp::Named("residual_norm") = rnorm);
+}

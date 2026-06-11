@@ -1,0 +1,16 @@
+{
+  "scenario": "barrier",
+  "nx": 64,
+  "ny": 64,
+  "names": [
+    "gradient",
+    "barrier"
+  ],
+  "theta_true": {
+    "gradient": 0.8,
+    "barrier": -2.5
+  },
+  "n_focal": 20,
+  "hab_min": 0.08,
+  "png": true
+}

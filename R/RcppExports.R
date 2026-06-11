@@ -61,3 +61,7 @@ graph_rhs_crossprod <- function(demes, n_vertices, X) {
     .Call(`_terradish_graph_rhs_crossprod`, demes, n_vertices, X)
 }
 
+block_cg_reduced_laplacian <- function(rhs, conductance, edge_pairs, x0 = NULL, tol = 1e-8, maxit = 1000L) {
+    .Call(`_terradish_block_cg_reduced_laplacian`, rhs, conductance, edge_pairs, x0, tol, maxit)
+}
+

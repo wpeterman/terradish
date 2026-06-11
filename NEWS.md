@@ -1,3 +1,21 @@
+terradish 0.0.40 (dev)
+---------
+* Added a `curvature` argument to `terradish()` and `terradish_algorithm()`
+  (`"exact"` default, or `"gauss_newton"`). The Gauss-Newton/Fisher curvature
+  drops the two residual-weighted second-derivative terms, is positive
+  semidefinite, needs only first derivatives of conductance, and equals the
+  exact Hessian at a well-fitting optimum. It flows unchanged into
+  `vcov()`/`summary()`/`confint()`, so the Fisher information becomes the
+  parameter covariance and the standard errors are information based.
+* Added `solver = "block_cg"`, a Jacobi-preconditioned block conjugate gradient
+  (O'Leary) sharing one Krylov space across all focal right-hand sides, for
+  small or well-conditioned graphs.
+* Added `terradish_kron_reduce_tiled()`, an exact tiled (out-of-core) Schur/Kron
+  reduction onto the focal sites. Sequential Schur complements compose, so it
+  matches `terradish_kron_reduce()` exactly while eliminating the interior tile
+  by tile, bounding peak memory to one tile's interior factor plus the sparse
+  interface operator.
+
 terradish 0.0.39
 ---------
 * Clarified Wishart `nu` guidance for microsatellite workflows, AIC/AICc/BIC model-comparison guidance, and CRAN installation text for `corMLPE`
