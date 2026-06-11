@@ -324,3 +324,22 @@ test_that("cov_from_biallelic drops or errors on monomorphic loci", {
     "No variable biallelic loci"
   )
 })
+
+test_that("cov_from_biallelic aligns each locus with its own pooled frequency", {
+  # Regression guard: the per-locus standardization must apply the pooled
+  # frequency vector Fr per COLUMN. With uniform sampling the result must be
+  # proportional (factor N) to the frequency-standardized GRM
+  # Z = (freq - p) / sqrt(p (1 - p)). A bare `N * Fr` (Fr length ncol) recycles
+  # column-major, down the rows, and corrupts this whenever nrow(Y) > 1 -- the
+  # earlier consistency-only tests could not catch that.
+  set.seed(1)
+  Y <- matrix(rbinom(5 * 30, 40, 0.4), nrow = 5, ncol = 30)
+  N <- 40L
+  Fr <- colSums(Y) / (N * nrow(Y))
+  keep <- Fr > 0 & Fr < 1                          # mirror the monomorphic drop
+  freq <- Y[, keep, drop = FALSE] / N
+  pb <- colMeans(freq)
+  Gs <- sweep(sweep(freq, 2, pb, "-"), 2, sqrt(pb * (1 - pb)), "/")
+  expect_equal(unname(cov_from_biallelic(Y, N)),
+               unname(N * (Gs %*% t(Gs)) / sum(keep)))
+})

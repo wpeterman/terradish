@@ -194,7 +194,11 @@ cov_from_biallelic <- function(Y,
     Fr <- Fr[variable]
   }
 
-  Y  <- (Y - N*Fr) / sqrt(N * Fr * (1-Fr))
+  # Fr is a per-locus (length-ncol) vector; broadcast it across columns so each
+  # locus frequency aligns with its column. (Bare `N*Fr` would recycle Fr
+  # column-major, down the rows, misaligning frequencies when nrow(Y) > 1.)
+  Frm <- matrix(Fr, nrow(Y), ncol(Y), byrow = TRUE)
+  Y  <- (Y - N * Frm) / sqrt(N * Frm * (1 - Frm))
 
   Y %*% t(Y) / ncol(Y)
 }
