@@ -18,9 +18,13 @@ future_dev_ideas.md
 # Generated SLiM / recapitation pipeline data artifacts (regenerable from scripts)
 dev/slim/*.trees
 dev/slim/*.csv
+dev/slim/out/
+dev/slim/out_*/
+dev/slim/__pycache__/
 
 # Transient dev run outputs (test logs, scratch captures)
 dev/*.log
 dev/*.out
+dev/slim/*.log
 dev/fulltest.txt
 dev/fulltest_fails.csv

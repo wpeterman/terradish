@@ -1,0 +1,92 @@
+// =====================================================================
+// Scenario 4 (tree-sequence): WF 2D stepping-stone with BOTH
+//   (i)  ASYMMETRIC (downstream-biased) migration along an elevation gradient
+//        (as in scen3): immigration into deme i from neighbour k at
+//        MIG * exp(BETA_DIR * (elev_k - elev_i)), so net downhill gene flow; and
+//   (ii) a DENSITY / Ne gradient CORRELATED with the same elevation axis:
+//        deme size N_i = round(N0 * exp(KAPPA_N * elev_i)).
+//
+// This is the rung-3 confound test for DRAGON. The robustness sweep showed that a
+// density gradient running along the directional covariate biases the directional
+// coefficient by ~68% if ignored, but a joint direction+drift fit recovers both.
+// scen4 reproduces that confound on real coalescent data: expect the DRAGON
+// direction-only fit to be biased and the direction+drift fit to recover both the
+// directional and the drift (coalescence-rate) signal.
+//
+// BETA_DIR = 0 recovers symmetric migration; KAPPA_N = 0 recovers uniform sizes
+// (i.e. scen3). Output: tree sequence + per-deme meta (incl. elevation and size)
+// for the recapitation pipeline.
+//
+// CLI (run from the terradish repo root):
+//   slim -seed 1 -d "OUTPRE='dev/slim/scen4ts'" -d DIM=6 -d N0=200 \
+//        -d MIG=0.004 -d BETA_DIR=0.8 -d KAPPA_N=0.6 -d BURNIN=6000 \
+//        dev/slim/scen4_ts.slim
+// =====================================================================
+initialize() {
+    initializeTreeSeq();
+    if (!exists("DIM"))      defineConstant("DIM", 6);
+    if (!exists("N0"))       defineConstant("N0", 200);       // baseline deme size
+    if (!exists("MIG"))      defineConstant("MIG", 0.004);    // base migration fraction
+    if (!exists("BETA_DIR")) defineConstant("BETA_DIR", 0.8); // downhill migration bias
+    if (!exists("KAPPA_N"))  defineConstant("KAPPA_N", 0.6);  // density gradient strength
+    if (!exists("RHO"))      defineConstant("RHO", 1e-8);
+    if (!exists("L"))        defineConstant("L", 1000000);
+    if (!exists("BURNIN"))   defineConstant("BURNIN", 6000);
+    if (!exists("OUTPRE"))   defineConstant("OUTPRE", "scen4ts");
+
+    initializeMutationRate(0);
+    initializeMutationType("m1", 0.5, "f", 0.0);
+    initializeGenomicElementType("g1", m1, 1.0);
+    initializeGenomicElement(g1, 0, asInteger(L) - 1);
+    initializeRecombinationRate(RHO);
+}
+
+1 early() {
+    ndeme = DIM * DIM;
+    gx = float(ndeme); gy = float(ndeme);
+    for (i in 0:(ndeme - 1)) {
+        gx[i] = i % DIM;
+        gy[i] = (i - (i % DIM)) / DIM;
+    }
+    elev = (gx - mean(gx)) / sd(gx);            // standardized elevation gradient
+    defineConstant("GX", gx);
+    defineConstant("GY", gy);
+    defineConstant("ELEV", elev);
+
+    // (ii) density / Ne gradient correlated with elevation
+    sizes = integer(ndeme);
+    for (i in 0:(ndeme - 1))
+        sizes[i] = asInteger(round(N0 * exp(KAPPA_N * elev[i])));
+    sizes = pmax(sizes, 2);                      // guard against empty demes
+    defineConstant("SIZES", sizes);
+
+    for (i in 0:(ndeme - 1))
+        sim.addSubpop(i, sizes[i]);
+
+    // (i) asymmetric immigration: into i from neighbour k at MIG*exp(BETA_DIR*(elev_k - elev_i))
+    for (i in 0:(ndeme - 1)) {
+        cx = i % DIM; cy = (i - (i % DIM)) / DIM;
+        srcs = integer(0);
+        if (cx > 0)        srcs = c(srcs, i - 1);
+        if (cx < DIM - 1)  srcs = c(srcs, i + 1);
+        if (cy > 0)        srcs = c(srcs, i - DIM);
+        if (cy < DIM - 1)  srcs = c(srcs, i + DIM);
+        rates = MIG * exp(BETA_DIR * (elev[srcs] - elev[i]));
+        rates = pmin(rates, 0.45 / size(srcs));  // keep total immigration < 1
+        sim.subpopulations[i].setMigrationRates(srcs, rates);
+    }
+    community.rescheduleScriptBlock(s1, BURNIN, BURNIN);
+}
+
+s1 2 late() {
+    ndeme = DIM * DIM;
+    sim.treeSeqOutput(OUTPRE + ".trees");
+    dmeta = "deme,gx,gy,elev,size";
+    for (i in 0:(ndeme - 1))
+        dmeta = c(dmeta, i + "," + GX[i] + "," + GY[i] + "," + ELEV[i] + "," + SIZES[i]);
+    writeFile(OUTPRE + "_demes.csv", dmeta);
+    catn("scenario 4 (tree-seq) done: " + ndeme + " demes, asymmetric MIG BETA_DIR="
+         + BETA_DIR + ", density gradient KAPPA_N=" + KAPPA_N
+         + "; size range [" + min(SIZES) + ", " + max(SIZES) + "]");
+    sim.simulationFinished();
+}

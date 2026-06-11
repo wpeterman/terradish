@@ -1,0 +1,77 @@
+// =====================================================================
+// Scenario 5 (tree-sequence): the REALISTIC fair test for the FRAME-coupled
+// coalescence model. Same asymmetric (downhill) migration along elevation as
+// scen3/scen4, but deme carrying capacities are set so effective size tracks the
+// migration-stationary distribution pi:  N_i proportional to pi_i^k.  The driver
+// (run_scen5_recap.py) computes pi from the directed generator and passes the
+// resulting per-deme SIZES vector; this model just uses them. With Ne genuinely
+// tied to pi, the coupled model (gamma_i = c * pi_i^(-alpha)) is correctly
+// specified and should recover both the directional coefficient and alpha = k.
+//
+// CLI (run from the terradish repo root):
+//   slim -d "OUTPRE='dev/slim/out/scen5_ts'" -d GRID=5 -d M0=0.05 -d BETA=0.6 \
+//        -d "SIZES=c(...)" -d NGEN=10000 dev/slim/scen5_ts.slim
+// =====================================================================
+initialize() {
+    if (!exists("SEED"))   defineConstant("SEED", 1);
+    if (!exists("GRID"))   defineConstant("GRID", 5);
+    if (!exists("M0"))     defineConstant("M0", 0.05);    // base migration fraction
+    if (!exists("BETA"))   defineConstant("BETA", 0.6);   // downhill directional bias
+    if (!exists("NGEN"))   defineConstant("NGEN", 10000);
+    if (!exists("L"))      defineConstant("L", 1e6);
+    if (!exists("RHO"))    defineConstant("RHO", 1e-8);
+    if (!exists("OUTPRE")) defineConstant("OUTPRE", "scen5_ts");
+    // SIZES (length GRID*GRID, per-deme carrying capacity ~ pi^k) is required via -d.
+    if (!exists("SIZES")) stop("scen5: SIZES vector must be supplied with -d");
+
+    setSeed(SEED);
+    initializeTreeSeq();
+    initializeMutationRate(0.0);
+    initializeMutationType("m1", 0.5, "f", 0.0);
+    initializeGenomicElementType("g1", m1, 1.0);
+    initializeGenomicElement(g1, 0, asInteger(L) - 1);
+    initializeRecombinationRate(RHO);
+
+    defineConstant("NDEME", GRID * GRID);
+    idx = 0:(NDEME - 1);
+    cx = idx % GRID;
+    cy = asInteger(idx / GRID);
+    defineConstant("CX", cx);
+    defineConstant("CY", cy);
+    defineConstant("ELEV", asFloat(cx));              // elevation = column index (raw)
+    defineConstant("KVEC", asInteger(SIZES));
+}
+
+1 early() {
+    for (i in 0:(NDEME - 1))
+        sim.addSubpop(i, KVEC[i]);
+
+    // asymmetric backward migration: into i from neighbour k at M0*exp(BETA*(elev_k-elev_i))
+    sp = sim.subpopulations;
+    for (a in 0:(NDEME - 1)) {
+        srcs = NULL; rates = float(0);
+        for (b in 0:(NDEME - 1)) {
+            if (a == b) next;
+            if (abs(CX[a] - CX[b]) + abs(CY[a] - CY[b]) == 1) {
+                srcs = c(srcs, sp[b]);
+                rates = c(rates, M0 * exp(BETA * (ELEV[a] - ELEV[b])));
+            }
+        }
+        // keep total immigration < 1
+        if (sum(rates) >= 0.95) rates = rates * (0.95 / sum(rates));
+        sp[a].setMigrationRates(srcs, rates);
+    }
+    catn("scen5: NDEME=" + NDEME + " sum(K)=" + sum(KVEC) +
+         " K range [" + min(KVEC) + "," + max(KVEC) + "] BETA=" + BETA);
+    community.rescheduleScriptBlock(s1, start = NGEN, end = NGEN);
+}
+
+s1 2 late() {
+    sim.treeSeqOutput(OUTPRE + ".trees");
+    dmeta = "deme,gx,gy,elev,size";
+    for (i in 0:(NDEME - 1))
+        dmeta = c(dmeta, i + "," + CX[i] + "," + CY[i] + "," + ELEV[i] + "," + KVEC[i]);
+    writeFile(OUTPRE + "_demes.csv", dmeta);
+    catn("scen5: wrote " + OUTPRE + ".trees at tick " + community.tick);
+    sim.simulationFinished();
+}

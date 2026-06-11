@@ -15,6 +15,16 @@ terradish 0.0.40 (dev)
   matches `terradish_kron_reduce()` exactly while eliminating the interior tile
   by tile, bounding peak memory to one tile's interior factor plus the sparse
   interface operator.
+* Added the DRAGON structured-coalescent directed engine (`R/dragon.R`, Phase 1,
+  pure R + Matrix): estimates asymmetric gene flow as a covariate function via a
+  directed migration generator and FRAME's Strobeck forward map (expected pairwise
+  coalescence times), with an analytic adjoint gradient, three coalescence-rate
+  models (uniform, covariate drift surface, FRAME stationary coupling), a
+  `dragon()` fit, a `dragon_collinearity()` direction-vs-drift diagnostic, and S3
+  methods. The coalescent-correct successor to `terradish_directed()` (which uses a
+  direction-blind commute time). Reference-pinned against the validated Python
+  prototype (`tests/testthat/test-dragon.R`). Run `devtools::document()` to register
+  exports/man pages before `R CMD check`.
 
 terradish 0.0.39
 ---------
