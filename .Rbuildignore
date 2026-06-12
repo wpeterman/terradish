@@ -23,3 +23,7 @@
 ^future_dev_ideas\.md$
 ^doc$
 ^Meta$
+^\.gitattributes$
+^\.editorconfig$
+^dev$
+^Rplots\.pdf$

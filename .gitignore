@@ -28,3 +28,8 @@ dev/*.out
 dev/slim/*.log
 dev/fulltest.txt
 dev/fulltest_fails.csv
+
+# Stray R plot output and large regenerable simulation artifacts
+Rplots.pdf
+*.trees
+*.npz

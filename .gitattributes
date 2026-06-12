@@ -1,0 +1,60 @@
+# Normalize all text files to LF in the repository and on checkout, so the
+# working tree matches the (LF) history regardless of platform / OneDrive sync.
+# git auto-detects binary content and leaves it untouched; the explicit binary
+# rules below are belt-and-suspenders for the formats this package ships.
+
+* text=auto eol=lf
+
+# --- R package text (force LF) ---
+*.R      text eol=lf
+*.Rd     text eol=lf
+*.Rmd    text eol=lf
+*.Rnw    text eol=lf
+*.md     text eol=lf
+*.markdown text eol=lf
+*.txt    text eol=lf
+*.csv    text eol=lf
+*.cpp    text eol=lf
+*.cc     text eol=lf
+*.c      text eol=lf
+*.h      text eol=lf
+*.hpp    text eol=lf
+*.py     text eol=lf
+*.slim   text eol=lf
+*.sh     text eol=lf
+*.in     text eol=lf
+*.ac     text eol=lf
+*.json   text eol=lf
+*.yml    text eol=lf
+*.yaml   text eol=lf
+DESCRIPTION  text eol=lf
+NAMESPACE    text eol=lf
+LICENSE      text eol=lf
+configure    text eol=lf
+cleanup      text eol=lf
+Makevars     text eol=lf
+Makevars.in  text eol=lf
+Makevars.win text eol=lf
+
+# --- binary (never touch) ---
+*.RData  binary
+*.rda    binary
+*.rds    binary
+*.Rds    binary
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.pdf    binary
+*.o      binary
+*.so     binary
+*.dll    binary
+*.a      binary
+*.dylib  binary
+*.zip    binary
+*.gz     binary
+*.bz2    binary
+*.tar    binary
+*.trees  binary
+*.npz    binary
