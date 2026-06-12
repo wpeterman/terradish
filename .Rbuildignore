@@ -5,6 +5,8 @@
 ^tmp_.*\.RData$
 ^CRAN-SUBMISSION$
 ^cran-comments\.md$
+^\.git$
+^\.gitignore$
 ^\.github$
 ^README\.Rmd$
 ^inst/extdata/.*\.RData$

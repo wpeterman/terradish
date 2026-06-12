@@ -15,16 +15,16 @@ terradish 0.0.40 (dev)
   matches `terradish_kron_reduce()` exactly while eliminating the interior tile
   by tile, bounding peak memory to one tile's interior factor plus the sparse
   interface operator.
-* Added the DRAGON structured-coalescent directed engine (`R/dragon.R`, Phase 1,
-  pure R + Matrix): estimates asymmetric gene flow as a covariate function via a
-  directed migration generator and FRAME's Strobeck forward map (expected pairwise
-  coalescence times), with an analytic adjoint gradient, three coalescence-rate
-  models (uniform, covariate drift surface, FRAME stationary coupling), a
-  `dragon()` fit, a `dragon_collinearity()` direction-vs-drift diagnostic, and S3
-  methods. The coalescent-correct successor to `terradish_directed()` (which uses a
-  direction-blind commute time). Reference-pinned against the validated Python
-  prototype (`tests/testthat/test-dragon.R`). Run `devtools::document()` to register
-  exports/man pages before `R CMD check`.
+* Extracted the shared landscape-genetic primitives to the new `landgraph` package
+  and now import them from there: the genetic covariance/distance helpers
+  (`cov_from_biallelic()`, `cov_from_genetic_data()`, `fst_from_biallelic()`,
+  `dist_from_cov()`, `dist_from_biallelic()`) and the directional edge-covariate
+  builders (`edge_gradient()`, `edge_flow()`). These are re-exported from terradish,
+  so existing code and documentation links are unchanged.
+* Moved the DRAGON structured-coalescent directed engine to its own package,
+  `dragonflow` (asymmetric gene flow as a function of directional covariates). It is
+  no longer shipped in terradish; install `dragonflow` to use `dragon()` and
+  `dragon_collinearity()`. terradish remains focused on symmetric resistance.
 
 terradish 0.0.39
 ---------

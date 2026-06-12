@@ -20,7 +20,7 @@ terradish_algorithm(
   validate = FALSE,
   cores = 1L,
   curvature = c("exact", "gauss_newton"),
-  solver = c("direct", "auto", "amg", "pcg", "pcg_jacobi"),
+  solver = c("direct", "auto", "amg", "pcg", "pcg_jacobi", "block_cg"),
   solver_control = NULL,
   solver_warm_start = NULL,
   solver_reuse_state = NULL
@@ -59,15 +59,17 @@ measurement models that require it.}
 \item{curvature}{Which curvature to return in \code{hessian}. \code{"exact"}
 (default) returns the exact Hessian of the negative log-likelihood.
 \code{"gauss_newton"} returns the Gauss-Newton / Fisher-information
-approximation, obtained by dropping the two residual-weighted second-derivative
-terms (the second derivative of the resistance covariance \eqn{E} and of
-conductance with respect to \code{theta}). The Gauss-Newton curvature equals the
-Fisher information at the optimum, where it is positive semidefinite and yields
-a well-defined \code{vcov} (away from the optimum the measurement model's
-observed curvature can be indefinite). It equals the exact Hessian at a
-well-fitting optimum, requires only first derivatives of the conductance model
-(useful for Gaussian scale-aware and spline conductance), and uses the same
-number of linear solves as the exact Hessian.}
+approximation, obtained by dropping the two residual-weighted
+second-derivative terms (the second derivative of the resistance covariance
+\eqn{E} and of conductance with respect to \code{theta}). The Gauss-Newton
+curvature equals the Fisher information at the optimum, where it is positive
+semidefinite and yields a well-defined \code{vcov} (away from the optimum
+the measurement model's observed curvature can be indefinite). It equals the
+exact Hessian at a well-fitting optimum, and the gap between them measures
+model misspecification. It also requires only first derivatives of the
+conductance model, which is useful for Gaussian scale-aware and spline
+conductance models whose second derivatives are expensive or unstable. The
+number of linear solves is the same as for the exact Hessian.}
 
 \item{solver}{Linear-system solver used for the reduced Laplacian. \code{"direct"} uses the cached sparse Cholesky factorization, \code{"auto"} conservatively chooses between the direct and AMG backends based on graph size and right-hand-side count, \code{"amg"} uses smoothed-aggregation algebraic multigrid preconditioned conjugate gradients, \code{"pcg"} uses incomplete-Cholesky preconditioned conjugate gradients, and \code{"pcg_jacobi"} keeps the older Jacobi-preconditioned prototype.}
 

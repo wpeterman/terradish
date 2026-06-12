@@ -62,8 +62,8 @@ direct solver's memory wall and past the point where even an algebraic
 multigrid solve must hold all focal potentials at once.
 }
 \details{
-The elimination is exact for any partition: \code{tiles} changes only how
-much fill, and therefore how much peak memory, the reduction incurs.
+The elimination is exact for any partition: \code{tiles} changes
+only how much fill, and therefore how much peak memory, the reduction incurs.
 Spatially compact tiles keep interfaces small. Because focal (boundary)
 vertices are never eliminated, focal effective resistances are preserved
 exactly, in contrast to approximate node lumping. The \code{peak} element of
@@ -77,6 +77,6 @@ likelihood gradient needs the adjoint of conductance through the Schur
 complement; that integration is a separate step.
 }
 \seealso{
-\code{\link{terradish_kron_reduce}} for the single-shot reduction this
-  matches exactly.
+\code{\link{terradish_kron_reduce}} for the single-shot reduction
+  this matches exactly.
 }
