@@ -1,0 +1,15 @@
+"n","cells","m","solver","eval_s","iters","converged"
+256,65536,50,"amg",2.9,10,TRUE
+256,65536,50,"direct",1.11,NA,TRUE
+512,262144,50,"amg",7,13,TRUE
+512,262144,50,"direct",3.88,NA,TRUE
+724,524176,50,"amg",10.02,11,TRUE
+724,524176,50,"direct",6.9,NA,TRUE
+1024,1048576,50,"amg",21.2,12,TRUE
+1024,1048576,50,"direct",14.43,NA,TRUE
+1152,1327104,50,"amg",30.12,14,TRUE
+1152,1327104,50,"direct",22.42,NA,TRUE
+1448,2096704,50,"amg",39.17,12,TRUE
+1448,2096704,50,"direct",NA,NA,"skipped: > direct_max_cells"
+2048,4194304,50,"amg",74.19,13,TRUE
+2048,4194304,50,"direct",NA,NA,"skipped: > direct_max_cells"

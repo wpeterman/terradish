@@ -1,0 +1,3 @@
+"n","cells","vertices","n_tiles","single_dim","single_factor_nnz","single_s","single_peakMB","single_status","tiled_peak_interior","tiled_peak_nnz","tiled_s","tiled_peakMB","tiled_status","exact_relerr"
+1024,1048576,1048576,66,1048526,60470378,17.67,3172.1,"ok",16384,9454659,60.64,4718.3,"ok",6.61e-13
+1448,2096704,2096704,131,2096654,NA,NA,NA,"skipped: > single_max_cells (OOM regime)",17424,19477865,227,6481.8,"ok",NA
