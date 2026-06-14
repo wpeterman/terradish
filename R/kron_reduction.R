@@ -188,7 +188,36 @@ terradish_kron_reduce <- function(data,
   groups
 }
 
-#' Exact tiled (out-of-core) Schur/Kron reduction of a terradish graph
+# 1-based undirected edge list (m x 2) for the graph, used to find tile
+# separators (cells with a neighbour in a different tile).
+.kron_edges <- function(data)
+{
+  ep <- data$edge_pairs
+  if (is.null(ep))
+  {
+    if (is.null(data$adj))
+      stop("graph has no edge list (`edge_pairs`/`adj`)", call. = FALSE)
+    ep <- t(data$adj) + 1L          # `adj` is 2 x m, 0-based
+  }
+  matrix(as.integer(ep), ncol = 2L)
+}
+
+# Local interior elimination for one tile: factor the tile's private interior
+# block and return its dense Schur contribution onto its interface cells
+# (positions within the global interface `B`). Independent across tiles, so this
+# is the unit of parallel work; the payload is only the tile's own blocks.
+.kron_tile_schur <- function(p)
+{
+  Cii <- tryCatch(
+    Matrix::Cholesky(p$Lii, LDL = TRUE, perm = TRUE),
+    error = function(e)
+      stop("a tile interior block is not positive definite; tiles must induce ",
+           "interior subgraphs connected to the interface", call. = FALSE))
+  list(Bt = p$Bt,
+       Ct = as.matrix(Matrix::crossprod(p$LiBt, Matrix::solve(Cii, p$LiBt))))
+}
+
+#' Exact tiled (out-of-core, optionally parallel) Schur/Kron reduction of a terradish graph
 #'
 #' Reduces a full terradish graph Laplacian onto a retained set of boundary
 #' vertices (usually the focal sampling sites) by eliminating every other vertex
@@ -218,19 +247,37 @@ terradish_kron_reduce <- function(data,
 #'   coordinates are unavailable.
 #' @param n_tiles Approximate number of tiles to build when \code{tiles} is
 #'   \code{NULL}. The vertices are divided into a near-square grid of this many
-#'   spatial blocks. More tiles lower the peak memory but raise the total work.
+#'   spatial blocks. Tile size is a tradeoff (see Details): smaller tiles shrink
+#'   each interior factor but enlarge the separator system between tiles.
 #' @param covariance If \code{TRUE}, also return the generalized inverse of the
 #'   reduced Laplacian on the retained vertices, that is the focal
 #'   effective-resistance covariance.
+#' @param cores Number of worker processes for the independent per-tile interior
+#'   eliminations. \code{cores = 1} (the default) runs them sequentially. With
+#'   \code{cores > 1} they run in parallel: by forking on Unix (workers share
+#'   memory) and on a socket cluster on Windows (each worker is sent only its own
+#'   tile blocks). The result is identical either way. Parallelism pays off only
+#'   when the per-tile factorizations are large relative to the worker overhead
+#'   and the sequential interface reduction; for small or moderate problems
+#'   \code{cores = 1} is usually faster.
 #'
-#' @details The elimination is exact for any partition: \code{tiles} changes
-#' only how much fill, and therefore how much peak memory, the reduction incurs.
-#' Spatially compact tiles keep interfaces small. Because focal (boundary)
-#' vertices are never eliminated, focal effective resistances are preserved
-#' exactly, in contrast to approximate node lumping. The \code{peak} element of
-#' the result reports the largest per-tile interior solve, the largest
-#' interface, and the largest working-operator nonzero count, a direct read on
-#' the memory the reduction actually needed.
+#' @details This uses a non-overlapping domain decomposition. A vertex is a
+#' \emph{separator} if it has a neighbour in a different tile; the
+#' \emph{interface} is the separators together with the focal (boundary)
+#' vertices. Each tile's remaining \emph{private interior} has no edges to any
+#' other tile's interior, so those interior blocks are mutually independent and
+#' are each eliminated by an exact Schur complement onto the interface, one tile
+#' at a time (or in parallel, see \code{cores}). The tile contributions are
+#' assembled into an interface operator, which is then reduced onto the focal
+#' vertices. The result is exact for any partition and identical to
+#' \code{\link{terradish_kron_reduce}}; only the cost changes.
+#'
+#' Tile size is a genuine tradeoff. Smaller tiles shrink the largest interior
+#' factor (\code{peak$interior}) but multiply the separators, so the assembled
+#' interface system (\code{peak$separators}) grows and eventually dominates both
+#' memory and time. The minimum total cost is at a balance, not at the smallest
+#' tiles. Because focal vertices are never eliminated, focal effective
+#' resistances are preserved exactly, in contrast to approximate node lumping.
 #'
 #' This promotes the tiled reduction as a standalone, exact primitive. It is not
 #' yet wired into \code{\link{terradish_algorithm}} as a solver, because the
@@ -239,10 +286,12 @@ terradish_kron_reduce <- function(data,
 #'
 #' @return A list of class \code{"terradish_kron_reduction"} with the reduced
 #'   \code{laplacian}, retained \code{boundary} vertices, eliminated
-#'   \code{interior} vertices, the \code{tiles} used, a \code{peak} list of
-#'   memory diagnostics (\code{interior}: largest per-tile interior solve;
-#'   \code{interface}: largest interface; \code{nnz}: largest working-operator
-#'   nonzero count), and optionally \code{covariance}.
+#'   \code{interior} vertices, the \code{tiles} used, the \code{cores} used, a
+#'   \code{peak} list of memory diagnostics (\code{interior}: largest per-tile
+#'   interior factor; \code{separators}: number of separator vertices eliminated
+#'   in the interface reduction; \code{interface}: total interface size;
+#'   \code{nnz}: largest working-operator nonzero count), and optionally
+#'   \code{covariance}.
 #'
 #' @seealso \code{\link{terradish_kron_reduce}} for the single-shot reduction
 #'   this matches exactly.
@@ -252,7 +301,8 @@ terradish_kron_reduce_tiled <- function(data,
                                         boundary = unique(data$demes),
                                         tiles = NULL,
                                         n_tiles = 16L,
-                                        covariance = FALSE)
+                                        covariance = FALSE,
+                                        cores = 1L)
 {
   stopifnot(inherits(data, c("terradish_graph", "radish_graph")))
   if (is.list(conductance) && !is.null(conductance$conductance))
@@ -286,41 +336,101 @@ terradish_kron_reduce_tiled <- function(data,
   }
 
   groups <- .terradish_tile_groups(data, tiles, n_tiles, n_vertices)
+  cores  <- max(1L, as.integer(cores))
 
-  present  <- seq_len(n_vertices)        # global ids currently in `cur`
   # general (not symmetric-packed) sparse so asymmetric tile subsets stay sparse
-  cur      <- as(Q, "generalMatrix")
-  peak_int <- peak_iface <- 0L
-  peak_nnz <- length(cur@x)
-  for (g in groups)
-  {
-    elim_local <- match(intersect(g, interior), present)
-    elim_local <- elim_local[!is.na(elim_local)]
-    if (!length(elim_local)) next
-    step       <- .schur_step_sparse(cur, elim_local)
-    cur        <- step$L
-    present    <- present[step$keep]
-    peak_int   <- max(peak_int, length(elim_local))
-    peak_iface <- max(peak_iface, step$interface)
-    peak_nnz   <- max(peak_nnz, length(cur@x))
-  }
-  # eliminate any interior vertex a partial partition left behind
-  leftover <- match(intersect(present, interior), present)
-  leftover <- leftover[!is.na(leftover)]
-  if (length(leftover))
-  {
-    step    <- .schur_step_sparse(cur, leftover)
-    cur     <- step$L
-    present <- present[step$keep]
-  }
+  Qg <- as(Q, "generalMatrix")
 
-  pos     <- match(boundary, present)    # align ascending `present` to `boundary`
-  reduced <- forceSymmetric(cur[pos, pos, drop = FALSE])
+  # tile id per vertex, then separators: a vertex with a neighbour in another
+  # tile. The interface B is the separators plus the retained (focal) vertices.
+  tile_of <- integer(n_vertices)
+  for (t in seq_along(groups)) tile_of[groups[[t]]] <- t
+  ep    <- .kron_edges(data)
+  cross <- tile_of[ep[, 1]] != tile_of[ep[, 2]]
+  Bmask <- logical(n_vertices)
+  Bmask[ep[cross, 1]] <- TRUE; Bmask[ep[cross, 2]] <- TRUE
+  Bmask[boundary] <- TRUE
+  B <- which(Bmask)
+
+  # Per tile, extract only its private-interior blocks (bounded payload). The
+  # private interiors of different tiles share no edges, so each tile's interior
+  # eliminates independently -- this is the parallel unit.
+  payloads <- lapply(groups, function(cells)
+  {
+    It <- cells[!Bmask[cells]]
+    if (!length(It)) return(NULL)
+    LiB <- as(Qg[It, B, drop = FALSE], "CsparseMatrix")   # interior x interface
+    Bt  <- which(diff(LiB@p) > 0L)                        # interface cols touching It
+    if (!length(Bt)) return(NULL)
+    list(Lii = forceSymmetric(Qg[It, It, drop = FALSE]),
+         LiBt = LiB[, Bt, drop = FALSE], Bt = Bt, ni = length(It))
+  })
+  payloads <- Filter(Negate(is.null), payloads)
+
+  nw <- min(as.integer(cores), length(payloads))
+  contribs <- if (nw > 1L && .Platform$OS.type == "unix")
+  {
+    # fork: workers share the parent's memory, so no per-tile serialization
+    parallel::mclapply(payloads, .kron_tile_schur, mc.cores = nw)
+  }
+  else if (nw > 1L)
+  {
+    # Windows: socket cluster (each worker is sent only its own tile blocks).
+    # Note that serializing those blocks has real overhead, so the parallel win
+    # only materializes when the per-tile factorizations are large relative to
+    # it; otherwise `cores = 1` is faster.
+    cl <- parallel::makeCluster(nw)
+    on.exit(parallel::stopCluster(cl), add = TRUE)
+    parallel::clusterEvalQ(cl, requireNamespace("Matrix", quietly = TRUE))
+    parallel::parLapply(cl, payloads, .kron_tile_schur)
+  }
+  else
+  {
+    lapply(payloads, .kron_tile_schur)
+  }
+  if (any(vapply(contribs, function(x) inherits(x, "try-error") || is.null(x), logical(1))))
+    stop("a parallel tile reduction failed; rerun with cores = 1 to see the error",
+         call. = FALSE)
+
+  # Assemble the interface operator S_B = Q[B,B] - sum_t (tile Schur contribution).
+  S_B <- as(Qg[B, B, drop = FALSE], "generalMatrix")
+  if (length(contribs))
+  {
+    ii <- jj <- xx <- numeric(0)
+    for (cc in contribs)
+    {
+      nb <- length(cc$Bt)
+      ii <- c(ii, rep.int(cc$Bt, nb)); jj <- c(jj, rep(cc$Bt, each = nb))
+      xx <- c(xx, as.numeric(cc$Ct))
+    }
+    S_B <- S_B - sparseMatrix(i = ii, j = jj, x = xx, dims = dim(S_B))
+  }
+  S_B <- as(forceSymmetric(S_B), "generalMatrix")
+
+  # Reduce the interface onto the focal vertices: eliminate the separators.
+  foc_in_B <- match(boundary, B)
+  elim_B   <- setdiff(seq_along(B), foc_in_B)
+  if (length(elim_B))
+  {
+    step    <- .schur_step_sparse(S_B, elim_B)
+    kept_B  <- (seq_along(B))[step$keep]
+    reduced <- step$L
+  }
+  else
+  {
+    kept_B <- seq_along(B); reduced <- S_B
+  }
+  pos     <- match(boundary, B[kept_B])  # align to `boundary` order
+  reduced <- forceSymmetric(reduced[pos, pos, drop = FALSE])
+
+  peak_int <- if (length(payloads))
+    max(vapply(payloads, function(p) p$ni, integer(1))) else 0L
 
   out <- list(laplacian = reduced, boundary = boundary, interior = interior,
               tiles = groups, n_boundary = length(boundary),
-              n_interior = length(interior),
-              peak = list(interior = peak_int, interface = peak_iface, nnz = peak_nnz),
+              n_interior = length(interior), cores = cores,
+              peak = list(interior = peak_int, separators = length(B) - length(boundary),
+                          interface = length(B), nnz = max(length(Qg@x), length(S_B@x))),
               covariance = if (isTRUE(covariance)) ginv(as.matrix(reduced)) else NULL)
   class(out) <- "terradish_kron_reduction"
   out

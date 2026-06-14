@@ -2,7 +2,7 @@
 % Please edit documentation in R/kron_reduction.R
 \name{terradish_kron_reduce_tiled}
 \alias{terradish_kron_reduce_tiled}
-\title{Exact tiled (out-of-core) Schur/Kron reduction of a terradish graph}
+\title{Exact tiled (out-of-core, optionally parallel) Schur/Kron reduction of a terradish graph}
 \usage{
 terradish_kron_reduce_tiled(
   data,
@@ -10,7 +10,8 @@ terradish_kron_reduce_tiled(
   boundary = unique(data$demes),
   tiles = NULL,
   n_tiles = 16L,
-  covariance = FALSE
+  covariance = FALSE,
+  cores = 1L
 )
 }
 \arguments{
@@ -32,19 +33,31 @@ coordinates are unavailable.}
 
 \item{n_tiles}{Approximate number of tiles to build when \code{tiles} is
 \code{NULL}. The vertices are divided into a near-square grid of this many
-spatial blocks. More tiles lower the peak memory but raise the total work.}
+spatial blocks. Tile size is a tradeoff (see Details): smaller tiles shrink
+each interior factor but enlarge the separator system between tiles.}
 
 \item{covariance}{If \code{TRUE}, also return the generalized inverse of the
 reduced Laplacian on the retained vertices, that is the focal
 effective-resistance covariance.}
+
+\item{cores}{Number of worker processes for the independent per-tile interior
+eliminations. \code{cores = 1} (the default) runs them sequentially. With
+\code{cores > 1} they run in parallel: by forking on Unix (workers share
+memory) and on a socket cluster on Windows (each worker is sent only its own
+tile blocks). The result is identical either way. Parallelism pays off only
+when the per-tile factorizations are large relative to the worker overhead
+and the sequential interface reduction; for small or moderate problems
+\code{cores = 1} is usually faster.}
 }
 \value{
 A list of class \code{"terradish_kron_reduction"} with the reduced
   \code{laplacian}, retained \code{boundary} vertices, eliminated
-  \code{interior} vertices, the \code{tiles} used, a \code{peak} list of
-  memory diagnostics (\code{interior}: largest per-tile interior solve;
-  \code{interface}: largest interface; \code{nnz}: largest working-operator
-  nonzero count), and optionally \code{covariance}.
+  \code{interior} vertices, the \code{tiles} used, the \code{cores} used, a
+  \code{peak} list of memory diagnostics (\code{interior}: largest per-tile
+  interior factor; \code{separators}: number of separator vertices eliminated
+  in the interface reduction; \code{interface}: total interface size;
+  \code{nnz}: largest working-operator nonzero count), and optionally
+  \code{covariance}.
 }
 \description{
 Reduces a full terradish graph Laplacian onto a retained set of boundary
@@ -62,14 +75,23 @@ direct solver's memory wall and past the point where even an algebraic
 multigrid solve must hold all focal potentials at once.
 }
 \details{
-The elimination is exact for any partition: \code{tiles} changes
-only how much fill, and therefore how much peak memory, the reduction incurs.
-Spatially compact tiles keep interfaces small. Because focal (boundary)
-vertices are never eliminated, focal effective resistances are preserved
-exactly, in contrast to approximate node lumping. The \code{peak} element of
-the result reports the largest per-tile interior solve, the largest
-interface, and the largest working-operator nonzero count, a direct read on
-the memory the reduction actually needed.
+This uses a non-overlapping domain decomposition. A vertex is a
+\emph{separator} if it has a neighbour in a different tile; the
+\emph{interface} is the separators together with the focal (boundary)
+vertices. Each tile's remaining \emph{private interior} has no edges to any
+other tile's interior, so those interior blocks are mutually independent and
+are each eliminated by an exact Schur complement onto the interface, one tile
+at a time (or in parallel, see \code{cores}). The tile contributions are
+assembled into an interface operator, which is then reduced onto the focal
+vertices. The result is exact for any partition and identical to
+\code{\link{terradish_kron_reduce}}; only the cost changes.
+
+Tile size is a genuine tradeoff. Smaller tiles shrink the largest interior
+factor (\code{peak$interior}) but multiply the separators, so the assembled
+interface system (\code{peak$separators}) grows and eventually dominates both
+memory and time. The minimum total cost is at a balance, not at the smallest
+tiles. Because focal vertices are never eliminated, focal effective
+resistances are preserved exactly, in contrast to approximate node lumping.
 
 This promotes the tiled reduction as a standalone, exact primitive. It is not
 yet wired into \code{\link{terradish_algorithm}} as a solver, because the
@@ -77,6 +99,6 @@ likelihood gradient needs the adjoint of conductance through the Schur
 complement; that integration is a separate step.
 }
 \seealso{
-\code{\link{terradish_kron_reduce}} for the single-shot reduction
-  this matches exactly.
+\code{\link{terradish_kron_reduce}} for the single-shot reduction this
+  matches exactly.
 }

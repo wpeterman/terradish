@@ -115,3 +115,24 @@ test_that("tiled reduction accepts a user-supplied vertex partition", {
     terradish_kron_reduce_tiled(surface, conductance, tiles = labels[-1]),
     "one entry per graph vertex")
 })
+
+test_that("parallel tiled reduction matches the sequential and single-shot results", {
+  dat <- melip_fixture(1:8)
+  surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
+  model <- loglinear_conductance(~ altitude + forestcover, surface$x)
+  conductance <- model(c(-0.3, 0.3))$conductance
+
+  seq1 <- terradish_kron_reduce_tiled(surface, conductance, n_tiles = 16L, cores = 1L)
+  par2 <- terradish_kron_reduce_tiled(surface, conductance, n_tiles = 16L, cores = 2L)
+  single <- terradish_kron_reduce(surface, conductance)
+
+  # parallel == sequential, exactly
+  expect_equal(as.matrix(par2$laplacian), as.matrix(seq1$laplacian), tolerance = 1e-10)
+  expect_equal(par2$cores, 2)
+  # and both match the single-shot reduction
+  P <- match(single$boundary, seq1$boundary)
+  expect_lt(
+    max(abs(as.matrix(single$laplacian) - as.matrix(seq1$laplacian[P, P]))) /
+      max(abs(as.matrix(single$laplacian))),
+    1e-8)
+})

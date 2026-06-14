@@ -11,10 +11,17 @@ terradish 0.0.40 (dev)
   (O'Leary) sharing one Krylov space across all focal right-hand sides, for
   small or well-conditioned graphs.
 * Added `terradish_kron_reduce_tiled()`, an exact tiled (out-of-core) Schur/Kron
-  reduction onto the focal sites. Sequential Schur complements compose, so it
-  matches `terradish_kron_reduce()` exactly while eliminating the interior tile
-  by tile, bounding peak memory to one tile's interior factor plus the sparse
-  interface operator.
+  reduction onto the focal sites. It uses a non-overlapping domain decomposition:
+  each tile's private interior (cells with no cross-tile neighbour) is eliminated
+  independently by a local Schur complement onto the interface (separators plus
+  focal), the tile contributions are assembled, and the interface is reduced onto
+  the focal vertices. The result matches `terradish_kron_reduce()` exactly while
+  bounding peak memory to one tile's interior factor plus the interface operator,
+  so it completes past the scale where the single-shot reduction runs out of
+  memory. The independent tile eliminations run in parallel with `cores > 1`
+  (socket cluster; each worker gets only its own tile blocks), identical to the
+  sequential result. Tile size is a tradeoff: smaller tiles shrink each interior
+  factor but enlarge the separator system.
 * Extracted the shared landscape-genetic primitives to the new `landgraph` package
   and now import them from there: the genetic covariance/distance helpers
   (`cov_from_biallelic()`, `cov_from_genetic_data()`, `fst_from_biallelic()`,
