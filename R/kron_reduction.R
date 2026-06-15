@@ -396,13 +396,10 @@ terradish_kron_reduce_tiled <- function(data,
   S_B <- as(Qg[B, B, drop = FALSE], "generalMatrix")
   if (length(contribs))
   {
-    ii <- jj <- xx <- numeric(0)
-    for (cc in contribs)
-    {
-      nb <- length(cc$Bt)
-      ii <- c(ii, rep.int(cc$Bt, nb)); jj <- c(jj, rep(cc$Bt, each = nb))
-      xx <- c(xx, as.numeric(cc$Ct))
-    }
+    # assemble all tile contributions in one pass (avoid growing vectors with c())
+    ii <- unlist(lapply(contribs, function(cc) rep.int(cc$Bt, length(cc$Bt))), use.names = FALSE)
+    jj <- unlist(lapply(contribs, function(cc) rep(cc$Bt, each = length(cc$Bt))), use.names = FALSE)
+    xx <- unlist(lapply(contribs, function(cc) as.numeric(cc$Ct)), use.names = FALSE)
     S_B <- S_B - sparseMatrix(i = ii, j = jj, x = xx, dims = dim(S_B))
   }
   S_B <- as(forceSymmetric(S_B), "generalMatrix")
