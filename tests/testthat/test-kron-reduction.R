@@ -44,30 +44,46 @@ test_that("experimental Kron reduction preserves focal effective distances", {
   )
 })
 
-test_that("nested-dissection reduction (default) equals the single-shot reduction", {
+test_that("auto default uses the single-shot reduction and matches it", {
   dat <- melip_fixture(1:8)
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
   model <- loglinear_conductance(~ altitude + forestcover, surface$x)
   conductance <- model(c(-0.3, 0.3))$conductance
 
   single <- terradish_kron_reduce(surface, conductance)
-  tiled  <- terradish_kron_reduce_tiled(surface, conductance)   # default = nested dissection
+  tiled  <- terradish_kron_reduce_tiled(surface, conductance)   # auto -> direct (small graph)
 
   expect_s3_class(tiled, "terradish_kron_reduction")
+  expect_equal(tiled$method, "direct")
   diff <- as.matrix(single$laplacian) - as.matrix(tiled$laplacian[
     match(single$boundary, tiled$boundary),
     match(single$boundary, tiled$boundary)])
   expect_lt(max(abs(diff)) / max(abs(as.matrix(single$laplacian))), 1e-8)
 })
 
-test_that("nested-dissection reduction is exact for any leaf size and bounds the factorization", {
+test_that("auto switches to nested dissection under a tight memory budget", {
+  dat <- melip_fixture(1:8)
+  surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
+  model <- loglinear_conductance(~ altitude + forestcover, surface$x)
+  conductance <- model(c(-0.3, 0.3))$conductance
+  single <- terradish_kron_reduce(surface, conductance)
+
+  tiled <- terradish_kron_reduce_tiled(surface, conductance, mem_budget = 1)
+  expect_equal(tiled$method, "nested")
+  P <- match(single$boundary, tiled$boundary)
+  expect_lt(
+    max(abs(as.matrix(single$laplacian) - as.matrix(tiled$laplacian[P, P]))) /
+      max(abs(as.matrix(single$laplacian))), 1e-8)
+})
+
+test_that("nested dissection is exact for any leaf size and bounds the factorization", {
   dat <- melip_fixture(1:8)
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
   model <- loglinear_conductance(~ altitude + forestcover, surface$x)
   conductance <- model(c(-0.2, 0.4))$conductance
 
-  small <- terradish_kron_reduce_tiled(surface, conductance, n_tiles = 1000L)
-  large <- terradish_kron_reduce_tiled(surface, conductance, n_tiles = 4000L)
+  small <- terradish_kron_reduce_tiled(surface, conductance, method = "nested", n_tiles = 1000L)
+  large <- terradish_kron_reduce_tiled(surface, conductance, method = "nested", n_tiles = 4000L)
   expect_equal(as.matrix(small$laplacian), as.matrix(large$laplacian), tolerance = 1e-8)
   # the largest single factorization is bounded well below the whole interior,
   # and a smaller leaf does not enlarge it
@@ -75,7 +91,7 @@ test_that("nested-dissection reduction is exact for any leaf size and bounds the
   expect_lte(small$peak$interior, large$peak$interior)
 })
 
-test_that("nested-dissection reduction preserves focal effective distances", {
+test_that("nested dissection preserves focal effective distances", {
   dat <- melip_fixture(1:8)
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
   model <- loglinear_conductance(~ altitude + forestcover, surface$x)
@@ -87,7 +103,7 @@ test_that("nested-dissection reduction preserves focal effective distances", {
     nu = 1000, theta = theta, objective = FALSE, gradient = FALSE,
     hessian = FALSE, partial = FALSE, solver = "direct")
 
-  tiled <- terradish_kron_reduce_tiled(surface, conductance, covariance = TRUE)
+  tiled <- terradish_kron_reduce_tiled(surface, conductance, method = "nested", covariance = TRUE)
   expect_equal(
     dist_from_cov(tiled$covariance),
     dist_from_cov(as.matrix(full_fit$covariance)),
@@ -125,8 +141,8 @@ test_that("nested-dissection result is identical with cores > 1", {
   model <- loglinear_conductance(~ altitude + forestcover, surface$x)
   conductance <- model(c(-0.3, 0.3))$conductance
 
-  one <- terradish_kron_reduce_tiled(surface, conductance, cores = 1L)
-  par <- terradish_kron_reduce_tiled(surface, conductance, cores = 2L)
+  one <- terradish_kron_reduce_tiled(surface, conductance, method = "nested", cores = 1L)
+  par <- terradish_kron_reduce_tiled(surface, conductance, method = "nested", cores = 2L)
   expect_equal(as.matrix(par$laplacian), as.matrix(one$laplacian), tolerance = 1e-10)
   expect_equal(par$cores, 2)
 })

@@ -12,19 +12,21 @@ terradish 0.0.40 (dev)
   small or well-conditioned graphs.
 * Added `terradish_kron_reduce_tiled()`, an exact out-of-core Schur/Kron
   reduction onto the focal sites that matches `terradish_kron_reduce()` exactly
-  while bounding peak memory. By default it uses recursive nested dissection:
-  the interior is bisected by a thin separator into two independent halves, each
-  reduced recursively, and the separator is eliminated last (a multifrontal
-  extend-add). This bounds every single factorization by a separator width
-  rather than by the interior or the separator skeleton, so it completes past
-  the scale where the single-shot reduction (and a one-level tiling, whose
-  separator factorization grows ~N^1.6) would run out of memory. `n_tiles` sets
-  the recursion's leaf size. With `cores > 1` the independent recursive halves
-  are reduced in parallel by forking on Unix (the budget halves down the
-  recursion), so memory stays bounded and the subtrees reduce concurrently;
-  supplying an explicit `tiles` partition instead uses a flat two-level
-  substructuring that parallelizes across tiles (fork on Unix, socket cluster on
-  Windows). Either path is identical to the sequential result, and focal
+  while keeping peak memory in check. By default (`method = "auto"`) it uses the
+  fast single-shot reduction while its estimated factorization fits `mem_budget`
+  (default 4 GB), and falls back to recursive nested dissection only when it
+  would not -- so the common case stays fast and the bounded path is reserved
+  for the regime where the single-shot factor (and a one-level tiling, whose
+  separator factorization grows ~N^1.6) would run out of memory. Nested
+  dissection bisects the interior by a thin separator into two independent
+  halves, reduces each recursively, and eliminates the separator last (a
+  multifrontal extend-add), bounding every single factorization by a separator
+  width; `n_tiles` is its leaf size. With `cores > 1` the independent recursive
+  halves are reduced in parallel by forking on Unix (the budget halves down the
+  recursion); the chosen `method` and the factor estimate are returned. Supplying
+  an explicit `tiles` partition instead uses a flat two-level substructuring that
+  parallelizes across tiles (fork on Unix, socket cluster on Windows). Every path
+  is identical to the sequential single-shot result, and focal
   vertices are never eliminated, so focal effective resistances are preserved
   exactly.
 * Extracted the shared landscape-genetic primitives to the new `landgraph` package

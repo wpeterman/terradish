@@ -2,7 +2,7 @@
 % Please edit documentation in R/kron_reduction.R
 \name{terradish_kron_reduce_tiled}
 \alias{terradish_kron_reduce_tiled}
-\title{Exact nested-dissection (out-of-core, optionally parallel) Schur/Kron reduction of a terradish graph}
+\title{Exact memory-aware (out-of-core, optionally parallel) Schur/Kron reduction of a terradish graph}
 \usage{
 terradish_kron_reduce_tiled(
   data,
@@ -11,7 +11,9 @@ terradish_kron_reduce_tiled(
   tiles = NULL,
   n_tiles = 2000L,
   covariance = FALSE,
-  cores = 1L
+  cores = 1L,
+  method = c("auto", "direct", "nested"),
+  mem_budget = 4e+09
 )
 }
 \arguments{
@@ -24,64 +26,82 @@ result list containing a \code{conductance} element.}
 \item{boundary}{Integer vertex indices to retain in the reduced graph.
 Defaults to the unique focal vertices in \code{data$demes}.}
 
-\item{tiles}{Partition control. \code{NULL} (the default) uses recursive
-nested dissection driven by \code{data$vertex_coordinates}. Supplying an
+\item{tiles}{Partition control. \code{NULL} (the default) selects between the
+single-shot and nested-dissection paths by \code{method}. Supplying an
 explicit partition instead (a list of integer index vectors, or a
 length-\code{nrow(data$x)} vector of per-vertex tile labels) uses a flat
 two-level substructuring over those tiles, which is the parallel path (see
 \code{cores}).}
 
-\item{n_tiles}{Leaf size for the default nested-dissection path: bisection
-stops when a subdomain interior has at most \code{n_tiles} vertices. Smaller
-leaves give a deeper recursion with smaller leaf factorizations; the largest
-factorization overall is set by the separator widths, not by this value.}
+\item{n_tiles}{Leaf size for the nested-dissection path: bisection stops when
+a subdomain interior has at most \code{n_tiles} vertices. Smaller leaves give
+a deeper recursion with smaller leaf factorizations; the largest factorization
+overall is set by the separator widths, not by this value.}
 
 \item{covariance}{If \code{TRUE}, also return the generalized inverse of the
 reduced Laplacian on the retained vertices, that is the focal
 effective-resistance covariance.}
 
 \item{cores}{Maximum number of parallel worker processes. \code{cores = 1}
-(the default) is fully sequential. With \code{cores > 1} the default
+(the default) is fully sequential. With \code{cores > 1} the
 nested-dissection path forks its independent recursive halves on Unix (the
 budget halves down the recursion, so roughly \code{cores} subtrees reduce at
 once); the explicit-partition path forks (Unix) or uses a socket cluster
 (Windows) across tiles. The result is identical to the sequential run.
 Forking shares memory, so the nested-dissection path falls back to
 sequential where forking is unavailable (for example on Windows).}
+
+\item{method}{Strategy when no explicit \code{tiles} are given:
+\code{"auto"} (the default) picks the single-shot reduction unless its
+estimated factorization exceeds \code{mem_budget}, in which case it uses
+nested dissection; \code{"direct"} forces the single-shot reduction (which
+may run out of memory at large scale); \code{"nested"} forces nested
+dissection. Ignored when \code{tiles} is supplied.}
+
+\item{mem_budget}{Memory budget in bytes for the \code{"auto"} decision
+(default \code{4e9}). When the estimated single-shot factor
+(\eqn{\approx 24 \times N \log_2 N} bytes, \eqn{N} = interior size) exceeds
+this, nested dissection is used. The chosen \code{method} and the estimate
+are returned so the decision is inspectable.}
 }
 \value{
 A list of class \code{"terradish_kron_reduction"} with the reduced
   \code{laplacian}, retained \code{boundary} vertices, eliminated
-  \code{interior} vertices, the \code{tiles} used (\code{NULL} for nested
-  dissection), the \code{cores} used, and a \code{peak} list of memory
-  diagnostics: \code{interior} (the largest single factorization), plus
-  \code{separators} and \code{interface} on the explicit-partition path, and
-  \code{nnz}. Optionally \code{covariance}.
+  \code{interior} vertices, the \code{tiles} used (\code{NULL} when no
+  partition was given), the \code{method} actually used
+  (\code{"direct"}/\code{"nested"}/\code{"tiled"}), the \code{cores} used, the
+  single-shot factor estimate \code{est_factor_bytes}, and a \code{peak} list
+  of memory diagnostics: \code{interior} (the largest single factorization),
+  plus \code{separators} and \code{interface} on the explicit-partition path,
+  and \code{nnz}. Optionally \code{covariance}.
 }
 \description{
 Reduces a full terradish graph Laplacian onto a retained set of boundary
 vertices (usually the focal sampling sites) with an exact Schur complement,
-bounding peak memory by never factorizing the whole interior at once. By
-default it uses recursive nested dissection: the interior is bisected by a
-thin separator into two independent halves, each reduced recursively, and the
-separator is eliminated last, so the largest single factorization is bounded
-by a separator width rather than by the interior or the separator skeleton.
-The reduced Laplacian is identical to the one from
-\code{\link{terradish_kron_reduce}}; the difference is purely computational.
-This lets the reduction proceed at scales where holding the full set of focal
-potentials no longer fits in memory: past the direct solver's memory wall and
-past the point where even an algebraic multigrid solve must hold all focal
-potentials at once.
+choosing a reduction strategy by memory. By default (\code{method = "auto"})
+it uses the fast single-shot reduction while that factorization is estimated
+to fit \code{mem_budget}, and falls back to recursive nested dissection only
+when the single-shot factor would not fit. Nested dissection bisects the
+interior by a thin separator into two independent halves, reduces each
+recursively, and eliminates the separator last, so the largest single
+factorization is bounded by a separator width rather than by the interior or
+the separator skeleton; it is slower per element but completes at scales where
+the single-shot reduction runs out of memory. The reduced Laplacian is
+identical to \code{\link{terradish_kron_reduce}} in every case; only the cost
+changes.
 }
 \details{
-The default nested-dissection path bisects the interior by its longer
+The nested-dissection path (chosen by \code{method = "auto"} above the budget,
+or forced by \code{method = "nested"}) bisects the interior by its longer
 coordinate axis, marks the vertices straddling the cut as the separator,
 recursively reduces each half onto its boundary, assembles the half
 contributions onto the interface (a multifrontal extend-add), and eliminates
 the separator last. Because the two halves share no edges the result is exact
 for any bisection, and recursing keeps every factorization bounded by a
 separator width, so the separator reduction no longer dominates memory at
-large scale.
+large scale. It is markedly slower per element than the single-shot factor
+(CHOLMOD), so it is reserved for the regime where the single-shot factor would
+not fit; that is the point of the \code{"auto"} switch.
 
 The explicit-partition path (\code{tiles} supplied) eliminates each tile's
 private interior independently onto a shared interface and then reduces that

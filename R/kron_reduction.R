@@ -299,21 +299,21 @@ terradish_kron_reduce <- function(data,
   }
 }
 
-#' Exact nested-dissection (out-of-core, optionally parallel) Schur/Kron reduction of a terradish graph
+#' Exact memory-aware (out-of-core, optionally parallel) Schur/Kron reduction of a terradish graph
 #'
 #' Reduces a full terradish graph Laplacian onto a retained set of boundary
 #' vertices (usually the focal sampling sites) with an exact Schur complement,
-#' bounding peak memory by never factorizing the whole interior at once. By
-#' default it uses recursive nested dissection: the interior is bisected by a
-#' thin separator into two independent halves, each reduced recursively, and the
-#' separator is eliminated last, so the largest single factorization is bounded
-#' by a separator width rather than by the interior or the separator skeleton.
-#' The reduced Laplacian is identical to the one from
-#' \code{\link{terradish_kron_reduce}}; the difference is purely computational.
-#' This lets the reduction proceed at scales where holding the full set of focal
-#' potentials no longer fits in memory: past the direct solver's memory wall and
-#' past the point where even an algebraic multigrid solve must hold all focal
-#' potentials at once.
+#' choosing a reduction strategy by memory. By default (\code{method = "auto"})
+#' it uses the fast single-shot reduction while that factorization is estimated
+#' to fit \code{mem_budget}, and falls back to recursive nested dissection only
+#' when the single-shot factor would not fit. Nested dissection bisects the
+#' interior by a thin separator into two independent halves, reduces each
+#' recursively, and eliminates the separator last, so the largest single
+#' factorization is bounded by a separator width rather than by the interior or
+#' the separator skeleton; it is slower per element but completes at scales where
+#' the single-shot reduction runs out of memory. The reduced Laplacian is
+#' identical to \code{\link{terradish_kron_reduce}} in every case; only the cost
+#' changes.
 #'
 #' @param data A \code{terradish_graph} object returned by
 #'   \code{\link{conductance_surface}}.
@@ -342,15 +342,29 @@ terradish_kron_reduce <- function(data,
 #'   (Windows) across tiles. The result is identical to the sequential run.
 #'   Forking shares memory, so the nested-dissection path falls back to
 #'   sequential where forking is unavailable (for example on Windows).
+#' @param method Strategy when no explicit \code{tiles} are given:
+#'   \code{"auto"} (the default) picks the single-shot reduction unless its
+#'   estimated factorization exceeds \code{mem_budget}, in which case it uses
+#'   nested dissection; \code{"direct"} forces the single-shot reduction (which
+#'   may run out of memory at large scale); \code{"nested"} forces nested
+#'   dissection. Ignored when \code{tiles} is supplied.
+#' @param mem_budget Memory budget in bytes for the \code{"auto"} decision
+#'   (default \code{4e9}). When the estimated single-shot factor
+#'   (\eqn{\approx 24 \times N \log_2 N} bytes, \eqn{N} = interior size) exceeds
+#'   this, nested dissection is used. The chosen \code{method} and the estimate
+#'   are returned so the decision is inspectable.
 #'
-#' @details The default nested-dissection path bisects the interior by its
+#' @details The nested-dissection path (chosen by \code{method = "auto"} above
+#' the budget, or forced by \code{method = "nested"}) bisects the interior by its
 #' longer coordinate axis, marks the vertices straddling the cut as the
 #' separator, recursively reduces each half onto its boundary, assembles the half
 #' contributions onto the interface (a multifrontal extend-add), and eliminates
 #' the separator last. Because the two halves share no edges the result is exact
 #' for any bisection, and recursing keeps every factorization bounded by a
 #' separator width, so the separator reduction no longer dominates memory at
-#' large scale.
+#' large scale. It is markedly slower per element than the single-shot factor
+#' (CHOLMOD), so it is reserved for the regime where the single-shot factor would
+#' not fit; that is the point of the \code{"auto"} switch.
 #'
 #' The explicit-partition path (\code{tiles} supplied) eliminates each tile's
 #' private interior independently onto a shared interface and then reduces that
@@ -367,11 +381,13 @@ terradish_kron_reduce <- function(data,
 #'
 #' @return A list of class \code{"terradish_kron_reduction"} with the reduced
 #'   \code{laplacian}, retained \code{boundary} vertices, eliminated
-#'   \code{interior} vertices, the \code{tiles} used (\code{NULL} for nested
-#'   dissection), the \code{cores} used, and a \code{peak} list of memory
-#'   diagnostics: \code{interior} (the largest single factorization), plus
-#'   \code{separators} and \code{interface} on the explicit-partition path, and
-#'   \code{nnz}. Optionally \code{covariance}.
+#'   \code{interior} vertices, the \code{tiles} used (\code{NULL} when no
+#'   partition was given), the \code{method} actually used
+#'   (\code{"direct"}/\code{"nested"}/\code{"tiled"}), the \code{cores} used, the
+#'   single-shot factor estimate \code{est_factor_bytes}, and a \code{peak} list
+#'   of memory diagnostics: \code{interior} (the largest single factorization),
+#'   plus \code{separators} and \code{interface} on the explicit-partition path,
+#'   and \code{nnz}. Optionally \code{covariance}.
 #'
 #' @seealso \code{\link{terradish_kron_reduce}} for the single-shot reduction
 #'   this matches exactly.
@@ -382,8 +398,11 @@ terradish_kron_reduce_tiled <- function(data,
                                         tiles = NULL,
                                         n_tiles = 2000L,
                                         covariance = FALSE,
-                                        cores = 1L)
+                                        cores = 1L,
+                                        method = c("auto", "direct", "nested"),
+                                        mem_budget = 4e9)
 {
+  method <- match.arg(method)
   stopifnot(inherits(data, c("terradish_graph", "radish_graph")))
   if (is.list(conductance) && !is.null(conductance$conductance))
     conductance <- conductance$conductance
@@ -415,12 +434,40 @@ terradish_kron_reduce_tiled <- function(data,
     return(out)
   }
 
-  # Default path: recursive nested dissection. Bisects the interior all the way
-  # down, so every single factorization is bounded by a separator width rather
-  # than by the whole interior or the whole separator skeleton. `n_tiles` is the
-  # leaf size: bisection stops when a subdomain interior has <= n_tiles vertices.
+  # No explicit partition: pick between the fast single-shot reduction and the
+  # memory-bounded nested dissection. `method = "auto"` (the default) estimates
+  # the single-shot interior factor and only switches to nested dissection when
+  # it would exceed `mem_budget`. The estimate uses the 2D nested-dissection fill
+  # law (factor nonzeros ~ 3 * N * log2(N), about 8 bytes each), which tracks the
+  # measured fill (~60M nonzeros at a 1M-vertex interior).
   if (is.null(tiles))
   {
+    nI  <- length(interior)
+    est_bytes <- 24 * nI * log2(max(2, nI))      # ~ 8 * 3 * N * log2(N)
+    use_nested <- switch(method,
+                         nested = TRUE,
+                         direct = FALSE,
+                         auto   = est_bytes > mem_budget)
+
+    if (!use_nested)
+    {
+      # fast path: full single-shot Schur reduction (the largest factorization is
+      # the whole interior, but it fits the budget).
+      red <- terradish_kron_reduce(data, conductance, boundary = boundary,
+                                   covariance = covariance)
+      out <- list(laplacian = red$laplacian, boundary = boundary, interior = interior,
+                  tiles = NULL, n_boundary = length(boundary), n_interior = nI,
+                  cores = 1L, method = "direct", est_factor_bytes = est_bytes,
+                  peak = list(interior = nI, separators = NA_integer_,
+                              interface = NA_integer_, nnz = length(Q@x)),
+                  covariance = red$covariance)
+      class(out) <- "terradish_kron_reduction"
+      return(out)
+    }
+
+    # bounded path: recursive nested dissection. Bisects the interior all the way
+    # down, so every single factorization is bounded by a separator width rather
+    # than by the whole interior. `n_tiles` is the leaf size.
     coords <- data$vertex_coordinates
     if (is.null(coords) || nrow(coords) != n_vertices)
       stop("nested dissection needs `data$vertex_coordinates`; pass an explicit ",
@@ -430,8 +477,9 @@ terradish_kron_reduce_tiled <- function(data,
                           par = max(1L, as.integer(cores)))
     reduced <- nd$laplacian
     out <- list(laplacian = reduced, boundary = boundary, interior = interior,
-                tiles = NULL, n_boundary = length(boundary),
-                n_interior = length(interior), cores = max(1L, as.integer(cores)),
+                tiles = NULL, n_boundary = length(boundary), n_interior = nI,
+                cores = max(1L, as.integer(cores)), method = "nested",
+                est_factor_bytes = est_bytes,
                 peak = list(interior = nd$maxfac, separators = NA_integer_,
                             interface = NA_integer_, nnz = length(Q@x)),
                 covariance = if (isTRUE(covariance)) ginv(as.matrix(reduced)) else NULL)
@@ -530,7 +578,7 @@ terradish_kron_reduce_tiled <- function(data,
 
   out <- list(laplacian = reduced, boundary = boundary, interior = interior,
               tiles = groups, n_boundary = length(boundary),
-              n_interior = length(interior), cores = cores,
+              n_interior = length(interior), cores = cores, method = "tiled",
               peak = list(interior = peak_int, separators = length(B) - length(boundary),
                           interface = length(B), nnz = max(length(Qg@x), length(S_B@x))),
               covariance = if (isTRUE(covariance)) ginv(as.matrix(reduced)) else NULL)
