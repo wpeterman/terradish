@@ -217,21 +217,86 @@ terradish_kron_reduce <- function(data,
        Ct = as.matrix(Matrix::crossprod(p$LiBt, Matrix::solve(Cii, p$LiBt))))
 }
 
-#' Exact tiled (out-of-core, optionally parallel) Schur/Kron reduction of a terradish graph
+# Undirected edge list (m x 2, 1-based, i < j) from a sparse operator's nonzero
+# pattern. Used at each nested-dissection level to bisect and to find the
+# vertices straddling the cut (the separator).
+.kron_operator_edges <- function(L)
+{
+  L <- as(L, "CsparseMatrix")
+  j <- rep.int(seq_len(ncol(L)), diff(L@p)); i <- L@i + 1L
+  k <- i < j
+  cbind(i[k], j[k])
+}
+
+# Recursive nested dissection. Reduces operator `L` onto `keep` (local vertex
+# indices) by bisecting the interior with a thin separator, recursively reducing
+# each half onto its boundary, assembling the half contributions onto the
+# interface (a multifrontal "extend-add"), and finally eliminating the
+# separator. The two halves share no edges, so the result is the exact Schur
+# complement on `keep`; bisecting keeps every single factorization bounded by
+# the separator width rather than the whole interior or separator skeleton.
+# Returns the reduced Laplacian on `keep` and the largest factorization
+# dimension encountered (`maxfac`).
+.kron_nd_reduce <- function(L, keep, coords, leaf, maxdepth = 40L, depth = 0L)
+{
+  n <- nrow(L); km <- logical(n); km[keep] <- TRUE; int <- which(!km)
+  if (!length(int))
+    return(list(laplacian = forceSymmetric(L[keep, keep, drop = FALSE]), maxfac = 0L))
+  direct <- function() {
+    s <- .schur_step_sparse(as(L, "generalMatrix"), int)
+    P <- match(keep, (seq_len(n))[s$keep])
+    list(laplacian = forceSymmetric(s$L[P, P, drop = FALSE]), maxfac = length(int))
+  }
+  if (length(int) <= leaf || depth >= maxdepth) return(direct())
+
+  ax  <- if (diff(range(coords[int, 1])) >= diff(range(coords[int, 2]))) 1L else 2L
+  med <- stats::median(coords[int, ax])
+  side <- ifelse(coords[, ax] <= med, -1L, 1L)
+  ed   <- .kron_operator_edges(L); cross <- side[ed[, 1]] != side[ed[, 2]]
+  sepm <- logical(n); sepm[ed[cross, 1]] <- TRUE; sepm[ed[cross, 2]] <- TRUE
+  Wm <- sepm & !km; Lh <- side < 0 & !km & !Wm; Rh <- side > 0 & !km & !Wm
+  if (!any(Lh) || !any(Rh)) return(direct())          # no clean split -> direct
+
+  M <- which(Wm | km); posM <- integer(n); posM[M] <- seq_along(M)
+  M_op <- as(L[M, M, drop = FALSE], "generalMatrix"); maxfac <- 0L
+  for (hm in list(Lh, Rh)) {
+    hi <- which(hm)
+    he <- ed[hm[ed[, 1]] | hm[ed[, 2]], , drop = FALSE]
+    nb <- setdiff(unique(as.integer(he)), hi); nb <- nb[(Wm | km)[nb]]   # boundary in M
+    hv <- c(hi, nb)
+    rec <- .kron_nd_reduce(L[hv, hv, drop = FALSE], match(nb, hv),
+                           coords[hv, , drop = FALSE], leaf, maxdepth, depth + 1L)
+    U  <- as.matrix(L[nb, nb, drop = FALSE]) - as.matrix(rec$laplacian)   # this half's update
+    bp <- posM[nb]; M_op[bp, bp] <- M_op[bp, bp] - U                      # extend-add
+    maxfac <- max(maxfac, rec$maxfac)
+  }
+  M_op <- as(forceSymmetric(M_op), "generalMatrix")
+  Wpos <- posM[which(Wm)]
+  if (length(Wpos)) {
+    s <- .schur_step_sparse(M_op, Wpos)
+    P <- match(keep, M[(seq_along(M))[s$keep]])
+    list(laplacian = forceSymmetric(s$L[P, P, drop = FALSE]), maxfac = max(maxfac, length(Wpos)))
+  } else {
+    P <- match(keep, M)
+    list(laplacian = forceSymmetric(M_op[P, P, drop = FALSE]), maxfac = maxfac)
+  }
+}
+
+#' Exact nested-dissection (out-of-core, optionally parallel) Schur/Kron reduction of a terradish graph
 #'
 #' Reduces a full terradish graph Laplacian onto a retained set of boundary
-#' vertices (usually the focal sampling sites) by eliminating every other vertex
-#' with an exact Schur complement, but does so tile by tile instead of in a
-#' single interior factorization. Sequential Schur complements compose, so the
-#' reduced Laplacian is identical to the one from
+#' vertices (usually the focal sampling sites) with an exact Schur complement,
+#' bounding peak memory by never factorizing the whole interior at once. By
+#' default it uses recursive nested dissection: the interior is bisected by a
+#' thin separator into two independent halves, each reduced recursively, and the
+#' separator is eliminated last, so the largest single factorization is bounded
+#' by a separator width rather than by the interior or the separator skeleton.
+#' The reduced Laplacian is identical to the one from
 #' \code{\link{terradish_kron_reduce}}; the difference is purely computational.
-#' Each tile contributes one small, local interior solve whose fill stays on
-#' that tile's interface, so the peak working memory is one tile's interior
-#' factor plus the (sparse) interface operator, never the full interior
-#' factorization. That is the structure that lets the reduction proceed when the
-#' full set of focal potentials no longer fits in memory: the regime past the
-#' direct solver's memory wall and past the point where even an algebraic
-#' multigrid solve must hold all focal potentials at once.
+#' This lets the reduction proceed at scales where holding the full set of focal
+#' potentials no longer fits in memory: past the direct solver's memory wall and
+#' past the point where even an algebraic multigrid solve must hold all focal
+#' potentials at once.
 #'
 #' @param data A \code{terradish_graph} object returned by
 #'   \code{\link{conductance_surface}}.
@@ -239,59 +304,54 @@ terradish_kron_reduce <- function(data,
 #'   result list containing a \code{conductance} element.
 #' @param boundary Integer vertex indices to retain in the reduced graph.
 #'   Defaults to the unique focal vertices in \code{data$demes}.
-#' @param tiles Optional partition of the graph vertices into tiles, either a
-#'   list of integer index vectors or a length-\code{nrow(data$x)} vector of
-#'   per-vertex tile labels. When \code{NULL} (the default) the vertices are
-#'   split into roughly \code{n_tiles} spatial blocks from
-#'   \code{data$vertex_coordinates}, falling back to contiguous index blocks if
-#'   coordinates are unavailable.
-#' @param n_tiles Approximate number of tiles to build when \code{tiles} is
-#'   \code{NULL}. The vertices are divided into a near-square grid of this many
-#'   spatial blocks. Tile size is a tradeoff (see Details): smaller tiles shrink
-#'   each interior factor but enlarge the separator system between tiles.
+#' @param tiles Partition control. \code{NULL} (the default) uses recursive
+#'   nested dissection driven by \code{data$vertex_coordinates}. Supplying an
+#'   explicit partition instead (a list of integer index vectors, or a
+#'   length-\code{nrow(data$x)} vector of per-vertex tile labels) uses a flat
+#'   two-level substructuring over those tiles, which is the parallel path (see
+#'   \code{cores}).
+#' @param n_tiles Leaf size for the default nested-dissection path: bisection
+#'   stops when a subdomain interior has at most \code{n_tiles} vertices. Smaller
+#'   leaves give a deeper recursion with smaller leaf factorizations; the largest
+#'   factorization overall is set by the separator widths, not by this value.
 #' @param covariance If \code{TRUE}, also return the generalized inverse of the
 #'   reduced Laplacian on the retained vertices, that is the focal
 #'   effective-resistance covariance.
 #' @param cores Number of worker processes for the independent per-tile interior
-#'   eliminations. \code{cores = 1} (the default) runs them sequentially. With
-#'   \code{cores > 1} they run in parallel: by forking on Unix (workers share
-#'   memory) and on a socket cluster on Windows (each worker is sent only its own
-#'   tile blocks). The result is identical either way. Parallelism pays off only
-#'   when the per-tile factorizations are large relative to the worker overhead
-#'   and the sequential interface reduction; for small or moderate problems
-#'   \code{cores = 1} is usually faster.
+#'   eliminations on the explicit-partition path (\code{tiles} not \code{NULL}).
+#'   \code{cores = 1} (the default) runs them sequentially; \code{cores > 1}
+#'   forks on Unix and uses a socket cluster on Windows, with an identical
+#'   result. The default nested-dissection path runs sequentially.
 #'
-#' @details This uses a non-overlapping domain decomposition. A vertex is a
-#' \emph{separator} if it has a neighbour in a different tile; the
-#' \emph{interface} is the separators together with the focal (boundary)
-#' vertices. Each tile's remaining \emph{private interior} has no edges to any
-#' other tile's interior, so those interior blocks are mutually independent and
-#' are each eliminated by an exact Schur complement onto the interface, one tile
-#' at a time (or in parallel, see \code{cores}). The tile contributions are
-#' assembled into an interface operator, which is then reduced onto the focal
-#' vertices. The result is exact for any partition and identical to
-#' \code{\link{terradish_kron_reduce}}; only the cost changes.
+#' @details The default nested-dissection path bisects the interior by its
+#' longer coordinate axis, marks the vertices straddling the cut as the
+#' separator, recursively reduces each half onto its boundary, assembles the half
+#' contributions onto the interface (a multifrontal extend-add), and eliminates
+#' the separator last. Because the two halves share no edges the result is exact
+#' for any bisection, and recursing keeps every factorization bounded by a
+#' separator width, so the separator reduction no longer dominates memory at
+#' large scale.
 #'
-#' Tile size is a genuine tradeoff. Smaller tiles shrink the largest interior
-#' factor (\code{peak$interior}) but multiply the separators, so the assembled
-#' interface system (\code{peak$separators}) grows and eventually dominates both
-#' memory and time. The minimum total cost is at a balance, not at the smallest
-#' tiles. Because focal vertices are never eliminated, focal effective
-#' resistances are preserved exactly, in contrast to approximate node lumping.
+#' The explicit-partition path (\code{tiles} supplied) eliminates each tile's
+#' private interior independently onto a shared interface and then reduces that
+#' interface in a single step; it parallelizes across tiles (see \code{cores}),
+#' but its one interface factorization grows with the separator count, so it is
+#' best at moderate scale. Either way focal vertices are never eliminated, so
+#' focal effective resistances are preserved exactly, in contrast to approximate
+#' node lumping.
 #'
-#' This promotes the tiled reduction as a standalone, exact primitive. It is not
-#' yet wired into \code{\link{terradish_algorithm}} as a solver, because the
+#' This promotes the reduction as a standalone, exact primitive. It is not yet
+#' wired into \code{\link{terradish_algorithm}} as a solver, because the
 #' likelihood gradient needs the adjoint of conductance through the Schur
 #' complement; that integration is a separate step.
 #'
 #' @return A list of class \code{"terradish_kron_reduction"} with the reduced
 #'   \code{laplacian}, retained \code{boundary} vertices, eliminated
-#'   \code{interior} vertices, the \code{tiles} used, the \code{cores} used, a
-#'   \code{peak} list of memory diagnostics (\code{interior}: largest per-tile
-#'   interior factor; \code{separators}: number of separator vertices eliminated
-#'   in the interface reduction; \code{interface}: total interface size;
-#'   \code{nnz}: largest working-operator nonzero count), and optionally
-#'   \code{covariance}.
+#'   \code{interior} vertices, the \code{tiles} used (\code{NULL} for nested
+#'   dissection), the \code{cores} used, and a \code{peak} list of memory
+#'   diagnostics: \code{interior} (the largest single factorization), plus
+#'   \code{separators} and \code{interface} on the explicit-partition path, and
+#'   \code{nnz}. Optionally \code{covariance}.
 #'
 #' @seealso \code{\link{terradish_kron_reduce}} for the single-shot reduction
 #'   this matches exactly.
@@ -300,7 +360,7 @@ terradish_kron_reduce_tiled <- function(data,
                                         conductance,
                                         boundary = unique(data$demes),
                                         tiles = NULL,
-                                        n_tiles = 16L,
+                                        n_tiles = 2000L,
                                         covariance = FALSE,
                                         cores = 1L)
 {
@@ -335,6 +395,30 @@ terradish_kron_reduce_tiled <- function(data,
     return(out)
   }
 
+  # Default path: recursive nested dissection. Bisects the interior all the way
+  # down, so every single factorization is bounded by a separator width rather
+  # than by the whole interior or the whole separator skeleton. `n_tiles` is the
+  # leaf size: bisection stops when a subdomain interior has <= n_tiles vertices.
+  if (is.null(tiles))
+  {
+    coords <- data$vertex_coordinates
+    if (is.null(coords) || nrow(coords) != n_vertices)
+      stop("nested dissection needs `data$vertex_coordinates`; pass an explicit ",
+           "`tiles` partition to use the flat substructuring path instead", call. = FALSE)
+    leaf <- max(64L, as.integer(n_tiles))
+    nd <- .kron_nd_reduce(as(Q, "generalMatrix"), boundary, as.matrix(coords), leaf)
+    reduced <- nd$laplacian
+    out <- list(laplacian = reduced, boundary = boundary, interior = interior,
+                tiles = NULL, n_boundary = length(boundary),
+                n_interior = length(interior), cores = 1L,
+                peak = list(interior = nd$maxfac, separators = NA_integer_,
+                            interface = NA_integer_, nnz = length(Q@x)),
+                covariance = if (isTRUE(covariance)) ginv(as.matrix(reduced)) else NULL)
+    class(out) <- "terradish_kron_reduction"
+    return(out)
+  }
+
+  # Explicit partition: flat two-level substructuring (parallel over tiles).
   groups <- .terradish_tile_groups(data, tiles, n_tiles, n_vertices)
   cores  <- max(1L, as.integer(cores))
 

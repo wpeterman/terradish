@@ -10,18 +10,20 @@ terradish 0.0.40 (dev)
 * Added `solver = "block_cg"`, a Jacobi-preconditioned block conjugate gradient
   (O'Leary) sharing one Krylov space across all focal right-hand sides, for
   small or well-conditioned graphs.
-* Added `terradish_kron_reduce_tiled()`, an exact tiled (out-of-core) Schur/Kron
-  reduction onto the focal sites. It uses a non-overlapping domain decomposition:
-  each tile's private interior (cells with no cross-tile neighbour) is eliminated
-  independently by a local Schur complement onto the interface (separators plus
-  focal), the tile contributions are assembled, and the interface is reduced onto
-  the focal vertices. The result matches `terradish_kron_reduce()` exactly while
-  bounding peak memory to one tile's interior factor plus the interface operator,
-  so it completes past the scale where the single-shot reduction runs out of
-  memory. The independent tile eliminations run in parallel with `cores > 1`
-  (socket cluster; each worker gets only its own tile blocks), identical to the
-  sequential result. Tile size is a tradeoff: smaller tiles shrink each interior
-  factor but enlarge the separator system.
+* Added `terradish_kron_reduce_tiled()`, an exact out-of-core Schur/Kron
+  reduction onto the focal sites that matches `terradish_kron_reduce()` exactly
+  while bounding peak memory. By default it uses recursive nested dissection:
+  the interior is bisected by a thin separator into two independent halves, each
+  reduced recursively, and the separator is eliminated last (a multifrontal
+  extend-add). This bounds every single factorization by a separator width
+  rather than by the interior or the separator skeleton, so it completes past
+  the scale where the single-shot reduction (and a one-level tiling, whose
+  separator factorization grows ~N^1.6) would run out of memory. `n_tiles` sets
+  the recursion's leaf size. Supplying an explicit `tiles` partition instead
+  uses a flat two-level substructuring that parallelizes across tiles with
+  `cores > 1` (fork on Unix, socket cluster on Windows), identical to the
+  sequential result. Focal vertices are never eliminated, so focal effective
+  resistances are preserved exactly.
 * Extracted the shared landscape-genetic primitives to the new `landgraph` package
   and now import them from there: the genetic covariance/distance helpers
   (`cov_from_biallelic()`, `cov_from_genetic_data()`, `fst_from_biallelic()`,

@@ -44,14 +44,14 @@ test_that("experimental Kron reduction preserves focal effective distances", {
   )
 })
 
-test_that("tiled Kron reduction equals the single-shot reduction exactly", {
+test_that("nested-dissection reduction (default) equals the single-shot reduction", {
   dat <- melip_fixture(1:8)
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
   model <- loglinear_conductance(~ altitude + forestcover, surface$x)
   conductance <- model(c(-0.3, 0.3))$conductance
 
   single <- terradish_kron_reduce(surface, conductance)
-  tiled  <- terradish_kron_reduce_tiled(surface, conductance, n_tiles = 16L)
+  tiled  <- terradish_kron_reduce_tiled(surface, conductance)   # default = nested dissection
 
   expect_s3_class(tiled, "terradish_kron_reduction")
   diff <- as.matrix(single$laplacian) - as.matrix(tiled$laplacian[
@@ -60,20 +60,22 @@ test_that("tiled Kron reduction equals the single-shot reduction exactly", {
   expect_lt(max(abs(diff)) / max(abs(as.matrix(single$laplacian))), 1e-8)
 })
 
-test_that("tiled Kron reduction is exact regardless of tile count", {
+test_that("nested-dissection reduction is exact for any leaf size and bounds the factorization", {
   dat <- melip_fixture(1:8)
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
   model <- loglinear_conductance(~ altitude + forestcover, surface$x)
   conductance <- model(c(-0.2, 0.4))$conductance
 
-  a <- terradish_kron_reduce_tiled(surface, conductance, n_tiles = 4L)
-  b <- terradish_kron_reduce_tiled(surface, conductance, n_tiles = 25L)
-  expect_equal(as.matrix(a$laplacian), as.matrix(b$laplacian), tolerance = 1e-8)
-  # more tiles means a smaller largest interior solve (lower peak memory)
-  expect_lte(b$peak$interior, a$peak$interior)
+  small <- terradish_kron_reduce_tiled(surface, conductance, n_tiles = 1000L)
+  large <- terradish_kron_reduce_tiled(surface, conductance, n_tiles = 4000L)
+  expect_equal(as.matrix(small$laplacian), as.matrix(large$laplacian), tolerance = 1e-8)
+  # the largest single factorization is bounded well below the whole interior,
+  # and a smaller leaf does not enlarge it
+  expect_lt(small$peak$interior, small$n_interior)
+  expect_lte(small$peak$interior, large$peak$interior)
 })
 
-test_that("tiled reduction preserves focal effective distances and bounds memory", {
+test_that("nested-dissection reduction preserves focal effective distances", {
   dat <- melip_fixture(1:8)
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
   model <- loglinear_conductance(~ altitude + forestcover, surface$x)
@@ -90,49 +92,29 @@ test_that("tiled reduction preserves focal effective distances and bounds memory
     dist_from_cov(tiled$covariance),
     dist_from_cov(as.matrix(full_fit$covariance)),
     tolerance = 1e-6)
-  # the whole point: the largest interior solve is far smaller than eliminating
-  # the entire interior at once
   expect_lt(tiled$peak$interior, tiled$n_interior)
 })
 
-test_that("tiled reduction accepts a user-supplied vertex partition", {
-  dat <- melip_fixture(1:8)
-  surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
-  model <- loglinear_conductance(~ altitude + forestcover, surface$x)
-  conductance <- model(c(0, 0))$conductance
-
-  n <- nrow(surface$x)
-  labels <- ((seq_len(n) - 1L) %% 6L) + 1L          # 6 interleaved tiles
-  user   <- terradish_kron_reduce_tiled(surface, conductance, tiles = labels)
-  single <- terradish_kron_reduce(surface, conductance)
-  expect_equal(
-    as.matrix(user$laplacian[match(single$boundary, user$boundary),
-                             match(single$boundary, user$boundary)]),
-    as.matrix(single$laplacian),
-    tolerance = 1e-8)
-
-  expect_error(
-    terradish_kron_reduce_tiled(surface, conductance, tiles = labels[-1]),
-    "one entry per graph vertex")
-})
-
-test_that("parallel tiled reduction matches the sequential and single-shot results", {
+test_that("explicit-partition path matches single-shot, parallel equals sequential", {
   dat <- melip_fixture(1:8)
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
   model <- loglinear_conductance(~ altitude + forestcover, surface$x)
   conductance <- model(c(-0.3, 0.3))$conductance
-
-  seq1 <- terradish_kron_reduce_tiled(surface, conductance, n_tiles = 16L, cores = 1L)
-  par2 <- terradish_kron_reduce_tiled(surface, conductance, n_tiles = 16L, cores = 2L)
   single <- terradish_kron_reduce(surface, conductance)
 
-  # parallel == sequential, exactly
-  expect_equal(as.matrix(par2$laplacian), as.matrix(seq1$laplacian), tolerance = 1e-10)
-  expect_equal(par2$cores, 2)
-  # and both match the single-shot reduction
+  n <- nrow(surface$x)
+  labels <- ((seq_len(n) - 1L) %% 6L) + 1L          # 6 interleaved tiles
+  seq1 <- terradish_kron_reduce_tiled(surface, conductance, tiles = labels, cores = 1L)
+  par2 <- terradish_kron_reduce_tiled(surface, conductance, tiles = labels, cores = 2L)
+
   P <- match(single$boundary, seq1$boundary)
   expect_lt(
     max(abs(as.matrix(single$laplacian) - as.matrix(seq1$laplacian[P, P]))) /
-      max(abs(as.matrix(single$laplacian))),
-    1e-8)
+      max(abs(as.matrix(single$laplacian))), 1e-8)
+  expect_equal(as.matrix(par2$laplacian), as.matrix(seq1$laplacian), tolerance = 1e-10)
+  expect_equal(par2$cores, 2)
+
+  expect_error(
+    terradish_kron_reduce_tiled(surface, conductance, tiles = labels[-1]),
+    "one entry per graph vertex")
 })

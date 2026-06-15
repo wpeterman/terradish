@@ -2,14 +2,14 @@
 % Please edit documentation in R/kron_reduction.R
 \name{terradish_kron_reduce_tiled}
 \alias{terradish_kron_reduce_tiled}
-\title{Exact tiled (out-of-core, optionally parallel) Schur/Kron reduction of a terradish graph}
+\title{Exact nested-dissection (out-of-core, optionally parallel) Schur/Kron reduction of a terradish graph}
 \usage{
 terradish_kron_reduce_tiled(
   data,
   conductance,
   boundary = unique(data$demes),
   tiles = NULL,
-  n_tiles = 16L,
+  n_tiles = 2000L,
   covariance = FALSE,
   cores = 1L
 )
@@ -24,77 +24,72 @@ result list containing a \code{conductance} element.}
 \item{boundary}{Integer vertex indices to retain in the reduced graph.
 Defaults to the unique focal vertices in \code{data$demes}.}
 
-\item{tiles}{Optional partition of the graph vertices into tiles, either a
-list of integer index vectors or a length-\code{nrow(data$x)} vector of
-per-vertex tile labels. When \code{NULL} (the default) the vertices are
-split into roughly \code{n_tiles} spatial blocks from
-\code{data$vertex_coordinates}, falling back to contiguous index blocks if
-coordinates are unavailable.}
+\item{tiles}{Partition control. \code{NULL} (the default) uses recursive
+nested dissection driven by \code{data$vertex_coordinates}. Supplying an
+explicit partition instead (a list of integer index vectors, or a
+length-\code{nrow(data$x)} vector of per-vertex tile labels) uses a flat
+two-level substructuring over those tiles, which is the parallel path (see
+\code{cores}).}
 
-\item{n_tiles}{Approximate number of tiles to build when \code{tiles} is
-\code{NULL}. The vertices are divided into a near-square grid of this many
-spatial blocks. Tile size is a tradeoff (see Details): smaller tiles shrink
-each interior factor but enlarge the separator system between tiles.}
+\item{n_tiles}{Leaf size for the default nested-dissection path: bisection
+stops when a subdomain interior has at most \code{n_tiles} vertices. Smaller
+leaves give a deeper recursion with smaller leaf factorizations; the largest
+factorization overall is set by the separator widths, not by this value.}
 
 \item{covariance}{If \code{TRUE}, also return the generalized inverse of the
 reduced Laplacian on the retained vertices, that is the focal
 effective-resistance covariance.}
 
 \item{cores}{Number of worker processes for the independent per-tile interior
-eliminations. \code{cores = 1} (the default) runs them sequentially. With
-\code{cores > 1} they run in parallel: by forking on Unix (workers share
-memory) and on a socket cluster on Windows (each worker is sent only its own
-tile blocks). The result is identical either way. Parallelism pays off only
-when the per-tile factorizations are large relative to the worker overhead
-and the sequential interface reduction; for small or moderate problems
-\code{cores = 1} is usually faster.}
+eliminations on the explicit-partition path (\code{tiles} not \code{NULL}).
+\code{cores = 1} (the default) runs them sequentially; \code{cores > 1}
+forks on Unix and uses a socket cluster on Windows, with an identical
+result. The default nested-dissection path runs sequentially.}
 }
 \value{
 A list of class \code{"terradish_kron_reduction"} with the reduced
   \code{laplacian}, retained \code{boundary} vertices, eliminated
-  \code{interior} vertices, the \code{tiles} used, the \code{cores} used, a
-  \code{peak} list of memory diagnostics (\code{interior}: largest per-tile
-  interior factor; \code{separators}: number of separator vertices eliminated
-  in the interface reduction; \code{interface}: total interface size;
-  \code{nnz}: largest working-operator nonzero count), and optionally
-  \code{covariance}.
+  \code{interior} vertices, the \code{tiles} used (\code{NULL} for nested
+  dissection), the \code{cores} used, and a \code{peak} list of memory
+  diagnostics: \code{interior} (the largest single factorization), plus
+  \code{separators} and \code{interface} on the explicit-partition path, and
+  \code{nnz}. Optionally \code{covariance}.
 }
 \description{
 Reduces a full terradish graph Laplacian onto a retained set of boundary
-vertices (usually the focal sampling sites) by eliminating every other vertex
-with an exact Schur complement, but does so tile by tile instead of in a
-single interior factorization. Sequential Schur complements compose, so the
-reduced Laplacian is identical to the one from
+vertices (usually the focal sampling sites) with an exact Schur complement,
+bounding peak memory by never factorizing the whole interior at once. By
+default it uses recursive nested dissection: the interior is bisected by a
+thin separator into two independent halves, each reduced recursively, and the
+separator is eliminated last, so the largest single factorization is bounded
+by a separator width rather than by the interior or the separator skeleton.
+The reduced Laplacian is identical to the one from
 \code{\link{terradish_kron_reduce}}; the difference is purely computational.
-Each tile contributes one small, local interior solve whose fill stays on
-that tile's interface, so the peak working memory is one tile's interior
-factor plus the (sparse) interface operator, never the full interior
-factorization. That is the structure that lets the reduction proceed when the
-full set of focal potentials no longer fits in memory: the regime past the
-direct solver's memory wall and past the point where even an algebraic
-multigrid solve must hold all focal potentials at once.
+This lets the reduction proceed at scales where holding the full set of focal
+potentials no longer fits in memory: past the direct solver's memory wall and
+past the point where even an algebraic multigrid solve must hold all focal
+potentials at once.
 }
 \details{
-This uses a non-overlapping domain decomposition. A vertex is a
-\emph{separator} if it has a neighbour in a different tile; the
-\emph{interface} is the separators together with the focal (boundary)
-vertices. Each tile's remaining \emph{private interior} has no edges to any
-other tile's interior, so those interior blocks are mutually independent and
-are each eliminated by an exact Schur complement onto the interface, one tile
-at a time (or in parallel, see \code{cores}). The tile contributions are
-assembled into an interface operator, which is then reduced onto the focal
-vertices. The result is exact for any partition and identical to
-\code{\link{terradish_kron_reduce}}; only the cost changes.
+The default nested-dissection path bisects the interior by its longer
+coordinate axis, marks the vertices straddling the cut as the separator,
+recursively reduces each half onto its boundary, assembles the half
+contributions onto the interface (a multifrontal extend-add), and eliminates
+the separator last. Because the two halves share no edges the result is exact
+for any bisection, and recursing keeps every factorization bounded by a
+separator width, so the separator reduction no longer dominates memory at
+large scale.
 
-Tile size is a genuine tradeoff. Smaller tiles shrink the largest interior
-factor (\code{peak$interior}) but multiply the separators, so the assembled
-interface system (\code{peak$separators}) grows and eventually dominates both
-memory and time. The minimum total cost is at a balance, not at the smallest
-tiles. Because focal vertices are never eliminated, focal effective
-resistances are preserved exactly, in contrast to approximate node lumping.
+The explicit-partition path (\code{tiles} supplied) eliminates each tile's
+private interior independently onto a shared interface and then reduces that
+interface in a single step; it parallelizes across tiles (see \code{cores}),
+but its one interface factorization grows with the separator count, so it is
+best at moderate scale. Either way focal vertices are never eliminated, so
+focal effective resistances are preserved exactly, in contrast to approximate
+node lumping.
 
-This promotes the tiled reduction as a standalone, exact primitive. It is not
-yet wired into \code{\link{terradish_algorithm}} as a solver, because the
+This promotes the reduction as a standalone, exact primitive. It is not yet
+wired into \code{\link{terradish_algorithm}} as a solver, because the
 likelihood gradient needs the adjoint of conductance through the Schur
 complement; that integration is a separate step.
 }
