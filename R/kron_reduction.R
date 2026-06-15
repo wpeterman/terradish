@@ -237,7 +237,7 @@ terradish_kron_reduce <- function(data,
 # the separator width rather than the whole interior or separator skeleton.
 # Returns the reduced Laplacian on `keep` and the largest factorization
 # dimension encountered (`maxfac`).
-.kron_nd_reduce <- function(L, keep, coords, leaf, maxdepth = 40L, depth = 0L)
+.kron_nd_reduce <- function(L, keep, coords, leaf, maxdepth = 40L, depth = 0L, par = 1L)
 {
   n <- nrow(L); km <- logical(n); km[keep] <- TRUE; int <- which(!km)
   if (!length(int))
@@ -259,16 +259,33 @@ terradish_kron_reduce <- function(data,
 
   M <- which(Wm | km); posM <- integer(n); posM[M] <- seq_along(M)
   M_op <- as(L[M, M, drop = FALSE], "generalMatrix"); maxfac <- 0L
-  for (hm in list(Lh, Rh)) {
+
+  # The two halves share no edges, so they reduce independently. Recurse on each
+  # (carrying its own boundary), returning the half's update onto that boundary;
+  # the parent applies both extend-adds. The recursion forks on Unix when a
+  # parallel budget remains (each child gets half the budget, so the number of
+  # concurrent workers stays near `par`); the result is identical to sequential.
+  half_fn <- function(hm) {
     hi <- which(hm)
     he <- ed[hm[ed[, 1]] | hm[ed[, 2]], , drop = FALSE]
     nb <- setdiff(unique(as.integer(he)), hi); nb <- nb[(Wm | km)[nb]]   # boundary in M
     hv <- c(hi, nb)
     rec <- .kron_nd_reduce(L[hv, hv, drop = FALSE], match(nb, hv),
-                           coords[hv, , drop = FALSE], leaf, maxdepth, depth + 1L)
-    U  <- as.matrix(L[nb, nb, drop = FALSE]) - as.matrix(rec$laplacian)   # this half's update
-    bp <- posM[nb]; M_op[bp, bp] <- M_op[bp, bp] - U                      # extend-add
-    maxfac <- max(maxfac, rec$maxfac)
+                           coords[hv, , drop = FALSE], leaf, maxdepth, depth + 1L,
+                           par %/% 2L)
+    list(nb = nb, U = as.matrix(L[nb, nb, drop = FALSE]) - as.matrix(rec$laplacian),
+         maxfac = rec$maxfac)
+  }
+  res <- if (par >= 2L && .Platform$OS.type == "unix")
+    parallel::mclapply(list(Lh, Rh), half_fn, mc.cores = 2L, mc.preschedule = FALSE)
+  else
+    lapply(list(Lh, Rh), half_fn)
+  if (any(vapply(res, function(r) is.null(r) || inherits(r, "try-error"), logical(1))))
+    stop("a parallel nested-dissection subtree failed; rerun with cores = 1 to see the error",
+         call. = FALSE)
+  for (r in res) {
+    bp <- posM[r$nb]; M_op[bp, bp] <- M_op[bp, bp] - r$U
+    maxfac <- max(maxfac, r$maxfac)
   }
   M_op <- as(forceSymmetric(M_op), "generalMatrix")
   Wpos <- posM[which(Wm)]
@@ -317,11 +334,14 @@ terradish_kron_reduce <- function(data,
 #' @param covariance If \code{TRUE}, also return the generalized inverse of the
 #'   reduced Laplacian on the retained vertices, that is the focal
 #'   effective-resistance covariance.
-#' @param cores Number of worker processes for the independent per-tile interior
-#'   eliminations on the explicit-partition path (\code{tiles} not \code{NULL}).
-#'   \code{cores = 1} (the default) runs them sequentially; \code{cores > 1}
-#'   forks on Unix and uses a socket cluster on Windows, with an identical
-#'   result. The default nested-dissection path runs sequentially.
+#' @param cores Maximum number of parallel worker processes. \code{cores = 1}
+#'   (the default) is fully sequential. With \code{cores > 1} the default
+#'   nested-dissection path forks its independent recursive halves on Unix (the
+#'   budget halves down the recursion, so roughly \code{cores} subtrees reduce at
+#'   once); the explicit-partition path forks (Unix) or uses a socket cluster
+#'   (Windows) across tiles. The result is identical to the sequential run.
+#'   Forking shares memory, so the nested-dissection path falls back to
+#'   sequential where forking is unavailable (for example on Windows).
 #'
 #' @details The default nested-dissection path bisects the interior by its
 #' longer coordinate axis, marks the vertices straddling the cut as the
@@ -406,11 +426,12 @@ terradish_kron_reduce_tiled <- function(data,
       stop("nested dissection needs `data$vertex_coordinates`; pass an explicit ",
            "`tiles` partition to use the flat substructuring path instead", call. = FALSE)
     leaf <- max(64L, as.integer(n_tiles))
-    nd <- .kron_nd_reduce(as(Q, "generalMatrix"), boundary, as.matrix(coords), leaf)
+    nd <- .kron_nd_reduce(as(Q, "generalMatrix"), boundary, as.matrix(coords), leaf,
+                          par = max(1L, as.integer(cores)))
     reduced <- nd$laplacian
     out <- list(laplacian = reduced, boundary = boundary, interior = interior,
                 tiles = NULL, n_boundary = length(boundary),
-                n_interior = length(interior), cores = 1L,
+                n_interior = length(interior), cores = max(1L, as.integer(cores)),
                 peak = list(interior = nd$maxfac, separators = NA_integer_,
                             interface = NA_integer_, nnz = length(Q@x)),
                 covariance = if (isTRUE(covariance)) ginv(as.matrix(reduced)) else NULL)

@@ -40,11 +40,14 @@ factorization overall is set by the separator widths, not by this value.}
 reduced Laplacian on the retained vertices, that is the focal
 effective-resistance covariance.}
 
-\item{cores}{Number of worker processes for the independent per-tile interior
-eliminations on the explicit-partition path (\code{tiles} not \code{NULL}).
-\code{cores = 1} (the default) runs them sequentially; \code{cores > 1}
-forks on Unix and uses a socket cluster on Windows, with an identical
-result. The default nested-dissection path runs sequentially.}
+\item{cores}{Maximum number of parallel worker processes. \code{cores = 1}
+(the default) is fully sequential. With \code{cores > 1} the default
+nested-dissection path forks its independent recursive halves on Unix (the
+budget halves down the recursion, so roughly \code{cores} subtrees reduce at
+once); the explicit-partition path forks (Unix) or uses a socket cluster
+(Windows) across tiles. The result is identical to the sequential run.
+Forking shares memory, so the nested-dissection path falls back to
+sequential where forking is unavailable (for example on Windows).}
 }
 \value{
 A list of class \code{"terradish_kron_reduction"} with the reduced

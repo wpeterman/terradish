@@ -19,11 +19,14 @@ terradish 0.0.40 (dev)
   rather than by the interior or the separator skeleton, so it completes past
   the scale where the single-shot reduction (and a one-level tiling, whose
   separator factorization grows ~N^1.6) would run out of memory. `n_tiles` sets
-  the recursion's leaf size. Supplying an explicit `tiles` partition instead
-  uses a flat two-level substructuring that parallelizes across tiles with
-  `cores > 1` (fork on Unix, socket cluster on Windows), identical to the
-  sequential result. Focal vertices are never eliminated, so focal effective
-  resistances are preserved exactly.
+  the recursion's leaf size. With `cores > 1` the independent recursive halves
+  are reduced in parallel by forking on Unix (the budget halves down the
+  recursion), so memory stays bounded and the subtrees reduce concurrently;
+  supplying an explicit `tiles` partition instead uses a flat two-level
+  substructuring that parallelizes across tiles (fork on Unix, socket cluster on
+  Windows). Either path is identical to the sequential result, and focal
+  vertices are never eliminated, so focal effective resistances are preserved
+  exactly.
 * Extracted the shared landscape-genetic primitives to the new `landgraph` package
   and now import them from there: the genetic covariance/distance helpers
   (`cov_from_biallelic()`, `cov_from_genetic_data()`, `fst_from_biallelic()`,

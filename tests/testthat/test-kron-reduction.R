@@ -118,3 +118,15 @@ test_that("explicit-partition path matches single-shot, parallel equals sequenti
     terradish_kron_reduce_tiled(surface, conductance, tiles = labels[-1]),
     "one entry per graph vertex")
 })
+
+test_that("nested-dissection result is identical with cores > 1", {
+  dat <- melip_fixture(1:8)
+  surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
+  model <- loglinear_conductance(~ altitude + forestcover, surface$x)
+  conductance <- model(c(-0.3, 0.3))$conductance
+
+  one <- terradish_kron_reduce_tiled(surface, conductance, cores = 1L)
+  par <- terradish_kron_reduce_tiled(surface, conductance, cores = 2L)
+  expect_equal(as.matrix(par$laplacian), as.matrix(one$laplacian), tolerance = 1e-10)
+  expect_equal(par$cores, 2)
+})
