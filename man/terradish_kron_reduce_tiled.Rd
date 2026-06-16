@@ -26,24 +26,24 @@ result list containing a \code{conductance} element.}
 \item{boundary}{Integer vertex indices to retain in the reduced graph.
 Defaults to the unique focal vertices in \code{data$demes}.}
 
-\item{tiles}{Partition control. \code{NULL} (the default) selects between the
-single-shot and nested-dissection paths by \code{method}. Supplying an
+\item{tiles}{Partition control. \code{NULL} (the default) uses recursive
+nested dissection driven by \code{data$vertex_coordinates}. Supplying an
 explicit partition instead (a list of integer index vectors, or a
 length-\code{nrow(data$x)} vector of per-vertex tile labels) uses a flat
 two-level substructuring over those tiles, which is the parallel path (see
 \code{cores}).}
 
-\item{n_tiles}{Leaf size for the nested-dissection path: bisection stops when
-a subdomain interior has at most \code{n_tiles} vertices. Smaller leaves give
-a deeper recursion with smaller leaf factorizations; the largest factorization
-overall is set by the separator widths, not by this value.}
+\item{n_tiles}{Leaf size for the default nested-dissection path: bisection
+stops when a subdomain interior has at most \code{n_tiles} vertices. Smaller
+leaves give a deeper recursion with smaller leaf factorizations; the largest
+factorization overall is set by the separator widths, not by this value.}
 
 \item{covariance}{If \code{TRUE}, also return the generalized inverse of the
 reduced Laplacian on the retained vertices, that is the focal
 effective-resistance covariance.}
 
 \item{cores}{Maximum number of parallel worker processes. \code{cores = 1}
-(the default) is fully sequential. With \code{cores > 1} the
+(the default) is fully sequential. With \code{cores > 1} the default
 nested-dissection path forks its independent recursive halves on Unix (the
 budget halves down the recursion, so roughly \code{cores} subtrees reduce at
 once); the explicit-partition path forks (Unix) or uses a socket cluster
@@ -91,10 +91,10 @@ identical to \code{\link{terradish_kron_reduce}} in every case; only the cost
 changes.
 }
 \details{
-The nested-dissection path (chosen by \code{method = "auto"} above the budget,
-or forced by \code{method = "nested"}) bisects the interior by its longer
-coordinate axis, marks the vertices straddling the cut as the separator,
-recursively reduces each half onto its boundary, assembles the half
+The nested-dissection path (chosen by \code{method = "auto"} above
+the budget, or forced by \code{method = "nested"}) bisects the interior by its
+longer coordinate axis, marks the vertices straddling the cut as the
+separator, recursively reduces each half onto its boundary, assembles the half
 contributions onto the interface (a multifrontal extend-add), and eliminates
 the separator last. Because the two halves share no edges the result is exact
 for any bisection, and recursing keeps every factorization bounded by a
@@ -117,6 +117,6 @@ likelihood gradient needs the adjoint of conductance through the Schur
 complement; that integration is a separate step.
 }
 \seealso{
-\code{\link{terradish_kron_reduce}} for the single-shot reduction this
-  matches exactly.
+\code{\link{terradish_kron_reduce}} for the single-shot reduction
+  this matches exactly.
 }
