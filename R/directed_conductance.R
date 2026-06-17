@@ -10,10 +10,9 @@
 # unchanged. Fitting is by penalized/profiled likelihood with a reverse-mode
 # (transpose-solve) adjoint; see dev/TIER3_DESIGN.md.
 #
-# Engine note: this R implementation factorizes one sub-generator per focal
-# absorber per evaluation (forward + transpose solve). Correct and adequate for
-# moderate graphs; an Eigen::SparseLU C++ backend (one factorization reused for
-# forward + transpose) is the planned optimization for large rasters.
+# Engine note: the default Matrix backend is correct and adequate for moderate
+# graphs. The optional Eigen::SparseLU C++ backend caches one factorization per
+# focal absorber and reuses it for the forward and transpose adjoint solves.
 # =====================================================================
 
 # Directed edge list (both directions) from the graph's undirected edge_pairs.
@@ -78,47 +77,65 @@
 #' @param gradient Compute the gradient with respect to \code{par}?
 #' @param phi Optional warm-start nuisance parameters.
 #' @param nonnegative Force nonnegative measurement-model slope where applicable.
+#' @param solver Linear solver backend. \code{"matrix"} uses the reference
+#'   \pkg{Matrix} implementation; \code{"sparse_lu_cpp"} uses the Eigen
+#'   SparseLU C++ backend and reuses each absorber factorization for the
+#'   forward and transpose adjoint solves.
 #' @return A list with \code{objective}, \code{covariance} (the commute-time
 #'   \code{E}), \code{phi}, and (if \code{gradient}) \code{gradient}.
 #' @keywords internal
 #' @export
 terradish_directed_algorithm <- function(gen, g, data, S, par, nu = NULL,
                                          gradient = TRUE, phi = NULL,
-                                         nonnegative = TRUE)
+                                         nonnegative = TRUE,
+                                         solver = c("matrix", "sparse_lu_cpp"))
 {
+  solver <- match.arg(solver)
   n <- gen$n
   focal <- data$demes
   nf <- length(focal)
   ed <- gen$edges; ea <- ed[, 1]; eb <- ed[, 2]
   rate <- gen$rates(par)
 
-  G <- Matrix::sparseMatrix(i = ea, j = eb, x = rate, dims = c(n, n))
-  Matrix::diag(G) <- 0
-  G <- G - Matrix::Diagonal(n, x = Matrix::rowSums(G))
-
   Jc <- diag(nf) - matrix(1 / nf, nf, nf)
-  H <- matrix(0, n, nf)
-  hcache <- vector("list", nf)
-  for (fj in seq_len(nf)) {
-    j <- focal[fj]
-    idx <- seq_len(n)[-j]
-    Q <- G[idx, idx, drop = FALSE]
-    hred <- tryCatch(as.numeric(Matrix::solve(Q, rep(-1, n - 1L))),
-                     error = function(e) NULL)
-    if (is.null(hred))
-      stop("Directed generator is numerically singular at these parameters ",
-           "(very strong asymmetry). Reduce the directional effect or bounds.",
-           call. = FALSE)
-    hfull <- numeric(n); hfull[idx] <- hred
-    H[, fj] <- hfull
-    hcache[[fj]] <- list(j = j, idx = idx, Q = Q, hfull = hfull)
+
+  if (identical(solver, "sparse_lu_cpp")) {
+    fw <- tryCatch(directed_sparse_lu_forward_cpp(ed, rate, as.integer(focal), n),
+                   error = function(e) e)
+    if (inherits(fw, "error"))
+      stop("Directed SparseLU backend failed at these parameters ",
+           "(very strong asymmetry can make the generator singular): ",
+           conditionMessage(fw), call. = FALSE)
+    Hf <- fw$Hf
+    hcache <- fw$hcache
+  } else {
+    G <- Matrix::sparseMatrix(i = ea, j = eb, x = rate, dims = c(n, n))
+    Matrix::diag(G) <- 0
+    G <- G - Matrix::Diagonal(n, x = Matrix::rowSums(G))
+
+    H <- matrix(0, n, nf)
+    hcache <- vector("list", nf)
+    for (fj in seq_len(nf)) {
+      j <- focal[fj]
+      idx <- seq_len(n)[-j]
+      Q <- G[idx, idx, drop = FALSE]
+      hred <- tryCatch(as.numeric(Matrix::solve(Q, rep(-1, n - 1L))),
+                       error = function(e) NULL)
+      if (is.null(hred))
+        stop("Directed generator is numerically singular at these parameters ",
+             "(very strong asymmetry). Reduce the directional effect or bounds.",
+             call. = FALSE)
+      hfull <- numeric(n); hfull[idx] <- hred
+      H[, fj] <- hfull
+      hcache[[fj]] <- list(j = j, idx = idx, Q = Q, hfull = hfull)
+    }
+    Hf <- H[focal, , drop = FALSE]
   }
-  Hf <- H[focal, , drop = FALSE]
   R <- Hf + t(Hf)
   E <- as.matrix(-0.5 * Jc %*% R %*% Jc)
 
   if (is.null(g))                                  # forward only: return E
-    return(list(covariance = E, hcache = hcache, Hf = Hf))
+    return(list(covariance = E, hcache = hcache, Hf = Hf, solver = solver))
 
   sub <- radish_subproblem(g, E, S, nu = nu, phi = phi, nonnegative = nonnegative,
                            control = NewtonRaphsonControl(verbose = FALSE,
@@ -130,15 +147,24 @@ terradish_directed_algorithm <- function(gen, g, data, S, par, nu = NULL,
   dL_dE <- as.matrix(sub$gradient)
   dL_dR <- -0.5 * (Jc %*% dL_dE %*% Jc)
   dL_dH <- dL_dR + t(dL_dR)                       # R = Hf + Hf^T
-  dL_drate <- numeric(length(ea))
-  for (fj in seq_len(nf)) {
-    hc <- hcache[[fj]]; j <- hc$j; idx <- hc$idx
-    b <- numeric(n); b[focal] <- dL_dH[, fj]; b[j] <- 0
-    ared <- as.numeric(Matrix::solve(Matrix::t(hc$Q), b[idx]))   # transpose solve
-    afull <- numeric(n); afull[idx] <- ared
-    keep <- ea != j
-    dL_drate[keep] <- dL_drate[keep] +
-      afull[ea[keep]] * (hc$hfull[ea[keep]] - hc$hfull[eb[keep]])
+  if (identical(solver, "sparse_lu_cpp")) {
+    dL_drate <- tryCatch(
+      directed_sparse_lu_adjoint_cpp(hcache, ed, as.integer(focal), dL_dH, n),
+      error = function(e) e)
+    if (inherits(dL_drate, "error"))
+      stop("Directed SparseLU adjoint failed: ", conditionMessage(dL_drate),
+           call. = FALSE)
+  } else {
+    dL_drate <- numeric(length(ea))
+    for (fj in seq_len(nf)) {
+      hc <- hcache[[fj]]; j <- hc$j; idx <- hc$idx
+      b <- numeric(n); b[focal] <- dL_dH[, fj]; b[j] <- 0
+      ared <- as.numeric(Matrix::solve(Matrix::t(hc$Q), b[idx]))   # transpose solve
+      afull <- numeric(n); afull[idx] <- ared
+      keep <- ea != j
+      dL_drate[keep] <- dL_drate[keep] +
+        afull[ea[keep]] * (hc$hfull[ea[keep]] - hc$hfull[eb[keep]])
+    }
   }
   # chain to (theta, gamma)
   grad_theta <- as.numeric(crossprod(gen$sab, dL_drate * rate))
@@ -179,6 +205,10 @@ terradish_directed_algorithm <- function(gen, g, data, S, par, nu = NULL,
 #'   \code{5}.
 #' @param nonnegative Force nonnegative measurement-model slope where applicable.
 #' @param control Passed to the inner nuisance-parameter fits.
+#' @param solver Linear solver backend for the directed hitting-time systems.
+#'   \code{"matrix"} uses the reference \pkg{Matrix} implementation.
+#'   \code{"sparse_lu_cpp"} uses Eigen SparseLU through C++ and reuses each
+#'   absorber factorization for the forward and transpose adjoint solves.
 #'
 #' @details
 #' \strong{Scope.} This is the tractable directional model (directed commute
@@ -201,8 +231,10 @@ terradish_directed <- function(formula, data, directional,
                                measurement_model = generalized_wishart,
                                nu = NULL, gamma_bound = 2, theta_bound = 5,
                                nonnegative = TRUE,
-                               control = NewtonRaphsonControl(verbose = FALSE))
+                               control = NewtonRaphsonControl(verbose = FALSE),
+                               solver = c("matrix", "sparse_lu_cpp"))
 {
+  solver <- match.arg(solver)
   stopifnot(inherits(formula, "formula"))
   stopifnot(inherits(data, c("terradish_graph", "radish_graph")))
   stopifnot(inherits(measurement_model, c("terradish_measurement_model",
@@ -225,7 +257,8 @@ terradish_directed <- function(formula, data, directional,
     r <- tryCatch(terradish_directed_algorithm(gen, measurement_model, data, S, par,
                                                nu = nu, gradient = FALSE,
                                                phi = phi_state$value,
-                                               nonnegative = nonnegative),
+                                               nonnegative = nonnegative,
+                                               solver = solver),
                   error = function(e) NULL)
     if (is.null(r)) return(1e12)
     phi_state$value <- r$phi
@@ -235,7 +268,8 @@ terradish_directed <- function(formula, data, directional,
     r <- tryCatch(terradish_directed_algorithm(gen, measurement_model, data, S, par,
                                                nu = nu, gradient = TRUE,
                                                phi = phi_state$value,
-                                               nonnegative = nonnegative),
+                                               nonnegative = nonnegative,
+                                               solver = solver),
                   error = function(e) NULL)
     if (is.null(r)) return(rep(0, p + q))
     phi_state$value <- r$phi
@@ -247,7 +281,8 @@ terradish_directed <- function(formula, data, directional,
 
   final <- terradish_directed_algorithm(gen, measurement_model, data, S, opt$par,
                                         nu = nu, gradient = TRUE,
-                                        nonnegative = nonnegative)
+                                        nonnegative = nonnegative,
+                                        solver = solver)
   # asymptotic vcov via numerical Hessian of the profiled objective (low-dim)
   # Hessian of the negative log-likelihood via the Jacobian of the analytic
   # gradient (cheap + accurate: reuses the transpose-solve adjoint rather than
@@ -281,6 +316,7 @@ terradish_directed <- function(formula, data, directional,
               response = S, convergence = opt$convergence,
               measurement_model = .terradish_measurement_model_name(measurement_model),
               nu = nu, npar = c(theta = p, gamma = q),
+              solver = solver,
               logconductance = eta,
               dim = c(vertices = gen$n, focal = length(data$demes)))
   class(out) <- c("terradish_directed", "terradish")
@@ -293,6 +329,7 @@ print.terradish_directed <- function(x, ...)
   cat("Directional (non-reversible) conductance surface\n")
   cat(sprintf("  measurement model: %s%s\n", x$measurement_model,
               if (is.null(x$nu)) "" else sprintf("  (nu = %g)", x$nu)))
+  if (!is.null(x$solver)) cat(sprintf("  solver: %s\n", x$solver))
   cat(sprintf("  loglik = %.3f\n", x$loglik))
   tab <- cbind(Estimate = c(x$theta, x$gamma),
                `Std. Error` = x$se)
@@ -338,6 +375,7 @@ summary.terradish_directed <- function(object, conf.level = 0.95, ...) {
               `Pr(>|z|)` = pmin(2 * (1 - pnorm(abs(z))), 1))
   out <- list(ztable = zt, loglik = object$loglik, df = object$df, aic = object$aic,
               phi = object$phi, npar = object$npar,
+              solver = object$solver,
               measurement_model = object$measurement_model, nu = object$nu,
               dim = object$dim, call = object$call)
   class(out) <- "summary.terradish_directed"
@@ -351,6 +389,7 @@ print.summary.terradish_directed <- function(x, digits = max(3L, getOption("digi
   cat("Call:   ", paste(deparse(x$call), collapse = "\n"), "\n", sep = "")
   cat(sprintf("Measurement model: %s%s\n", x$measurement_model,
               if (is.null(x$nu)) "" else sprintf(" (nu = %g)", x$nu)))
+  if (!is.null(x$solver)) cat(sprintf("Solver: %s\n", x$solver))
   cat(sprintf("Loglik: %.3f  (df = %d)   AIC: %.2f\n\n", x$loglik, x$df, x$aic))
   cat("Coefficients (theta = symmetric conductance; gamma = directional):\n")
   printCoefmat(x$ztable, digits = digits, signif.stars = signif.stars, na.print = "NA")

@@ -110,6 +110,35 @@ BEGIN_RCPP
     return rcpp_result_gen;
 END_RCPP
 }
+// directed_sparse_lu_forward_cpp
+Rcpp::List directed_sparse_lu_forward_cpp(const arma::umat& edges, const arma::vec& rate, const arma::uvec& focal, const int n);
+RcppExport SEXP _terradish_directed_sparse_lu_forward_cpp(SEXP edgesSEXP, SEXP rateSEXP, SEXP focalSEXP, SEXP nSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< const arma::umat& >::type edges(edgesSEXP);
+    Rcpp::traits::input_parameter< const arma::vec& >::type rate(rateSEXP);
+    Rcpp::traits::input_parameter< const arma::uvec& >::type focal(focalSEXP);
+    Rcpp::traits::input_parameter< const int >::type n(nSEXP);
+    rcpp_result_gen = Rcpp::wrap(directed_sparse_lu_forward_cpp(edges, rate, focal, n));
+    return rcpp_result_gen;
+END_RCPP
+}
+// directed_sparse_lu_adjoint_cpp
+arma::vec directed_sparse_lu_adjoint_cpp(Rcpp::List hcache, const arma::umat& edges, const arma::uvec& focal, const arma::mat& dL_dH, const int n);
+RcppExport SEXP _terradish_directed_sparse_lu_adjoint_cpp(SEXP hcacheSEXP, SEXP edgesSEXP, SEXP focalSEXP, SEXP dL_dHSEXP, SEXP nSEXP) {
+BEGIN_RCPP
+    Rcpp::RObject rcpp_result_gen;
+    Rcpp::RNGScope rcpp_rngScope_gen;
+    Rcpp::traits::input_parameter< Rcpp::List >::type hcache(hcacheSEXP);
+    Rcpp::traits::input_parameter< const arma::umat& >::type edges(edgesSEXP);
+    Rcpp::traits::input_parameter< const arma::uvec& >::type focal(focalSEXP);
+    Rcpp::traits::input_parameter< const arma::mat& >::type dL_dH(dL_dHSEXP);
+    Rcpp::traits::input_parameter< const int >::type n(nSEXP);
+    rcpp_result_gen = Rcpp::wrap(directed_sparse_lu_adjoint_cpp(hcache, edges, focal, dL_dH, n));
+    return rcpp_result_gen;
+END_RCPP
+}
 // assemble_reduced_laplacian
 arma::sp_mat assemble_reduced_laplacian(const arma::vec& conductance, const arma::umat& edge_pairs);
 RcppExport SEXP _terradish_assemble_reduced_laplacian(SEXP conductanceSEXP, SEXP edge_pairsSEXP) {
@@ -243,6 +272,8 @@ static const R_CallMethodDef CallEntries[] = {
     {"_terradish_cholmod_direct_create", (DL_FUNC) &_terradish_cholmod_direct_create, 3},
     {"_terradish_cholmod_direct_update", (DL_FUNC) &_terradish_cholmod_direct_update, 2},
     {"_terradish_cholmod_direct_solve", (DL_FUNC) &_terradish_cholmod_direct_solve, 2},
+    {"_terradish_directed_sparse_lu_forward_cpp", (DL_FUNC) &_terradish_directed_sparse_lu_forward_cpp, 4},
+    {"_terradish_directed_sparse_lu_adjoint_cpp", (DL_FUNC) &_terradish_directed_sparse_lu_adjoint_cpp, 5},
     {"_terradish_assemble_reduced_laplacian", (DL_FUNC) &_terradish_assemble_reduced_laplacian, 2},
     {"_terradish_pcg_reduced_laplacian_ic", (DL_FUNC) &_terradish_pcg_reduced_laplacian_ic, 6},
     {"_terradish_pcg_reduced_laplacian", (DL_FUNC) &_terradish_pcg_reduced_laplacian, 6},

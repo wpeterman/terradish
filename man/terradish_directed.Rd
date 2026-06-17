@@ -13,7 +13,8 @@ terradish_directed(
   gamma_bound = 2,
   theta_bound = 5,
   nonnegative = TRUE,
-  control = NewtonRaphsonControl(verbose = FALSE)
+  control = NewtonRaphsonControl(verbose = FALSE),
+  solver = c("matrix", "sparse_lu_cpp")
 )
 }
 \arguments{
@@ -41,6 +42,11 @@ Default \code{2}.}
 \item{nonnegative}{Force nonnegative measurement-model slope where applicable.}
 
 \item{control}{Passed to the inner nuisance-parameter fits.}
+
+\item{solver}{Linear solver backend for the directed hitting-time systems.
+\code{"matrix"} uses the reference \pkg{Matrix} implementation.
+\code{"sparse_lu_cpp"} uses Eigen SparseLU through C++ and reuses each
+absorber factorization for the forward and transpose adjoint solves.}
 }
 \value{
 An object of class \code{"terradish_directed"} with the symmetric

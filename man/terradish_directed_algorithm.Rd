@@ -13,7 +13,8 @@ terradish_directed_algorithm(
   nu = NULL,
   gradient = TRUE,
   phi = NULL,
-  nonnegative = TRUE
+  nonnegative = TRUE,
+  solver = c("matrix", "sparse_lu_cpp")
 )
 }
 \arguments{
@@ -35,6 +36,11 @@ terradish_directed_algorithm(
 \item{phi}{Optional warm-start nuisance parameters.}
 
 \item{nonnegative}{Force nonnegative measurement-model slope where applicable.}
+
+\item{solver}{Linear solver backend. \code{"matrix"} uses the reference
+\pkg{Matrix} implementation; \code{"sparse_lu_cpp"} uses the Eigen
+SparseLU C++ backend and reuses each absorber factorization for the
+forward and transpose adjoint solves.}
 }
 \value{
 A list with \code{objective}, \code{covariance} (the commute-time

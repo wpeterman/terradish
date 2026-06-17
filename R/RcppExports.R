@@ -29,6 +29,14 @@ cholmod_direct_solve <- function(solver_ptr, rhs) {
     .Call(`_terradish_cholmod_direct_solve`, solver_ptr, rhs)
 }
 
+directed_sparse_lu_forward_cpp <- function(edges, rate, focal, n) {
+    .Call(`_terradish_directed_sparse_lu_forward_cpp`, edges, rate, focal, n)
+}
+
+directed_sparse_lu_adjoint_cpp <- function(hcache, edges, focal, dL_dH, n) {
+    .Call(`_terradish_directed_sparse_lu_adjoint_cpp`, hcache, edges, focal, dL_dH, n)
+}
+
 assemble_reduced_laplacian <- function(conductance, edge_pairs) {
     .Call(`_terradish_assemble_reduced_laplacian`, conductance, edge_pairs)
 }

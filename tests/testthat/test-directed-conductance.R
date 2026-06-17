@@ -54,6 +54,37 @@ test_that("directed engine gradient matches numDeriv (generalized Wishart)", {
   expect_equal(unname(an), nd, tolerance = 1e-4)
 })
 
+test_that("SparseLU directed backend matches Matrix reference", {
+  fx <- mk_directed_fixture(7L)
+  surface <- fx$surface; nf <- length(surface$demes)
+  gen <- terradish:::.directed_generator(~ v1, surface, fx$dir_cov)
+  par <- c(0.3, 0.45)
+
+  ref <- terradish_directed_algorithm(gen, NULL, surface, NULL, par = par,
+                                      solver = "matrix")
+  lu <- terradish_directed_algorithm(gen, NULL, surface, NULL, par = par,
+                                     solver = "sparse_lu_cpp")
+  expect_equal(lu$covariance, ref$covariance, tolerance = 1e-8)
+  expect_equal(lu$Hf, ref$Hf, tolerance = 1e-8)
+
+  nu <- 800
+  set.seed(17)
+  Scov <- rWishart(1, df = nu,
+                   Sigma = (ref$covariance + 0.2 * diag(nf)) / nu)[, , 1]
+  S <- outer(diag(Scov), rep(1, nf)) + outer(rep(1, nf), diag(Scov)) - 2 * Scov
+  diag(S) <- 0
+
+  ref_fit <- terradish_directed_algorithm(gen, generalized_wishart, surface, S,
+                                          par, nu = nu, gradient = TRUE,
+                                          solver = "matrix")
+  lu_fit <- terradish_directed_algorithm(gen, generalized_wishart, surface, S,
+                                         par, nu = nu, gradient = TRUE,
+                                         solver = "sparse_lu_cpp")
+  expect_equal(lu_fit$objective, ref_fit$objective, tolerance = 1e-8)
+  expect_equal(lu_fit$covariance, ref_fit$covariance, tolerance = 1e-8)
+  expect_equal(unname(lu_fit$gradient), unname(ref_fit$gradient), tolerance = 1e-6)
+})
+
 test_that("directed_rates and directed plots expose fitted edge bias", {
   fx <- mk_directed_fixture(6L)
   surface <- fx$surface

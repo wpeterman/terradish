@@ -57,8 +57,9 @@ reversible and the model reduces to isolation by resistance.
 
 > **Scope.** This is the tractable directional model (a directed commute time
 > reducing to resistance distance when reversible), not the full structured
-> coalescent (intractable on fine rasters). It is also a deme/coarse-graph tool
-> in its current pure-R form (see "Performance and scope" below).
+> coalescent (intractable on fine rasters). It is most useful at deme scale or
+> on coarse rasters; full-resolution use should start with the SparseLU backend
+> and careful sensitivity checks (see "Performance and scope" below).
 
 This vignette uses a small precomputed example so the document can show real
 tables and figures without fitting the directed model during package checks. The
@@ -75,8 +76,7 @@ per-directed-edge covariate \eqn{d_{ab} = x_a - x_b}:
 library(terradish)
 library(terra)
 
-# A coarse/deme-scale conductance surface (directional fitting is for small or
-# coarse graphs in the current R engine; see Performance and scope).
+# A coarse/deme-scale conductance surface is the recommended starting point.
 surface <- conductance_surface(covariates, coords, directions = 8)
 
 # Directional covariate from an elevation layer (downhill = positive drop)
@@ -95,7 +95,8 @@ fit <- terradish_directed(
   data              = surface,
   directional       = dir_cov,    # directional covariate(s)
   measurement_model = wishart_covariance,   # or generalized_wishart / mlpe
-  nu                = nu
+  nu                = nu,
+  solver            = "sparse_lu_cpp"
 )
 summary(fit)        # theta (symmetric) + gamma (directional), z-tests, AIC
 ```
@@ -131,7 +132,8 @@ fit_reversible <- terradish_directed(
   directional       = dir_cov,
   measurement_model = wishart_covariance,
   nu                = nu,
-  gamma_bound       = 0
+  gamma_bound       = 0,
+  solver            = "sparse_lu_cpp"
 )
 
 lrt_stat <- 2 * (as.numeric(logLik(fit)) -
@@ -249,7 +251,8 @@ the model:
 
 ```{r recovery-show, eval = FALSE}
 fit <- terradish_directed(S ~ v1, data = surface, directional = dir_cov,
-                          measurement_model = generalized_wishart, nu = nu)
+                          measurement_model = generalized_wishart, nu = nu,
+                          solver = "sparse_lu_cpp")
 coef(fit)           # theta (~truth) and gamma (~truth, positive)
 ```
 
@@ -290,12 +293,14 @@ distance. This is a fundamental limit, not a limitation of this implementation.
 
 ## Performance and scope
 
-The current engine factorizes one sub-generator per focal site per likelihood
+The directed engine factorizes one sub-generator per focal site per likelihood
 evaluation. This is exact and fine for **small or coarse graphs** (deme-scale
-analyses, coarsened rasters), but a *fit* on a full-resolution raster (hundreds of
-thousands of cells) is slow, and strongly heterogeneous rates can ill-condition
-the solves. A non-symmetric sparse-LU C++ backend (one factorization reused for
-the forward and transpose solves) is planned for full-resolution use. Until then:
+analyses, coarsened rasters). For larger graphs, use
+`solver = "sparse_lu_cpp"` to call the non-symmetric Eigen SparseLU backend. It
+caches one factorization per focal absorber and reuses it for the forward
+hitting-time solve and the transpose adjoint solve. Even with that backend,
+full-resolution raster fits (hundreds of thousands of cells) can be slow, and
+strongly heterogeneous rates can ill-condition the solves. Practical guidance:
 
 - coarsen the raster (`terra::aggregate`) or work at the deme scale;
 - keep covariates scaled and directional effects moderate;
@@ -308,7 +313,8 @@ library(terradish)
 surface <- conductance_surface(covariates, coords, directions = 8)  # coarse/deme-scale
 dir_cov <- edge_gradient(elevation, surface)                        # directional covariate
 fit <- terradish_directed(S ~ habitat, data = surface, directional = dir_cov,
-                          measurement_model = wishart_covariance, nu = nu)
+                          measurement_model = wishart_covariance, nu = nu,
+                          solver = "sparse_lu_cpp")
 summary(fit)                       # theta (symmetric) + gamma (directional)
 plot(fit, data = surface)          # symmetric conductance surface
 edge_rates <- directed_rates(fit, data = surface, directional = dir_cov)

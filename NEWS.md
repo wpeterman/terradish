@@ -1,3 +1,13 @@
+terradish 0.0.42 (dev)
+---------
+* Added `solver = "sparse_lu_cpp"` for `terradish_directed()` and
+  `terradish_directed_algorithm()`, using an Eigen SparseLU C++ backend that
+  caches one factorization per focal absorber and reuses it for the forward
+  hitting-time solve and transpose adjoint solve.
+* Added regression coverage comparing directed SparseLU covariance and gradient
+  output against the reference Matrix backend, and updated the directional
+  vignette performance guidance.
+
 terradish 0.0.41 (dev)
 ---------
 * Added `directed_rates()` and new `plot.terradish_directed()` directional
