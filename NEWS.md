@@ -1,3 +1,14 @@
+terradish 0.0.41 (dev)
+---------
+* Added `directed_rates()` and new `plot.terradish_directed()` directional
+  visualizations for edge-rate bias and combined symmetric-conductance plus
+  directional-bias maps.
+* Expanded the directional-conductance vignette with a cached fitted example,
+  likelihood-ratio comparison against the reversible special case, edge-rate
+  summaries, and interpretation guidance for directional plots.
+* Added a focused large-landscape curvature benchmark script and corresponding
+  vignette guidance comparing exact and Gauss-Newton curvature.
+
 terradish 0.0.40 (dev)
 ---------
 * Added a `curvature` argument to `terradish()` and `terradish_algorithm()`

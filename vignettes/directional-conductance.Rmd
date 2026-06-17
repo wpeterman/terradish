@@ -14,8 +14,24 @@ vignette: >
 ```{r setup, include = FALSE}
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
                       fig.width = 6, fig.height = 4.5, warning = FALSE, message = FALSE)
+suppressPackageStartupMessages(library(terradish))
 res <- tryCatch(readRDS("vignette-directional.rds"), error = function(e) NULL)
 have_res <- !is.null(res)
+if (have_res) {
+  DIM <- res$example$DIM
+  r <- terra::rast(nrows = DIM, ncols = DIM, xmin = 0, xmax = DIM,
+                   ymin = 0, ymax = DIM)
+  covs <- c(
+    terra::setValues(r, res$example$v1_values),
+    terra::setValues(r, res$example$elev_values)
+  )
+  names(covs) <- c("v1", "elev")
+  coords <- terra::xyFromCell(r, res$example$focal_cells)
+  surface <- conductance_surface(covs, coords, directions = 8)
+  dir_cov <- edge_gradient(covs[["elev"]], surface)
+  dir_cov$d <- cbind(elev = dir_cov$d)
+  edge_rates <- directed_rates(res$fit, data = surface, directional = dir_cov)
+}
 ```
 
 ## Why directional conductance?
@@ -44,6 +60,12 @@ reversible and the model reduces to isolation by resistance.
 > coalescent (intractable on fine rasters). It is also a deme/coarse-graph tool
 > in its current pure-R form (see "Performance and scope" below).
 
+This vignette uses a small precomputed example so the document can show real
+tables and figures without fitting the directed model during package checks. The
+vignette rebuilds the tiny example graph, but the fitted model itself is read
+from `vignettes/vignette-directional.rds`. To refresh the cached fit, run
+`dev/make_vignette_directional.R` from the source tree.
+
 ## Directional edge covariates
 
 `edge_gradient()` turns a spatial layer (e.g. elevation) into the antisymmetric
@@ -59,6 +81,10 @@ surface <- conductance_surface(covariates, coords, directions = 8)
 
 # Directional covariate from an elevation layer (downhill = positive drop)
 dir_cov <- edge_gradient(elevation, surface)
+
+# Optional, but helpful: name the directional covariate so the coefficient
+# appears as gamma_elev rather than gamma1 in printed output.
+dir_cov$d <- cbind(elev = dir_cov$d)
 ```
 
 ## Fitting a directional model
@@ -75,30 +101,156 @@ summary(fit)        # theta (symmetric) + gamma (directional), z-tests, AIC
 ```
 
 The fitted object carries the full S3 suite: `print`, `summary`, `coef`,
-`logLik`, `AIC`, `vcov`, `confint`, and `plot` (the symmetric conductance
-surface). A likelihood-ratio test of the directional effect compares the model
-against its reversible (\eqn{\gamma = 0}) special case:
+`logLik`, `AIC`, `vcov`, `confint`, and `plot`. The cached example below was
+simulated from a known directional model on a 7 by 7 lattice, with six focal
+sites, 156 undirected graph edges, \eqn{\theta = 0.5}, and
+\eqn{\gamma = 0.6}.
+
+```{r cached-summary, eval = have_res}
+summary(res$fit)
+```
+
+**How to read the `summary()` output:** The `theta` row is the reversible
+conductance effect. It is on the log-conductance scale, so a one-unit increase
+in `v1` multiplies the symmetric conductance by `exp(theta)`. The `gamma` row is
+the directional effect. It is also on a log-rate scale, but it applies to an
+antisymmetric edge covariate: positive `gamma_elev` means edges with positive
+`elev` gradient have higher fitted rate in the positive-gradient direction and
+lower fitted rate in the reverse direction. The z table is a Wald approximation;
+use it as evidence for detectability, then use the edge-rate plots below to see
+where that detectable directional mechanism is expressed on the graph.
+
+A likelihood-ratio test of the directional effect compares the model against its
+reversible (${\gamma = 0}$) special case:
 
 ```{r lrt, eval = FALSE}
-# directed vs reversible (gamma = 0) on the same commute-time engine
-AIC(fit)            # vs the reversible reduced fit
+# Refit the same model with the directional coefficient fixed at zero.
+fit_reversible <- terradish_directed(
+  S ~ habitat,
+  data              = surface,
+  directional       = dir_cov,
+  measurement_model = wishart_covariance,
+  nu                = nu,
+  gamma_bound       = 0
+)
+
+lrt_stat <- 2 * (as.numeric(logLik(fit)) -
+                   as.numeric(logLik(fit_reversible)))
+
+# The test df is the number of constrained directional coefficients.
+# Set this explicitly because the reduced object still carries a gamma slot
+# fixed at zero.
+lrt_df <- length(fit$gamma)
+lrt_p  <- pchisq(lrt_stat, df = lrt_df, lower.tail = FALSE)
+
+data.frame(statistic = lrt_stat, df = lrt_df, p_value = lrt_p)
+```
+
+```{r lrt-table, echo = FALSE, eval = have_res}
+knitr::kable(
+  res$lrt_table,
+  digits = 3,
+  caption = "Likelihood-ratio comparison of the directed model against the reversible special case."
+)
+```
+
+**How to read the likelihood-ratio test:** The reduced model keeps the same
+symmetric conductance structure but fixes \eqn{\gamma = 0}. The test statistic
+is twice the log-likelihood gain from allowing directionality. The degrees of
+freedom are the number of directional coefficients fixed at zero in the reduced
+model. A small p-value means the directed generator fits better than its
+reversible special case for this response.
+
+## Visualizing directional results
+
+Use the coefficient table and the map together. The coefficient table answers
+whether the directional mechanism is supported; the map shows where that fitted
+mechanism has the strongest edge-level expression on the graph.
+
+```{r recovery-table, echo = FALSE, eval = have_res}
+knitr::kable(
+  res$coef_table,
+  digits = 3,
+  caption = "Directed-model recovery on simulated data."
+)
+```
+
+**How to read the coefficient table:** The `truth` column is the parameter value
+used to generate the synthetic response. The `estimate` column is what
+`terradish_directed()` recovered from that response. Here the fitted symmetric
+conductance effect and the directional effect are both close to the generating
+values, which is what this controlled example is meant to demonstrate.
+
+```{r directional-visuals, eval = FALSE}
+# One row per undirected graph edge, with fitted rates in both directions.
+edge_rates <- directed_rates(fit, data = surface, directional = dir_cov)
+
+# Arrows point from the lower-rate endpoint toward the higher-rate endpoint.
+# Width and color increase with |log(rate_ab / rate_ba)|.
+plot(fit, type = "directional", data = surface, directional = dir_cov)
+
+# Overlay directional arrows on the fitted reversible conductance surface.
+plot(fit, type = "combined", data = surface, directional = dir_cov)
+```
+
+```{r edge-summary, echo = FALSE, eval = have_res}
+knitr::kable(
+  res$edge_summary,
+  digits = 3,
+  caption = "Summary of fitted directional edge-rate bias in the cached example."
+)
+```
+
+The key edge-scale quantity is
+${\log(G_{a\to b} / G_{b\to a})}$. A value of 0 means the fitted rate is the
+same in both directions along that edge. A value of 0.69 means the favored
+direction has about twice the rate of the reverse direction, because
+${\exp(0.69) \approx 2}$.
+
+```{r directional-plot, echo = FALSE, fig.width = 6, fig.height = 5, eval = have_res}
+plot(res$fit, type = "directional", data = surface, directional = dir_cov,
+     min_abs_log_ratio = 0.05)
+```
+
+**How to read the directional map:** Each arrow points from the lower-rate
+endpoint toward the higher-rate endpoint on an undirected graph edge. Color and
+line width increase with ${|\log(G_{a\to b} / G_{b\to a})|}$. The map is an
+edge-level diagnostic for the fitted generator, not a direct observation of
+migration.
+
+```{r combined-plot, echo = FALSE, fig.width = 6, fig.height = 5, eval = have_res}
+plot(res$fit, type = "combined", data = surface, directional = dir_cov,
+     min_abs_log_ratio = 0.05)
+```
+
+**How to read the combined map:** The background raster is the reversible
+conductance component, `exp(x theta)`. The arrows show the directional bias on
+top of that surface. Read the two layers separately first: the background says
+where movement is generally easy or difficult, and the arrows say which
+direction is favored along each edge after accounting for the symmetric
+component.
+
+The directional map is inspired by effective-migration surface displays such as
+EEMS and FEEMS, but the interpretation is model-specific. In
+`terradish_directed()`, arrows show fitted **directional edge-rate bias** in the
+directed generator. They should not be described as directly observed migration
+rates. For presentation figures, consider filtering very small arrows:
+
+```{r directional-filter, eval = FALSE}
+plot(fit, type = "combined", data = surface, directional = dir_cov,
+     min_abs_log_ratio = 0.6)
 ```
 
 ### Worked example (simulated from the directed model)
 
-To show the machinery recovering a known directional effect, we simulate a
-covariance response from the directed model on a small lattice with a positive
-(downhill-biased) \eqn{\gamma} and refit:
+To create the cached result, we simulated a covariance response from the
+directed model on a small lattice with a positive directional effect and refit
+the model:
 
 ```{r recovery-show, eval = FALSE}
 fit <- terradish_directed(S ~ v1, data = surface, directional = dir_cov,
                           measurement_model = generalized_wishart, nu = nu)
 coef(fit)           # theta (~truth) and gamma (~truth, positive)
-```
-
-```{r recovery-table, echo = FALSE, eval = have_res}
-knitr::kable(res$coef_table, digits = 3,
-             caption = "Directed-model recovery on simulated data (true theta = 0.5, gamma = 0.6).")
 ```
 
 ```{r grad-check, echo = FALSE, results = "asis", eval = have_res}
@@ -159,4 +311,7 @@ fit <- terradish_directed(S ~ habitat, data = surface, directional = dir_cov,
                           measurement_model = wishart_covariance, nu = nu)
 summary(fit)                       # theta (symmetric) + gamma (directional)
 plot(fit, data = surface)          # symmetric conductance surface
+edge_rates <- directed_rates(fit, data = surface, directional = dir_cov)
+head(edge_rates)                   # fitted edge rates and log-rate ratios
+plot(fit, type = "combined", data = surface, directional = dir_cov)
 ```

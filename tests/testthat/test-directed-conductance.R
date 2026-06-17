@@ -54,6 +54,46 @@ test_that("directed engine gradient matches numDeriv (generalized Wishart)", {
   expect_equal(unname(an), nd, tolerance = 1e-4)
 })
 
+test_that("directed_rates and directed plots expose fitted edge bias", {
+  fx <- mk_directed_fixture(6L)
+  surface <- fx$surface
+  theta <- c(v1 = 0.5)
+  gamma <- c(gamma_elev = 0.6)
+  vc <- diag(c(0.01, 0.02), 2)
+  dimnames(vc) <- list(c(names(theta), names(gamma)),
+                       c(names(theta), names(gamma)))
+  fit <- list(
+    formula = S ~ v1,
+    theta = theta,
+    gamma = gamma,
+    vcov = vc,
+    logconductance = surface$x$v1 * theta[["v1"]]
+  )
+  class(fit) <- c("terradish_directed", "terradish")
+
+  rates <- directed_rates(fit, data = surface, directional = fx$dir_cov)
+  m <- nrow(surface$edge_pairs)
+  expect_s3_class(rates, "data.frame")
+  expect_equal(nrow(rates), m)
+  expect_true(all(rates$rate_ab > 0))
+  expect_true(all(rates$rate_ba > 0))
+  expect_equal(rates$log_rate_ratio, log(rates$rate_ab / rates$rate_ba),
+               tolerance = 1e-10)
+  expect_equal(rates$symmetric_rate, sqrt(rates$rate_ab * rates$rate_ba),
+               tolerance = 1e-10)
+  expect_true(all(rates$favored_from == rates$a | rates$favored_from == rates$b))
+  expect_true(all(rates$favored_to == rates$a | rates$favored_to == rates$b))
+  expect_true(all(is.finite(rates$abs_log_rate_ratio)))
+  expect_true(all(is.finite(rates$log_rate_ratio_se)))
+
+  p_directional <- plot(fit, type = "directional", data = surface,
+                        directional = fx$dir_cov)
+  p_combined <- plot(fit, type = "combined", data = surface,
+                     directional = fx$dir_cov)
+  expect_s3_class(p_directional, "ggplot")
+  expect_s3_class(p_combined, "ggplot")
+})
+
 test_that("terradish_directed recovers symmetric and directional effects", {
   skip_on_cran()
   skip_if_not_installed("numDeriv")

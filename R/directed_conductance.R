@@ -267,7 +267,11 @@ terradish_directed <- function(formula, data, directional,
   loglik <- -final$objective
   n_phi <- length(final$phi)
   df <- p + q + n_phi
-  eta <- as.numeric(assemble_model_matrix(rhs, data$x) %*% theta)  # symmetric log-conductance
+  eta <- withCallingHandlers(
+    as.numeric(assemble_model_matrix(rhs, data$x) %*% theta),  # symmetric log-conductance
+    warning = function(w)
+      if (grepl("Removed unused spatial covariates", conditionMessage(w)))
+        invokeRestart("muffleWarning"))
 
   out <- list(call = match.call(), formula = formula,
               theta = theta, gamma = gamma, se = se, vcov = vcov,
@@ -354,16 +358,261 @@ print.summary.terradish_directed <- function(x, digits = max(3L, getOption("digi
   invisible(x)
 }
 
+#' Extract fitted directed edge rates
+#'
+#' Computes fitted forward and reverse edge rates from a
+#' \code{\link{terradish_directed}} model. The returned table is useful for
+#' diagnosing and plotting the directional component of the model: the
+#' symmetric part describes where conductance is high or low, while
+#' \code{log_rate_ratio} describes how strongly the fitted generator favors one
+#' direction over the reverse direction along each graph edge.
+#'
+#' @param object A fitted \code{terradish_directed} object.
+#' @param data The \code{terradish_graph} used to fit \code{object}.
+#' @param directional Directional edge covariates from
+#'   \code{\link{edge_gradient}}. This must be the same directional object used
+#'   when fitting \code{object}.
+#' @param level Confidence level used for the optional edge-level Wald summary
+#'   of \code{log_rate_ratio}. The default is \code{0.95}.
+#'
+#' @return A data frame with one row per undirected graph edge. Columns include
+#'   the original edge endpoints (\code{a}, \code{b}), endpoint coordinates,
+#'   fitted rates in both directions, the geometric mean symmetric rate,
+#'   arithmetic mean bidirectional rate, \code{log_rate_ratio =
+#'   log(rate_ab / rate_ba)}, and arrow-ready coordinates from the lower-rate
+#'   endpoint toward the higher-rate endpoint. If \code{object} contains a
+#'   finite covariance matrix for \code{gamma}, standard errors, z statistics,
+#'   p-values, and Wald significance indicators are also returned for
+#'   \code{log_rate_ratio}.
+#'
+#' @seealso \code{\link{terradish_directed}}, \code{\link{edge_gradient}}
 #' @export
-plot.terradish_directed <- function(x, data, type = c("conductance", "logconductance"), ...) {
+directed_rates <- function(object, data, directional, level = 0.95)
+{
+  if (!inherits(object, "terradish_directed"))
+    stop("`object` must be a fitted terradish_directed object.", call. = FALSE)
+  if (!inherits(data, c("terradish_graph", "radish_graph")))
+    stop("`data` must be the terradish_graph used to fit `object`.", call. = FALSE)
+  if (missing(directional))
+    stop("`directional` must be supplied; use the edge covariates passed to terradish_directed().",
+         call. = FALSE)
+  if (is.null(data$vertex_coordinates))
+    stop("`data` must contain vertex coordinates to extract directed rates.",
+         call. = FALSE)
+
+  tm <- stats::terms(object$formula)
+  labels <- attr(tm, "term.labels")
+  rhs <- if (length(labels)) stats::reformulate(labels) else stats::as.formula("~1")
+  gen <- .directed_generator(rhs, data, directional)
+  q <- gen$q
+  m <- nrow(gen$edges) / 2L
+  if (m != floor(m))
+    stop("Directed edge list must contain paired forward and reverse edges.",
+         call. = FALSE)
+  if (q != length(object$gamma))
+    stop("`directional` does not match the fitted directional coefficients.",
+         call. = FALSE)
+
+  par <- c(object$theta, object$gamma)
+  rates <- gen$rates(par)
+  rate_ab <- rates[seq_len(m)]
+  rate_ba <- rates[m + seq_len(m)]
+
+  edge_pairs <- gen$edges[seq_len(m), , drop = FALSE]
+  coords <- as.matrix(data$vertex_coordinates)
+  xy_a <- coords[edge_pairs[, 1], , drop = FALSE]
+  xy_b <- coords[edge_pairs[, 2], , drop = FALSE]
+  colnames(xy_a) <- colnames(xy_b) <- c("x", "y")
+
+  log_rate_ratio <- log(rate_ab) - log(rate_ba)
+  forward_favored <- log_rate_ratio >= 0
+  x <- ifelse(forward_favored, xy_a[, 1], xy_b[, 1])
+  y <- ifelse(forward_favored, xy_a[, 2], xy_b[, 2])
+  xend <- ifelse(forward_favored, xy_b[, 1], xy_a[, 1])
+  yend <- ifelse(forward_favored, xy_b[, 2], xy_a[, 2])
+
+  out <- data.frame(
+    a = edge_pairs[, 1],
+    b = edge_pairs[, 2],
+    x_a = xy_a[, 1],
+    y_a = xy_a[, 2],
+    x_b = xy_b[, 1],
+    y_b = xy_b[, 2],
+    rate_ab = rate_ab,
+    rate_ba = rate_ba,
+    symmetric_rate = sqrt(rate_ab * rate_ba),
+    average_rate = (rate_ab + rate_ba) / 2,
+    log_rate_ratio = log_rate_ratio,
+    abs_log_rate_ratio = abs(log_rate_ratio),
+    favored_from = ifelse(forward_favored, edge_pairs[, 1], edge_pairs[, 2]),
+    favored_to = ifelse(forward_favored, edge_pairs[, 2], edge_pairs[, 1]),
+    x = x,
+    y = y,
+    xend = xend,
+    yend = yend
+  )
+
+  gamma_start <- length(object$theta) + 1L
+  gamma_idx <- gamma_start:(gamma_start + q - 1L)
+  vc <- object$vcov
+  if (!is.null(vc) && all(dim(vc) >= c(max(gamma_idx), max(gamma_idx))) &&
+      all(is.finite(vc[gamma_idx, gamma_idx, drop = FALSE])))
+  {
+    D <- as.matrix(gen$D)
+    grad <- D[seq_len(m), , drop = FALSE] - D[m + seq_len(m), , drop = FALSE]
+    vc_g <- vc[gamma_idx, gamma_idx, drop = FALSE]
+    se <- sqrt(pmax(rowSums((grad %*% vc_g) * grad), 0))
+    z <- log_rate_ratio / se
+    p <- pmin(2 * (1 - stats::pnorm(abs(z))), 1)
+    crit <- stats::qnorm(1 - (1 - level) / 2)
+    out$log_rate_ratio_se <- se
+    out$z <- z
+    out$p_value <- p
+    out$significant <- is.finite(se) & se > 0 & abs(log_rate_ratio) > crit * se
+  }
+  else
+  {
+    out$log_rate_ratio_se <- NA_real_
+    out$z <- NA_real_
+    out$p_value <- NA_real_
+    out$significant <- NA
+  }
+
+  out
+}
+
+#' @export
+plot.terradish_directed <- function(x, data,
+                                    type = c("conductance", "logconductance",
+                                             "directional", "combined"),
+                                    directional,
+                                    min_abs_log_ratio = 0,
+                                    significant_only = FALSE,
+                                    level = 0.95,
+                                    ...) {
   type <- match.arg(type)
-  if (missing(data) || is.null(data$stack))
-    stop("Pass the `terradish_graph` (with a stored raster stack) as `data` to plot.", call. = FALSE)
-  vals <- if (identical(type, "conductance")) exp(x$logconductance) else x$logconductance
+  if (missing(data))
+    stop("Pass the `terradish_graph` used for fitting as `data` to plot.",
+         call. = FALSE)
+  if (!inherits(data, c("terradish_graph", "radish_graph")))
+    stop("`data` must be the terradish_graph used to fit `x`.", call. = FALSE)
+  if (!identical(type, "directional") && is.null(data$stack))
+    stop("Pass a `terradish_graph` with a stored raster stack for this plot type.",
+         call. = FALSE)
+
+  if (type %in% c("conductance", "logconductance"))
+  {
+    vals <- if (identical(type, "conductance")) exp(x$logconductance) else x$logconductance
+    template <- data$stack[[1]]
+    tv <- terra::values(template, dataframe = FALSE)[, 1]
+    missing <- is.na(tv); tv[!missing] <- vals
+    r <- terra::setValues(template, tv); names(r) <- paste0("symmetric_", type)
+    terra::plot(r, main = "Symmetric conductance (reversible part)", ...)
+    return(invisible(r))
+  }
+
+  if (missing(directional))
+    stop('plot(type = "directional" or "combined") requires `directional`: ',
+         'supply the edge covariates used for fitting.',
+         call. = FALSE)
+
+  edge_data <- directed_rates(x, data = data, directional = directional,
+                              level = level)
+  edge_data <- edge_data[is.finite(edge_data$abs_log_rate_ratio) &
+                           edge_data$abs_log_rate_ratio >= min_abs_log_ratio, ,
+                         drop = FALSE]
+  if (isTRUE(significant_only))
+    edge_data <- edge_data[edge_data$significant %in% TRUE, , drop = FALSE]
+
+  if (nrow(edge_data) == 0)
+    stop("No directed edges remain after filtering.", call. = FALSE)
+
+  if (identical(type, "directional"))
+    return(.plot_directed_edges(edge_data))
+
+  .plot_directed_combined(x, data, edge_data)
+}
+
+.directed_symmetric_raster_data <- function(x, data)
+{
   template <- data$stack[[1]]
   tv <- terra::values(template, dataframe = FALSE)[, 1]
-  missing <- is.na(tv); tv[!missing] <- vals
-  r <- terra::setValues(template, tv); names(r) <- paste0("symmetric_", type)
-  terra::plot(r, main = "Symmetric conductance (reversible part)", ...)
-  invisible(r)
+  missing <- is.na(tv); tv[!missing] <- exp(x$logconductance)
+  r <- terra::setValues(template, tv)
+  out <- as.data.frame(r, xy = TRUE, na.rm = TRUE)
+  names(out)[3] <- "conductance"
+  out
+}
+
+.directed_focal_data <- function(data)
+{
+  coords <- as.matrix(data$vertex_coordinates)
+  demes <- data$demes
+  data.frame(x = coords[demes, 1], y = coords[demes, 2])
+}
+
+.plot_directed_edges <- function(edge_data)
+{
+  edge_data <- .shorten_directed_segments(edge_data)
+  ggplot2::ggplot(edge_data, ggplot2::aes(x = x, y = y, xend = xend, yend = yend)) +
+    ggplot2::geom_segment(
+      ggplot2::aes(colour = abs_log_rate_ratio, linewidth = abs_log_rate_ratio),
+      arrow = grid::arrow(length = grid::unit(0.06, "inches"), type = "closed"),
+      lineend = "round"
+    ) +
+    ggplot2::coord_equal(expand = TRUE) +
+    ggplot2::scale_colour_gradient(low = "grey82", high = "#9e0142",
+                                   name = "|log rate ratio|") +
+    ggplot2::scale_linewidth_continuous(range = c(0.15, 1.6),
+                                        guide = "none") +
+    ggplot2::scale_x_continuous(labels = .terradish_plot_number) +
+    ggplot2::scale_y_continuous(labels = .terradish_plot_number) +
+    ggplot2::labs(title = "Directional edge-rate bias", x = NULL, y = NULL) +
+    .terradish_plot_theme()
+}
+
+.plot_directed_combined <- function(x, data, edge_data)
+{
+  background <- .directed_symmetric_raster_data(x, data)
+  focal <- .directed_focal_data(data)
+  edge_data <- .shorten_directed_segments(edge_data)
+
+  ggplot2::ggplot() +
+    ggplot2::geom_raster(data = background,
+                         ggplot2::aes(x = x, y = y, fill = conductance)) +
+    ggplot2::geom_segment(
+      data = edge_data,
+      ggplot2::aes(x = x, y = y, xend = xend, yend = yend,
+                   colour = abs_log_rate_ratio,
+                   linewidth = abs_log_rate_ratio),
+      alpha = 0.8,
+      arrow = grid::arrow(length = grid::unit(0.055, "inches"), type = "closed"),
+      lineend = "round"
+    ) +
+    ggplot2::geom_point(data = focal, ggplot2::aes(x = x, y = y),
+                        shape = 21, size = 1.8, stroke = 0.35,
+                        fill = "white", colour = "black") +
+    ggplot2::coord_equal(expand = FALSE) +
+    ggplot2::scale_fill_gradientn(colours = terrain.colors(100),
+                                  name = "Conductance") +
+    ggplot2::scale_colour_gradient(low = "grey20", high = "#9e0142",
+                                   name = "|log rate ratio|") +
+    ggplot2::scale_linewidth_continuous(range = c(0.12, 1.2),
+                                        guide = "none") +
+    ggplot2::scale_x_continuous(labels = .terradish_plot_number) +
+    ggplot2::scale_y_continuous(labels = .terradish_plot_number) +
+    ggplot2::labs(title = "Symmetric conductance and directional bias",
+                  x = NULL, y = NULL) +
+    .terradish_plot_theme()
+}
+
+.shorten_directed_segments <- function(edge_data, inset = 0.28)
+{
+  dx <- edge_data$xend - edge_data$x
+  dy <- edge_data$yend - edge_data$y
+  edge_data$x <- edge_data$x + inset * dx
+  edge_data$y <- edge_data$y + inset * dy
+  edge_data$xend <- edge_data$xend - inset * dx
+  edge_data$yend <- edge_data$yend - inset * dy
+  edge_data
 }

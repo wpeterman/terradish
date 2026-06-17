@@ -28,6 +28,7 @@
 "_PACKAGE"
 
 globalVariables(c(
+  "abs_log_rate_ratio", "conductance",
   "distance", "distance_lower", "distance_upper", "est", "label",
-  "label_y", "observed", "upper", "weight", "x", "y"
+  "label_y", "observed", "upper", "weight", "x", "xend", "y", "yend"
 ))

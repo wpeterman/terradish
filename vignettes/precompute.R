@@ -1,11 +1,12 @@
 # vignettes/precompute.R
 #
-# Pre-computes slow simulation results for simulation-design.Rmd.
+# Pre-computes slow simulation results for package vignettes.
 # Run this script manually whenever you want to refresh the artifacts:
 #
 #   source("vignettes/precompute.R")
 #
 # Output files (committed to source):
+#   vignettes/vignette-directional.rds  (refresh via dev/make_vignette_directional.R)
 #   vignettes/vignette-nu-power.rds
 #   vignettes/vignette-power.rds
 #

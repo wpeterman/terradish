@@ -177,6 +177,46 @@ Hessian far from the optimum, or when you want strictly information-based
 standard errors. At a good fit the two agree, so the choice rarely changes
 conclusions.
 
+The focused benchmark in `inst/benchmarks/benchmark-curvature-large-landscape.R`
+makes this comparison reproducible. It builds a synthetic heterogeneous raster,
+simulates a `generalized_wishart` distance response from known conductance
+parameters, then fits the same model with `curvature = "exact"` and
+`curvature = "gauss_newton"`.
+
+```{r curvature-benchmark-run, eval = FALSE}
+source(system.file("benchmarks", "benchmark-curvature-large-landscape.R",
+                   package = "terradish"))
+
+bench <- run_curvature_large_landscape_benchmark(CONFIG)
+bench$comparison
+```
+
+The default case is deliberately small enough to run during review. To repeat
+the same comparison in the large-N solver regime, copy `CONFIG`, increase
+`side`, and set `solver = "amg"` or `solver = "auto"` before calling
+`run_curvature_large_landscape_benchmark()`.
+
+On the development workstation, the default 96 x 96 synthetic case gave:
+
+| Comparison | Result |
+|------------|--------|
+| Maximum absolute coefficient difference | 0 |
+| Absolute log-likelihood difference | 0 |
+| `ridge` SE ratio, `gauss_newton` / `exact` | 0.997 |
+| `basin` SE ratio, `gauss_newton` / `exact` | 0.994 |
+| Elapsed-time ratio, `gauss_newton` / `exact` | 0.807 |
+| Minimum exact-Hessian eigenvalue | 2363.5 |
+| Minimum Gauss-Newton eigenvalue | 2375.9 |
+
+**How to read this benchmark.** The fitted surface did not move: the
+coefficients and log likelihood were identical. The standard errors were within
+1% because the simulated data were generated from the fitted model and the
+residual-weighted second-derivative terms were small. In this setting,
+`gauss_newton` was slightly faster and returned a positive-definite information
+matrix. If your real data show much larger differences in standard errors, run
+both curvature settings as a sensitivity check; that gap is evidence that model
+residuals or misspecification are affecting the observed curvature.
+
 ## Markers and sites buy precision
 
 With the `generalized_wishart` measurement model, `nu` is the number of genetic
