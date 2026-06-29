@@ -192,13 +192,18 @@
 #'
 #' \eqn{\tau^2} is chosen (when \code{tau2 = "reml"}) by a Laplace approximation
 #' to the marginal likelihood that integrates out the field, evaluated at each
-#' candidate value's penalized optimum.
+#' candidate value's penalized optimum. The returned \code{loglik} is the
+#' profiled measurement-model log-likelihood \eqn{\ell(\hat\theta, \hat u \mid
+#' \hat\phi)} and does not include the Gaussian field penalty. The returned
+#' \code{logml} is the Laplace marginal log-likelihood at the selected or fixed
+#' \eqn{\tau^2}; \code{logML} is retained as a compatibility alias.
 #'
 #' @return An object of class \code{"terradish_hierarchical"} containing the
 #'   covariate estimates \code{theta} (with conditional standard errors), the
 #'   fitted field \code{u}, the selected \code{tau2}, the profiled nuisance
 #'   parameters \code{phi}, the maximized log-likelihood and marginal
-#'   log-likelihood, and the field construction needed by
+#'   log-likelihood (\code{logml}; also available as \code{logML}), and the
+#'   field construction needed by
 #'   \code{\link{conductance_field}}.
 #'
 #' @seealso \code{\link{terradish}}, \code{\link{conductance_field}},
@@ -355,6 +360,7 @@ terradish_hierarchical <- function(formula, data,
     tau2_selection = tau2_selection,
     phi = fit$phi,
     loglik = loglik,
+    logml = logml_final,
     logML = logml_final,
     df = df,
     edf_field = edf_field,

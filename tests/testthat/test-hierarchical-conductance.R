@@ -68,6 +68,23 @@ test_that("terradish_hierarchical reduces toward terradish as tau2 -> 0", {
   expect_equal(unname(fit_h$theta), unname(coef(fit_t)), tolerance = 0.05)
 })
 
+test_that("fixed tau2 hierarchical fits expose marginal log-likelihood", {
+  dat <- melip_fixture(keep = 1:6)
+  surface <- conductance_surface(dat$covariates, dat$coords, directions = 4)
+
+  fit_h <- suppressWarnings(
+    terradish_hierarchical(dat$melip.Fst ~ altitude, data = surface,
+                           measurement_model = leastsquares,
+                           field_resolution = 2L, tau2 = 1,
+                           maxit = 20L, verbose = FALSE)
+  )
+
+  expect_true("logml" %in% names(fit_h))
+  expect_true(is.finite(fit_h$logml))
+  expect_equal(fit_h$logml, fit_h$logML)
+  expect_true(is.finite(fit_h$loglik))
+})
+
 test_that("terradish_hierarchical recovers an unmapped feature into the field", {
   skip_on_cran()
   dat <- melip_fixture(keep = 1:24)

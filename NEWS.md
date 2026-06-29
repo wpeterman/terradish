@@ -1,3 +1,19 @@
+terradish 0.0.43 (dev)
+---------
+* Fixed `terradish_directed_algorithm()` to normalize the directed commute-time
+  covariance `E` before the measurement-model subproblem (dividing `dL/dE` back by
+  the same factor). On large graphs `E` grows with the graph (commute time is
+  roughly `2 * |edges| *` resistance), which ill-conditioned the nuisance-parameter
+  Hessian and made `BoxConstrainedNewton()`'s diagonal-eigenvalue inverse fail with
+  "system is computationally singular"; the optimizer's `tryCatch` swallowed the
+  error and the objective collapsed to the `1e12` sentinel, so directed fits
+  silently failed to move off the start point on fine rasters. Because the
+  measurement-model likelihood enters `E` linearly, the rescaling is exactly
+  likelihood-invariant: the log-likelihood, the directional `gamma`, and the
+  gradient are unchanged (verified identical across normalization scales to
+  ~1e-18). Directed fits now run out-of-the-box at landscape scale with the
+  reference `"matrix"` solver.
+
 terradish 0.0.42 (dev)
 ---------
 * Added `solver = "sparse_lu_cpp"` for `terradish_directed()` and
@@ -7,6 +23,9 @@ terradish 0.0.42 (dev)
 * Added regression coverage comparing directed SparseLU covariance and gradient
   output against the reference Matrix backend, and updated the directional
   vignette performance guidance.
+* Added the lowercase `logml` return field to `terradish_hierarchical()` as an
+  alias for the existing `logML` marginal-likelihood value, including fixed
+  numeric `tau2` fits, and clarified that `loglik` excludes the field penalty.
 
 terradish 0.0.41 (dev)
 ---------

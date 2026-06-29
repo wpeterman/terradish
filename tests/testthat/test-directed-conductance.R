@@ -140,10 +140,19 @@ test_that("terradish_directed recovers symmetric and directional effects", {
   diag(S) <- 0
 
   fit <- terradish_directed(S ~ v1, data = surface, directional = fx$dir_cov,
-                            measurement_model = generalized_wishart, nu = nu)
+                            measurement_model = generalized_wishart, nu = nu,
+                            estimate_vcov = FALSE,
+                            solver = "sparse_lu_cpp")
   expect_s3_class(fit, "terradish_directed")
   expect_equal(unname(fit$theta), theta_true, tolerance = 0.35)
   expect_equal(unname(fit$gamma), gamma_true, tolerance = 0.35)
   expect_output(print(fit), "Directional")
   expect_length(coef(fit), 2L)
+})
+
+test_that("terradish_directed exposes batch-fit optimizer controls", {
+  directed_args <- names(formals(terradish_directed))
+  expect_true("estimate_vcov" %in% directed_args)
+  expect_true("control" %in% directed_args)
+  expect_true("solver" %in% directed_args)
 })

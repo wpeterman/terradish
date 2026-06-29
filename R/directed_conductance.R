@@ -137,14 +137,24 @@ terradish_directed_algorithm <- function(gen, g, data, S, par, nu = NULL,
   if (is.null(g))                                  # forward only: return E
     return(list(covariance = E, hcache = hcache, Hf = Hf, solver = solver))
 
-  sub <- radish_subproblem(g, E, S, nu = nu, phi = phi, nonnegative = nonnegative,
+  # Normalize the directed commute-time covariance before the measurement-model
+  # subproblem. On large graphs E is huge (commute time ~ 2 * |edges| * resistance),
+  # which ill-conditions the phi-Hessian and makes BoxConstrainedNewton's
+  # diag-eigenvalue inverse fail ("system is computationally singular"), silently
+  # driving the objective to the 1e12 failure sentinel. The measurement-model
+  # likelihood enters E linearly, so a uniform scale is exactly absorbed by phi:
+  # the log-likelihood and the directional gamma are unchanged, and dL/dE simply
+  # rescales by 1 / Escale (un-scaled below).
+  Escale <- max(abs(E))
+  if (!is.finite(Escale) || Escale <= 0) Escale <- 1
+  sub <- radish_subproblem(g, E / Escale, S, nu = nu, phi = phi, nonnegative = nonnegative,
                            control = NewtonRaphsonControl(verbose = FALSE,
                                                           ftol = 1e-10, ctol = 1e-10))
   out <- list(objective = sub$loglikelihood, covariance = E, phi = sub$phi,
               boundary = sub$boundary)
   if (!gradient) return(out)
 
-  dL_dE <- as.matrix(sub$gradient)
+  dL_dE <- as.matrix(sub$gradient) / Escale       # un-scale: d/dE = (1/Escale) d/d(E/Escale)
   dL_dR <- -0.5 * (Jc %*% dL_dE %*% Jc)
   dL_dH <- dL_dR + t(dL_dR)                       # R = Hf + Hf^T
   if (identical(solver, "sparse_lu_cpp")) {
@@ -203,8 +213,19 @@ terradish_directed_algorithm <- function(gen, g, data, S, par, nu = NULL,
 #'   Default \code{2}.
 #' @param theta_bound Symmetric bound on the conductance coefficients. Default
 #'   \code{5}.
+#' @param start Optional numeric starting values for the symmetric conductance
+#'   and directional coefficients, ordered as \code{c(theta, gamma)} or named by
+#'   coefficient. Defaults to zero for backwards compatibility.
 #' @param nonnegative Force nonnegative measurement-model slope where applicable.
-#' @param control Passed to the inner nuisance-parameter fits.
+#' @param estimate_vcov Estimate an asymptotic covariance matrix for the directed
+#'   coefficients by numerically differentiating the analytic gradient. Set
+#'   \code{FALSE} for large simulation batches where coefficient standard errors
+#'   are not needed.
+#' @param control Optimization control. For the outer directed L-BFGS-B fit,
+#'   \code{maxit}, \code{ctol}, \code{ftol}, and \code{verbose} are honored as
+#'   the iteration cap, projected-gradient tolerance, relative objective
+#'   tolerance, and optimizer tracing flag. The same control object is also
+#'   passed to the inner nuisance-parameter fits.
 #' @param solver Linear solver backend for the directed hitting-time systems.
 #'   \code{"matrix"} uses the reference \pkg{Matrix} implementation.
 #'   \code{"sparse_lu_cpp"} uses Eigen SparseLU through C++ and reuses each
@@ -230,7 +251,8 @@ terradish_directed_algorithm <- function(gen, g, data, S, par, nu = NULL,
 terradish_directed <- function(formula, data, directional,
                                measurement_model = generalized_wishart,
                                nu = NULL, gamma_bound = 2, theta_bound = 5,
-                               nonnegative = TRUE,
+                               start = NULL,
+                               nonnegative = TRUE, estimate_vcov = TRUE,
                                control = NewtonRaphsonControl(verbose = FALSE),
                                solver = c("matrix", "sparse_lu_cpp"))
 {
@@ -251,54 +273,145 @@ terradish_directed <- function(formula, data, directional,
   par0 <- rep(0, p + q)
   lower <- c(rep(-theta_bound, p), rep(-gamma_bound, q))
   upper <- c(rep(theta_bound, p),  rep(gamma_bound, q))
+  pnames <- c(gen$theta_names, gen$gamma_names)
+  names(par0) <- names(lower) <- names(upper) <- pnames
+  if (!is.null(start)) {
+    if (!is.numeric(start))
+      stop("`start` must be numeric.", call. = FALSE)
+    if (!is.null(names(start)) && any(nzchar(names(start)))) {
+      idx <- match(names(start), pnames)
+      if (anyNA(idx))
+        stop("Named `start` values must match directed coefficient names.",
+             call. = FALSE)
+      par0[idx] <- as.numeric(start)
+    } else {
+      if (length(start) != length(par0))
+        stop("Unnamed `start` must have length ", length(par0), ".",
+             call. = FALSE)
+      par0[] <- as.numeric(start)
+    }
+    if (any(!is.finite(par0)))
+      stop("`start` must contain only finite values.", call. = FALSE)
+    par0 <- pmin(pmax(par0, lower), upper)
+  }
 
   phi_state <- new.env(parent = emptyenv()); phi_state$value <- NULL
+  diagnostics <- .terradish_new_diagnostics()
+  directed_diagnostics <- list(
+    objective_failures = 0L,
+    gradient_failures = 0L,
+    last_error = NULL
+  )
+  best_state <- new.env(parent = emptyenv())
+  best_state$value <- Inf
+  best_state$par <- par0
+  best_state$phi <- NULL
   fn <- function(par) {
+    .terradish_increment_diagnostic(diagnostics, "objective_evaluations")
     r <- tryCatch(terradish_directed_algorithm(gen, measurement_model, data, S, par,
                                                nu = nu, gradient = FALSE,
                                                phi = phi_state$value,
                                                nonnegative = nonnegative,
                                                solver = solver),
-                  error = function(e) NULL)
-    if (is.null(r)) return(1e12)
+                  error = function(e) e)
+    if (inherits(r, "error")) {
+      directed_diagnostics$objective_failures <<-
+        directed_diagnostics$objective_failures + 1L
+      directed_diagnostics$last_error <<- conditionMessage(r)
+      return(1e12)
+    }
     phi_state$value <- r$phi
+    if (is.finite(r$objective) && r$objective < best_state$value) {
+      best_state$value <- r$objective
+      best_state$par <- par
+      best_state$phi <- r$phi
+    }
     r$objective
   }
   gr <- function(par) {
+    .terradish_increment_diagnostic(diagnostics, "gradient_evaluations")
     r <- tryCatch(terradish_directed_algorithm(gen, measurement_model, data, S, par,
                                                nu = nu, gradient = TRUE,
                                                phi = phi_state$value,
                                                nonnegative = nonnegative,
                                                solver = solver),
-                  error = function(e) NULL)
-    if (is.null(r)) return(rep(0, p + q))
+                  error = function(e) e)
+    if (inherits(r, "error")) {
+      directed_diagnostics$gradient_failures <<-
+        directed_diagnostics$gradient_failures + 1L
+      directed_diagnostics$last_error <<- conditionMessage(r)
+      return(rep(0, p + q))
+    }
     phi_state$value <- r$phi
     r$gradient
   }
 
-  opt <- optim(par0, fn, gr, method = "L-BFGS-B", lower = lower, upper = upper,
-               control = list(maxit = 300))
+  outer_maxit <- suppressWarnings(as.integer(control$maxit)[1])
+  if (is.na(outer_maxit) || outer_maxit < 1L) outer_maxit <- 300L
+  outer_control <- list(maxit = outer_maxit)
+  if (isTRUE(control$verbose)) {
+    outer_control$trace <- 1L
+    outer_control$REPORT <- 1L
+  }
+  outer_ctol <- suppressWarnings(as.numeric(control$ctol)[1])
+  outer_ftol <- suppressWarnings(as.numeric(control$ftol)[1])
+  if (!is.na(outer_ctol) && is.finite(outer_ctol) && outer_ctol > 0)
+    outer_control$pgtol <- outer_ctol
+  if (!is.na(outer_ftol) && is.finite(outer_ftol) && outer_ftol > 0)
+    outer_control$factr <- max(outer_ftol / .Machine$double.eps, 1)
 
-  final <- terradish_directed_algorithm(gen, measurement_model, data, S, opt$par,
-                                        nu = nu, gradient = TRUE,
-                                        nonnegative = nonnegative,
-                                        solver = solver)
+  elapsed_start <- proc.time()[["elapsed"]]
+  opt <- optim(par0, fn, gr, method = "L-BFGS-B", lower = lower, upper = upper,
+               control = outer_control)
+  elapsed <- proc.time()[["elapsed"]] - elapsed_start
+
+  final_par <- opt$par
+  used_best_par <- FALSE
+  final <- tryCatch(
+    terradish_directed_algorithm(gen, measurement_model, data, S, final_par,
+                                 nu = nu, gradient = TRUE,
+                                 nonnegative = nonnegative,
+                                 solver = solver),
+    error = function(e) e
+  )
+  if (inherits(final, "error") && is.finite(best_state$value)) {
+    directed_diagnostics$last_error <- conditionMessage(final)
+    final_par <- best_state$par
+    used_best_par <- TRUE
+    final <- tryCatch(
+      terradish_directed_algorithm(gen, measurement_model, data, S, final_par,
+                                   nu = nu, gradient = TRUE,
+                                   phi = best_state$phi,
+                                   nonnegative = nonnegative,
+                                   solver = solver),
+      error = function(e) e
+    )
+  }
+  if (inherits(final, "error"))
+    stop("Directed fit failed at both the optimizer solution and the best finite trial point: ",
+         conditionMessage(final), call. = FALSE)
   # asymptotic vcov via numerical Hessian of the profiled objective (low-dim)
   # Hessian of the negative log-likelihood via the Jacobian of the analytic
   # gradient (cheap + accurate: reuses the transpose-solve adjoint rather than
   # finite-differencing the objective).
   pnames <- c(gen$theta_names, gen$gamma_names)
-  H <- if (!requireNamespace("numDeriv", quietly = TRUE)) NULL else
+  H <- if (!isTRUE(estimate_vcov) || !requireNamespace("numDeriv", quietly = TRUE)) NULL else
     tryCatch({
-      Hm <- numDeriv::jacobian(gr, opt$par)
+        Hm <- numDeriv::jacobian(gr, final_par)
       (Hm + t(Hm)) / 2
     }, error = function(e) NULL)
   vcov <- if (is.null(H)) matrix(NA_real_, p + q, p + q) else .safe_invert(H)
   dimnames(vcov) <- list(pnames, pnames)
   se <- sqrt(pmax(diag(vcov), 0)); names(se) <- pnames
 
-  theta <- opt$par[seq_len(p)]; names(theta) <- gen$theta_names
-  gamma <- opt$par[p + seq_len(q)]; names(gamma) <- gen$gamma_names
+  theta <- final_par[seq_len(p)]; names(theta) <- gen$theta_names
+  gamma <- final_par[p + seq_len(q)]; names(gamma) <- gen$gamma_names
+  pnames <- c(gen$theta_names, gen$gamma_names)
+  names(lower) <- names(upper) <- pnames
+  bound_tol <- sqrt(.Machine$double.eps) * pmax(1, abs(upper), abs(lower))
+  at_lower <- final_par <= lower + bound_tol
+  at_upper <- final_par >= upper - bound_tol
+  names(at_lower) <- names(at_upper) <- pnames
   loglik <- -final$objective
   n_phi <- length(final$phi)
   df <- p + q + n_phi
@@ -313,12 +426,38 @@ terradish_directed <- function(formula, data, directional,
               phi = final$phi, loglik = loglik, df = df,
               aic = -2 * loglik + 2 * df,
               covariance = final$covariance, fitted = final$covariance,
-              response = S, convergence = opt$convergence,
-              measurement_model = .terradish_measurement_model_name(measurement_model),
-              nu = nu, npar = c(theta = p, gamma = q),
-              solver = solver,
-              logconductance = eta,
-              dim = c(vertices = gen$n, focal = length(data$demes)))
+               response = S, convergence = opt$convergence,
+               measurement_model = .terradish_measurement_model_name(measurement_model),
+               nu = nu, npar = c(theta = p, gamma = q),
+               solver = solver,
+               optim_message = if (is.null(opt$message)) NA_character_ else opt$message,
+               vcov_estimated = isTRUE(estimate_vcov),
+               diagnostics = list(
+                 outer_optimizer = list(
+                   method = "L-BFGS-B",
+                   line_search = "optim_L-BFGS-B_internal",
+                   maxit = outer_maxit,
+                   control = outer_control,
+                   counts = opt$counts,
+                   convergence = opt$convergence,
+                   message = if (is.null(opt$message)) NA_character_ else opt$message,
+                   elapsed = elapsed,
+                   objective_failures = directed_diagnostics$objective_failures,
+                   gradient_failures = directed_diagnostics$gradient_failures,
+                   last_error = directed_diagnostics$last_error,
+                   best_objective = best_state$value,
+                   used_best_par = used_best_par,
+                   optim_par = opt$par,
+                   final_par = final_par,
+                   at_lower = at_lower,
+                   at_upper = at_upper,
+                   lower = lower,
+                   upper = upper
+                 ),
+                 evaluations = .terradish_diagnostics_snapshot(diagnostics)
+               ),
+               logconductance = eta,
+               dim = c(vertices = gen$n, focal = length(data$demes)))
   class(out) <- c("terradish_directed", "terradish")
   out
 }

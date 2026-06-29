@@ -12,7 +12,9 @@ terradish_directed(
   nu = NULL,
   gamma_bound = 2,
   theta_bound = 5,
+  start = NULL,
   nonnegative = TRUE,
+  estimate_vcov = TRUE,
   control = NewtonRaphsonControl(verbose = FALSE),
   solver = c("matrix", "sparse_lu_cpp")
 )
@@ -39,9 +41,22 @@ Default \code{2}.}
 \item{theta_bound}{Symmetric bound on the conductance coefficients. Default
 \code{5}.}
 
+\item{start}{Optional numeric starting values for the symmetric conductance
+and directional coefficients, ordered as \code{c(theta, gamma)} or named by
+coefficient. Defaults to zero for backwards compatibility.}
+
 \item{nonnegative}{Force nonnegative measurement-model slope where applicable.}
 
-\item{control}{Passed to the inner nuisance-parameter fits.}
+\item{estimate_vcov}{Estimate an asymptotic covariance matrix for the directed
+coefficients by numerically differentiating the analytic gradient. Set
+\code{FALSE} for large simulation batches where coefficient standard errors
+are not needed.}
+
+\item{control}{Optimization control. For the outer directed L-BFGS-B fit,
+\code{maxit}, \code{ctol}, \code{ftol}, and \code{verbose} are honored as
+the iteration cap, projected-gradient tolerance, relative objective
+tolerance, and optimizer tracing flag. The same control object is also
+passed to the inner nuisance-parameter fits.}
 
 \item{solver}{Linear solver backend for the directed hitting-time systems.
 \code{"matrix"} uses the reference \pkg{Matrix} implementation.
