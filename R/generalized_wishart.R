@@ -207,25 +207,25 @@ generalized_wishart <- function(E, S, phi, nu, gradient = TRUE, hessian = TRUE, 
       dSigInvW_dtau <- -solve(Sigma, E %*% SigInvW)
       dSigInvW_dsigma <- -solve(Sigma, SigInvW)
 
-      fuckoff_tau <- ones %*% solve(t(ones) %*% solve(Sigma) %*% ones) %*% t(ones) %*% solve(Sigma) %*% E %*% solve(Sigma) +
+      dW_correction_dtau <- ones %*% solve(t(ones) %*% solve(Sigma) %*% ones) %*% t(ones) %*% solve(Sigma) %*% E %*% solve(Sigma) +
         -c(t(ones) %*% solve(Sigma) %*% E %*% solve(Sigma) %*% ones) * c(solve(t(ones) %*% solve(Sigma) %*% ones)^2) * ones %*% t(ones) %*% solve(Sigma)
       #dgrad_dtau <- -0.5 * nu * dSigInvW_dtau - 0.25 * nu * dSigInvW_dtau %*% S %*% t(SigInvW) -
       #               0.25 * nu * SigInvW %*% S %*% t(dSigInvW_dtau)
       dgrad_dtau <- -0.5 * nu * dSigInvW_dtau %*% W - 0.25 * nu * dSigInvW_dtau %*% S %*% t(SigInvW) -
                        0.5 * nu * W %*% dSigInvW_dtau - 0.25 * nu * SigInvW %*% S %*% t(dSigInvW_dtau) +
                        0.5 * nu * W %*% dSigInvW_dtau %*% W
-      dgrad_dtau <- -0.5 * nu * solve(Sigma) %*% fuckoff_tau - 
-        nu/4 * solve(Sigma) %*% fuckoff_tau %*% S %*% t(W) %*% solve(Sigma) -
-        nu/4 * solve(Sigma) %*% W %*% S %*% t(fuckoff_tau) %*% solve(Sigma) + dgrad_dtau
+      dgrad_dtau <- -0.5 * nu * solve(Sigma) %*% dW_correction_dtau -
+        nu/4 * solve(Sigma) %*% dW_correction_dtau %*% S %*% t(W) %*% solve(Sigma) -
+        nu/4 * solve(Sigma) %*% W %*% S %*% t(dW_correction_dtau) %*% solve(Sigma) + dgrad_dtau
       
-      fuckoff_sigma <- ones %*% solve(t(ones) %*% solve(Sigma) %*% ones) %*% t(ones) %*% solve(Sigma) %*% solve(Sigma) +
+      dW_correction_dsigma <- ones %*% solve(t(ones) %*% solve(Sigma) %*% ones) %*% t(ones) %*% solve(Sigma) %*% solve(Sigma) +
         -c(t(ones) %*% solve(Sigma) %*% solve(Sigma) %*% ones) * c(solve(t(ones) %*% solve(Sigma) %*% ones)^2) * ones %*% t(ones) %*% solve(Sigma)
       dgrad_dsigma <- -0.5 * nu * dSigInvW_dsigma %*% W - 0.25 * nu * dSigInvW_dsigma %*% S %*% t(SigInvW) -
                        0.5 * nu * W %*% dSigInvW_dsigma - 0.25 * nu * SigInvW %*% S %*% t(dSigInvW_dsigma) +
                        0.5 * nu * W %*% dSigInvW_dsigma %*% W
-      dgrad_dsigma <- -0.5 * nu * solve(Sigma) %*% fuckoff_sigma - 
-        nu/4 * solve(Sigma) %*% fuckoff_sigma %*% S %*% t(W) %*% solve(Sigma) -
-        nu/4 * solve(Sigma) %*% W %*% S %*% t(fuckoff_sigma) %*% solve(Sigma) + dgrad_dsigma
+      dgrad_dsigma <- -0.5 * nu * solve(Sigma) %*% dW_correction_dsigma -
+        nu/4 * solve(Sigma) %*% dW_correction_dsigma %*% S %*% t(W) %*% solve(Sigma) -
+        nu/4 * solve(Sigma) %*% W %*% S %*% t(dW_correction_dsigma) %*% solve(Sigma) + dgrad_dsigma
       dgrad_dsigma <- dgrad_dsigma * sigma
 
       # hessian, phi x phi
@@ -255,15 +255,15 @@ generalized_wishart <- function(E, S, phi, nu, gradient = TRUE, hessian = TRUE, 
         {
           dE <- symm(dE)
           dSigInvW_dE <- -solve(Sigma, dE %*% SigInvW)
-          fuckoff_E <- ones %*% solve(t(ones) %*% solve(Sigma) %*% ones) %*% t(ones) %*% solve(Sigma) %*% dE %*% solve(Sigma) +
+          dW_correction_dE <- ones %*% solve(t(ones) %*% solve(Sigma) %*% ones) %*% t(ones) %*% solve(Sigma) %*% dE %*% solve(Sigma) +
             -c(t(ones) %*% solve(Sigma) %*% dE %*% solve(Sigma) %*% ones) * c(solve(t(ones) %*% solve(Sigma) %*% ones)^2) * ones %*% t(ones) %*% solve(Sigma)
           dgrad_dE <- -0.5 * nu * dSigInvW_dE - 0.25 * nu * dSigInvW_dE %*% S %*% t(SigInvW) -
             0.25 * nu * SigInvW %*% S %*% t(dSigInvW_dE)
-          dgrad_dE <- -0.5 * nu * solve(Sigma) %*% fuckoff_E - 
-            nu/4 * solve(Sigma) %*% fuckoff_E %*% S %*% t(W) %*% solve(Sigma) -
-            nu/4 * solve(Sigma) %*% W %*% S %*% t(fuckoff_E) %*% solve(Sigma) + dgrad_dE
+          dgrad_dE <- -0.5 * nu * solve(Sigma) %*% dW_correction_dE -
+            nu/4 * solve(Sigma) %*% dW_correction_dE %*% S %*% t(W) %*% solve(Sigma) -
+            nu/4 * solve(Sigma) %*% W %*% S %*% t(dW_correction_dE) %*% solve(Sigma) + dgrad_dE
           -dgrad_dE * tau^2
-        } #jesus christ
+        }
 
         jacobian_S <- function(dE)
         {

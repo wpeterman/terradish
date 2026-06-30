@@ -458,11 +458,20 @@ bisect <- function(dphifn, st, ia, ib, phi_lim, verbose)
     stopifnot(st$slopes[ib] < 0)       # otherwise we wouldn't be here
     stopifnot(st$values[ib] > phi_lim)
     stopifnot(b > a)
-    while (b - a > .Machine$double.eps)
+    # Terminate on a SCALE-RELATIVE interval width. The smallest representable gap
+    # between two doubles of magnitude |alpha| is ~|alpha| * eps, so once the
+    # bracketing step lengths grow past 1 the midpoint (a + b) / 2 can no longer
+    # land strictly between a and b. An absolute `.Machine$double.eps` threshold
+    # then never trips and this loop spins forever (a flat, numerically noisy
+    # nuisance objective can push alpha to O(1-10) and trigger exactly this).
+    tol = .Machine$double.eps * max(1, abs(a), abs(b))
+    while (b - a > tol)
     {
         if (verbose)
             cat("bisect: a = ", a, ", b = ", b, ", b - a = ", b - a, "\n")
         d = (a + b) / 2.
+        if (d <= a || d >= b)          # midpoint cannot produce a new interior point
+            break
         fit = dphifn(d)
         phi_d = fit$objective
         gphi = fit$gradient

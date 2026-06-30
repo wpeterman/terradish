@@ -1,3 +1,21 @@
+terradish 0.0.44 (dev)
+---------
+* Fixed the Laplace marginal log-likelihood in `terradish_hierarchical()` to
+  use the joint penalized curvature of the covariate and field coefficients.
+  The previous field-block-only determinant could overstate support for large
+  `tau2` values when the field started absorbing covariate signal.
+* Fixed an infinite loop in the Hager-Zhang line search (`bisect()` in
+  `hager_zhang.R`), used by `BoxConstrainedNewton()` for every measurement model's
+  nuisance-parameter fit. The bisection terminated on an absolute interval-width
+  threshold (`.Machine$double.eps`), but the smallest representable gap between two
+  doubles of magnitude `|alpha|` is `~|alpha| * eps`; once the bracketing step
+  lengths grew past 1, the midpoint `(a + b) / 2` could no longer fall strictly
+  between `a` and `b`, the interval stalled above the absolute threshold, and the
+  loop spun forever. A flat, numerically noisy nuisance objective (seen with
+  `generalized_wishart` on some fits) pushes the line search into exactly that
+  regime. Now uses a scale-relative threshold (`eps * max(1, |a|, |b|)`) plus a
+  midpoint-stagnation guard; small-step behavior is unchanged.
+
 terradish 0.0.43 (dev)
 ---------
 * Fixed `terradish_directed_algorithm()` to normalize the directed commute-time

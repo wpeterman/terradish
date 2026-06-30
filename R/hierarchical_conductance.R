@@ -124,10 +124,11 @@
                                  nu, uidx, Q, nonnegative, solver,
                                  solver_control, phi_state = NULL,
                                  want_grad = FALSE, want_hess = TRUE)
-  Huu <- res$hessian[uidx, uidx, drop = FALSE] + Q / tau2
-  ld_H <- tryCatch(2 * sum(log(diag(chol((Huu + t(Huu)) / 2)))),
+  H_pen <- res$hessian
+  H_pen[uidx, uidx] <- H_pen[uidx, uidx, drop = FALSE] + Q / tau2
+  ld_H <- tryCatch(2 * sum(log(diag(chol((H_pen + t(H_pen)) / 2)))),
                    error = function(e) {
-                     ev <- eigen(Huu, symmetric = TRUE, only.values = TRUE)$values
+                     ev <- eigen(H_pen, symmetric = TRUE, only.values = TRUE)$values
                      sum(log(pmax(ev, .Machine$double.eps)))
                    })
   ld_Q <- determinant(Q, logarithm = TRUE)$modulus

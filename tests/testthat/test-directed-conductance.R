@@ -85,6 +85,39 @@ test_that("SparseLU directed backend matches Matrix reference", {
   expect_equal(unname(lu_fit$gradient), unname(ref_fit$gradient), tolerance = 1e-6)
 })
 
+test_that("directed covariance normalization avoids large-graph phi singularity", {
+  fx <- mk_directed_fixture(60L)
+  surface <- fx$surface; nf <- length(surface$demes)
+  gen <- terradish:::.directed_generator(~ v1, surface, fx$dir_cov)
+  par <- c(v1 = 4, gamma_elev = 4)
+
+  E <- terradish_directed_algorithm(gen, NULL, surface, NULL, par = par,
+                                    solver = "sparse_lu_cpp")$covariance
+  Escale <- max(abs(E))
+  S <- E / Escale + 0.2 * diag(nf)
+  ctrl <- NewtonRaphsonControl(verbose = FALSE, ftol = 1e-10, ctol = 1e-10)
+
+  expect_gt(Escale, 1e12)
+  expect_error(
+    terradish:::radish_subproblem(wishart_covariance, E, S, nu = 1000,
+                                  control = ctrl),
+    "system is computationally singular",
+    fixed = TRUE
+  )
+
+  scaled_subproblem <- terradish:::radish_subproblem(
+    wishart_covariance, E / Escale, S, nu = 1000, control = ctrl)
+  normalized <- terradish_directed_algorithm(
+    gen, wishart_covariance, surface, S, par = par, nu = 1000,
+    gradient = TRUE, solver = "sparse_lu_cpp")
+
+  expect_true(is.finite(normalized$objective))
+  expect_lt(abs(normalized$objective), 1e12)
+  expect_true(all(is.finite(normalized$gradient)))
+  expect_equal(normalized$objective, scaled_subproblem$loglikelihood,
+               tolerance = 1e-8)
+})
+
 test_that("directed_rates and directed plots expose fitted edge bias", {
   fx <- mk_directed_fixture(6L)
   surface <- fx$surface

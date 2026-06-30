@@ -85,6 +85,47 @@ test_that("fixed tau2 hierarchical fits expose marginal log-likelihood", {
   expect_true(is.finite(fit_h$loglik))
 })
 
+test_that("hierarchical logml uses joint covariate-field curvature", {
+  dat <- melip_fixture(keep = 1:6)
+  surface <- conductance_surface(dat$covariates, dat$coords, directions = 4)
+
+  fit_h <- suppressWarnings(
+    terradish_hierarchical(dat$melip.Fst ~ altitude, data = surface,
+                           measurement_model = leastsquares,
+                           field_resolution = 2L, tau2 = 1,
+                           maxit = 20L, verbose = FALSE)
+  )
+
+  X <- suppressWarnings(assemble_model_matrix(~ altitude, surface$x))
+  D <- cbind(X, fit_h$field$Z)
+  cm <- terradish:::.design_loglinear_model(D)
+  uidx <- (ncol(X) + 1L):(ncol(X) + fit_h$field$m)
+  par <- c(fit_h$theta, fit_h$u)
+  hres <- terradish:::.hierarchical_penalized(
+    par, tau2 = fit_h$tau2, cm = cm, measurement_model = leastsquares,
+    data = surface, S = dat$melip.Fst, nu = NULL, uidx = uidx,
+    Q = fit_h$field$Q, nonnegative = TRUE, solver = "direct",
+    solver_control = NULL, phi_state = NULL, want_grad = FALSE,
+    want_hess = TRUE)
+
+  H_pen <- hres$hessian
+  H_pen[uidx, uidx] <- H_pen[uidx, uidx, drop = FALSE] +
+    fit_h$field$Q / fit_h$tau2
+  Huu <- hres$hessian[uidx, uidx, drop = FALSE] +
+    fit_h$field$Q / fit_h$tau2
+  logdet <- function(x)
+    as.numeric(determinant((x + t(x)) / 2, logarithm = TRUE)$modulus)
+  pen <- as.numeric(crossprod(fit_h$u, fit_h$field$Q %*% fit_h$u)) /
+    (2 * fit_h$tau2)
+  base <- -hres$loglik_objective -
+    (fit_h$field$m / 2) * log(fit_h$tau2) +
+    0.5 * as.numeric(determinant(fit_h$field$Q, logarithm = TRUE)$modulus) -
+    pen
+
+  expect_equal(fit_h$logml, base - 0.5 * logdet(H_pen), tolerance = 1e-8)
+  expect_false(isTRUE(all.equal(fit_h$logml, base - 0.5 * logdet(Huu))))
+})
+
 test_that("terradish_hierarchical recovers an unmapped feature into the field", {
   skip_on_cran()
   dat <- melip_fixture(keep = 1:24)
