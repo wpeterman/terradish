@@ -363,11 +363,14 @@ plus the example-wrapping follow-up.
 - Blanket `\dontrun` -> `\donttest`: several `\dontrun` blocks reference
   undefined objects (illustrative snippets, e.g. `NewtonRaphsonControl`) and are
   correctly `\dontrun`; converting them would break the check. Left as-is.
-- Runnable examples for six exports lacking them (`conductance_field`,
-  `directed_rates`, `terradish_directed(_algorithm)`, `terradish_kron_reduce`,
-  `terradish_kron_reduce_tiled`): not a check NOTE; add self-contained
-  `\donttest` examples when convenient.
 - N5 amgcl trim; the efficiency roadmap (Part 3).
+
+**Added after the first pass:** self-contained `\donttest` examples for the six
+exports that lacked them (`conductance_field`, `directed_rates`,
+`terradish_directed`, `terradish_directed_algorithm`, `terradish_kron_reduce`,
+`terradish_kron_reduce_tiled`), each on a small synthetic lattice and verified
+to run under `--run-donttest`. The directed examples simulate an illustrative
+directional distance from the model and recover `(theta, gamma) = (0.5, 0.6)`.
 
 **Before submitting:** run `devtools::check_win_devel()` and `rhub::rhub_check()`
 on a clean toolchain (with `pandoc` and a working TeX) to confirm the PDF/pandoc
