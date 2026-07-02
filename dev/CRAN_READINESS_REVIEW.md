@@ -313,3 +313,64 @@ algorithmic win.
    catches platform-specific issues).
 6. **Efficiency:** land #1 and #2 first (biggest large-landscape wins), then #3;
    schedule #9a (Kron/Schur adjoint) as a dedicated effort.
+
+---
+
+## Resolution log (branch `phase-c-cran-readiness`, 2026-07-02)
+
+All requested fixes were applied and verified with `R CMD check --as-cran`
+(built from a clean `git archive`; `--no-vignettes` because vignette execution
+needs `landgraph` and the precomputed `.rds`). Commits: `11b312a`, `ec7dd28`,
+plus the example-wrapping follow-up.
+
+**Fixed and verified:**
+- **B2** `set.seed()` guarded (save/restore `.Random.seed` on exit) in
+  `terradish_cv`, `simulate_covariance_response`, `simulate.radish`.
+- **M1** `LICENSE` corrected. Note: the BSD_3_clause template *requires* the
+  `ORGANIZATION` field; removing it created a "License stub records with
+  missing fields" NOTE, so it was restored with current holders. The
+  DESCRIPTION meta-information check is now OK.
+- **M2** `melip.RData` xz-compressed (310 KB -> 274 KB).
+- **M3** declared `grDevices`, `methods::as`, `stats::formula`, `stats::optim`;
+  the "no visible global function" NOTE is gone.
+- **M4** `.Rbuildignore` extended (`.Rhistory`, `.agents`, `.codex`, `figure`,
+  `vignettes/*.rds`). **M5** `src/*.dll` added to `src/.gitignore` (artifacts
+  were already build-ignored).
+- **C1** `terradish_hierarchical` now detects the `tau = 0` boundary and returns
+  NA inference with a warning instead of inverting a singular Hessian; the
+  degenerate fit is flagged in `print`. **C2** warns on `tau2` grid-edge maxima.
+  **C3** documents that `logml` is a joint `(theta, u)` evidence. Fast `nu`
+  check added to `terradish_directed`.
+- **Docs** `@return` added to `ArmijoControl`; `cran-comments.md` and
+  `inst/WORDLIST` created; NEWS updated; the nine examples exceeding ~5s wrapped
+  in `\donttest` (the example-timing NOTE is cleared; `--run-donttest` passes).
+
+**Final check status: 1 ERROR, 4 WARNINGs, 3 NOTEs, all non-package or expected:**
+- WARNING (incoming feasibility): "New submission" + `landgraph` not yet on CRAN
+  (submitted; resolves when it lands) + "no prebuilt vignette index" (artifact of
+  `--no-vignettes`).
+- 2 vignette WARNINGs: artifacts of the `--no-vignettes` build; a full
+  vignette-building check is needed once `landgraph` is installable.
+- PDF-manual WARNING + ERROR: local MiKTeX `xkeyval`/graphics fault, not an Rd
+  problem. The HTML manual builds fine.
+- 3 NOTEs: `pandoc` missing (README/NEWS), and MiKTeX detritus
+  (`terradish-manual.tex`, `lastMiKTeXException`). All local-toolchain.
+- INFO: installed size 6.0 MB (1.5 MB is the vendored `amgcl` headers; optional
+  trim, item N5).
+- **Tests pass** under `R CMD check` (`testthat.R` OK).
+
+**Not done (deliberate):**
+- Blanket `\dontrun` -> `\donttest`: several `\dontrun` blocks reference
+  undefined objects (illustrative snippets, e.g. `NewtonRaphsonControl`) and are
+  correctly `\dontrun`; converting them would break the check. Left as-is.
+- Runnable examples for six exports lacking them (`conductance_field`,
+  `directed_rates`, `terradish_directed(_algorithm)`, `terradish_kron_reduce`,
+  `terradish_kron_reduce_tiled`): not a check NOTE; add self-contained
+  `\donttest` examples when convenient.
+- N5 amgcl trim; the efficiency roadmap (Part 3).
+
+**Before submitting:** run `devtools::check_win_devel()` and `rhub::rhub_check()`
+on a clean toolchain (with `pandoc` and a working TeX) to confirm the PDF/pandoc
+items are environment-only, run a full vignette-building check once `landgraph`
+is installable, reconcile `inst/WORDLIST` with `spelling::spell_check_package()`,
+and update `cran-comments.md` with the final results.
