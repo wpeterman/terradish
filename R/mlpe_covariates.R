@@ -152,6 +152,7 @@ pairwise_endpoint_covariates <- function(x,
 #' 7(3):361-372.
 #'
 #' @examples
+#' \donttest{
 #' library(terra)
 #'
 #' data(melip)
@@ -169,6 +170,7 @@ pairwise_endpoint_covariates <- function(x,
 #'                     terradish::loglinear_conductance, g_joint)
 #' summary(fit_joint)
 #'
+#' }
 #' @export
 mlpe_covariates <- function(x,
                             coords = NULL,

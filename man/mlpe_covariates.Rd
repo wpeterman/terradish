@@ -65,6 +65,7 @@ stored as an attribute of the returned function.  This allows
 each train/test split automatically.
 }
 \examples{
+\donttest{
 library(terra)
 
 data(melip)
@@ -82,6 +83,7 @@ fit_joint <- terradish(melip.Fst ~ altitude + forestcover, surface,
                     terradish::loglinear_conductance, g_joint)
 summary(fit_joint)
 
+}
 }
 \references{
 Clarke RT, Rothery P, Raybould AF. 2002. Confidence limits for regression

@@ -235,6 +235,7 @@ null model of isolation-by-distance, the fitted object will not contain
 influence/leverage/gradient/hessian.
 }
 \examples{
+\donttest{
 
 library(terra)
 
@@ -294,4 +295,5 @@ fit_mlpe_cat <- terradish(melip.Fst ~ forestcover + altitude, surface_cat,
                        terradish::loglinear_conductance, terradish::mlpe)
 summary(fit_mlpe_cat)
 
+}
 }

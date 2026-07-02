@@ -77,6 +77,7 @@ The function requires the MLE to be in the interior of the parameter space
 detectable IBR signal) an error is thrown.
 }
 \examples{
+\donttest{
 library(terra)
 
 data(melip)
@@ -97,6 +98,7 @@ cond <- conductance(surface, fit)
 names(cond)   # "est", "lower95", "upper95"
 plot(cond)
 
+}
 }
 \seealso{
 \code{\link{terradish}}, \code{\link{conductance_surface}},

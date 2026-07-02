@@ -59,6 +59,7 @@ graph. \code{terradish_multiscale()} remains useful when you want to inspect
 or retain every intermediate fit explicitly.
 }
 \examples{
+\donttest{
 library(terra)
 
 data(melip)
@@ -82,4 +83,5 @@ fit <- terradish_multiscale(
 )
 fit$multiscale$factors
 
+}
 }

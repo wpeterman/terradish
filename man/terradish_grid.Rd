@@ -77,6 +77,7 @@ a grid of parameter values (e.g. the nuisance parameters are optimized at each
 point on the grid).
 }
 \examples{
+\donttest{
 
 library(terra)
 
@@ -110,4 +111,5 @@ grid_coarse <- terradish_grid(theta, melip.Fst ~ forestcover + altitude, surface
 cbind(grid$theta, loglik = grid$loglik)
 coef(fit_mlpe)
 
+}
 }

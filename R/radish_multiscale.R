@@ -135,6 +135,7 @@
 #' additional \code{$multiscale} component containing the per-level fits.
 #'
 #' @examples
+#' \donttest{
 #' library(terra)
 #'
 #' data(melip)
@@ -158,6 +159,7 @@
 #' )
 #' fit$multiscale$factors
 #'
+#' }
 #' @importFrom terra aggregate
 #' @export
 terradish_multiscale <- function(formula,

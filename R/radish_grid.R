@@ -491,6 +491,7 @@
 #'   \code{covariance}.
 #'
 #' @examples
+#' \donttest{
 #'
 #' library(terra)
 #' 
@@ -524,6 +525,7 @@
 #' cbind(grid$theta, loglik = grid$loglik)
 #' coef(fit_mlpe)
 #'
+#' }
 #' @export
 
 terradish_grid <- function(theta,

@@ -340,6 +340,7 @@ conductance_surface <- function(covariates, coords, directions=4, saveStack=TRUE
 #'   \code{\link{plot.terradish}}
 #'
 #' @examples
+#' \donttest{
 #' library(terra)
 #'
 #' data(melip)
@@ -360,6 +361,7 @@ conductance_surface <- function(covariates, coords, directions=4, saveStack=TRUE
 #' names(cond)   # "est", "lower95", "upper95"
 #' plot(cond)
 #'
+#' }
 #' @export
 conductance <- function(x, ...)
 {

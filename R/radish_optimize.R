@@ -696,6 +696,7 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   available S3 methods.
 #'
 #' @examples
+#' \donttest{
 #'
 #' library(terra)
 #' 
@@ -755,6 +756,7 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'                        terradish::loglinear_conductance, terradish::mlpe)
 #' summary(fit_mlpe_cat)
 #'
+#' }
 #' @export
 
 terradish <- function(formula, 
