@@ -2,7 +2,7 @@ Package: terradish
 Type: Package
 Title: Fast Gradient-Based Optimization of Resistance Surfaces
 Version: 0.0.44
-Date: 2026-06-30
+Date: 2026-07-02
 Authors@R: c(
   person(
     given = "Bill",
@@ -28,6 +28,7 @@ License: BSD_3_clause + file LICENSE
 Depends: R (>= 4.0.0)
 Imports:
   ggplot2,
+  grDevices,
   landgraph,
   MASS,
   Matrix (>= 1.6-2),

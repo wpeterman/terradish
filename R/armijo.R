@@ -21,6 +21,12 @@
 #' gradient once at the accepted point so the quasi-Newton update remains
 #' well-defined.
 #'
+#' @return A list of class \code{"terradish_armijo_control"} holding the
+#'   validated Armijo line-search settings (\code{type}, \code{initial},
+#'   \code{contraction}, \code{sufficient_decrease}, \code{maxit},
+#'   \code{min_alpha}, and \code{verbose}), suitable for the \code{ls.control}
+#'   element of a \code{\link{NewtonRaphsonControl}} object.
+#'
 #' @examples
 #' ctrl <- NewtonRaphsonControl(
 #'   maxit = 25,

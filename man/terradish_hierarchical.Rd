@@ -104,7 +104,16 @@ candidate value's penalized optimum. The returned \code{loglik} is the
 profiled measurement-model log-likelihood \eqn{\ell(\hat\theta, \hat u \mid
 \hat\phi)} and does not include the Gaussian field penalty. The returned
 \code{logml} is the Laplace marginal log-likelihood at the selected or fixed
-\eqn{\tau^2}; \code{logML} is retained as a compatibility alias.
+\eqn{\tau^2}; \code{logML} is retained as a compatibility alias. This
+\code{logml} is a joint Laplace evidence over \eqn{(\theta, u)} rather than a
+clean marginal over the field alone, so it is appropriate for selecting
+\eqn{\tau^2} within one model but should not be compared as an absolute
+evidence across models with different numbers of covariates.
+
+If the measurement model profiles to \eqn{\tau^2 = 0} (no detectable
+resistance-distance signal), the conductance surface is unidentified; the fit
+is returned with a warning and \code{NA} standard errors, effective degrees of
+freedom, and AIC.
 }
 \examples{
 \dontrun{

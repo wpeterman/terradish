@@ -1441,6 +1441,15 @@ fitted.radish <- function(object, type = c("response", "distance", "covariance")
 #' @export
 simulate.radish <- function(object, nsim = 1, seed = NULL, method = c("permutation", "parametric"), ...)
 {
+  old_seed_exists <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+  if (old_seed_exists)
+    old_seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+  on.exit({
+    if (old_seed_exists)
+      assign(".Random.seed", old_seed, envir = .GlobalEnv)
+    else if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
+      rm(".Random.seed", envir = .GlobalEnv)
+  }, add = TRUE)
   if (!is.null(seed))
     set.seed(seed)
   method <- match.arg(method)

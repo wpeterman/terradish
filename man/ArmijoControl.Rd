@@ -27,6 +27,13 @@ steps. Must be strictly between 0 and 1.}
 
 \item{verbose}{Should line-search progress be printed?}
 }
+\value{
+A list of class \code{"terradish_armijo_control"} holding the
+  validated Armijo line-search settings (\code{type}, \code{initial},
+  \code{contraction}, \code{sufficient_decrease}, \code{maxit},
+  \code{min_alpha}, and \code{verbose}), suitable for the \code{ls.control}
+  element of a \code{\link{NewtonRaphsonControl}} object.
+}
 \description{
 Tuning parameters for an objective-only Armijo line search. This line search
 is currently intended for \code{optimizer = "bfgs"} fits where trial

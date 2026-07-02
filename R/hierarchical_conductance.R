@@ -197,7 +197,16 @@
 #' profiled measurement-model log-likelihood \eqn{\ell(\hat\theta, \hat u \mid
 #' \hat\phi)} and does not include the Gaussian field penalty. The returned
 #' \code{logml} is the Laplace marginal log-likelihood at the selected or fixed
-#' \eqn{\tau^2}; \code{logML} is retained as a compatibility alias.
+#' \eqn{\tau^2}; \code{logML} is retained as a compatibility alias. This
+#' \code{logml} is a joint Laplace evidence over \eqn{(\theta, u)} rather than a
+#' clean marginal over the field alone, so it is appropriate for selecting
+#' \eqn{\tau^2} within one model but should not be compared as an absolute
+#' evidence across models with different numbers of covariates.
+#'
+#' If the measurement model profiles to \eqn{\tau^2 = 0} (no detectable
+#' resistance-distance signal), the conductance surface is unidentified; the fit
+#' is returned with a warning and \code{NA} standard errors, effective degrees of
+#' freedom, and AIC.
 #'
 #' @return An object of class \code{"terradish_hierarchical"} containing the
 #'   covariate estimates \code{theta} (with conditional standard errors), the
@@ -309,7 +318,16 @@ terradish_hierarchical <- function(formula, data,
       if (verbose)
         message(sprintf("  tau2 = %10.4g   logML = %.3f", tau2_grid[i], logml[i]))
     }
-    tau2_hat <- tau2_grid[which.max(logml)]
+    if (all(is.na(logml)))
+      stop("tau2 selection failed: the Laplace marginal likelihood could not ",
+           "be evaluated at any grid point.", call. = FALSE)
+    wm <- which.max(logml)
+    tau2_hat <- tau2_grid[wm]
+    if (wm == 1L || wm == length(tau2_grid))
+      warning("Selected tau2 (", format(tau2_hat, digits = 3), ") sits at the ",
+              if (wm == 1L) "lower" else "upper", " edge of `tau2_grid`; the ",
+              "marginal likelihood may be maximized outside the grid. Consider ",
+              "widening `tau2_grid`.", call. = FALSE)
     tau2_selection <- data.frame(tau2 = tau2_grid, logML = logml)
   } else {
     stopifnot(is.numeric(tau2), length(tau2) == 1L, tau2 > 0)
@@ -322,30 +340,57 @@ terradish_hierarchical <- function(formula, data,
                                   S, nu, uidx, field$Q, nonnegative, solver,
                                   solver_control, phi_state = NULL,
                                   want_grad = FALSE, want_hess = TRUE)
-  H_pen <- hres$hessian
-  H_pen[uidx, uidx] <- H_pen[uidx, uidx] + field$Q / tau2_hat
-  vcov_full <- .safe_invert((H_pen + t(H_pen)) / 2)
+
   theta_hat <- fit$par[seq_len(p)]
   u_hat <- fit$par[uidx]
   names(theta_hat) <- theta_names
-  theta_se <- if (p) sqrt(pmax(diag(vcov_full)[seq_len(p)], 0)) else numeric(0)
+  loglik <- -hres$loglik_objective
+  n_phi <- length(fit$phi)
+
+  # The measurement model can profile to tau = 0 (no detectable resistance-
+  # distance signal). There terradish_algorithm zeroes every theta-derivative
+  # (the likelihood is flat in the conductance surface), so both the covariate
+  # coefficients and the smooth field are unidentified and the penalized Hessian
+  # is singular in the theta block. Detect this and return an honest degenerate
+  # fit (NA inference) rather than inverting a singular matrix or reporting a
+  # spuriously collapsed field.
+  on_boundary <- isTRUE(hres$boundary > 0)
+  if (on_boundary) {
+    warning("terradish_hierarchical: the measurement model profiled to ",
+            "tau = 0 (no detectable resistance-distance signal), so the ",
+            "conductance coefficients and the smooth field are not identified. ",
+            "The fit is returned, but standard errors, effective degrees of ",
+            "freedom, and AIC are unavailable (NA). This usually means the ",
+            "genetic data carry little isolation-by-resistance signal at this ",
+            "scale.", call. = FALSE)
+    npar <- length(fit$par)
+    vcov_full <- matrix(NA_real_, npar, npar)
+    theta_se <- rep(NA_real_, p)
+    edf_field <- NA_real_
+    df <- NA_real_
+    aic <- NA_real_
+  } else {
+    H_pen <- hres$hessian
+    H_pen[uidx, uidx] <- H_pen[uidx, uidx] + field$Q / tau2_hat
+    vcov_full <- .safe_invert((H_pen + t(H_pen)) / 2)
+    theta_se <- if (p) sqrt(pmax(diag(vcov_full)[seq_len(p)], 0)) else numeric(0)
+    # Effective degrees of freedom of the (penalized) field: trace of the
+    # smoother "hat" on the u-block, edf = tr[(H_lik + Q/tau2)^-1 H_lik]. Total
+    # df counts covariates + nuisance phi + tau2 + the field's effective df (so
+    # AIC treats the smooth field honestly, as in a GAM / mixed model).
+    Huu_lik <- hres$hessian[uidx, uidx, drop = FALSE]
+    edf_field <- tryCatch(
+      sum(diag(solve(H_pen[uidx, uidx, drop = FALSE], Huu_lik))),
+      error = function(e) NA_real_)
+    df <- p + n_phi + 1 + edf_field          # +1 for tau2
+    aic <- -2 * loglik + 2 * df
+  }
   names(theta_se) <- theta_names
 
-  loglik <- -hres$loglik_objective
   logml_final <- .hierarchical_logml(fit, tau2_hat, cm, measurement_model, data,
                                      S, nu, uidx, field$Q, nonnegative, solver,
                                      solver_control)
 
-  # Effective degrees of freedom of the (penalized) field: trace of the
-  # smoother "hat" on the u-block, edf = tr[(H_lik + Q/tau2)^-1 H_lik]. Total df
-  # counts covariates + nuisance phi + tau2 + the field's effective df (so AIC
-  # treats the smooth field honestly, as in a GAM / mixed model).
-  Huu_lik <- hres$hessian[uidx, uidx, drop = FALSE]
-  edf_field <- tryCatch(
-    sum(diag(solve(H_pen[uidx, uidx, drop = FALSE], Huu_lik))),
-    error = function(e) NA_real_)
-  n_phi <- length(fit$phi)
-  df <- p + n_phi + 1 + edf_field          # +1 for tau2
   vcov_theta <- if (p) vcov_full[seq_len(p), seq_len(p), drop = FALSE] else
     matrix(numeric(0), 0, 0)
   if (p) dimnames(vcov_theta) <- list(theta_names, theta_names)
@@ -365,7 +410,8 @@ terradish_hierarchical <- function(formula, data,
     logML = logml_final,
     df = df,
     edf_field = edf_field,
-    aic = -2 * loglik + 2 * df,
+    aic = aic,
+    boundary = on_boundary,
     vcov = vcov_theta,
     vcov_full = vcov_full,
     convergence = fit$convergence,
@@ -440,6 +486,9 @@ print.terradish_hierarchical <- function(x, ...)
               x$tau2, sd(x$u), x$edf_field))
   cat(sprintf("  loglik = %.3f   marginal loglik = %.3f\n", x$loglik, x$logML))
   cat(sprintf("  df = %.2f   AIC = %.2f\n", x$df, x$aic))
+  if (isTRUE(x$boundary))
+    cat("  NOTE: measurement model at tau = 0; the conductance surface is ",
+        "unidentified (standard errors, edf, and AIC unavailable).\n", sep = "")
   if (x$npar_covariate) {
     cat("\nConductance coefficients:\n")
     z <- x$theta / x$theta_se

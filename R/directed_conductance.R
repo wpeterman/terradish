@@ -262,6 +262,14 @@ terradish_directed <- function(formula, data, directional,
   stopifnot(inherits(measurement_model, c("terradish_measurement_model",
                                           "radish_measurement_model")))
 
+  # Fail fast when a Wishart measurement model is used without `nu`, rather than
+  # wasting the whole optimization on sentinel objective values before erroring.
+  mm_name <- .terradish_measurement_model_name(measurement_model)
+  if (grepl("wishart", mm_name, ignore.case = TRUE) &&
+      (is.null(nu) || length(nu) != 1L || !is.finite(nu) || nu <= 0))
+    stop("`nu` (effective Wishart degrees of freedom) must be a positive ",
+         "number for the '", mm_name, "' measurement model.", call. = FALSE)
+
   tm <- terms(formula)
   response <- attr(tm, "response")
   if (!response) stop("'formula' must have the genetic response matrix on the LHS")

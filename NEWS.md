@@ -1,5 +1,20 @@
-terradish 0.0.44 (dev)
+terradish 0.0.44
 ---------
+* Prepared the package for CRAN submission: corrected the `LICENSE` file to the
+  standard two-field form, xz-compressed the bundled `melip` data, declared the
+  `grDevices`, `methods::as`, and `stats::formula`/`stats::optim` imports, and
+  extended `.Rbuildignore` to exclude development artifacts.
+* Guarded `set.seed()` in `terradish_cv()`, `simulate_covariance_response()`, and
+  `simulate.radish()` so they no longer change the user's global random state;
+  the RNG is saved and restored on exit.
+* `terradish_hierarchical()` now detects when the measurement model profiles to
+  `tau = 0` (no detectable resistance-distance signal). The conductance surface
+  is unidentified there, so the fit is returned with a warning and `NA` standard
+  errors, effective degrees of freedom, and AIC instead of inverting a singular
+  Hessian. It also warns when the selected `tau2` sits at the edge of
+  `tau2_grid`.
+* `terradish_directed()` now fails fast with a clear message when a Wishart
+  measurement model is supplied without `nu`.
 * Fixed the Laplace marginal log-likelihood in `terradish_hierarchical()` to
   use the joint penalized curvature of the covariate and field coefficients.
   The previous field-block-only determinant could overstate support for large

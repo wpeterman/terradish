@@ -579,6 +579,15 @@ terradish_cv <- function(pts,
                     c("terradish_conductance_model_factory",
                       "radish_conductance_model_factory")))
 
+  old_seed_exists <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+  if (old_seed_exists)
+    old_seed <- get(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+  on.exit({
+    if (old_seed_exists)
+      assign(".Random.seed", old_seed, envir = .GlobalEnv)
+    else if (exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE))
+      rm(".Random.seed", envir = .GlobalEnv)
+  }, add = TRUE)
   if (is.null(seed))
     seed <- sample.int(.Machine$integer.max, 1)
   set.seed(seed)

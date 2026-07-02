@@ -27,3 +27,8 @@
 ^\.editorconfig$
 ^dev$
 ^Rplots\.pdf$
+^\.Rhistory$
+^\.agents$
+^\.codex$
+^figure$
+^vignettes/.*\.rds$
