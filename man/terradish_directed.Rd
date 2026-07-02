@@ -92,6 +92,31 @@ depends on the data: asymmetry leaves a signature in the symmetric commute
 time on bounded landscapes, but it can be weak; report \eqn{\gamma} with its
 uncertainty and check sensitivity.
 }
+\examples{
+\donttest{
+# small synthetic lattice: symmetric covariate v1 and elevation gradient elev
+r  <- terra::rast(nrows = 6, ncols = 6, xmin = 0, xmax = 6, ymin = 0, ymax = 6)
+gx <- terra::xFromCell(r, seq_len(terra::ncell(r)))
+gy <- terra::yFromCell(r, seq_len(terra::ncell(r)))
+covs <- c(terra::setValues(r, scale(gx + 0.5 * gy)[, 1]),
+          terra::setValues(r, scale(gx)[, 1]))
+names(covs) <- c("v1", "elev")
+coords  <- terra::xyFromCell(r, c(1, 6, 36, 31, 18, 20))
+surface <- conductance_surface(covs, coords, directions = 8, saveStack = TRUE)
+dir_cov <- edge_gradient(covs[["elev"]], surface)
+# simulate an illustrative directional distance from the model, then refit
+# (.directed_generator is internal, used here only to build a demo dataset)
+gen <- terradish:::.directed_generator(~ v1, surface, dir_cov)
+E   <- terradish_directed_algorithm(gen, NULL, surface, NULL,
+                                    par = c(0.5, 0.6))$covariance
+S   <- outer(diag(E), rep(1, nrow(E))) + outer(rep(1, nrow(E)), diag(E)) - 2 * E
+diag(S) <- 0
+
+fit <- terradish_directed(S ~ v1, data = surface, directional = dir_cov,
+                          measurement_model = leastsquares)
+summary(fit)   # theta (symmetric) + gamma (directional)
+}
+}
 \seealso{
 \code{\link{edge_gradient}}, \code{\link{terradish}},
   \code{\link{conductance_surface}}

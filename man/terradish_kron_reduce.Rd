@@ -41,3 +41,22 @@ faster than the main \code{\link{terradish_algorithm}} solve. Its purpose is
 to make Schur/Kron reduction explicit so future approximations can be tested
 against an exact reduction on small to moderate graphs.
 }
+\examples{
+\donttest{
+# small synthetic lattice: symmetric covariate v1 and elevation gradient elev
+r  <- terra::rast(nrows = 6, ncols = 6, xmin = 0, xmax = 6, ymin = 0, ymax = 6)
+gx <- terra::xFromCell(r, seq_len(terra::ncell(r)))
+gy <- terra::yFromCell(r, seq_len(terra::ncell(r)))
+covs <- c(terra::setValues(r, scale(gx + 0.5 * gy)[, 1]),
+          terra::setValues(r, scale(gx)[, 1]))
+names(covs) <- c("v1", "elev")
+coords  <- terra::xyFromCell(r, c(1, 6, 36, 31, 18, 20))
+surface <- conductance_surface(covs, coords, directions = 8, saveStack = TRUE)
+model <- loglinear_conductance(~ v1, surface$x)
+conductance <- model(0.3)$conductance
+
+# exact Kron reduction of the interior onto the focal (boundary) block
+kr <- terradish_kron_reduce(surface, conductance, covariance = TRUE)
+kr$n_boundary
+}
+}

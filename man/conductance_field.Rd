@@ -29,6 +29,27 @@ covariates did not explain) from a \code{\link{terradish_hierarchical}} fit,
 as a \code{terra::SpatRaster} when the graph stored its raster stack, or as a
 per-cell numeric vector otherwise.
 }
+\examples{
+\donttest{
+# small synthetic lattice: symmetric covariate v1 and elevation gradient elev
+r  <- terra::rast(nrows = 6, ncols = 6, xmin = 0, xmax = 6, ymin = 0, ymax = 6)
+gx <- terra::xFromCell(r, seq_len(terra::ncell(r)))
+gy <- terra::yFromCell(r, seq_len(terra::ncell(r)))
+covs <- c(terra::setValues(r, scale(gx + 0.5 * gy)[, 1]),
+          terra::setValues(r, scale(gx)[, 1]))
+names(covs) <- c("v1", "elev")
+coords  <- terra::xyFromCell(r, c(1, 6, 36, 31, 18, 20))
+surface <- conductance_surface(covs, coords, directions = 8, saveStack = TRUE)
+# a symmetric distance response, fit with a smooth field at fixed tau^2
+S <- terradish_distance(matrix(0.4, 1), ~ v1, surface,
+                        loglinear_conductance)$distance[, , 1]
+fit <- terradish_hierarchical(S ~ v1, data = surface,
+                              measurement_model = leastsquares,
+                              field_resolution = 4, tau2 = 1, verbose = FALSE)
+
+field <- conductance_field(fit, surface, type = "field")
+}
+}
 \seealso{
 \code{\link{terradish_hierarchical}}
 }

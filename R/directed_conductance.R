@@ -84,6 +84,24 @@
 #' @return A list with \code{objective}, \code{covariance} (the commute-time
 #'   \code{E}), \code{phi}, and (if \code{gradient}) \code{gradient}.
 #' @keywords internal
+#' @examples
+#' \donttest{
+#' # small synthetic lattice: symmetric covariate v1 and elevation gradient elev
+#' r  <- terra::rast(nrows = 6, ncols = 6, xmin = 0, xmax = 6, ymin = 0, ymax = 6)
+#' gx <- terra::xFromCell(r, seq_len(terra::ncell(r)))
+#' gy <- terra::yFromCell(r, seq_len(terra::ncell(r)))
+#' covs <- c(terra::setValues(r, scale(gx + 0.5 * gy)[, 1]),
+#'           terra::setValues(r, scale(gx)[, 1]))
+#' names(covs) <- c("v1", "elev")
+#' coords  <- terra::xyFromCell(r, c(1, 6, 36, 31, 18, 20))
+#' surface <- conductance_surface(covs, coords, directions = 8, saveStack = TRUE)
+#' dir_cov <- edge_gradient(covs[["elev"]], surface)
+#' # directed commute-time covariance at (theta, gamma) = (0.5, 0.6)
+#' gen <- terradish:::.directed_generator(~ v1, surface, dir_cov)
+#' E <- terradish_directed_algorithm(gen, NULL, surface, NULL,
+#'                                   par = c(v1 = 0.5, gamma_elev = 0.6))$covariance
+#' dim(E)
+#' }
 #' @export
 terradish_directed_algorithm <- function(gen, g, data, S, par, nu = NULL,
                                          gradient = TRUE, phi = NULL,
@@ -247,6 +265,30 @@ terradish_directed_algorithm <- function(gen, g, data, S, par, nu = NULL,
 #'
 #' @seealso \code{\link{edge_gradient}}, \code{\link{terradish}},
 #'   \code{\link{conductance_surface}}
+#' @examples
+#' \donttest{
+#' # small synthetic lattice: symmetric covariate v1 and elevation gradient elev
+#' r  <- terra::rast(nrows = 6, ncols = 6, xmin = 0, xmax = 6, ymin = 0, ymax = 6)
+#' gx <- terra::xFromCell(r, seq_len(terra::ncell(r)))
+#' gy <- terra::yFromCell(r, seq_len(terra::ncell(r)))
+#' covs <- c(terra::setValues(r, scale(gx + 0.5 * gy)[, 1]),
+#'           terra::setValues(r, scale(gx)[, 1]))
+#' names(covs) <- c("v1", "elev")
+#' coords  <- terra::xyFromCell(r, c(1, 6, 36, 31, 18, 20))
+#' surface <- conductance_surface(covs, coords, directions = 8, saveStack = TRUE)
+#' dir_cov <- edge_gradient(covs[["elev"]], surface)
+#' # simulate an illustrative directional distance from the model, then refit
+#' # (.directed_generator is internal, used here only to build a demo dataset)
+#' gen <- terradish:::.directed_generator(~ v1, surface, dir_cov)
+#' E   <- terradish_directed_algorithm(gen, NULL, surface, NULL,
+#'                                     par = c(0.5, 0.6))$covariance
+#' S   <- outer(diag(E), rep(1, nrow(E))) + outer(rep(1, nrow(E)), diag(E)) - 2 * E
+#' diag(S) <- 0
+#'
+#' fit <- terradish_directed(S ~ v1, data = surface, directional = dir_cov,
+#'                           measurement_model = leastsquares)
+#' summary(fit)   # theta (symmetric) + gamma (directional)
+#' }
 #' @export
 terradish_directed <- function(formula, data, directional,
                                measurement_model = generalized_wishart,
@@ -572,6 +614,31 @@ print.summary.terradish_directed <- function(x, digits = max(3L, getOption("digi
 #'   \code{log_rate_ratio}.
 #'
 #' @seealso \code{\link{terradish_directed}}, \code{\link{edge_gradient}}
+#' @examples
+#' \donttest{
+#' # small synthetic lattice: symmetric covariate v1 and elevation gradient elev
+#' r  <- terra::rast(nrows = 6, ncols = 6, xmin = 0, xmax = 6, ymin = 0, ymax = 6)
+#' gx <- terra::xFromCell(r, seq_len(terra::ncell(r)))
+#' gy <- terra::yFromCell(r, seq_len(terra::ncell(r)))
+#' covs <- c(terra::setValues(r, scale(gx + 0.5 * gy)[, 1]),
+#'           terra::setValues(r, scale(gx)[, 1]))
+#' names(covs) <- c("v1", "elev")
+#' coords  <- terra::xyFromCell(r, c(1, 6, 36, 31, 18, 20))
+#' surface <- conductance_surface(covs, coords, directions = 8, saveStack = TRUE)
+#' dir_cov <- edge_gradient(covs[["elev"]], surface)
+#' # simulate an illustrative directional distance from the model, then refit
+#' # (.directed_generator is internal, used here only to build a demo dataset)
+#' gen <- terradish:::.directed_generator(~ v1, surface, dir_cov)
+#' E   <- terradish_directed_algorithm(gen, NULL, surface, NULL,
+#'                                     par = c(0.5, 0.6))$covariance
+#' S   <- outer(diag(E), rep(1, nrow(E))) + outer(rep(1, nrow(E)), diag(E)) - 2 * E
+#' diag(S) <- 0
+#' fit <- terradish_directed(S ~ v1, data = surface, directional = dir_cov,
+#'                           measurement_model = leastsquares)
+#'
+#' rates <- directed_rates(fit, data = surface, directional = dir_cov)
+#' head(rates)    # per-edge forward/back rates, log-ratio, favored direction
+#' }
 #' @export
 directed_rates <- function(object, data, directional, level = 0.95)
 {

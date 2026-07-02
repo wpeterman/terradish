@@ -54,4 +54,23 @@ model, and returns the profiled objective and its gradient with respect to
 \code{(theta, gamma)} via a transpose-solve adjoint.  Users normally call
 \code{\link{terradish_directed}} rather than this function.
 }
+\examples{
+\donttest{
+# small synthetic lattice: symmetric covariate v1 and elevation gradient elev
+r  <- terra::rast(nrows = 6, ncols = 6, xmin = 0, xmax = 6, ymin = 0, ymax = 6)
+gx <- terra::xFromCell(r, seq_len(terra::ncell(r)))
+gy <- terra::yFromCell(r, seq_len(terra::ncell(r)))
+covs <- c(terra::setValues(r, scale(gx + 0.5 * gy)[, 1]),
+          terra::setValues(r, scale(gx)[, 1]))
+names(covs) <- c("v1", "elev")
+coords  <- terra::xyFromCell(r, c(1, 6, 36, 31, 18, 20))
+surface <- conductance_surface(covs, coords, directions = 8, saveStack = TRUE)
+dir_cov <- edge_gradient(covs[["elev"]], surface)
+# directed commute-time covariance at (theta, gamma) = (0.5, 0.6)
+gen <- terradish:::.directed_generator(~ v1, surface, dir_cov)
+E <- terradish_directed_algorithm(gen, NULL, surface, NULL,
+                                  par = c(v1 = 0.5, gamma_elev = 0.6))$covariance
+dim(E)
+}
+}
 \keyword{internal}

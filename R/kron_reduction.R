@@ -50,6 +50,24 @@
 #' @return A list with the reduced \code{laplacian}, retained \code{boundary}
 #'   vertices, eliminated \code{interior} vertices, and optionally
 #'   \code{covariance}.
+#' @examples
+#' \donttest{
+#' # small synthetic lattice: symmetric covariate v1 and elevation gradient elev
+#' r  <- terra::rast(nrows = 6, ncols = 6, xmin = 0, xmax = 6, ymin = 0, ymax = 6)
+#' gx <- terra::xFromCell(r, seq_len(terra::ncell(r)))
+#' gy <- terra::yFromCell(r, seq_len(terra::ncell(r)))
+#' covs <- c(terra::setValues(r, scale(gx + 0.5 * gy)[, 1]),
+#'           terra::setValues(r, scale(gx)[, 1]))
+#' names(covs) <- c("v1", "elev")
+#' coords  <- terra::xyFromCell(r, c(1, 6, 36, 31, 18, 20))
+#' surface <- conductance_surface(covs, coords, directions = 8, saveStack = TRUE)
+#' model <- loglinear_conductance(~ v1, surface$x)
+#' conductance <- model(0.3)$conductance
+#'
+#' # exact Kron reduction of the interior onto the focal (boundary) block
+#' kr <- terradish_kron_reduce(surface, conductance, covariance = TRUE)
+#' kr$n_boundary
+#' }
 #' @export
 terradish_kron_reduce <- function(data,
                                   conductance,
@@ -391,6 +409,24 @@ terradish_kron_reduce <- function(data,
 #'
 #' @seealso \code{\link{terradish_kron_reduce}} for the single-shot reduction
 #'   this matches exactly.
+#' @examples
+#' \donttest{
+#' # small synthetic lattice: symmetric covariate v1 and elevation gradient elev
+#' r  <- terra::rast(nrows = 6, ncols = 6, xmin = 0, xmax = 6, ymin = 0, ymax = 6)
+#' gx <- terra::xFromCell(r, seq_len(terra::ncell(r)))
+#' gy <- terra::yFromCell(r, seq_len(terra::ncell(r)))
+#' covs <- c(terra::setValues(r, scale(gx + 0.5 * gy)[, 1]),
+#'           terra::setValues(r, scale(gx)[, 1]))
+#' names(covs) <- c("v1", "elev")
+#' coords  <- terra::xyFromCell(r, c(1, 6, 36, 31, 18, 20))
+#' surface <- conductance_surface(covs, coords, directions = 8, saveStack = TRUE)
+#' model <- loglinear_conductance(~ v1, surface$x)
+#' conductance <- model(0.3)$conductance
+#'
+#' # nested-dissection reduction (bounds the largest single factorization)
+#' kr <- terradish_kron_reduce_tiled(surface, conductance, method = "nested")
+#' kr$method
+#' }
 #' @export
 terradish_kron_reduce_tiled <- function(data,
                                         conductance,

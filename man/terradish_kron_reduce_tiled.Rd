@@ -116,6 +116,25 @@ wired into \code{\link{terradish_algorithm}} as a solver, because the
 likelihood gradient needs the adjoint of conductance through the Schur
 complement; that integration is a separate step.
 }
+\examples{
+\donttest{
+# small synthetic lattice: symmetric covariate v1 and elevation gradient elev
+r  <- terra::rast(nrows = 6, ncols = 6, xmin = 0, xmax = 6, ymin = 0, ymax = 6)
+gx <- terra::xFromCell(r, seq_len(terra::ncell(r)))
+gy <- terra::yFromCell(r, seq_len(terra::ncell(r)))
+covs <- c(terra::setValues(r, scale(gx + 0.5 * gy)[, 1]),
+          terra::setValues(r, scale(gx)[, 1]))
+names(covs) <- c("v1", "elev")
+coords  <- terra::xyFromCell(r, c(1, 6, 36, 31, 18, 20))
+surface <- conductance_surface(covs, coords, directions = 8, saveStack = TRUE)
+model <- loglinear_conductance(~ v1, surface$x)
+conductance <- model(0.3)$conductance
+
+# nested-dissection reduction (bounds the largest single factorization)
+kr <- terradish_kron_reduce_tiled(surface, conductance, method = "nested")
+kr$method
+}
+}
 \seealso{
 \code{\link{terradish_kron_reduce}} for the single-shot reduction
   this matches exactly.
