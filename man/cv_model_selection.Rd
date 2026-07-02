@@ -38,6 +38,7 @@ Creates a ranked log-likelihood table from fitted cross-validation results
 and, optionally, an information-criterion table from the full-data fits.
 }
 \examples{
+\donttest{
 library(terra)
 
 data(melip)
@@ -64,4 +65,5 @@ cv_model_selection(list(
   list(train_mod = fit2, cv_loglik = fit2$loglik, full_mod = fit2)
 ), aic = TRUE, AICc = TRUE)
 
+}
 }

@@ -114,6 +114,7 @@ conductance and a function mapping resistance distance (covariance) to
 genetic distance; using the algorithm in Pope (in prep).
 }
 \examples{
+\donttest{
 library(terra)
 
 data(melip)
@@ -130,4 +131,5 @@ terradish_algorithm(conductance_model, terradish::leastsquares,
                  surface, ifelse(melip.Fst < 0, 0, melip.Fst),
                  nu = 1000, theta = c(-0.3, 0.3))
 
+}
 }

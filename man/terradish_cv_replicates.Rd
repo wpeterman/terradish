@@ -73,6 +73,7 @@ Repeats \code{\link{terradish_cv}} across multiple random splits and
 summarizes held-out log-likelihood across replicates.
 }
 \examples{
+\donttest{
 library(terra)
 
 data(melip)
@@ -94,4 +95,5 @@ cv_rep <- terradish_cv_replicates(melip.coords[keep], covariates,
                                   control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
 cv_rep$mean_loglik
 
+}
 }

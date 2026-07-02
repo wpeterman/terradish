@@ -694,6 +694,7 @@
 #'  \item{partial_S}{(if 'partial') Jacobian of the gradient with respect to the observed genetic distances}
 #'
 #' @examples
+#' \donttest{
 #' library(terra)
 #'
 #' data(melip)
@@ -710,6 +711,7 @@
 #'                  surface, ifelse(melip.Fst < 0, 0, melip.Fst),
 #'                  nu = 1000, theta = c(-0.3, 0.3))
 #'
+#' }
 #' @export
 terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, objective = TRUE, gradient = TRUE, hessian = TRUE, partial = TRUE, nonnegative = TRUE, validate = FALSE, cores = 1L, curvature = c("exact", "gauss_newton"), solver = c("direct", "auto", "amg", "pcg", "pcg_jacobi", "block_cg"), solver_control = NULL, solver_warm_start = NULL, solver_reuse_state = NULL)
 {

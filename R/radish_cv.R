@@ -179,6 +179,7 @@
 #'   log-likelihoods.
 #'
 #' @examples
+#' \donttest{
 #' library(terra)
 #'
 #' data(melip)
@@ -203,6 +204,7 @@
 #' aic_table(list(fit1, fit2))
 #' aic_table(list(fit1, fit2), AICc = TRUE)
 #'
+#' }
 #' @export
 aic_table <- function(mod_list, AICc = FALSE, BIC = FALSE, mod_names = NULL, verbose = FALSE)
 {
@@ -733,6 +735,7 @@ terradish_cv <- function(pts,
 #'   cross-validation fits.
 #'
 #' @examples
+#' \donttest{
 #' library(terra)
 #'
 #' data(melip)
@@ -754,6 +757,7 @@ terradish_cv <- function(pts,
 #'                                   control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
 #' cv_rep$mean_loglik
 #'
+#' }
 #' @export
 terradish_cv_replicates <- function(pts,
                                     covariates,
@@ -941,6 +945,7 @@ radish_cv <- function(...)
 #'   cross-validation table and information-criterion table.
 #'
 #' @examples
+#' \donttest{
 #' library(terra)
 #'
 #' data(melip)
@@ -967,6 +972,7 @@ radish_cv <- function(...)
 #'   list(train_mod = fit2, cv_loglik = fit2$loglik, full_mod = fit2)
 #' ), aic = TRUE, AICc = TRUE)
 #'
+#' }
 #' @export
 cv_model_selection <- function(cv_list,
                                cv_names = NULL,

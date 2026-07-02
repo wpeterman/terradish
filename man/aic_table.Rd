@@ -51,6 +51,7 @@ produce AIC differences that have no straightforward probabilistic
 interpretation.
 }
 \examples{
+\donttest{
 library(terra)
 
 data(melip)
@@ -75,4 +76,5 @@ fit2 <- terradish(melip.Fst_small ~ altitude + forestcover, surface_small,
 aic_table(list(fit1, fit2))
 aic_table(list(fit1, fit2), AICc = TRUE)
 
+}
 }
