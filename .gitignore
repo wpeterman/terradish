@@ -23,6 +23,7 @@ dev/slim/out_*/
 dev/slim/__pycache__/
 
 # Transient dev run outputs (test logs, scratch captures)
+dev/check/
 dev/*.log
 dev/*.out
 dev/slim/*.log
