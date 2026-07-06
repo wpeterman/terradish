@@ -1,0 +1,32 @@
+{
+  "upload_type": "software",
+  "title": "terradish: Fast Gradient-Based Optimization of Resistance Surfaces",
+  "description": "An R package for maximum likelihood estimation of parameterized conductance (resistance) surfaces in landscape genetics, via Newton and quasi-Newton methods. Supports terra-native workflows, multiple measurement models, spline and scale-aware conductance estimation, cross-validation across conductance models, hierarchical (covariate-plus-smooth-field) surfaces, and directional (non-reversible) conductance.",
+  "license": "BSD-3-Clause",
+  "creators": [
+    {
+      "name": "Peterman, Bill",
+      "orcid": "0000-0001-5229-9268"
+    },
+    {
+      "name": "Pope, Nathaniel S.",
+      "orcid": "0000-0001-8409-7812"
+    }
+  ],
+  "keywords": [
+    "landscape genetics",
+    "isolation by resistance",
+    "resistance surface",
+    "conductance",
+    "population genetics",
+    "spatial ecology",
+    "R"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "https://github.com/wpeterman/terradish",
+      "relation": "isSupplementTo",
+      "scheme": "url"
+    }
+  ]
+}

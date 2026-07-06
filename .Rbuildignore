@@ -29,6 +29,8 @@
 ^Rplots\.pdf$
 ^\.Rhistory$
 ^\.agents$
+^\.zenodo\.json$
+^CITATION\.cff$
 ^\.codex$
 ^figure$
 ^vignettes/.*\.rds$

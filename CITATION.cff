@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use terradish, please cite it as below."
+title: "terradish: Fast Gradient-Based Optimization of Resistance Surfaces"
+version: 0.0.44
+date-released: "2026-07-02"
+license: BSD-3-Clause
+type: software
+repository-code: "https://github.com/wpeterman/terradish"
+url: "https://github.com/wpeterman/terradish"
+# After the first Zenodo release, add the concept DOI here, e.g.:
+# doi: "10.5281/zenodo.XXXXXXX"
+authors:
+  - family-names: Peterman
+    given-names: Bill
+    orcid: "https://orcid.org/0000-0001-5229-9268"
+  - family-names: Pope
+    given-names: Nathaniel S.
+    orcid: "https://orcid.org/0000-0001-8409-7812"
