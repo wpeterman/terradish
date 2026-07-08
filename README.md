@@ -2,6 +2,8 @@
 
 ### Fast gradient-based optimization of resistance surfaces for landscape genetics.
 
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21225712.svg)](https://doi.org/10.5281/zenodo.21225712)
+
 `terradish` is an R package for maximum likelihood estimation of isolation-by-resistance (IBR) models. The core optimization infrastructure (sparse Laplacian factorization, reverse-mode gradient backpropagation through the graph Laplacian, and the MLPE and generalized Wishart likelihood layers) was developed by **Nate Pope** as the [`radish`](https://github.com/nspope/radish) R package. `terradish` is a `terra`-native extension of that framework, adding new measurement models, Gaussian scale-of-effect optimization, IBE + IBR joint fitting, cross-validation tools, improved visualization, and a suite of helper utilities, while preserving full backward compatibility with `radish` function names.
 
 The central idea is **isolation by resistance (IBR)**: instead of assuming genetic distance simply tracks straight-line geographic distance (isolation by distance, IBD), IBR recognizes that the landscape is heterogeneous. Some cells are easy to cross; others are barriers. `terradish` estimates how raster covariates (altitude, forest cover, roads, etc.) shape this permeability using efficient sparse linear algebra and analytic gradients throughout.

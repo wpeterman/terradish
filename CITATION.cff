@@ -7,8 +7,7 @@ license: BSD-3-Clause
 type: software
 repository-code: "https://github.com/wpeterman/terradish"
 url: "https://github.com/wpeterman/terradish"
-# After the first Zenodo release, add the concept DOI here, e.g.:
-# doi: "10.5281/zenodo.XXXXXXX"
+doi: "10.5281/zenodo.21225712"
 authors:
   - family-names: Peterman
     given-names: Bill

@@ -7,5 +7,6 @@ bibentry(
                person(c("Nathaniel", "S."), "Pope")),
   year     = "2026",
   note     = "R package version 0.0.44",
-  url      = "https://github.com/wpeterman/terradish"
+  doi      = "10.5281/zenodo.21225712",
+  url      = "https://doi.org/10.5281/zenodo.21225712"
 )

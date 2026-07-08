@@ -24,6 +24,9 @@ Description: Maximum likelihood estimation for parameterized conductance models
   conductance estimation, cross-validation across supported conductance
   models, and selected-pair analysis while retaining all focal sites in the
   resistance graph.
+URL: https://github.com/wpeterman/terradish,
+  https://doi.org/10.5281/zenodo.21225712
+BugReports: https://github.com/wpeterman/terradish/issues
 License: BSD_3_clause + file LICENSE
 Depends: R (>= 4.0.0)
 Imports:
