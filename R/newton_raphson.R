@@ -36,12 +36,23 @@
 #' changing them when:
 #'
 #' \itemize{
-#'   \item The optimizer hits \code{maxit} before converging — increase
+#'   \item The optimizer hits \code{maxit} before converging: increase
 #'     \code{maxit}.
-#'   \item You want a quick exploratory fit — reduce \code{maxit} (e.g. 5–10).
-#'   \item Fitting is slow because of oscillation — tighten \code{ctol} or
+#'   \item You want a quick exploratory fit: reduce \code{maxit} (for example
+#'     5 to 10).
+#'   \item Fitting is slow because of oscillation: tighten \code{ctol} or
 #'     switch to a more conservative line search via \code{ls.control}.
 #' }
+#'
+#' @return A named list of class \code{"NewtonRaphsonControl"} holding the
+#'   settings passed to the optimizer.  The elements are the arguments above,
+#'   validated and stored unchanged: \code{maxit}, \code{ctol}, \code{ftol},
+#'   \code{etol}, \code{verbose}, \code{eps}, \code{del}, and
+#'   \code{ls.control} (itself a \code{HagerZhangControl} or
+#'   \code{ArmijoControl} list).  Pass the object to the \code{control}
+#'   argument of \code{\link{terradish}}; inspect it with \code{str()}.  The
+#'   list carries no fitted quantities, so nothing in it needs
+#'   back-transforming.
 #'
 #' @seealso \code{\link{HagerZhangControl}}, \code{\link{ArmijoControl}},
 #'   \code{\link{terradish}}
@@ -50,16 +61,31 @@
 #' ctrl <- NewtonRaphsonControl(maxit = 25, verbose = FALSE)
 #' str(ctrl)
 #'
-#' # Verbose fit with relaxed tolerances for a quick exploratory run:
-#' ctrl_quick <- NewtonRaphsonControl(maxit = 10, verbose = TRUE,
-#'                                    ctol = 1e-3, ftol = 1e-3)
+#' # Relaxed tolerances for a quick exploratory run:
+#' ctrl_quick <- NewtonRaphsonControl(maxit = 10, ctol = 1e-3, ftol = 1e-3)
 #'
-#' # Pass to terradish():
-#' \dontrun{
+#' \donttest{
+#' data(melip)
+#' covariates <- c(terra::unwrap(melip.altitude), terra::unwrap(melip.forestcover))
+#' names(covariates) <- c("altitude", "forestcover")
+#' covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+#'                                                 na.rm = TRUE))
+#' surface <- conductance_surface(covariates, terra::unwrap(melip.coords),
+#'                                directions = 8)
+#'
+#' # A tighter, longer-running control than the default
 #' fit <- terradish(melip.Fst ~ forestcover + altitude, data = surface,
 #'                  conductance_model = loglinear_conductance,
 #'                  measurement_model = mlpe,
-#'                  control = NewtonRaphsonControl(maxit = 200))
+#'                  control = NewtonRaphsonControl(maxit = 200, ctol = 1e-8))
+#' coef(fit)
+#'
+#' # The same fit, reporting each optimizer step. `verbose` is the simple
+#' # switch; it overrides whatever `control` says.
+#' fit_loud <- terradish(melip.Fst ~ forestcover + altitude, data = surface,
+#'                       conductance_model = loglinear_conductance,
+#'                       measurement_model = mlpe,
+#'                       control = ctrl_quick, verbose = TRUE)
 #' }
 #'
 #' @export
@@ -74,6 +100,17 @@ NewtonRaphsonControl <- function(maxit = 100,
   list(maxit = maxit, ctol = ctol, etol = etol, 
        ftol = ftol, verbose = verbose, eps = eps, 
        del = del, ls.control = ls.control)
+
+# Both optimizers iterate `seq_len(maxit)` and then read the loop variable, so
+# a non-positive or non-finite `maxit` has to be rejected up front rather than
+# silently producing a zero-length or reversed sequence.
+.terradish_validate_maxit <- function(maxit)
+{
+  maxit <- suppressWarnings(as.integer(maxit)[1])
+  if (is.na(maxit) || maxit < 1L)
+    stop("`maxit` must be a single integer of at least 1.", call. = FALSE)
+  maxit
+}
 
 BoxConstrainedNewton <- function(par, fn, lower = rep(-Inf, length(par)), upper = rep(Inf, length(par)), control = NewtonRaphsonControl())
 {
@@ -124,24 +161,27 @@ BoxConstrainedNewton <- function(par, fn, lower = rep(-Inf, length(par)), upper 
          call. = FALSE)
 
   if (verbose)
-    cat("Projected Newton-Raphson with Hager-Zhang line search\n")
+    message("Projected Newton-Raphson with Hager-Zhang line search")
+
+  # `maxit` must be at least one step: the loop below defines `fit` and `i`,
+  # and the convergence check after it reads both.
+  maxit <- .terradish_validate_maxit(maxit)
 
   convergence <- 0
   line_search_failed <- FALSE
   par <- as.matrix(par)
 
-  for (i in 1:maxit)
+  for (i in seq_len(maxit))
   {
     fit   <- fn(par, gradient = TRUE, hessian = TRUE)
     delta <- if (i > 1) abs(oldfit$objective - fit$objective) else 0
 
     if (verbose)
-      cat(paste0("[", i, "]"), 
-          "f(x) =", prettify(-fit$objective),
-          "  |f(x)-fold(x)| =", prettify(delta),
-          "  max|f'(x)| =", prettify(max(abs(fit$gradient))),
-          "  |f''(x)| =", prettify(-det(fit$hessian)),
-          "\n")
+      message(paste0("[", i, "]"),
+              " f(x) = ", prettify(-fit$objective),
+              "  |f(x)-fold(x)| = ", prettify(delta),
+              "  max|f'(x)| = ", prettify(max(abs(fit$gradient))),
+              "  |f''(x)| = ", prettify(-det(fit$hessian)))
 
     if (max(abs(fit$gradient)) < ctol || (i > 1 && delta < ftol))
       break
@@ -184,7 +224,8 @@ BoxConstrainedNewton <- function(par, fn, lower = rep(-Inf, length(par)), upper 
     alpha <- tryCatch({
       HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
     }, error = function(err) {
-      message("Hager-Zhang line search failed; switching to bounded backtracking.")
+      if (verbose)
+        message("Hager-Zhang line search failed; switching to bounded backtracking.")
       Backtracking(dphi_fn, phi0, dphi0, control = ls.control)
     })
     if (!is.finite(alpha) || alpha <= 0 ||
@@ -203,10 +244,10 @@ BoxConstrainedNewton <- function(par, fn, lower = rep(-Inf, length(par)), upper 
 
   boundary_fit <- any(par == lower | par == upper)
   if (verbose)
-    if (boundary_fit)
-      cat ("Solution on boundary with `max(abs(gradient))` ==", max(abs(fit$gradient)), "and `diff(f)` ==", delta, "\n")
-    else
-      cat ("Solution on interior with `max(abs(gradient))` ==", max(abs(fit$gradient)), "and `diff(f)` ==", delta, "\n")
+    message("Solution on ",
+            if (boundary_fit) "boundary" else "interior",
+            " with `max(abs(gradient))` == ", max(abs(fit$gradient)),
+            " and `diff(f)` == ", delta)
 
   if (!line_search_failed && i == maxit)
   {

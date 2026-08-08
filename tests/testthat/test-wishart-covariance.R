@@ -166,6 +166,27 @@ test_that("plot methods handle covariance responses and smooth conductance", {
                     marginal_response_data$upper))
 })
 
+test_that("simulate_covariance_response validates and preserves Wishart nu", {
+  dat <- melip_fixture(keep = 1:6)
+  surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
+
+  expect_error(
+    simulate_covariance_response(
+      theta = c(altitude = 0.15, forestcover = -0.2),
+      formula = ~ altitude + forestcover,
+      data = surface, tau = 0.7, sigma = 0.05, nu = 5.5, seed = 1
+    ),
+    "at least the covariance-matrix dimension"
+  )
+
+  sim <- simulate_covariance_response(
+    theta = c(altitude = 0.15, forestcover = -0.2),
+    formula = ~ altitude + forestcover,
+    data = surface, tau = 0.7, sigma = 0.05, nu = 6.5, seed = 1
+  )
+  expect_equal(sim$nu, 6.5)
+})
+
 test_that("Wishart fit plotting follows the May 21 visibility contract", {
   dat <- melip_fixture(keep = 1:6)
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)

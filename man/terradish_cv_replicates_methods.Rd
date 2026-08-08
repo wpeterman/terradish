@@ -28,7 +28,9 @@
 \itemize{
   \item \code{print()} returns its input invisibly.
   \item \code{summary()} returns an object of class
-    \code{"summary.terradish_cv_replicates"}.
+    \code{"summary.terradish_cv_replicates"}, a list holding the
+    per-replicate table plus the mean and standard deviation of the held-out
+    log-likelihood.
 }
 }
 \description{
@@ -37,4 +39,58 @@ Methods for repeated terradish cross-validation results
 \details{
 S3 methods for working with objects returned by
 \code{\link{terradish_cv_replicates}}.
+
+
+\strong{How to read the output.}  \code{print()} reports the number of
+replicate train/test splits, then the mean and standard deviation of the
+held-out log-likelihood across them, then one row per replicate.
+
+The mean is the comparable quantity: higher means better out-of-sample
+prediction, and it is on the log-likelihood scale, so differences are read
+the same way as a log-likelihood difference rather than as a percentage.
+The standard deviation says how much the answer depends on which sites
+landed in the training set.  When two models' means differ by less than a
+standard deviation or so, the data do not separate them, and repeating with
+more replicates is more useful than picking the higher mean.
+
+Because each replicate refits on a different subset, an occasional replicate
+can converge poorly; scan the per-replicate column for outliers before
+trusting the mean.
+}
+\examples{
+\donttest{
+data(melip)
+melip.altitude    <- terra::unwrap(melip.altitude)
+melip.forestcover <- terra::unwrap(melip.forestcover)
+melip.coords      <- terra::unwrap(melip.coords)
+covariates <- c(melip.altitude, melip.forestcover)
+names(covariates) <- c("altitude", "forestcover")
+# coarsened, and only two replicates, so the example stays quick
+covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+                                                na.rm = TRUE))
+
+reps <- terradish_cv_replicates(
+  pts        = melip.coords,
+  covariates = covariates,
+  fmla       = melip.Fst ~ altitude + forestcover,
+  model      = leastsquares,
+  n_reps     = 2,
+  prop_train = 2 / 3,
+  seeds      = c(1, 2),
+  fit_full   = FALSE,
+  control    = NewtonRaphsonControl(maxit = 5))
+
+reps                 # replicate count, mean and sd, then each replicate
+summary(reps)        # the same information as a summary object
+reps$mean_loglik     # the number to compare between models
+}
+
+}
+\seealso{
+\code{\link{terradish_cv_replicates}} for running the replicates,
+  \code{\link{terradish_cv}} for a single split,
+  \code{\link{cv_model_selection}} for combining cross-validation with an
+  AIC table, and \code{\link{aic_table}} for in-sample ranking.  See
+  \code{vignette("model-comparison", package = "terradish")} for how these
+  fit together.
 }

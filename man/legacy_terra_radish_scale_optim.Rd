@@ -23,7 +23,7 @@ terra_radish_scale_optim(
   postprocess = scale_covariates,
   directions = 8L,
   theta = NULL,
-  verbose = TRUE,
+  verbose = FALSE,
   ...
 )
 }

@@ -29,28 +29,26 @@ The default `terradish` conductance model is **log-linear**:
 
 $$C_i = \exp(\theta_1 x_{i1} + \theta_2 x_{i2} + \cdots)$$
 
-This model asks a simple binary question for each landscape covariate: does
-conductance go up or down as the covariate increases? That is exactly the right
-question for many problems. Forest cover, for example, often has a monotone
-positive effect on connectivity for forest-dependent species: higher cover,
-higher conductance, end of story.
+This model represents a monotone fitted association for each landscape
+covariate: does relative conductance go up or down as the covariate increases,
+conditional on the other predictors? That constrained form is useful when a
+monotone relationship is scientifically defensible.
 
 But ecological responses to landscape features are often more complex. Consider:
 
-- **Elevation**: Movement may be easiest at intermediate elevations; high mountain
-  peaks and valley floors are both barriers, but for different reasons (snow vs.
-  flooding vs. predation risk).
-- **Slope**: Slight grades may be navigable; steep terrain may become a barrier
-  only past some threshold.
+- **Elevation**: A prior hypothesis may predict the strongest connectivity at
+  intermediate elevations rather than at either extreme.
+- **Slope**: A prior hypothesis may predict little change until terrain passes
+  a threshold.
 - **Temperature**: Many ectotherms have a thermal optimum; conductance may be
   highest at intermediate temperatures and fall off steeply in both directions.
-- **Canopy density**: Too little or too much canopy may suppress movement for a
-  species that needs dappled light.
+- **Canopy density**: A prior hypothesis may predict lower connectivity at both
+  low and high canopy density.
 
 None of these shapes can be captured by a single linear term on the log scale. A
-negative coefficient makes the covariate a monotone barrier; a positive
-coefficient makes it a monotone highway. There is no room for "best in the
-middle."
+negative coefficient gives a declining fitted conductance association; a
+positive coefficient gives an increasing association. There is no room for an
+interior optimum.
 
 `smooth_loglinear_conductance()` extends the log-linear model by expanding
 selected covariates into **spline basis functions**. The model structure is still:
@@ -76,7 +74,7 @@ several basis functions, each capturing part of the altitude range.
 The figure below shows what natural spline and B-spline basis functions look like
 for a covariate that runs from −2 to 2 (as after `scale_covariates()`):
 
-```{r basis-demo, fig.cap = "***Natural spline (ns) and B-spline (bs) basis functions for a standardized covariate.*** Each colored line is one basis column. The fitted conductance effect is a weighted combination of all basis functions in a panel.", fig.height = 5}
+```{r basis-demo, fig.cap = "***Natural spline (ns) and B-spline (bs) basis functions for a standardized covariate.*** Each colored line is one basis column. The fitted conductance association is a weighted combination of all basis functions in a panel.", fig.height = 5}
 library(splines)
 library(terradish)
 
@@ -113,7 +111,7 @@ legend("topright", legend = paste0("basis ", 1:4),
 
 Each basis column covers a different part of the covariate range. The optimizer
 assigns a coefficient to each column; the weighted sum of all columns defines the
-shape of the effect. A hump in the middle of the covariate range is captured by
+shape of the association. A hump in the middle of the covariate range is captured by
 upweighting the middle basis columns relative to the edge ones.
 
 ### Natural splines vs. B-splines
@@ -143,18 +141,19 @@ With sparse spatial genetic data, overfitting is a real risk. Guidelines:
 
 - **df = 3 or 4** is a good starting point for most covariates. This allows a
   single hump, valley, or threshold-like shape.
-- **df = 2** is essentially a quadratic effect; it adds one parameter over the
-  linear model and tests for a simple non-linear shape.
+- **df = 2** is a low-flexibility nonlinear curve; it adds one parameter over
+  the linear model and can represent simple curvature.
 - **df ≥ 6** should be reserved for cases where both the data and a clear
   ecological hypothesis support it; compare against simpler models with AICc.
-- Use **AICc** rather than AIC when sample sizes (number of population pairs)
-  are small relative to the number of parameters.
+- Consider **AICc** when the number of focal sites is small relative to the
+  number of estimated parameters. `terradish` uses focal sites, not the number
+  of dependent population pairs, as `n` in its AICc calculation.
 
 ---
 
 ## Data preparation
 
-The rest of this vignette uses the bundled *Melipona* bee example with all 34
+The rest of this vignette uses the bundled *Melipona* bee example with all 37
 sampling sites.
 
 ```{r load-data}
@@ -178,6 +177,11 @@ from a common starting point.
 ```{r prepare-covariates}
 covariates <- c(melip.altitude, melip.forestcover)
 names(covariates) <- c("altitude", "forestcover")
+
+# Coarsen the demonstration graph so the many candidate fits remain suitable
+# for a package vignette. Use a scientifically justified resolution in an
+# applied analysis.
+covariates <- terra::aggregate(covariates, fact = 3, na.rm = TRUE)
 
 # Center and scale each layer to mean 0, sd 1
 covariates <- scale_covariates(covariates)
@@ -283,8 +287,9 @@ We fit four candidate models, moving from most constrained to most flexible:
 4. **Altitude spline (bs)**: altitude as a B-spline; forest cover linear (for
    comparison with model 2)
 
-We use a small `maxit` to keep the vignette fast; for real analyses, allow more
-iterations.
+The coarsened demonstration graph keeps these repeated fits practical. For an
+applied analysis, use a scientifically justified raster resolution and allow
+the optimizer to converge.
 
 ```{r fit-models}
 assessment_spline_light <- terradish_assess_settings(
@@ -377,7 +382,7 @@ str(attr(smooth_spec, "smooth_loglinear_info"))
 ```
 
 The `s(altitude).*` parameters are the basis coefficients for altitude. Taken
-individually they are not interpretable. What matters is their combined effect
+individually they are not interpretable. What matters is their combined association
 on the conductance surface, which is best visualized through marginal plots.
 
 ---
@@ -399,11 +404,10 @@ print(round(coef(fit_bs_alt), 4))
 ```
 
 The spline coefficients for `s(altitude)` are not directly comparable to the
-single altitude coefficient in the linear model. The linear model distills the
-altitude effect to one number (positive = conductance increases with elevation,
-negative = conductance decreases). The spline model allows the effect to change
-direction across the altitude range. The marginal plots in the next sections
-reveal the actual shape.
+single altitude coefficient in the linear model. The linear model summarizes
+the conditional altitude association with one number. The spline model allows
+the fitted association to change direction across the altitude range. The
+marginal plots in the next sections show the implied shape.
 
 ---
 
@@ -427,31 +431,31 @@ aic_table(
 
 Interpret this table as a first-pass diagnostic, not a definitive verdict:
 
-- **ΔAICc < 2** from the top model: models that are empirically indistinguishable
-  given the data. Do not over-interpret small differences.
-- **ΔAICc 2-7**: Some support for the simpler model; spline flexibility is not
-  clearly warranted.
-- **ΔAICc > 7**: Strong support for the better model.
+- **ΔAICc below about 2**: a common heuristic for similar relative support
+  within this declared candidate set, not proof of equivalence.
+- **Larger ΔAICc**: progressively less support relative to the top-ranked model.
+  Interpret the magnitude together with model complexity, stability, and the
+  predeclared scientific hypotheses.
 
-An AICc improvement must be accompanied by an ecologically plausible marginal
-effect curve. A spline with a lower AICc but a biologically implausible shape
-(oscillating wildly, extreme at the edges) should be treated with skepticism.
+An AICc improvement should be evaluated alongside the stability and scientific
+plausibility of the marginal association. A spline with a lower AICc but an
+implausible shape (oscillating wildly, extreme at the edges) should be treated
+with skepticism.
 
 ---
 
-## Marginal conductance effects
+## Marginal conductance associations
 
-Marginal plots show what happens to conductance as one covariate changes while
-all others are held at their mean. For spline models this is the primary
-diagnostic tool, because the basis coefficients themselves are uninterpretable.
+Marginal plots vary one covariate while averaging over the observed values of
+the other model covariates. For spline models this is the primary diagnostic
+tool because the basis coefficients are not individually interpretable.
 
-### Natural vs. B-spline altitude effect
+### Natural vs. B-spline altitude association
 
 Use `marginal_covariates = "altitude"` to extract only the altitude panel from
-each model, then combine the ggplot objects side-by-side with `patchwork`:
+each model, then combine the ggplot objects side-by-side with `patchwork`, if it is installed:
 
-```{r marginal-ns-vs-bs, fig.cap = "***Altitude marginal effect on the conductance scale.*** Left: natural spline (ns). Right: B-spline (bs). Both use df/k = 4 and degree 3.", fig.height = 4.5}
-library(patchwork)
+```{r marginal-ns-vs-bs, fig.cap = "***Altitude marginal association on the conductance scale.*** Left: natural spline (ns). Right: B-spline (bs). Both use df/k = 4 and degree 3.", fig.height = 4.5}
 library(ggplot2)
 
 p_ns <- plot(fit_ns_alt, type = "marginal", data = surface, n = 80,
@@ -462,21 +466,28 @@ p_bs <- plot(fit_bs_alt, type = "marginal", data = surface, n = 80,
              marginal_covariates = "altitude") +
   ggtitle("Altitude: bs (k = 4)")
 
-p_ns | p_bs
+# patchwork is optional; fall back to one panel per page without it
+if (requireNamespace("patchwork", quietly = TRUE)) {
+  library(patchwork)
+  p_ns | p_bs
+} else {
+  print(p_ns)
+  print(p_bs)
+}
 ```
 
-Both spline families should produce broadly similar effect shapes when the signal
-is genuine. Large discrepancies between ns and bs estimates at the same df/k are
-a warning sign: the spline is fitting noise rather than signal, and a simpler
-model may be preferable.
+Broad agreement between spline families is a useful stability check, but it
+does not prove that a shape is genuine. Large discrepancies between natural and
+B-spline estimates at the same df/k indicate sensitivity to the basis choice;
+a simpler model or more constrained candidate set may be preferable.
 
-### All four model marginal effects (altitude)
+### All four model marginal associations (altitude)
 
 Setting `marginal_covariates = "altitude"` keeps only the altitude panel from
 each model (which may otherwise also show forest cover). This makes it easy to
 arrange all four altitude curves in a single 2 × 2 grid for direct comparison:
 
-```{r marginal-all, fig.cap = "***Altitude marginal effect across all four candidate models.*** The linear model constrains the effect to a straight line (on the log-conductance scale). Both spline models can represent non-monotone shapes.", fig.height = 6}
+```{r marginal-all, fig.cap = "***Altitude marginal association across all four candidate models.*** The linear model constrains the association to a straight line (on the log-conductance scale). Both spline models can represent non-monotone shapes.", fig.height = 6}
 p_lin   <- plot(fit_linear,  type = "marginal", data = surface, n = 80,
                 marginal_covariates = "altitude") +
   ggtitle("Linear baseline")
@@ -496,19 +507,18 @@ p_bs_a  <- plot(fit_bs_alt,  type = "marginal", data = surface, n = 80,
 (p_lin | p_ns_a) / (p_ns_b | p_bs_a)
 ```
 
-### Response-scale marginal effects
+### Response-scale marginal associations
 
-The `type = "marginal_response"` plot shows the same effect on the **response
-scale** (genetic distance or log-likelihood units, depending on the measurement
-model), together with predictive uncertainty bands. This is useful for
-communicating results to an ecological audience that may not think in terms of
-log-conductance.
+The `type = "marginal_response"` plot maps the same fitted association to the
+**response scale**. For the MLPE fits in this vignette, that scale is pairwise
+genetic distance. The plot includes approximate predictive uncertainty bands
+and can be easier to interpret than log conductance.
 
-Comparing the ns and bs altitude response-scale effects side-by-side gives an
-additional consistency check: if the two families agree, the non-linear shape
-has genuine support; if they diverge, the spline is likely fitting noise.
+Comparing the ns and bs altitude response-scale associations side-by-side gives an
+additional stability check. Agreement does not establish causality or a unique
+ecological mechanism; divergence indicates sensitivity to the spline basis.
 
-```{r marginal-response, fig.cap = "***Marginal response-scale effects from the altitude natural-spline model.*** Shaded bands are approximate pointwise 95% predictive intervals. Left: natural spline. Right: B-spline.", fig.height = 4.5}
+```{r marginal-response, fig.cap = "***Marginal response-scale associations from the altitude natural-spline model.*** Shaded bands are approximate pointwise 95% predictive intervals. Left: natural spline. Right: B-spline.", fig.height = 4.5}
 p_resp_ns <- plot(fit_ns_alt, type = "marginal_response", data = surface,
                   n = 80, marginal_covariates = "altitude") +
   ggtitle("ns (df = 4): response scale")
@@ -559,18 +569,20 @@ p_fit_bs_alt <- plot(fit_bs_alt,  type = "fit", main = "Altitude bs (k = 4)")
 (p_fit_linear | p_fit_ns_alt) / (p_fit_ns_both | p_fit_bs_alt)
 ```
 
-All four panels should show a similar cloud pattern because all models use the
-same data and MLPE correlation structure. Systematic deviations from the diagonal
-(e.g. all large-distance pairs systematically under-predicted) would indicate
-model misspecification beyond the conductance formula.
+All four panels use the same data and MLPE correlation structure. Systematic
+deviations from the diagonal (e.g. all large-distance pairs systematically
+under-predicted) indicate lack of fit that could arise from the conductance
+formula, measurement model, response construction, or other misspecification.
 
 ---
 
 ## Estimated conductance surfaces
 
 The conductance surface shows the per-cell conductance value across the
-landscape. `conductance()` returns a three-layer SpatRaster with point estimate
-and 95% confidence bounds (delta-method).
+landscape. `conductance()` returns a three-layer SpatRaster with a point
+estimate and pointwise 95% confidence bounds from the delta method. These
+bounds reflect uncertainty in $\theta$ conditional on the fitted model; they do
+not include nuisance-parameter or model-selection uncertainty.
 
 ### Altitude natural-spline model
 
@@ -586,7 +598,7 @@ points(melip.coords, pch = 19, cex = 0.6, col = "red")
 
 ### Comparison: linear vs. altitude spline
 
-```{r surface-compare, fig.cap = "***Point-estimate conductance surfaces: linear model (left) vs. altitude natural-spline model (right).*** Differences in surface texture reflect the non-linear altitude effect captured by the spline.", fig.height = 4}
+```{r surface-compare, fig.cap = "***Point-estimate conductance surfaces: linear model (left) vs. altitude natural-spline model (right).*** Differences in surface texture reflect the non-linear altitude association represented by the spline.", fig.height = 4}
 cond_linear <- conductance(surface, fit_linear)
 
 par(mfrow = c(1, 2))
@@ -598,17 +610,18 @@ points(melip.coords, pch = 19, cex = 0.6, col = "red")
 ```
 
 Differences between the two surfaces are most informative at intermediate
-elevations where the spline effect departs most from the linear extrapolation.
+elevations where the spline association departs most from the linear extrapolation.
 
 ---
 
 ## Natural splines: varying degrees of freedom
 
-A key modeling decision is how many basis functions to use. More df → more
-flexibility → more parameters. This section illustrates the effect of df on the
-fitted altitude curve using natural splines.
+A key modeling decision is how many basis functions to use. More degrees of
+freedom allow more flexibility and require more parameters. This section
+illustrates the consequence of degrees of freedom for the fitted altitude curve
+using natural splines.
 
-```{r ns-df-comparison, fig.cap = "***Natural spline altitude effect for df = 2, 3, 4, and 6.*** Higher df allows more shape complexity. Compare the smoothness and ecological plausibility of each curve before selecting a value.", fig.height = 6}
+```{r ns-df-comparison, fig.cap = "***Natural spline altitude association for df = 2, 3, 4, and 6.*** Higher df allows more shape complexity. Compare the smoothness and ecological plausibility of each curve before selecting a value.", fig.height = 6}
 fit_ns2 <- terradish(
   melip.Fst ~ forestcover + s(altitude, df = 2),
   data              = surface,
@@ -666,7 +679,12 @@ p6 <- plot(fit_ns6,    type = "marginal", data = surface, n = 80,
            marginal_covariates = "altitude") +
   ggtitle("ns, df = 6")
 
-(p2 | p3) / (p4 | p6)
+if (requireNamespace("patchwork", quietly = TRUE)) {
+  library(patchwork)
+  (p2 | p3) / (p4 | p6)
+} else {
+  for (p in list(p2, p3, p4, p6)) print(p)
+}
 ```
 
 ```{r ns-df-aic}
@@ -691,7 +709,7 @@ basis columns. Degree 1 is piecewise linear, degree 2 is quadratic, and degree 3
 (the default) is cubic. Higher degrees produce smoother but more globally
 coupled curves.
 
-```{r bs-degree-comparison, fig.cap = "***B-spline altitude effect for degree 1, 2, and 3 (k = 4 basis columns each).*** Degree 1 is piecewise linear; degree 3 is cubic. Smoother curves do not always fit better.", fig.height = 4}
+```{r bs-degree-comparison, fig.cap = "***B-spline altitude association for degree 1, 2, and 3 (k = 4 basis columns each).*** Degree 1 is piecewise linear; degree 3 is cubic. Smoother curves do not always fit better.", fig.height = 4}
 fit_bs1 <- terradish(
   melip.Fst ~ forestcover + s(altitude, k = 4, basis = "bs", degree = 1),
   data              = surface,
@@ -734,10 +752,10 @@ pd1 | pd2 | pd3
 ```
 
 For most conductance problems, degree 3 (cubic) B-splines are a good default
-when you choose B-splines. They produce smooth second derivatives, which is
-appropriate for a surface that represents gradual changes in habitat quality. Use
-degree 1 when you expect abrupt thresholds (e.g. an ecological edge) rather than
-smooth transitions.
+when you choose B-splines. They produce smooth second derivatives, which can
+represent gradual changes in fitted conductance. Use degree 1 when the
+predeclared candidate set includes abrupt thresholds rather than smooth
+transitions.
 
 ---
 
@@ -745,7 +763,7 @@ smooth transitions.
 
 You can freely mix linear terms and spline terms in the same formula. This is
 often the most useful specification: use a spline for the covariate you have
-prior reason to believe has a non-linear effect, and keep all others linear to
+prior reason to believe has a non-linear association, and keep all others linear to
 avoid over-parameterization.
 
 ```{r mixed-terms}
@@ -766,17 +784,18 @@ fit_mixed <- terradish(
 coef(fit_mixed)
 ```
 
-The `forestcover` coefficient is interpreted exactly as in the linear model: its
-sign indicates whether forest cover increases or decreases conductance, and its
-magnitude reflects the strength of that effect (on the log-conductance scale).
-The `s(altitude).*` coefficients together define the altitude shape.
+The `forestcover` coefficient is interpreted as in the linear model: its sign
+indicates the direction of the fitted conditional association with conductance,
+and its magnitude is on the log-conductance scale. The `s(altitude).*`
+coefficients together define the altitude shape. Neither interpretation is a
+causal effect or direct movement estimate.
 
 When a model contains both linear and spline terms, the default marginal plot
 produces one panel per covariate. Use `marginal_covariates` to view a single
 panel in isolation, or to place the two panels side-by-side rather than
 stacked:
 
-```{r mixed-marginal, fig.cap = "***Marginal effects from the mixed model (linear forest cover + altitude natural spline, df = 3).*** Left: the linear forest-cover effect (log-conductance scale). Right: the non-linear altitude effect (smooth curve).", fig.height = 4}
+```{r mixed-marginal, fig.cap = "***Marginal associations from the mixed model (linear forest cover + altitude natural spline, df = 3).*** Left: the linear forest-cover association (log-conductance scale). Right: the non-linear altitude association (smooth curve).", fig.height = 4}
 p_fc  <- plot(fit_mixed, type = "marginal", data = surface, n = 80,
               marginal_covariates = "forestcover") +
   ggtitle("Forest cover (linear term)")
@@ -818,20 +837,21 @@ aic_table(
 
 Use `smooth_loglinear_conductance()` when:
 
-1. **There is a prior ecological reason** to expect a non-linear landscape effect, e.g. an intermediate optimum, a threshold, or a well-documented hump-shaped
+1. **There is a prior ecological reason** to expect a non-linear landscape association, e.g. an intermediate optimum, a threshold, or a well-documented hump-shaped
    response in the literature.
-2. **The linear model's marginal effect is implausible**: e.g. a strong
+2. **The linear model's marginal association is implausible**: e.g. a strong
    negative altitude coefficient that would predict near-zero conductance at
    high elevations where sampling actually occurs.
-3. **The data are dense enough** to support the extra parameters. As a rough
-   guide, you need at least 5-10 site-pairs per estimated parameter. With 34
-   sites (561 pairs) and df = 4, the spline adds 3 parameters over the linear
-   model, a modest increase that is usually well-supported.
+3. **The design can support the extra parameters.** Pairwise observations are
+   dependent, so do not justify spline complexity by counting all site pairs as
+   independent replicates. Evaluate stability, focal-site support, AICc under
+   its stated convention, and simulation under plausible scenarios.
 
 ### When to stay with the linear model
 
-- Small datasets (fewer than ~20 sampling sites).
-- No prior hypothesis about a non-linear effect; treat splines as exploratory
+- Designs with sparse focal-site or covariate support relative to the proposed
+  spline complexity.
+- No prior hypothesis about a non-linear association; treat splines as exploratory
   rather than confirmatory.
 - The spline and linear models give similar AICc; parsimony favors the simpler
   model.
@@ -863,8 +883,8 @@ fit_linear <- terradish(
   approximation_control = rec$approximation_control
 )
 
-# Step 2: Inspect the linear marginal effects.
-# Which covariate might plausibly have a non-linear effect?
+# Step 2: Inspect the linear marginal associations.
+# Which covariate might plausibly have a non-linear association?
 # Use marginal_covariates to view one covariate at a time.
 plot(fit_linear, type = "marginal", data = surface,
      marginal_covariates = "covar1")
@@ -888,7 +908,7 @@ aic_table(list(fit_linear, fit_spline),
           mod_names = c("Linear", "Spline df=3"),
           AICc = TRUE)
 
-# Step 5: Inspect the spline marginal effect
+# Step 5: Inspect the spline marginal association
 plot(fit_spline, type = "marginal", data = surface)
 
 # Step 6: If AICc improved and the curve is plausible, try more flexibility
@@ -968,9 +988,9 @@ melip_spline <- fit_melip_spline_example()
 melip_spline$model_comparison
 ```
 
-This script is the right tool when you want to verify that a candidate spline
-specification is identifiable for your particular landscape and sampling design
-before committing to it in the real analysis.
+This script assesses recoverability for a specified generating scenario on a
+particular landscape and sampling design. It cannot verify identifiability for
+all parameter values or guarantee recovery in the real analysis.
 
 ---
 
@@ -1059,7 +1079,8 @@ plot(best, type = "marginal", data = surface)
 plot(best, type = "marginal", data = surface,
      marginal_covariates = "altitude")          # altitude panel only
 
-# Side-by-side comparison of two models' altitude effects with patchwork
+# Side-by-side comparison of two models' altitude associations. patchwork is
+# optional; install it for the `|` and `/` layout operators used here.
 library(patchwork)
 p1 <- plot(fit_lin,  type = "marginal", data = surface,
            marginal_covariates = "altitude") + ggtitle("Linear")
@@ -1067,7 +1088,7 @@ p2 <- plot(fit_ns,   type = "marginal", data = surface,
            marginal_covariates = "altitude") + ggtitle("ns df=4")
 p1 | p2
 
-plot(best, type = "marginal_response",         # Response-scale effects
+plot(best, type = "marginal_response",         # Response-scale associations
      data = surface, marginal_covariates = "altitude")
 
 # Extract the conductance surface as a SpatRaster
@@ -1075,3 +1096,28 @@ cond_raster <- conductance(surface, best)
 # Layer names: "est", "lower95", "upper95"
 plot(cond_raster)
 ```
+
+## Summary of key functions
+
+| Function | Purpose |
+|----------|---------|
+| `smooth_loglinear_conductance()` | Conductance model with `s()` spline terms |
+| `terradish_assess_settings()` | Recommend solver and optimizer settings once, reuse for every candidate |
+| `terradish()` | Fit each linear and spline candidate |
+| `aic_table()` | Rank comparable candidates using the stated AICc convention |
+| `plot(type = "marginal")` | The fitted conditional association on the conductance scale |
+| `plot(type = "marginal_response")` | The corresponding curve on the MLPE genetic-distance scale |
+| `conductance()` | Extract the fitted surface with confidence intervals |
+
+## See also
+
+- **`vignette("getting-started", package = "terradish")`**, the log-linear
+  baseline these models extend.
+- **`vignette("model-comparison", package = "terradish")`**, AICc, likelihood
+  ratio tests, and cross-validation for choosing among candidates.
+- **`vignette("gaussian-scale-optimization", package = "terradish")`**,
+  Gaussian raster smoothing rather than flexibility in the covariate-response
+  shape.
+- **`vignette("hierarchical-conductance", package = "terradish")`**, a
+  diagnostic residual-conductance field for spatial structure not represented
+  by the fixed covariates.

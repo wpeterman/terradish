@@ -71,19 +71,22 @@ A function of class \code{"terradish_measurement_model"} that evaluates a
 Wishart likelihood for an observed genetic \strong{covariance} matrix.
 This is the natural model when raw genotype data are summarized with
 \code{\link{cov_from_genetic_data}} or \code{\link{cov_from_biallelic}}
-rather than as pairwise distances.  For distance-matrix data use
-\code{\link{generalized_wishart}}.
+rather than as pairwise distances. For an admissible squared-distance
+representation coherently related to a centered positive semidefinite
+covariance matrix, use \code{\link{generalized_wishart}}. For other pairwise
+distances, use \code{\link{mlpe}} or \code{\link{leastsquares}}.
 }
 \details{
 The nuisance parameters are:
 \describe{
   \item{\code{tau}}{Nonnegative scale applied to the conductance-implied
-    covariance \code{E}.  A value near zero signals no detectable resistance
-    effect.}
+    covariance \code{E}. A value near zero signals no detectable graph-kernel
+    contribution under this response and model.}
   \item{\code{sigma}}{Log-scale nugget: the identity component added to the
-    model covariance is \eqn{\exp(\sigma)}.  It absorbs genetic drift,
-    population-size differences, and any variation not explained by landscape
-    resistance.}
+    model covariance is \eqn{\exp(\sigma)}. It captures diagonal variation
+    not represented by the graph covariance, including sampling variation
+    and model mismatch. It is not a smoothing scale or a direct estimate of
+    genetic drift or population size.}
 }
 
 The fitted covariance is \eqn{\Sigma = \tau E + \exp(\sigma) I}.  The
@@ -104,16 +107,16 @@ distinct consequences:
 \itemize{
   \item \strong{Point estimates do not depend on \code{nu}.}  The maximizing
     conductance parameters \eqn{\theta} and nuisance parameters
-    \eqn{(\tau, \sigma)} are completely invariant to \code{nu}: scaling the
-    objective by a positive constant does not move its optimum.  You can
-    change \code{nu} by orders of magnitude and the estimated surface is
-    identical.
+    \eqn{(\tau, \sigma)} are invariant to \code{nu} at the exact optimum for
+    a fixed response and model because scaling the objective by a positive
+    constant does not move its optimum. Numerical optimizer tolerances can
+    produce negligible differences in practice.
   \item \strong{Standard errors and confidence intervals scale as}
     \eqn{1/\sqrt{\nu}}.  The Hessian scales with \code{nu}, so the
     asymptotic covariance scales with \eqn{1/\nu}.  Doubling \code{nu}
     shrinks every standard error by a factor of \eqn{\sqrt{2}}.  This is the
-    correct behavior: more markers carry more information and should yield
-    tighter intervals.
+    reflects the assumption that larger effective marker information should
+    yield tighter intervals.
   \item \strong{Model selection and likelihood-ratio tests depend strongly
     on \code{nu}.}  The log-likelihood scales linearly with \code{nu}, but
     the AIC/BIC complexity penalty (and the \eqn{\chi^2} reference
@@ -132,13 +135,12 @@ determines how strongly the data speak.  Choosing \code{nu} requires care:
   \item \emph{Microsatellites:} use the number of loci \eqn{L} as the
     conservative default.  Allele frequencies within a locus are correlated
     (they sum to a constant), so the locus is the natural unit of
-    information.  \eqn{\sum_l (K_l - 1)}, where \eqn{K_l} is the number of
-    observed alleles at locus \eqn{l}, is an upper bound that would only be
-    correct if alleles within a locus were independent; they are not.
-    Using it can produce confidence intervals that are too narrow and
-    model-selection statistics that are too large.  The true effective
-    \eqn{\nu} lies between \eqn{L} and \eqn{\sum_l (K_l - 1)}.  Report
-    the value used and conduct a sensitivity analysis across that range.
+    information. \eqn{\sum_l (K_l - 1)}, where \eqn{K_l} is the number of
+    observed alleles at locus \eqn{l}, is a larger sensitivity value that
+    would count within-locus allele-frequency dimensions more aggressively.
+    Treating it as independent information can produce confidence intervals
+    that are too narrow and model-selection statistics that are too large.
+    Report the primary \code{nu} and a justified sensitivity analysis.
 }
 
 \strong{Typical workflow:}

@@ -1,15 +1,16 @@
-#' Wishart measurement models with a site-level drift (effective-size) surface
+#' Wishart measurement models with site-specific diagonal variance
 #'
 #' Creates a Wishart measurement model whose fitted covariance replaces the
-#' single scalar nugget of \code{\link{wishart_covariance}} /
-#' \code{\link{generalized_wishart}} with a \strong{per-site diagonal} driven by
-#' site-level covariates.  This parameterizes a drift / effective-size surface,
-#' separating local genetic drift (which inflates within-site variance) from the
-#' between-site structure carried by isolation by resistance.  It is the
-#' diagonal (within-deme) analogue of \code{\link{wishart_covariates}}, which
-#' adds off-diagonal isolation-by-environment kernels.
+#' single scalar nugget of \code{\link{wishart_covariance}} or
+#' \code{\link{generalized_wishart}} with a \strong{per-site diagonal}
+#' parameterized by site-level covariates. This models heterogeneity in diagonal genetic
+#' variance. Under an explicit population-genetic model and compatible sampling
+#' design, that heterogeneity may be consistent with differences in drift or
+#' effective population size, but the fitted diagonal is not a direct estimate
+#' of either quantity. It is the diagonal analogue of
+#' \code{\link{wishart_covariates}}, which adds covariance kernels.
 #'
-#' @param x Site-level covariates that drive the drift surface.  Supported
+#' @param x Site-level covariates that parameterize the diagonal variance surface. Supported
 #'   inputs are the same as \code{\link{wishart_covariates}}: a numeric vector,
 #'   matrix, data frame, or \code{terra::SpatRaster}.  \code{NULL} (the default)
 #'   gives an intercept-only model, which reproduces the scalar-nugget
@@ -20,8 +21,10 @@
 #' @param model Which Wishart likelihood to use.
 #'   \code{"wishart_covariance"} is appropriate when the response \code{S} is a
 #'   \strong{covariance} matrix (e.g. from \code{\link{cov_from_genetic_data}});
-#'   \code{"generalized_wishart"} is appropriate when \code{S} is a pairwise
-#'   \strong{distance} matrix (e.g. F\eqn{_{ST}}).
+#'   \code{"generalized_wishart"} is appropriate only when \code{S} is an
+#'   admissible squared-distance representation coherently related to a centered
+#'   positive semidefinite covariance matrix. An arbitrary distance matrix,
+#'   including an unchecked F\eqn{_{ST}} matrix, is not sufficient.
 #' @param scale Logical.  Standardize site-level covariates to zero mean and
 #'   unit variance before building the design matrix?  Recommended when
 #'   covariates use different units or scales.
@@ -35,7 +38,7 @@
 #' inverse of the graph Laplacian at conductance parameters \eqn{\theta}),
 #' \eqn{\tau \ge 0} is the resistance weight (IBR signal), and \eqn{Z} is the
 #' site design matrix consisting of an intercept column plus one (mean-centered)
-#' column per drift covariate.  The per-site nugget
+#' column per diagonal-variance covariate. The per-site nugget
 #' \eqn{n_i = \exp((Z\gamma)_i)} is strictly positive for any real
 #' \eqn{\gamma}, so \eqn{\Sigma} stays positive definite whenever \eqn{\tau \ge 0}.
 #'
@@ -43,48 +46,44 @@
 #' \describe{
 #'   \item{\code{tau}}{Nonnegative scale on the resistance-implied covariance
 #'     \eqn{E}.  A value near zero indicates no detectable IBR signal.}
-#'   \item{\code{sigma}}{Intercept of the log-nugget: the baseline within-site
-#'     drift variance at mean covariate values.  With no drift covariates this
+#'   \item{\code{sigma}}{Intercept of the log-nugget: the baseline diagonal
+#'     variance at mean covariate values. With no diagonal covariates this
 #'     is exactly the scalar nugget of \code{\link{wishart_covariance}}.}
-#'   \item{\code{gamma_<covariate>}}{Slope of the log-nugget on each drift
-#'     covariate.  \eqn{\gamma_j > 0} means that covariate raises within-site
-#'     variance, i.e. \strong{more drift / smaller effective size}; the implied
-#'     effective size scales as \eqn{N_e \propto 1/n_i}.}
+#'   \item{\code{gamma_<covariate>}}{Slope of the log-nugget on each supplied
+#'     site covariate. \eqn{\gamma_j > 0} means that higher covariate values are
+#'     associated with greater fitted diagonal variance, conditional on the
+#'     graph covariance and other diagonal terms.}
 #' }
 #'
-#' \strong{When to use this.} Conductance conflates how readily an organism
-#' moves through a cell with how many organisms a cell supports.  Resistance
-#' distance alone cannot tell a low-similarity region caused by a movement
-#' barrier from one caused by a density / effective-size trough.  Putting
-#' interpretable covariates on the diagonal lets the two be distinguished: the
-#' off-diagonal IBR signal (\eqn{\tau}, \eqn{\theta}) describes movement, while
-#' the diagonal drift surface (\eqn{\gamma}) describes local effective size.
+#' \strong{When to use this.} Use the extension when the response and study
+#' design support a hypothesis about site-specific diagonal variance. It can
+#' reduce confounding between a common nugget and structured diagonal
+#' heterogeneity, but it does not guarantee separation of landscape
+#' connectivity, drift, sampling variation, density, or effective size.
 #'
-#' \strong{Scope.} This is a \emph{deme-structured} model: the diagonal is a
-#' per-focal-site within-deme variance, appropriate when sampling is organized
-#' into populations / demes with reasonably well-defined local effective sizes.
-#' Coalescent simulations confirm that it recovers a per-deme effective-size
-#' gradient (drift decreasing with \eqn{N_e}).  It is \emph{not} a continuous-space
-#' density estimator: when individuals are sampled from a continuum, the genetic
-#' covariance diagonal is confounded by local relatedness and sampling scale and
-#' need not track local density, so the drift surface should not be read as a
-#' density map in that setting.
+#' \strong{Scope.} This is a deme-structured covariance parameterization: the
+#' diagonal is a per-focal-site variance. Reading that term as genetic drift
+#' requires additional assumptions about the genetic summary, marker sampling,
+#' deme definition, and demographic model. Do not report it as local
+#' \eqn{N_e}, abundance, carrying capacity, or density without an external
+#' calibration that identifies that relationship.
 #'
-#' For the \code{"generalized_wishart"} (distance) model the per-site diagonal is
-#' the within-deme contribution to expected pairwise distances, i.e. the
-#' EEMS/FEEMS-style local diversity term, here made an explicit function of
-#' covariates.
+#' For the \code{"generalized_wishart"} (squared-distance) model the per-site
+#' diagonal is a site-specific diagonal contribution to the admissible distance
+#' representation. Its biological meaning remains conditional on the same
+#' assumptions described above.
 #'
 #' @return A function of class \code{"terradish_measurement_model"} suitable for
 #'   the \code{measurement_model} argument of \code{\link{terradish}} and
 #'   \code{\link{terradish_grid}}.  The nuisance parameter vector \eqn{\phi}
 #'   contains \code{tau}, \code{sigma} (the log-nugget intercept), and one
 #'   \code{gamma_<covariate>} per drift covariate, in that order.  The function
-#'   stores the drift covariates in attribute \code{"drift_covariates"} and
+#'   stores the diagonal covariates in attribute \code{"drift_covariates"} and
 #'   supports site-subsetting for cross-validation through its \code{"subsetter"}
 #'   attribute.
 #'
-#' @seealso \code{\link{wishart_covariance}}, \code{\link{generalized_wishart}},
+#' @seealso \code{\link{check_distance_response}},
+#'   \code{\link{wishart_covariance}}, \code{\link{generalized_wishart}},
 #'   \code{\link{wishart_covariates}}, \code{\link{terradish}}
 #'
 #' @references
@@ -103,10 +102,11 @@
 #' start <- g0(E, S, nu = 25)
 #' names(start$phi)        # "tau"   "sigma"
 #'
-#' # With a site covariate driving local effective size.
-#' g <- wishart_drift_covariates(data.frame(density = c(-1, 0, 1)),
+#' # With a site covariate associated with diagonal variance.
+#' g <- wishart_drift_covariates(data.frame(local_variance = c(-1, 0, 1)),
 #'                               model = "wishart_covariance")
-#' fit <- g(E, S, phi = c(tau = 0.8, sigma = log(0.2), gamma_density = 0.1),
+#' fit <- g(E, S, phi = c(tau = 0.8, sigma = log(0.2),
+#'                         gamma_local_variance = 0.1),
 #'          nu = 25)
 #' fit$objective
 #'
@@ -202,15 +202,10 @@ wishart_drift_covariates <- function(x = NULL,
   phi_names <- c("tau", diag_names)
 
   E <- .pair_subset_symm(E)
-  S <- .pair_subset_symm(S)
   if (!isTRUE(covariance))
-  {
-    if (any(diag(S) != 0))
-      warning("Ignoring non-zero diagonal entries in `S`.")
-    diag(S) <- 0
-    if (any(S < 0))
-      warning("Some distances are negative after symmetrization.")
-  }
+    S <- .prepare_gw_response(S)
+  else
+    S <- .pair_subset_symm(S)
 
   if (is.null(phi))
   {

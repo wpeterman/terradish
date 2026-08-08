@@ -2,7 +2,7 @@
 % Please edit documentation in R/gaussian_scale_conductance.R
 \name{gaussian_scale_summary}
 \alias{gaussian_scale_summary}
-\title{Summarize fitted Gaussian scales of effect}
+\title{Summarize fitted Gaussian smoothing scales}
 \usage{
 gaussian_scale_summary(
   object,
@@ -20,8 +20,8 @@ half-width and two-dimensional radial extent of the Gaussian kernel.}
 
 \item{distance_per_map_unit}{Optional scalar conversion factor used to express
 \code{sigma} and the derived radii in user-supplied distance units. For
-example, if the raster CRS is in metres, use \code{distance_per_map_unit =
-0.001} and \code{distance_unit = "km"} to report kilometres.}
+example, if the raster CRS is in meters, use \code{distance_per_map_unit =
+0.001} and \code{distance_unit = "km"} to report kilometers.}
 
 \item{distance_unit}{Optional label used when
 \code{distance_per_map_unit} is supplied.}
@@ -43,6 +43,8 @@ conversion factor back to map units. For each probability \code{p},
 \eqn{qnorm((1 + p) / 2) * sigma}, while \code{radial_*} gives the isotropic
 two-dimensional radius \eqn{sigma * sqrt(-2 * log(1 - p))} containing
 proportion \code{p} of the Gaussian kernel mass.
+These quantities summarize the fitted raster-smoothing kernel. They are not
+estimates of dispersal distance, movement distance, or home-range size.
 
 If the retained raster is in longitude/latitude, the native-unit results are
 in degrees. In that case, use a projected raster for direct distance
@@ -50,13 +52,32 @@ interpretation, or provide an approximate \code{distance_per_map_unit}
 conversion if you need a quick descriptive summary.
 }
 \examples{
-\dontrun{
+\donttest{
+data(melip)
+forestcover <- terra::unwrap(melip.forestcover)
+names(forestcover) <- "forestcover"
+
+# Coarsen the raster so the example runs quickly; the Gaussian model
+# re-smooths the layer at every optimizer step, so cost scales with cell
+# count. Use the full resolution in a real analysis.
+forestcover <- terra::aggregate(forestcover, fact = 3, na.rm = TRUE)
+
+# Feed the model the raw (unsmoothed, unstandardized) raster: it smooths and
+# standardizes internally at each candidate sigma.
+surface <- conductance_surface(forestcover, terra::unwrap(melip.coords),
+                               directions = 8, saveStack = TRUE)
 fit <- terradish(melip.Fst ~ forestcover,
                  data = surface,
-                 conductance_model = gaussian_smoothed_loglinear_conductance(surface),
+                 conductance_model =
+                   gaussian_smoothed_loglinear_conductance(surface),
                  measurement_model = leastsquares,
                  optimizer = "bfgs")
-gaussian_scale_summary(fit, distance_per_map_unit = 0.001, distance_unit = "km")
+
+# sigma is in map units. The melip rasters are unprojected, so those units
+# are degrees; distance_per_map_unit rescales the reported distances.
+gaussian_scale_summary(fit)
+gaussian_scale_summary(fit, distance_per_map_unit = 111,
+                       distance_unit = "km")
 }
 
 }

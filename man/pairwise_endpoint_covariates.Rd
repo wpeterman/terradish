@@ -29,8 +29,9 @@ environmental-mismatch measure.
 \describe{
   \item{\code{"absdiff"}}{Absolute difference between endpoints:
     \eqn{|x_i - x_j|}.  One output column per covariate.  Symmetric;
-    suitable when you expect environmental dissimilarity (regardless of
-    direction) to drive differentiation.}
+    suitable when the hypothesis concerns an association between
+    environmental dissimilarity and differentiation, regardless of
+    direction.}
   \item{\code{"sqdiff"}}{Squared difference:
     \eqn{(x_i - x_j)^2}.  One output column per covariate.  Like
     \code{"absdiff"} but penalizes large differences more heavily.}

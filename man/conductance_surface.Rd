@@ -35,7 +35,7 @@ is less sensitive to grid orientation artifacts.}
 \item{saveStack}{Logical.  If \code{TRUE} (default), the masked
 \code{SpatRaster} is stored inside the returned \code{terradish_graph}
 object.  Required for raster-based conductance visualization
-(\code{plot(fit, type = "surface")}) and marginal-effect plots.  Set to
+(\code{plot(fit, type = "surface")}) and marginal-association plots. Set to
 \code{FALSE} to reduce memory use when the raster is large and
 visualization is not needed.}
 
@@ -44,7 +44,7 @@ visualization is not needed.}
 When supplied, \code{\link{crop_to_focal_buffer}} is called internally.
 A scalar applies the same buffer in both x and y directions; a
 length-two vector gives \code{c(x_buffer, y_buffer)}.  Units are the
-raster's map units (degrees for lon/lat, metres for projected rasters).
+raster's map units (degrees for lon/lat, meters for projected rasters).
 See Details.}
 }
 \value{

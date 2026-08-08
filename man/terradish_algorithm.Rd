@@ -61,15 +61,17 @@ measurement models that require it.}
 \code{"gauss_newton"} returns the Gauss-Newton / Fisher-information
 approximation, obtained by dropping the two residual-weighted
 second-derivative terms (the second derivative of the resistance covariance
-\eqn{E} and of conductance with respect to \code{theta}). The Gauss-Newton
-curvature equals the Fisher information at the optimum, where it is positive
-semidefinite and yields a well-defined \code{vcov} (away from the optimum
-the measurement model's observed curvature can be indefinite). It equals the
-exact Hessian at a well-fitting optimum, and the gap between them measures
-model misspecification. It also requires only first derivatives of the
-conductance model, which is useful for Gaussian scale-aware and spline
-conductance models whose second derivatives are expensive or unstable. The
-number of linear solves is the same as for the exact Hessian.}
+\eqn{E} and of conductance with respect to \code{theta}). It is an
+information-based approximation and is positive semidefinite when the
+retained measurement-model curvature is positive semidefinite. It equals
+the exact Hessian only when the omitted terms are zero or negligible;
+convergence alone does not guarantee equality. A large gap can reflect
+residual structure, model mismatch, or numerical instability and should be
+investigated rather than assigned a unique cause. It also requires only
+first derivatives of the conductance model, which is useful for Gaussian
+scale-aware and spline conductance models whose second derivatives are
+expensive or unstable. The number of linear solves is the same as for the
+exact Hessian.}
 
 \item{solver}{Linear-system solver used for the reduced Laplacian. \code{"direct"} uses the cached sparse Cholesky factorization, \code{"auto"} conservatively chooses between the direct and AMG backends based on graph size and right-hand-side count, \code{"amg"} uses smoothed-aggregation algebraic multigrid preconditioned conjugate gradients, \code{"pcg"} uses incomplete-Cholesky preconditioned conjugate gradients, and \code{"pcg_jacobi"} keeps the older Jacobi-preconditioned prototype.}
 
@@ -128,8 +130,7 @@ surface <- conductance_surface(covariates, melip.coords, directions = 8)
 conductance_model <- loglinear_conductance(~ altitude + forestcover, surface$x)
 
 terradish_algorithm(conductance_model, terradish::leastsquares,
-                 surface, ifelse(melip.Fst < 0, 0, melip.Fst),
-                 nu = 1000, theta = c(-0.3, 0.3))
+                    surface, melip.Fst, theta = c(-0.3, 0.3))
 
 }
 }

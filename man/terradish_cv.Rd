@@ -32,10 +32,9 @@ evaluate to a genetic distance matrix in the calling environment.}
 \code{"mlpe"}, \code{"wishart"}, or \code{"ls"}.}
 
 \item{nu}{Effective Wishart degrees of freedom, passed to measurement models
-that require it.  For biallelic SNPs this is usually the number of
-retained SNPs; for microsatellites use approximately
-\eqn{\sum_l (K_l - 1)} where \eqn{K_l} is the number of observed alleles at
-locus \eqn{l}.}
+that require it. For biallelic SNPs, use the number of approximately
+independent retained SNPs. For microsatellites, use the locus count as a
+conservative primary value and report a sensitivity analysis.}
 
 \item{prop_train}{Proportion of focal points assigned to the training set.}
 

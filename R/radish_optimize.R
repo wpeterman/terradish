@@ -237,6 +237,114 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
   NULL
 }
 
+.terradish_measurement_family <- function(model_name)
+{
+  if (!is.character(model_name) || length(model_name) != 1L)
+    return(NULL)
+
+  switch(model_name,
+         leastsquares = "gaussian_distance",
+         mlpe = "gaussian_distance",
+         generalized_wishart = "generalized_wishart_distance",
+         wishart_covariance = "wishart_covariance",
+         NULL)
+}
+
+.terradish_comparison_contract <- function(measurement_model, nu = NULL,
+                                           response = NULL)
+{
+  model_name <- .terradish_measurement_model_name(measurement_model)
+  family <- .terradish_measurement_family(model_name)
+  pairs <- attr(measurement_model, "pairs", exact = TRUE)
+
+  list(
+    measurement_model = model_name,
+    likelihood_family = family,
+    nu = if (isTRUE(grepl("wishart", family, fixed = TRUE))) nu else NULL,
+    response = response,
+    pairs = if (is.null(pairs)) NULL else as.matrix(pairs)
+  )
+}
+
+.terradish_fit_comparison_contract <- function(fit)
+{
+  contract <- fit$comparison
+  if (!is.list(contract))
+    contract <- list()
+
+  measurement_model <- fit$submodels$g
+  if (is.null(contract$measurement_model) && is.function(measurement_model))
+    contract$measurement_model <- .terradish_measurement_model_name(measurement_model)
+  if (is.null(contract$likelihood_family))
+    contract$likelihood_family <- .terradish_measurement_family(contract$measurement_model)
+  if (is.null(contract$response) && !is.null(fit$fit$response))
+    contract$response <- fit$fit$response
+  if (is.null(contract$pairs) && is.function(measurement_model))
+  {
+    pairs <- attr(measurement_model, "pairs", exact = TRUE)
+    if (!is.null(pairs))
+      contract$pairs <- as.matrix(pairs)
+  }
+
+  contract
+}
+
+.terradish_assert_comparable_fits <- function(fits, purpose = c("information criterion",
+                                                                 "likelihood-ratio test"))
+{
+  purpose <- match.arg(purpose)
+  if (length(fits) < 2L)
+    stop("At least two fitted models are required for comparison.", call. = FALSE)
+
+  dim_keys <- vapply(fits, function(x) paste(x$dim, collapse = "|"), character(1))
+  if (length(unique(dim_keys)) != 1L)
+    stop("Models must use the same focal sites and graph dimensions for a valid ",
+         purpose, ".", call. = FALSE)
+
+  contracts <- lapply(fits, .terradish_fit_comparison_contract)
+  families <- vapply(contracts,
+                     function(x) if (is.null(x$likelihood_family)) NA_character_ else x$likelihood_family,
+                     character(1))
+  known_families <- unique(stats::na.omit(families))
+  if (anyNA(families))
+    stop("Could not identify every model's likelihood family, so a valid ",
+         purpose, " cannot be verified. Use a built-in measurement model or set ",
+         "its `base_model` attribute to the corresponding built-in model.",
+         call. = FALSE)
+  if (length(known_families) > 1L)
+    stop("Models use different likelihood families. Do not compare Gaussian distance, ",
+         "generalized-Wishart distance, and covariance-Wishart fits by ", purpose, ".",
+         call. = FALSE)
+
+  responses <- lapply(contracts, `[[`, "response")
+  have_responses <- !vapply(responses, is.null, logical(1))
+  if (all(have_responses) &&
+      !all(vapply(responses[-1L], identical, logical(1), responses[[1L]])))
+    stop("Models must use the same response matrix for a valid ", purpose, ".",
+         call. = FALSE)
+
+  pairs <- lapply(contracts, `[[`, "pairs")
+  have_pairs <- !vapply(pairs, is.null, logical(1))
+  if (any(have_pairs) &&
+      (!all(have_pairs) || !all(vapply(pairs[-1L], identical, logical(1), pairs[[1L]]))))
+    stop("Models must use the same selected pairs for a valid ", purpose, ".",
+         call. = FALSE)
+
+  is_wishart <- grepl("wishart", families, fixed = TRUE)
+  if (any(is_wishart, na.rm = TRUE))
+  {
+    nu <- vapply(contracts, function(x) {
+      if (is.null(x$nu) || length(x$nu) != 1L) NA_real_ else as.numeric(x$nu)
+    }, numeric(1))
+    known_nu <- unique(nu[is.finite(nu)])
+    if (length(known_nu) > 1L)
+      stop("Wishart models must use the same effective degrees of freedom (`nu`) for a valid ",
+           purpose, ".", call. = FALSE)
+  }
+
+  invisible(contracts)
+}
+
 .deme_coordinates <- function(data)
 {
   coords <- data$vertex_coordinates
@@ -508,10 +616,12 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'
 #' Uses maximum likelihood to fit a parameterized conductance surface to genetic data,
 #' given a function relating spatial data to conductance (a "conductance model")
-#' and a function relating resistance distance (covariance) to genetic distance
-#' (a "measurement model").
+#' and a function linking the graph kernel to an observed genetic distance or
+#' covariance matrix (a "measurement model").
 #'
-#' @param formula A formula with a matrix of observed genetic distances on the lhs, and covariates used in the creation of \code{data} on the rhs
+#' @param formula A formula with an observed genetic distance or covariance
+#'   matrix on the left-hand side and conductance covariates from \code{data} on
+#'   the right-hand side.
 #' @param data An object of class \code{terradish_graph} (see
 #'   \code{\link{conductance_surface}})
 #' @param conductance_model A function of class
@@ -522,11 +632,11 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   \code{\link{terradish_measurement_model}})
 #' @param nu Effective Wishart degrees of freedom passed to measurement models
 #'   that require it, such as \code{\link{generalized_wishart}} and
-#'   \code{\link{wishart_covariance}}.  For biallelic SNPs this is usually the
-#'   number of retained SNPs.  For microsatellites, use the independent
-#'   allele-frequency count, approximately \eqn{\sum_l (K_l - 1)} where
-#'   \eqn{K_l} is the number of observed alleles at locus \eqn{l}.  Ignored by
-#'   non-Wishart measurement models.
+#'   \code{\link{wishart_covariance}}. It must be supplied and is not estimated.
+#'   For biallelic SNPs, use the number of approximately independent retained
+#'   SNPs. For microsatellites, use the number of loci as the conservative
+#'   primary value and examine larger plausible values in a sensitivity
+#'   analysis. Ignored by non-Wishart measurement models.
 #' @param theta Starting values for optimization
 #' @param leverage Compute influence measures and leverage?
 #' @param nonnegative Force regression-like \code{measurement_model} to have nonnegative slope?
@@ -539,18 +649,29 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   and \code{auto} selects \code{bfgs} when there are more than three
 #'   conductance parameters and \code{newton} otherwise. Regardless of the
 #'   optimizer, \code{terradish()} evaluates the fitted model once more at the
-#'   final parameter values with the exact Hessian so standard errors and
-#'   summaries use the same final derivative machinery.
+#'   final parameter values using the requested \code{curvature}, so standard
+#'   errors and summaries use the selected final derivative machinery.
+#' @param verbose Logical.  Should the optimizer report its progress?  The
+#'   default \code{FALSE} fits silently.  Set \code{TRUE} to see the iteration
+#'   count, objective value, gradient norm, and Hessian determinant at each
+#'   step, which is what you want when a fit fails to converge or you are
+#'   tuning \code{control}.  The trace is emitted with \code{message()}, so you
+#'   can also capture or silence it with \code{suppressMessages()}.  Setting
+#'   \code{verbose} explicitly overrides the \code{verbose} field of
+#'   \code{control}; leaving it alone lets a hand-built \code{control} object
+#'   speak for itself.  The much noisier line-search trace stays separate: turn
+#'   it on with
+#'   \code{control = NewtonRaphsonControl(ls.control = HagerZhangControl(verbose = TRUE))}.
 #' @param control A list containing options for the optimization routine (see \code{\link{NewtonRaphsonControl}} for list)
 #' @param validate Numerical validation of leverage via package \code{numDeriv} (very slow, use for debugging small examples)
 #' @param cores Number of worker processes to use for Hessian and leverage calculations. \code{1} evaluates serially.
 #' @param curvature Curvature used for optimization steps and for the returned
 #'   covariance matrix. \code{"exact"} (default) uses the exact Hessian.
-#'   \code{"gauss_newton"} uses the Gauss-Newton / Fisher-information
-#'   approximation, which equals the Fisher information at the optimum (where it
-#'   is positive semidefinite, giving a well-defined \code{vcov}), requires only
-#'   first derivatives of the conductance model, and equals the exact Hessian at
-#'   a well-fitting optimum.
+#'   \code{"gauss_newton"} uses an information-based approximation that drops
+#'   residual-weighted second-derivative terms and requires only first
+#'   derivatives of the conductance model. It equals the exact Hessian only when
+#'   those omitted terms are zero or negligible; convergence alone does not
+#'   guarantee agreement.
 #'   Standard errors from \code{summary()} are then the asymptotic
 #'   information-based errors. With \code{leverage = TRUE} the leverage
 #'   diagnostics inherit the same approximation.
@@ -611,14 +732,14 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'
 #' @details 
 #' \figure{terradish-sticker.png}{options: style='float: right; width: 150px; margin-left: 12px;'}
-#' By "parameterized conductance surface", what is meant is a model
-#' where the per-vertex conductance (and thus resistance distance) is a function of
-#' spatial covariates. The choice of function is referred to in this package as
-#' the "conductance model". The inverse problem (and the purpose of this
-#' package) is to estimate the parameters of the conductance model, by relating
-#' the (unknown, modeled) resistance distance to observed genetic dissimilarity
-#' via a probability model (referred to as the "measurement model" throughout
-#' this package).
+#' A parameterized conductance surface maps raster covariates to positive vertex
+#' conductance. Vertex values define weighted edges and a graph Laplacian
+#' \eqn{L(\theta)}. Its generalized inverse \eqn{E(\theta) = L(\theta)^+} is the
+#' shared graph-process kernel. Distance likelihoods use resistance distances
+#' derived from \eqn{E(\theta)}, whereas covariance likelihoods use the kernel
+#' directly. The selected probability model is called the measurement model.
+#' These alternatives describe how related genetic summaries are observed; they
+#' are not competing biological process theories.
 #'
 #'
 #' For example, a log-linear choice of conductance model is:
@@ -641,16 +762,20 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' from CIRCUITSCAPE, where the edge 
 #' conductance/resistance is the average of the vertex conductance/resistance.
 #'
-#' \code{terradish} estimates \code{theta} (and thus the conductance) by maximum
-#' likelihood; by finding the
-#' values of \code{theta} (and associated conductance) that result in
-#' resistance distances that are closest to the observed genetic distances,
-#' according to some measure of fit (like least squares). The optimization is
+#' \code{terradish} estimates \code{theta} by maximizing the selected
+#' measurement likelihood for the observed response. The optimization is
 #' done via Newton's method (default; requires computation of Hessian during
 #' optimization), via the BFGS algorithm (requires gradient only during
 #' optimization) if \code{optimizer = "bfgs"}, or via a simple parameter-count
 #' heuristic if \code{optimizer = "auto"}. In all cases, the final returned fit
-#' is evaluated with the exact Hessian at the optimized parameters for inference.
+#' is evaluated at the optimized parameters using the requested
+#' \code{curvature} for inference.
+#'
+#' Conductance coefficients are conditional model associations. Their sign and
+#' magnitude depend on covariate coding, other terms, graph construction,
+#' response, measurement likelihood, and candidate set. They are not direct
+#' estimates of causal effects, habitat suitability, migration, dispersal, or
+#' organismal movement rates.
 #'
 #' For an explanation of how categorical spatial covariates are handled, see
 #' \code{details} of \code{\link{conductance_surface}} and the examples below.
@@ -719,7 +844,7 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' 
 #' # a different "measurement_model" that incorporates dependence
 #' # among pairwise measurements
-#' fit_mlpe <- terradish(melip.Fst ~ altitude * forestcover, data = surface, 
+#' fit_mlpe <- terradish(melip.Fst ~ altitude + forestcover, data = surface,
 #'                    terradish::loglinear_conductance, terradish::mlpe)
 #' summary(fit_mlpe)
 #'
@@ -768,8 +893,9 @@ terradish <- function(formula,
                    leverage = FALSE, 
                    nonnegative = TRUE, 
                    conductance = TRUE, 
-                   optimizer = c("newton", "bfgs", "auto"), 
-                   control = NewtonRaphsonControl(verbose = TRUE, ctol = 1e-6, ftol = 1e-6), 
+                   optimizer = c("newton", "bfgs", "auto"),
+                   verbose = FALSE,
+                   control = NewtonRaphsonControl(ctol = 1e-6, ftol = 1e-6),
                    validate = FALSE,
                    cores = 1L,
                    curvature = c("exact", "gauss_newton"),
@@ -787,6 +913,19 @@ terradish <- function(formula,
   stopifnot(length(cores) == 1, is.numeric(cores), cores >= 1)
   if (!isTRUE(conductance))
     stop("`conductance = FALSE` is not currently supported.", call. = FALSE)
+
+  # `verbose` is the simple switch; `control$verbose` is the fine-grained one.
+  # Supplying `verbose` explicitly wins, so `terradish(..., verbose = TRUE)`
+  # turns the trace on whatever the control object says, while an untouched
+  # `verbose` leaves a hand-built control alone. It deliberately does not touch
+  # `ls.control$verbose`: the line-search trace is far noisier and is a
+  # separate opt-in via NewtonRaphsonControl(ls.control = ...).
+  if (!missing(verbose))
+  {
+    if (!is.logical(verbose) || length(verbose) != 1L || is.na(verbose))
+      stop("`verbose` must be TRUE or FALSE.", call. = FALSE)
+    control$verbose <- verbose
+  }
   solver <- match.arg(solver)
   curvature <- match.arg(curvature)
   approximation <- match.arg(approximation)
@@ -796,7 +935,8 @@ terradish <- function(formula,
   vars     <- as.character(attr(terms, "variables"))[-1]
   response <- attr(terms, "response")
   S        <- if(response) eval(attr(terms, "variables")[[response + 1L]], parent.frame())
-              else stop("'formula' must have genetic distance matrix on lhs")
+              else stop("'formula' must have a response matrix on the left-hand side")
+  S        <- .validate_measurement_response(measurement_model, S)
   is_ibd   <- length(vars) == 1
   formula  <- if (!is_ibd) reformulate(attr(terms, "term.labels"))
               else formula(~1)
@@ -857,6 +997,9 @@ terradish <- function(formula,
                          solver_state,
                          eval_conductance_model = conductance_model)
   {
+    # Landmark subsetting drops matrix attributes, so validate and mark each
+    # stage once before the optimizer evaluates it repeatedly.
+    eval_S <- .validate_measurement_response(measurement_model, eval_S)
     function(par, gradient, hessian)
     {
       fcalls$count <- fcalls$count + 1L
@@ -1155,7 +1298,7 @@ terradish <- function(formula,
     for (k in seq_along(theta_external))
       leverage_S[, , k] <- (leverage_S[, , k] + t(leverage_S[, , k])) / 2
     leverage_X <- array(NA, dim = dim(fit$partial_X))
-    for (k in 1:length(theta_external))
+    for (k in seq_along(theta_external))
       leverage_X[,,k] <- -fit$partial_X[,,k] %*% ihess
   }
   num_leverage_S <- NULL
@@ -1193,6 +1336,10 @@ terradish <- function(formula,
                                     "hessian"  = if(no_coef) NULL else -fit$hessian,
                                     "hessian_internal" = if(no_coef) NULL else -fit$hessian_internal),
               approximation  = approximation_info,
+              comparison     = .terradish_comparison_contract(
+                measurement_model = measurement_model,
+                nu = nu
+              ),
               leverage       = list("S" = if(!leverage) NULL else leverage_S,
                                     "X" = if(!leverage) NULL else leverage_X,
                                     "validate" = if(!validate || !leverage) NULL 
@@ -1242,6 +1389,23 @@ radish <- function(...)
 #'   the fitted conductance surface.
 #' @param ... Additional arguments passed through to generic methods.
 #'
+#' @details
+#' Nuisance-parameter estimates and intervals from \code{summary()} remain on
+#' the parameterization used by the measurement model. For example, MLPE
+#' \code{tau} is log precision and its stored \code{rho} is unconstrained; the
+#' actual shared-site correlation is \eqn{\text{plogis}(\rho)/2}. Consult the
+#' selected measurement-model help page before interpreting \code{phi}.
+#'
+#' \code{anova()} is a likelihood-ratio test for nested conductance formulas
+#' fitted to the same response, sites, graph domain, conductance-model factory,
+#' measurement model, and pair subset; Wishart fits must also use the same
+#' \code{nu}. The function checks formula-term nesting, but the analyst must
+#' still verify that the full measurement and conductance parameterization is
+#' substantively nested. Its chi-squared reference distribution assumes the
+#' tested parameters are regular interior parameters. It can be unreliable when
+#' a null value is on a parameter boundary or other regularity conditions fail;
+#' use a justified alternative or simulation calibration in those cases.
+#'
 #' @return
 #' \itemize{
 #'   \item \code{print()} returns its input invisibly.
@@ -1253,8 +1417,54 @@ radish <- function(...)
 #'   \item \code{simulate()} returns one or more simulated response matrices.
 #'   \item \code{anova()} returns a likelihood-ratio comparison table.
 #'   \item \code{logLik()} returns a \code{logLik} object.
-#'   \item \code{AIC()} returns Akaike's Information Criterion.
-#'   \item \code{residuals()} returns the residual genetic-distance matrix.
+#'   \item \code{AIC()} returns \eqn{-2\ell + kK}; the default \code{k = 2}
+#'     gives Akaike's Information Criterion.
+#'   \item \code{residuals()} returns the residual response matrix.
+#' }
+#'
+#' @seealso \code{\link{terradish}} for fitting, \code{\link{conductance}} for
+#'   the fitted surface as a raster, \code{\link{plot.terradish}} for the five
+#'   diagnostic plot types, \code{\link{aic_table}} for ranking a model set,
+#'   and \code{\link{mlpe_response_change}} for putting an MLPE covariate
+#'   association on the response scale.  See
+#'   \code{vignette("getting-started", package = "terradish")} for a walkthrough
+#'   of reading these outputs and
+#'   \code{vignette("model-comparison", package = "terradish")} for
+#'   \code{anova()} and \code{AIC()} in context.
+#'
+#' @examples
+#' \donttest{
+#' data(melip)
+#' covariates <- c(terra::unwrap(melip.altitude), terra::unwrap(melip.forestcover))
+#' names(covariates) <- c("altitude", "forestcover")
+#' covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+#'                                                 na.rm = TRUE))
+#' surface <- conductance_surface(covariates, terra::unwrap(melip.coords),
+#'                                directions = 8)
+#'
+#' fit <- terradish(melip.Fst ~ altitude + forestcover, data = surface,
+#'                  conductance_model = loglinear_conductance,
+#'                  measurement_model = mlpe)
+#'
+#' fit                    # coefficients, log-likelihood, and AIC
+#' summary(fit)           # adds standard errors, Wald tests, and the phi table
+#'
+#' # Conductance coefficients are on the LOG scale, so exponentiate for a
+#' # multiplicative reading: exp(theta) is the change in conductance per
+#' # one-unit (one standard deviation, here) increase in the covariate.
+#' coef(fit)
+#' exp(coef(fit))
+#'
+#' logLik(fit)            # carries a df attribute, so AIC()/BIC() work
+#' AIC(fit)               # compare only fits using the same response and likelihood family
+#' head(fitted(fit)[, 1:4])     # fitted genetic distances
+#' head(residuals(fit)[, 1:4])  # observed minus fitted
+#'
+#' # A nested comparison: is forest cover worth its parameter?
+#' fit_alt <- terradish(melip.Fst ~ altitude, data = surface,
+#'                      conductance_model = loglinear_conductance,
+#'                      measurement_model = mlpe)
+#' anova(fit_alt, fit)
 #' }
 #'
 #' @name terradish_methods
@@ -1383,7 +1593,7 @@ print.summary.radish <- function(x, digits = max(3L, getOption("digits") - 3L), 
   {
     cat("Nuisance parameters")
     if (!is.null(x$phi_table))
-      cat(" (conditional on fitted conductance surface)")
+      cat(" (conditional on fitted conductance surface; measurement-model scale)")
     cat(":\n")
     if (!is.null(x$phi_table))
       print.default(format(x$phi_table, digits = digits), print.gap = 2L, quote = FALSE)
@@ -1464,9 +1674,9 @@ simulate.radish <- function(object, nsim = 1, seed = NULL, method = c("permutati
     fit <- fitted(object)
     resid  <- residuals(object)
     sims   <- array(NA, c(nrow(resid), ncol(resid), nsim))
-    for (i in 1:nsim)
+    for (i in seq_len(nsim))
     {
-      ind <- sample(1:nrow(resid))
+      ind <- sample.int(nrow(resid))
       sims[,,i] <- fit + resid[ind,ind]
     }
   }
@@ -1485,6 +1695,22 @@ anova.radish <- function(object, ..., alternative = NULL)
             inherits(alternative, c("terradish", "radish")))
   stopifnot(!object$fit$boundary && !alternative$fit$boundary)
 
+  contracts <- .terradish_assert_comparable_fits(
+    list(object, alternative), purpose = "likelihood-ratio test"
+  )
+  model_names <- vapply(contracts,
+                        function(x) if (is.null(x$measurement_model)) NA_character_ else x$measurement_model,
+                        character(1))
+  if (all(!is.na(model_names)) && length(unique(model_names)) > 1L)
+    stop("Likelihood-ratio tests require the same measurement model; use information criteria or cross-validation for non-nested alternatives.",
+         call. = FALSE)
+
+  if (!identical(object$submodels$f_factory,
+                 alternative$submodels$f_factory))
+    stop("Likelihood-ratio tests require the same conductance-model factory; ",
+         "different conductance parameterizations are not verified as nested.",
+         call. = FALSE)
+
   if (object$df >= alternative$df)
   {
     full <- object
@@ -1496,11 +1722,20 @@ anova.radish <- function(object, ..., alternative = NULL)
     reduced <- object
   }
 
+  reduced_terms <- .canonical_formula_terms(reduced$formula)
+  full_terms <- .canonical_formula_terms(full$formula)
+  if (!all(reduced_terms %in% full_terms))
+    stop("The reduced model's formula terms are not nested within the full model.",
+         call. = FALSE)
+
   form_reduced <- paste("Null:", paste(reduced$formula, collapse = " "))
   form_full    <- paste("Alt:", paste(full$formula, collapse = " "))
 
   Chisq <- 2 * (full$loglik - reduced$loglik)
   Df    <- full$df - reduced$df
+  if (!is.finite(Df) || Df <= 0)
+    stop("The full model must add at least one estimated parameter for a likelihood-ratio test.",
+         call. = FALSE)
   P     <- pchisq(Chisq, Df, lower.tail = FALSE)
   Ll    <- c(reduced$loglik, full$loglik)
   Np    <- c(reduced$df, full$df)
@@ -1516,6 +1751,18 @@ anova.radish <- function(object, ..., alternative = NULL)
                            form_reduced, form_full)
   class(out) <- "anova"
   out
+}
+
+.canonical_formula_terms <- function(formula)
+{
+  factors <- attr(stats::terms(formula), "factors")
+  if (is.null(factors) || length(factors) == 0L ||
+      is.null(dim(factors)) || ncol(factors) == 0L)
+    return(character())
+
+  vapply(seq_len(ncol(factors)), function(i) {
+    paste(sort(rownames(factors)[factors[, i] > 0]), collapse = ":")
+  }, character(1))
 }
 
 #' @rdname legacy_radish_methods
@@ -1534,7 +1781,7 @@ logLik.radish <- function(object, ...)
 #' @export
 AIC.radish <- function(object, ..., k = 2)
 {
-  object$aic
+  -2 * object$loglik + k * object$df
 }
 
 #' @rdname legacy_radish_methods

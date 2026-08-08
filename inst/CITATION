@@ -5,8 +5,8 @@ bibentry(
   title    = "terradish: Fast Gradient-Based Optimization of Resistance Surfaces",
   author   = c(person("Bill", "Peterman"),
                person(c("Nathaniel", "S."), "Pope")),
-  year     = "2026",
-  note     = "R package version 0.0.44",
+  year     = sub("-.*", "", meta$Date),
+  note     = paste("R package version", meta$Version),
   doi      = "10.5281/zenodo.21225712",
   url      = "https://doi.org/10.5281/zenodo.21225712"
 )

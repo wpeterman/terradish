@@ -31,36 +31,33 @@ have_res <- !is.null(res)
 
 ## Why add a field to a covariate model?
 
-A covariate conductance model (`terradish` with `loglinear_conductance`) is
-mechanistic and predictive, but it is blind to any process its covariates do not
-encode. If an important driver of gene flow is unmapped, the optimizer does not
-return a clean null; it bends the *mapped* covariates to soak up the missing
-structure, biasing their estimated effects. This is the omitted-variable problem
-documented for correlative resistance estimation (Graves et al. 2013; Daniel et
-al. 2024).
+A covariate conductance model (`terradish` with `loglinear_conductance`) can leave
+spatial structure that the supplied covariates and transformations do not
+represent. That residual pattern can reflect an omitted covariate, an incorrect
+functional form, spatial confounding, sampling structure, historical signal, or
+measurement-model mismatch.
 
-`terradish_hierarchical()` addresses this by writing log-conductance as a
-mechanistic covariate term **plus a spatially smooth Gaussian random field**:
+`terradish_hierarchical()` represents log-conductance as a covariate term **plus
+a spatially smooth Gaussian random field**:
 
 $$\log c = X\theta + u, \qquad u \sim \mathrm{Normal}\!\big(0,\ \tau^2 (L_{coarse} + \epsilon I)^{-1}\big).$$
 
-The GMRF prior on $u$ is exactly the FEEMS spatial-smoothness penalty written as
-a proper distribution: it pulls neighboring field values together, with $\tau^2$
-controlling how much structure the field may absorb. This single model nests both
-parents:
+The proper GMRF prior pulls neighboring field values together, with $\tau^2$
+controlling how much residual structure the field may absorb. This model includes
+two limiting cases:
 
 - set the field to zero ($\tau^2 \to 0$) and you recover **`terradish`**;
-- drop the covariates and let $u$ carry the whole surface and you recover a
-  **FEEMS-style** free, smoothed surface;
-- keep both and you get a model that is mechanistic where covariates explain the
-  data and flexible where they do not.
+- drop the covariates and let $u$ carry the whole surface to obtain a free,
+  smoothed field;
+- keep both to estimate covariate coefficients conditional on a flexible
+  residual spatial term.
 
-Two payoffs follow. First, the covariate effects $\theta$ are **protected from
-omitted-variable bias**, because unmodeled spatial structure is absorbed by $u$
-rather than distorting $\theta$. Second, the fitted field $u$ is **a deliverable
-in its own right**: a map of the conductance variation your covariates failed to
-explain, and therefore a residual diagnostic and a guide to the next covariate
-worth collecting.
+The fitted field $u$ is primarily a **diagnostic**: it maps residual
+log-conductance structure after the supplied covariates. The field may reduce
+some omitted spatial pattern in a controlled setting, but it can also compete
+with spatially structured covariates. It does not guarantee unbiased $\theta$,
+identify a missing mechanism, or establish causality. Interpret both $\theta$
+and $u$ conditionally and examine sensitivity to field resolution and $\tau^2$.
 
 ## How it is fit
 
@@ -72,8 +69,8 @@ where $\ell$ is the measurement-model log-likelihood (the nuisance parameters
 $\phi$ profiled out) and $L_{coarse}$ is the Laplacian of the coarse-field
 adjacency graph. The field lives on a coarse `field_resolution` $\times$
 `field_resolution` grid over the landscape, deliberately coarser than the
-covariate grid, which is the main safeguard against $\theta$ and $u$ competing to
-explain the same signal.
+covariate grid. This reduces, but does not eliminate, competition between
+$\theta$ and $u$ for the same spatial pattern.
 
 Optimization is by L-BFGS over $(\theta, u)$ using only the gradient, which flows
 through the same single sparse-Cholesky solve `terradish` already uses; the dense
@@ -83,8 +80,10 @@ a Laplace (empirical-Bayes) marginal likelihood that integrates the field out.
 ## A worked example
 
 We use the bundled *Melipona* landscape and **simulate** a covariance response
-whose true conductance depends on altitude and forest cover **plus an unmapped
-smooth feature** (a localized corridor/barrier the analyst did not measure).
+whose generating conductance depends on altitude and forest cover **plus an
+omitted smooth feature**. This deliberately favorable simulation illustrates
+the method under a known model; it is not a general validation of field or
+coefficient recovery.
 
 ```{r build-surface, eval = FALSE}
 library(terradish)
@@ -98,15 +97,34 @@ surface <- conductance_surface(covs, terra::unwrap(melip.coords), directions = 8
 ```
 
 ```{r simulate, eval = FALSE}
-# True log-conductance = 0.5*altitude - 0.6*forestcover + an UNMAPPED blob.
-Vc <- surface$vertex_coordinates
+set.seed(20)
+
+n  <- length(surface$demes)                       # 37 focal sites
+Vc <- surface$vertex_coordinates                  # cell centers of the graph
+X  <- as.matrix(surface$x[, c("altitude", "forestcover")])
+
+# The UNMAPPED feature: a smooth Gaussian bump in log-conductance that no
+# raster in the model encodes. Centering it keeps it out of the intercept.
 xr <- range(Vc[, 1]); yr <- range(Vc[, 2])
 blob <- 1.6 * exp(-(((Vc[, 1] - (xr[1] + 0.35 * diff(xr)))^2 +
                      (Vc[, 2] - (yr[1] + 0.6 * diff(yr)))^2) /
                     (2 * (0.18 * sqrt(diff(xr)^2 + diff(yr)^2))^2)))
 blob <- blob - mean(blob)
-# (helper builds a conductance model from a raw design matrix; see ?terradish)
-S <- ... # cov_from_genetic_data() on real genotypes; here a simulated Wishart draw
+
+# True log-conductance = 0.5*altitude - 0.6*forestcover + 1.0*blob.
+# .design_loglinear_model() builds a conductance model straight from a design
+# matrix, which lets us put the blob in the truth without giving it to the fit.
+E <- as.matrix(terradish_algorithm(
+  terradish:::.design_loglinear_model(cbind(X, blob)),
+  leastsquares, surface, S = diag(n), theta = c(0.5, -0.6, 1.0),
+  objective = FALSE, gradient = FALSE, hessian = FALSE,
+  partial = FALSE)$covariance)
+
+# Draw a genetic covariance matrix from that truth. With real data this is
+# where cov_from_genetic_data() or cov_from_biallelic() would supply S, and nu
+# would be your effective marker count.
+nu <- 1500
+S  <- rWishart(1, df = nu, Sigma = (E + 0.25 * diag(n)) / nu)[, , 1]
 ```
 
 Fit the hierarchical model, letting $\tau^2$ be chosen by REML, and a plain
@@ -129,7 +147,7 @@ fit_plain <- terradish(
 )
 ```
 
-### The field absorbs the unmapped feature, protecting `theta`
+### Behavior in this controlled simulation
 
 ```{r show-coef, echo = FALSE, eval = have_res}
 knitr::kable(res$coef_table, digits = 3,
@@ -139,25 +157,26 @@ knitr::kable(res$coef_table, digits = 3,
 ```{r coef-text, eval = FALSE}
 # With the field: altitude ~0.54, forestcover ~-0.63 (close to truth 0.50, -0.60)
 coef(fit_h)
-# Without the field: forestcover ~-0.43, biased ~30% toward zero by the
-# unmodeled blob.
+# Without the field: forestcover ~-0.43 in this particular simulation.
 coef(fit_plain)
 ```
 
 ```{r recovery-text, echo = FALSE, results = "asis", eval = have_res}
 cat(sprintf(
-  "The fitted field recovers the unmapped feature with correlation **%.2f** to the true blob, and the selected field variance is **tau^2 = %.3g**.\n",
+  "In this controlled simulation, the fitted field correlates **%.2f** with the generating blob, and the selected field variance is **tau^2 = %.3g**.\n",
   res$cor_field_blob, res$tau2))
 ```
 
-The plain model, missing the blob, biases the forest-cover effect toward zero;
-the hierarchical model recovers it because the field, not `theta`, absorbs the
-unmodeled structure.
+In this one simulation, the plain model's forest-cover coefficient is closer to
+zero and the hierarchical coefficient is closer to the generating value. That
+contrast demonstrates possible behavior under a deliberately matched setting.
+It does not show that a field generally removes omitted-variable bias.
 
-### Mapping the unexplained conductance
+### Mapping fitted residual log-conductance
 
 `conductance_field()` returns the field as a raster (when the graph stored its
-stack), so you can see *where* the covariates fell short:
+stack), so you can inspect where residual structure remains under the fitted
+model:
 
 ```{r field-map, eval = FALSE}
 field_raster <- conductance_field(fit_h, surface, type = "field")
@@ -167,7 +186,7 @@ plot(field_raster)            # the smooth residual conductance surface u
 plot(conductance_field(fit_h, surface, type = "conductance"))
 ```
 
-```{r field-plot, echo = FALSE, eval = have_res, fig.cap = "Fitted smooth field u: the conductance variation the covariates did not explain. The peak coincides with the unmapped feature."}
+```{r field-plot, echo = FALSE, eval = have_res, fig.cap = "Fitted smooth residual field u in the controlled simulation. The peak overlaps the omitted generating feature."}
 if (!is.null(res$field_raster)) {
   terra::plot(terra::unwrap(res$field_raster), main = "Fitted field (u)")
 }
@@ -184,10 +203,11 @@ knitr::kable(res$tau2_selection, digits = 3,
 ```
 
 A clear interior maximum (rather than a value pinned at the smallest or largest
-grid point) indicates the data support a field of intermediate smoothness. If the
-maximum sits at a grid boundary, widen `tau2_grid`. You can also pass a fixed
-numeric `tau2` if you want to control the amount of flexibility directly, or set
-it from external information.
+grid point) indicates that an intermediate field variance maximizes this
+empirical-Bayes profile. It does not identify a unique biological spatial
+scale. If the maximum sits at a grid boundary, widen `tau2_grid`. You can also
+pass a fixed numeric `tau2` if you want to control the amount of flexibility
+directly, or set it from external information.
 
 ## Practical guidance
 
@@ -196,16 +216,16 @@ it from external information.
   erode identifiability. Start coarse (the default `6`) and increase only if a
   clear, stable feature demands it.
 - **Read the field as a diagnostic, not a mechanism.** A strong field feature
-  says "something here is not in your covariates", a hypothesis generator for
-  the next layer to collect, not an explanation by itself.
+  indicates residual structure under the fitted model. It is a hypothesis
+  generator, not an explanation by itself.
 - **Genetic data constrain conductance weakly.** Added flexibility is only
   helpful if paid for by an informative prior; that is exactly what the GMRF on
   the (coarse) field provides. Sanity-check that `theta` and predictive accuracy
   are stable across a couple of `field_resolution` values.
-- **It nests your simpler models.** Fitting `terradish_hierarchical()` and
-  comparing the field magnitude (and `theta`) against a plain `terradish` fit is
-  a direct check on whether omitted spatial structure is distorting your
-  covariate effects.
+- **Compare sensitivity, not just one fit.** Compare `theta`, the field, and
+  predictive behavior across a plain fit, several `field_resolution` values,
+  and a defensible `tau2_grid`. Stability is more informative than any single
+  residual map.
 
 ## Quick-reference
 
@@ -225,7 +245,29 @@ fit <- terradish_hierarchical(
   tau2              = "reml"
 )
 
-# 3. Inspect mechanism + the unexplained-conductance map
-summary(fit)                                  # theta (protected) + tau^2 profile
+# 3. Inspect conditional coefficients and the residual-field diagnostic
+summary(fit)                                  # theta + tau^2 profile
 plot(conductance_field(fit, surface))         # the field u
 ```
+
+## Summary of key functions
+
+| Function | Purpose |
+|----------|---------|
+| `conductance_surface()` | Build the weighted graph over the raster grid |
+| `terradish_hierarchical()` | Fit `log c = X theta + u`, selecting `tau^2` by REML |
+| `summary()` | Covariate table, field sd and edf, and the `tau^2` profile |
+| `conductance_field()` | Return the field `u` or the full surface as a `SpatRaster` |
+| `plot(type = "field")` | Map the fitted residual log-conductance field |
+| `AIC()` | Conditional-likelihood summary that charges the field's edf; use cautiously with sensitivity and predictive checks |
+
+## See also
+
+- **`vignette("getting-started", package = "terradish")`**, the plain
+  covariate model this one extends.
+- **`vignette("spline-conductance", package = "terradish")`**, added
+  flexibility in the covariate response rather than in space.
+- **`vignette("wishart-covariance", package = "terradish")`**, the covariance
+  measurement model used here and how to choose `nu`.
+- **`vignette("model-comparison", package = "terradish")`**, deciding whether
+  the field earns the effective degrees of freedom it costs.

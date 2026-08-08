@@ -140,15 +140,14 @@
 
 #' Hierarchical (covariate + smooth field) conductance surface
 #'
-#' Fits a conductance surface whose log-conductance is the sum of a mechanistic
-#' covariate term and a spatially smooth Gaussian random field,
+#' Fits a conductance surface whose log-conductance is the sum of a covariate
+#' term and a spatially smooth Gaussian random field,
 #' \eqn{\log c = X\theta + u}.  This nests the standard \code{\link{terradish}}
-#' model (recovered as the field variance \eqn{\tau^2 \to 0}) and a
-#' FEEMS-style free surface (recovered when no covariates are supplied), and it
-#' protects the covariate effects \eqn{\theta} from omitted-variable bias by
-#' letting the field \eqn{u} absorb spatial structure the covariates do not
-#' explain.  The fitted field is itself a deliverable: a map of conductance
-#' variation your covariates failed to capture.
+#' model as the field variance \eqn{\tau^2 \to 0} and allows a field-only fit
+#' when no covariates are supplied. The field is a diagnostic residual
+#' log-conductance surface. It can absorb omitted, misspecified, or spatially
+#' confounded structure, so it does not guarantee unbiased \eqn{\theta}, identify
+#' a missing mechanism, or establish that the supplied covariates are causal.
 #'
 #' @param formula Model formula with the genetic response matrix on the
 #'   left-hand side and conductance covariates on the right, exactly as in
@@ -165,8 +164,9 @@
 #'   measurement models.
 #' @param field_resolution Integer \eqn{G}: the field lives on a coarse
 #'   \eqn{G \times G} grid over the graph extent (piecewise-constant within each
-#'   occupied coarse cell).  A coarser field than the covariate grid is the main
-#'   identifiability safeguard.  Default \code{6}.
+#'   occupied coarse cell). A coarser field than the covariate grid reduces, but
+#'   does not eliminate, spatial confounding. Report sensitivity to this value.
+#'   Default \code{6}.
 #' @param tau2 Field variance.  Either a positive number (fit at that fixed
 #'   value) or \code{"reml"} (default), which selects \eqn{\tau^2} by maximizing
 #'   a Laplace empirical-Bayes marginal likelihood over \code{tau2_grid}.
@@ -185,8 +185,8 @@
 #' \deqn{J(\theta, u) = -\ell(\theta, u \mid \phi) + \frac{1}{2\tau^2} u^\top (L_{coarse} + \epsilon I)\, u,}
 #' where \eqn{\ell} is the measurement-model log-likelihood (with nuisance
 #' parameters \eqn{\phi} profiled out) and \eqn{L_{coarse}} is the Laplacian of
-#' the coarse-field adjacency graph, so the penalty is exactly the FEEMS spatial
-#' smoothness prior written as a proper GMRF.  Optimization is by \code{L-BFGS-B}
+#' the coarse-field adjacency graph, giving a proper GMRF smoothness penalty.
+#' Optimization is by \code{L-BFGS-B}
 #' over \eqn{(\theta, u)} using only the gradient, which flows through the same
 #' single sparse-Cholesky solve that \code{\link{terradish_algorithm}} already
 #' uses; the dense Hessian over the field is never formed during fitting.
@@ -203,8 +203,16 @@
 #' \eqn{\tau^2} within one model but should not be compared as an absolute
 #' evidence across models with different numbers of covariates.
 #'
-#' If the measurement model profiles to \eqn{\tau^2 = 0} (no detectable
-#' resistance-distance signal), the conductance surface is unidentified; the fit
+#' Interpret \eqn{u} as fitted residual spatial structure on the
+#' log-conductance scale, conditional on the selected field resolution,
+#' \eqn{\tau^2} grid, covariates, graph, response, and measurement model. A
+#' prominent field feature may reflect an omitted landscape variable, an
+#' incorrect covariate transformation, sampling structure, historical signal,
+#' or residual model mismatch. Check field-resolution and \eqn{\tau^2}
+#' sensitivity before interpreting it.
+#'
+#' If the measurement model profiles its graph-kernel weight to zero (no
+#' detectable graph contribution), the conductance surface is unidentified; the fit
 #' is returned with a warning and \code{NA} standard errors, effective degrees of
 #' freedom, and AIC.
 #'
@@ -220,24 +228,30 @@
 #'   \code{\link{conductance_surface}}, \code{\link{wishart_covariance}}
 #'
 #' @examples
-#' \dontrun{
-#' library(terra)
+#' \donttest{
 #' data(melip)
-#' covs <- c(terra::scale(terra::unwrap(melip.altitude)),
-#'           terra::scale(terra::unwrap(melip.forestcover)))
+#' covs <- c(terra::unwrap(melip.altitude), terra::unwrap(melip.forestcover))
 #' names(covs) <- c("altitude", "forestcover")
+#'
+#' # Coarsen the raster and the field grid so the example runs quickly: the
+#' # inner L-BFGS solves the Laplacian system once per (theta, u) evaluation,
+#' # at every tau^2 on the grid. Use the full resolution and the default
+#' # field_resolution = 6 in a real analysis.
+#' covs <- scale_covariates(terra::aggregate(covs, fact = 3, na.rm = TRUE))
 #' surface <- conductance_surface(covs, terra::unwrap(melip.coords),
-#'                                directions = 8)
+#'                                directions = 8, saveStack = TRUE)
 #'
 #' fit <- terradish_hierarchical(
 #'   melip.Fst ~ altitude + forestcover,
 #'   data              = surface,
-#'   measurement_model = generalized_wishart,
-#'   nu                = 1000,
-#'   field_resolution  = 6
+#'   measurement_model = leastsquares,
+#'   field_resolution  = 3,
+#'   tau2_grid         = c(0.1, 1)
 #' )
-#' summary(fit)
-#' plot(conductance_field(fit, surface))   # map of unexplained conductance
+#' summary(fit)   # theta, field sd/edf, and the tau^2 profile
+#'
+#' # diagnostic map of fitted residual log-conductance structure
+#' terra::plot(conductance_field(fit, surface))
 #' }
 #'
 #' @export
@@ -255,7 +269,7 @@ terradish_hierarchical <- function(formula, data,
                                    solver_control = NULL,
                                    maxit = 500L,
                                    factr = 1e7,
-                                   verbose = TRUE)
+                                   verbose = FALSE)
 {
   stopifnot(inherits(formula, "formula"))
   stopifnot(inherits(data, c("terradish_graph", "radish_graph")))
@@ -271,6 +285,7 @@ terradish_hierarchical <- function(formula, data,
     stop("'formula' must have the genetic response matrix on the left-hand side")
   S        <- eval(attr(tm, "variables")[[response + 1L]], parent.frame())
   S        <- as.matrix(S)
+  S        <- .validate_measurement_response(measurement_model, S)
   is_ibd   <- length(vars) == 1
   rhs      <- if (!is_ibd) reformulate(attr(tm, "term.labels")) else formula(~1)
 
@@ -308,26 +323,65 @@ terradish_hierarchical <- function(formula, data,
     if (is.null(tau2_grid))
       tau2_grid <- 10 ^ seq(-2, 2, length.out = 9)
     logml <- rep(NA_real_, length(tau2_grid))
+    failures <- character(length(tau2_grid))
     par_start <- par0
     for (i in seq_along(tau2_grid)) {
-      fi <- fit_at(tau2_grid[i], par_start)
-      par_start <- fi$par                       # warm start across the grid
-      logml[i] <- .hierarchical_logml(fi, tau2_grid[i], cm, measurement_model,
-                                      data, S, nu, uidx, field$Q, nonnegative,
-                                      solver, solver_control)
+      # A large tau2 weakens the field penalty, which can leave the nuisance
+      # subproblem's Hessian numerically singular and make the inner optimizer
+      # stop. That is a property of this grid point, not of the model, so drop
+      # the point and carry on rather than losing the whole fit. It matters
+      # because the grid-edge warning below tells users to widen `tau2_grid`,
+      # and widening is exactly what provokes the failure.
+      step <- tryCatch({
+        fi <- fit_at(tau2_grid[i], par_start)
+        list(fit = fi,
+             logml = .hierarchical_logml(fi, tau2_grid[i], cm,
+                                         measurement_model, data, S, nu, uidx,
+                                         field$Q, nonnegative, solver,
+                                         solver_control))
+      }, error = function(e) structure(list(message = conditionMessage(e)),
+                                       class = "hierarchical_tau2_failure"))
+
+      if (inherits(step, "hierarchical_tau2_failure")) {
+        failures[i] <- step$message
+        if (verbose)
+          message(sprintf("  tau2 = %10.4g   skipped (%s)", tau2_grid[i],
+                          step$message))
+        next                                    # keep the last good warm start
+      }
+
+      par_start <- step$fit$par                 # warm start across the grid
+      logml[i] <- step$logml
       if (verbose)
         message(sprintf("  tau2 = %10.4g   logML = %.3f", tau2_grid[i], logml[i]))
     }
-    if (all(is.na(logml)))
+
+    usable <- which(is.finite(logml))
+    if (!length(usable)) {
+      first <- failures[nzchar(failures)][1]
       stop("tau2 selection failed: the Laplace marginal likelihood could not ",
-           "be evaluated at any grid point.", call. = FALSE)
-    wm <- which.max(logml)
+           "be evaluated at any grid point.",
+           if (is.na(first)) "" else paste0("  First error: ", first),
+           call. = FALSE)
+    }
+    if (any(nzchar(failures)))
+      warning(sum(nzchar(failures)), " of ", length(tau2_grid),
+              " `tau2_grid` values were skipped because the fit failed there (",
+              paste(format(tau2_grid[nzchar(failures)], digits = 3),
+                    collapse = ", "),
+              "); tau2 was selected from the ", length(usable),
+              " that succeeded.", call. = FALSE)
+
+    wm <- usable[which.max(logml[usable])]
     tau2_hat <- tau2_grid[wm]
-    if (wm == 1L || wm == length(tau2_grid))
+    # "Edge" means the edge of the usable range, not of the requested grid: a
+    # maximum next to a skipped point is just as uninformative.
+    if (wm == usable[1L] || wm == usable[length(usable)])
       warning("Selected tau2 (", format(tau2_hat, digits = 3), ") sits at the ",
-              if (wm == 1L) "lower" else "upper", " edge of `tau2_grid`; the ",
-              "marginal likelihood may be maximized outside the grid. Consider ",
-              "widening `tau2_grid`.", call. = FALSE)
+              if (wm == usable[1L]) "lower" else "upper",
+              " edge of the usable `tau2_grid` values; the marginal likelihood ",
+              "may be maximized outside that range. Consider widening ",
+              "`tau2_grid`.", call. = FALSE)
     tau2_selection <- data.frame(tau2 = tau2_grid, logML = logml)
   } else {
     stopifnot(is.numeric(tau2), length(tau2) == 1L, tau2 > 0)
@@ -335,7 +389,12 @@ terradish_hierarchical <- function(formula, data,
   }
 
   # ---- final fit + conditional theta covariance ----
-  fit <- fit_at(tau2_hat, par0)
+  fit <- tryCatch(fit_at(tau2_hat, par0), error = function(e)
+    stop("The hierarchical fit failed at tau2 = ", format(tau2_hat, digits = 4),
+         ". A large tau2 weakens the field penalty and can leave the nuisance ",
+         "subproblem numerically singular; try a smaller value, or leave ",
+         "`tau2 = \"reml\"` so a workable value is chosen from the grid. ",
+         "Underlying error: ", conditionMessage(e), call. = FALSE))
   hres <- .hierarchical_penalized(fit$par, tau2_hat, cm, measurement_model, data,
                                   S, nu, uidx, field$Q, nonnegative, solver,
                                   solver_control, phi_state = NULL,
@@ -425,8 +484,8 @@ terradish_hierarchical <- function(formula, data,
 
 #' Extract the fitted conductance field from a hierarchical model
 #'
-#' Returns the smooth residual field \eqn{u} (the conductance variation the
-#' covariates did not explain) from a \code{\link{terradish_hierarchical}} fit,
+#' Returns the fitted smooth residual field \eqn{u} from a
+#' \code{\link{terradish_hierarchical}} fit,
 #' as a \code{terra::SpatRaster} when the graph stored its raster stack, or as a
 #' per-cell numeric vector otherwise.
 #'
@@ -494,6 +553,157 @@ conductance_field <- function(fit, data, type = c("field", "logconductance", "co
   values_out
 }
 
+#' Methods for fitted hierarchical conductance models
+#'
+#' S3 methods for objects of class \code{terradish_hierarchical} returned by
+#' \code{\link{terradish_hierarchical}}.  These models write log-conductance as
+#' \code{log c = X theta + u}: a covariate part (\code{theta}) plus a smooth
+#' spatial random field (\code{u}) representing fitted residual structure after
+#' the supplied covariate terms.
+#'
+#' @param x A fitted \code{terradish_hierarchical} object.
+#' @param object A fitted \code{terradish_hierarchical} object.
+#' @param k Penalty multiplier supplied to \code{AIC()}.  The default
+#'   \code{k = 2} gives Akaike's Information Criterion.
+#' @param parm Optional character or numeric selection of covariate parameters
+#'   for \code{confint()}.  Omit it to get intervals for every covariate.
+#' @param level Confidence level for \code{confint()}.
+#' @param data The \code{\link{conductance_surface}} graph used to fit the
+#'   model.  Required by \code{plot()}, which needs the raster template; build
+#'   the graph with \code{saveStack = TRUE}.
+#' @param type Which surface to draw: \code{"field"} (the fitted random field
+#'   \code{u} alone, on the log-conductance scale), \code{"conductance"} (the full fitted
+#'   surface \code{exp(X theta + u)} on the natural scale), or
+#'   \code{"logconductance"} (that surface on the log scale).
+#' @param ... Additional arguments passed to the underlying generic or, for
+#'   \code{plot()}, to \code{terra::plot()}.
+#'
+#' @details
+#' \strong{How to read the \code{print()} and \code{summary()} output.}  The
+#' header reports the measurement model, how many covariate parameters and
+#' coarse-grid field cells were estimated, and three numbers that describe the
+#' field:
+#' \itemize{
+#'   \item \code{tau^2} is the prior variance of the field on the
+#'     log-conductance scale. Larger values allow more residual spatial
+#'     structure.  It is selected by maximizing a Laplace marginal likelihood
+#'     over \code{tau2_grid}, and the fit warns if the maximum sits at the edge
+#'     of that grid, which means the grid should be widened.
+#'   \item \code{field sd} is the standard deviation of the fitted \code{u}
+#'     values, again on the log scale. A field sd of 0.5 means the fitted
+#'     residual component varies by roughly \code{exp(0.5)}, about 1.6-fold,
+#'     across the landscape.
+#'   \item \code{field edf} is the effective degrees of freedom the field
+#'     consumed. It runs from 0 (field fully shrunk away under the selected
+#'     settings) up to the number of field cells (a flexible fitted field).
+#'     It is what \code{df} and therefore \code{AIC()} charge for
+#'     the field.
+#' }
+#'
+#' The coefficient table below the header holds \code{theta}, on the
+#' \strong{log-conductance} scale, so \code{exp(theta)} is the multiplicative
+#' change in conductance per one-unit increase in the (scaled) covariate.
+#' Standard errors come from the penalized observed information and are
+#' therefore conditional on the selected \code{tau^2}; they do not propagate
+#' uncertainty in \code{tau^2} itself.
+#'
+#' Two log-likelihoods are printed.  \code{loglik} is the conditional
+#' likelihood at the fitted \code{(theta, u)} and is what \code{logLik()} and
+#' \code{AIC()} use.  \code{marginal loglik} (\code{logML}) is the Laplace
+#' evidence used only to choose \code{tau^2}; it is a joint evidence over
+#' \code{(theta, u)} rather than a clean field-only marginal, so do not compare
+#' it across models with different numbers of covariates.
+#'
+#' \strong{Degenerate fits.}  If the measurement model lands on its
+#' \code{tau = 0} boundary the conductance surface is unidentified: there is no
+#' detectable isolation-by-resistance signal for the field to shape.  In that
+#' case \code{print()} shows a NOTE, and standard errors, \code{edf}, and
+#' \code{AIC} are returned as \code{NA} rather than computed from a singular
+#' Hessian. Treat such a fit as no detectable resistance-distance signal under
+#' the fitted response and model, not as proof of absent gene flow or absent
+#' landscape association.
+#'
+#' @return
+#' \itemize{
+#'   \item \code{print()} returns its input invisibly, after printing the field
+#'     summary and the covariate coefficient table described above.
+#'   \item \code{summary()} prints the same report plus the \code{tau^2}
+#'     selection table (one row per grid value, with its Laplace marginal
+#'     log-likelihood) and returns the fitted object invisibly.
+#'   \item \code{coef()} returns the named covariate coefficients \code{theta},
+#'     on the log-conductance scale.  The field \code{u} is not included; get
+#'     it from \code{object$u} or map it with \code{plot(type = "field")}.
+#'   \item \code{vcov()} returns the variance-covariance matrix of
+#'     \code{coef()}, on the log scale, or a matrix of \code{NA} for a
+#'     degenerate (\code{tau = 0}) fit.
+#'   \item \code{confint()} returns a two-column matrix of Wald confidence
+#'     limits on the log scale, one row per covariate, or a zero-row matrix
+#'     when the model has no covariates.
+#'   \item \code{logLik()} returns a \code{\link[stats]{logLik}} object whose
+#'     \code{df} attribute is the covariate count plus the field's effective
+#'     degrees of freedom, so it is generally fractional.
+#'   \item \code{AIC()} returns Akaike's Information Criterion as a single
+#'     number, charging the fractional field \code{edf}.  Lower is better.
+#'   \item \code{plot()} draws the requested surface and invisibly returns the
+#'     \code{terra::SpatRaster} it drew.
+#' }
+#'
+#' @seealso \code{\link{terradish_hierarchical}} for fitting and
+#'   \code{\link{conductance_field}} for extracting the field or the full
+#'   surface as a raster without plotting it.  See
+#'   \code{vignette("hierarchical-conductance", package = "terradish")} for a
+#'   worked example.
+#'
+#' @examples
+#' \donttest{
+#' # a small synthetic landscape keeps the example quick; the cost of a
+#' # hierarchical fit is driven by the number of raster cells in the graph, so
+#' # use the full-resolution surface only in a real analysis
+#' r  <- terra::rast(nrows = 12, ncols = 12, xmin = 0, xmax = 12,
+#'                   ymin = 0, ymax = 12)
+#' gx <- terra::xFromCell(r, seq_len(terra::ncell(r)))
+#' gy <- terra::yFromCell(r, seq_len(terra::ncell(r)))
+#' covariates <- c(terra::setValues(r, scale(gx)[, 1]),
+#'                 terra::setValues(r, scale(gy)[, 1]))
+#' names(covariates) <- c("altitude", "forestcover")
+#' coords  <- terra::xyFromCell(r, c(1, 12, 66, 79, 133, 144, 40, 105))
+#' surface <- conductance_surface(covariates, coords, directions = 8,
+#'                                saveStack = TRUE)
+#'
+#' # simulate a response from a known conductance truth so the fit has signal
+#' E <- terradish_algorithm(loglinear_conductance(~ altitude + forestcover,
+#'                                                surface$x),
+#'                          leastsquares, surface, S = diag(nrow(coords)),
+#'                          theta = c(0.5, -0.4), objective = FALSE,
+#'                          gradient = FALSE, hessian = FALSE,
+#'                          partial = FALSE)$covariance
+#' E <- as.matrix(E)
+#' S <- outer(diag(E), diag(E), "+") - 2 * E
+#' diag(S) <- 0
+#'
+#' # A coarse field (field_resolution = 3) and a two-point tau^2 grid keep the
+#' # example fast; use the defaults in a real analysis. The response here was
+#' # generated with no unmapped structure, so tau^2 runs to the top of this
+#' # deliberately tiny grid and the fit warns about it: that warning is the
+#' # expected behavior, not a problem with the example.
+#' fit <- terradish_hierarchical(S ~ altitude + forestcover,
+#'                               data = surface,
+#'                               measurement_model = leastsquares,
+#'                               field_resolution = 3L,
+#'                               tau2_grid = c(0.1, 1),
+#'                               verbose = FALSE)
+#'
+#' fit                  # field sd and edf summarize fitted residual flexibility
+#' coef(fit)            # conditional covariate associations, log-conductance scale
+#' exp(coef(fit))       # multiplicative conductance change per unit covariate
+#' confint(fit)         # Wald intervals, still on the log scale
+#' AIC(fit)             # charges the fractional field edf
+#' }
+#'
+#' @name terradish_hierarchical_methods
+NULL
+
+#' @rdname terradish_hierarchical_methods
 #' @export
 print.terradish_hierarchical <- function(x, ...)
 {
@@ -519,20 +729,24 @@ print.terradish_hierarchical <- function(x, ...)
   invisible(x)
 }
 
+#' @rdname terradish_hierarchical_methods
 #' @export
 logLik.terradish_hierarchical <- function(object, ...) {
   val <- object$loglik; attr(val, "df") <- object$df; class(val) <- "logLik"; val
 }
 
+#' @rdname terradish_hierarchical_methods
 #' @export
 AIC.terradish_hierarchical <- function(object, ..., k = 2) {
   if (identical(k, 2)) return(object$aic)
   -2 * object$loglik + k * object$df
 }
 
+#' @rdname terradish_hierarchical_methods
 #' @export
 vcov.terradish_hierarchical <- function(object, ...) object$vcov
 
+#' @rdname terradish_hierarchical_methods
 #' @export
 confint.terradish_hierarchical <- function(object, parm, level = 0.95, ...) {
   if (!object$npar_covariate)
@@ -545,6 +759,7 @@ confint.terradish_hierarchical <- function(object, parm, level = 0.95, ...) {
   ci
 }
 
+#' @rdname terradish_hierarchical_methods
 #' @export
 plot.terradish_hierarchical <- function(x, data, type = c("field", "conductance", "logconductance"), ...) {
   type <- match.arg(type)
@@ -556,6 +771,7 @@ plot.terradish_hierarchical <- function(x, data, type = c("field", "conductance"
   invisible(r)
 }
 
+#' @rdname terradish_hierarchical_methods
 #' @export
 summary.terradish_hierarchical <- function(object, ...)
 {
@@ -567,5 +783,6 @@ summary.terradish_hierarchical <- function(object, ...)
   invisible(object)
 }
 
+#' @rdname terradish_hierarchical_methods
 #' @export
 coef.terradish_hierarchical <- function(object, ...) object$theta

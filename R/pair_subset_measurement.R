@@ -23,7 +23,7 @@
 #' \code{\link{wishart_covariance}} are intentionally not supported. Wishart
 #' models evaluate a full distance or covariance matrix likelihood, so dropping
 #' selected pair entries would change the model contract. For site-level
-#' environmental effects in Wishart models, use
+#' environmental associations in Wishart models, use
 #' \code{\link{wishart_covariates}()} instead.
 #'
 #' @return A function of class \code{terradish_measurement_model}.

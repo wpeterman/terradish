@@ -34,17 +34,5 @@
   .suggested_export("numDeriv", "jacobian", context = "numerical validation")(...)
 }
 
-.randomfields_rmexp <- function(...)
-{
-  .suggested_export("RandomFields", "RMexp", context = "benchmark simulation helpers")(...)
-}
-
-.randomfields_rfsimulate <- function(...)
-{
-  .suggested_export("RandomFields", "RFsimulate", context = "benchmark simulation helpers")(...)
-}
-
-.nloptr_bobyqa <- function(...)
-{
-  .suggested_export("nloptr", "bobyqa", context = "benchmark optimization helpers")(...)
-}
+# Accessors for packages used only by the benchmark harness in
+# inst/benchmarks/generalized-wishart-timing.R live in that file, not here.

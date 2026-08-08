@@ -36,14 +36,14 @@ A \code{SpatRaster} with transformed values and a
 \description{
 Transforms each layer of a \code{SpatRaster} and stores the original-scale
 offset and divisor as a \code{"terradish_scale"} attribute.  When the scaled
-raster is used to build a \code{\link{conductance_surface}}, marginal-effect
+raster is used to build a \code{\link{conductance_surface}}, marginal-association
 plots (\code{plot(fit, type = "marginal", data = surface)}) can
 automatically back-transform x-axes to the original covariate units.
 }
 \details{
 Scaling is strongly recommended before fitting conductance models.  In the
 loglinear model, conductance is \eqn{\exp(\theta \cdot x)}.  When \code{x}
-has a large range (e.g. altitude in metres), a small change in \eqn{\theta}
+has a large range (e.g. altitude in meters), a small change in \eqn{\theta}
 produces enormous conductance differences, making the objective surface
 poorly conditioned and the optimizer slow to converge.
 

@@ -24,13 +24,17 @@ needs to inspect saved terradish outputs before extracting parameter tables
 with \code{\link{terradish_parameters}}.
 }
 \examples{
-\dontrun{
-tmp <- tempfile()
-dir.create(tmp)
+# a saved-results directory, written under tempdir() so nothing is left
+# behind, holding the minimal object terradish_results() looks for
+tmp <- file.path(tempdir(), "terradish-results-example")
+dir.create(tmp, showWarnings = FALSE)
 saveRDS(list(effect_size = c(altitude = 0.2)),
         file.path(tmp, "AllResults_list.rds"))
-terradish_results(tmp)
-}
+
+res <- terradish_results(tmp)
+res$effect_size   # the true/target effect sizes recorded alongside the fits
+
+unlink(tmp, recursive = TRUE)
 
 }
 \seealso{

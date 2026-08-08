@@ -1,29 +1,32 @@
 Package: terradish
 Type: Package
 Title: Fast Gradient-Based Optimization of Resistance Surfaces
-Version: 0.0.44
-Date: 2026-07-02
+Version: 0.0.46
+Date: 2026-09-08
 Authors@R: c(
   person(
     given = "Bill",
     family = "Peterman",
     role = c("aut", "cre"),
-    email = "peterman.73@osu.edu"
+    email = "peterman.73@osu.edu",
+    comment = c(ORCID = "0000-0001-5229-9268")
   ),
   person(
     given = c("Nathaniel", "S."),
     family = "Pope",
     role = "aut",
-    email = "nspope@utexas.edu"
+    email = "nspope@utexas.edu",
+    comment = c(ORCID = "0000-0001-8409-7812")
   )
   )
 Description: Maximum likelihood estimation for parameterized conductance models
   via Newton and quasi-Newton methods, for moderate-sized problems
   such as spatial grids with fewer than a million cells. Supports
-  terra-native workflows, multiple measurement models, spline and scale-aware
-  conductance estimation, cross-validation across supported conductance
-  models, and selected-pair analysis while retaining all focal sites in the
-  resistance graph.
+  'terra'-native workflows, Gaussian distance and Wishart distance or covariance
+  measurement models, spline and scale-aware conductance estimation,
+  environmental and diagonal-variance extensions, cross-validation across
+  supported conductance models, and selected-pair analysis while retaining all
+  focal sites in the resistance graph.
 URL: https://github.com/wpeterman/terradish,
   https://doi.org/10.5281/zenodo.21225712
 BugReports: https://github.com/wpeterman/terradish/issues
@@ -51,10 +54,9 @@ LinkingTo:
   RcppEigen
 Suggests:
   adegenet,
-  corMLPE,
   knitr,
-  nloptr,
   numDeriv,
+  patchwork,
   pkgload,
   rmarkdown,
   testthat (>= 3.0.0)

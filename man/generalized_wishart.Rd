@@ -21,8 +21,10 @@ generalized_wishart(
 the graph Laplacian at the current conductance parameters.  Passed
 automatically by the optimizer.}
 
-\item{S}{Square, symmetric matrix of observed pairwise genetic distances
-(e.g. F\eqn{_{ST}}). Must have the same dimensions as \code{E}.}
+\item{S}{Square, symmetric admissible genetic squared-distance matrix with
+zero diagonal. It must have the same dimensions as \code{E}
+and must correspond to a centered positive semidefinite covariance
+representation under the scaling used to construct it.}
 
 \item{phi}{Named numeric vector of nuisance parameters \code{(tau, sigma)}.
 Omit to obtain default starting values \code{c(1, 0)}.}
@@ -35,14 +37,13 @@ Omit to obtain default starting values \code{c(1, 0)}.}
   (reduced for linkage disequilibrium if markers are not independent).
 
   \emph{For microsatellites:} use the number of loci as the conservative
-  default.  Allele frequencies within a locus are correlated because they
+  primary value. Allele frequencies within a locus are correlated because they
   sum to a constant, so individual alleles are not independent observations in the
-  Wishart sense.  The locus count \eqn{L} is a well-defined lower bound: the
-  true effective \eqn{\nu} is likely somewhere between \eqn{L} and
-  \eqn{\sum_l (K_l - 1)}, where \eqn{K_l} is the number of observed alleles
-  at locus \eqn{l}, but the within-locus correlations make \eqn{L} the more
-  defensible primary choice.  Report the value used, and conduct a
-  sensitivity analysis across the plausible range \eqn{[L, \sum_l (K_l-1)]}.}
+  Wishart sense. The locus count \eqn{L} is the more defensible primary
+  choice. \eqn{\sum_l (K_l - 1)}, where \eqn{K_l} is the number of observed
+  alleles at locus \eqn{l}, can be examined as a larger sensitivity value,
+  but it should not be described as the known effective degrees of freedom.
+  Report the primary value and the full sensitivity analysis.}
 
 \item{gradient}{Logical. Compute gradient of the negative log-likelihood
 with respect to \code{phi}?}
@@ -62,7 +63,7 @@ When \code{phi} is missing, a list with elements \code{phi}
   (starting values \code{c(tau = 1, sigma = 0)}), \code{lower}
   (\code{c(0, -Inf)}), and \code{upper}.  Otherwise a list containing:
  \item{objective}{Negative log-likelihood.}
- \item{fitted}{Matrix of expected genetic distances.}
+ \item{fitted}{Matrix of expected squared genetic distances.}
  \item{boundary}{Logical; \code{TRUE} if \code{tau = 0}, indicating no detectable IBR signal.}
  \item{gradient}{Gradient with respect to \code{phi} (if \code{gradient = TRUE}).}
  \item{hessian}{Hessian matrix with respect to \code{phi} (if \code{hessian = TRUE}).}
@@ -74,33 +75,39 @@ When \code{phi} is missing, a list with elements \code{phi}
 }
 \description{
 A function of class \code{"terradish_measurement_model"} that evaluates the
-generalized Wishart likelihood for an observed pairwise genetic distance
-matrix.  This is the principled Wishart-based model when data are available
-as distances (e.g. F\eqn{_{ST}}) and the effective marker degrees of freedom
-are known.  For covariance-matrix data use \code{\link{wishart_covariance}}.
+generalized Wishart likelihood for an admissible pairwise genetic
+squared-distance matrix. This model requires a distance representation
+that is coherently related to a centered positive semidefinite covariance
+matrix; it is not valid for an arbitrary dissimilarity matrix. The effective
+marker degrees of freedom must also be supplied. For covariance-matrix data,
+use \code{\link{wishart_covariance}}.
 }
 \details{
 The nuisance parameters are:
 \describe{
   \item{\code{tau}}{Nonnegative scale applied to the conductance-implied
     covariance \code{E}. A \code{tau} near zero signals no detectable
-    resistance effect.}
+    contribution from conductance-implied covariance under this model.}
   \item{\code{sigma}}{Log-scale identity component: the nugget variance
-    added to the diagonal is \eqn{\exp(\sigma)}. It absorbs genetic
-    variation not explained by landscape resistance.}
+    added to the diagonal is \eqn{\exp(\sigma)}. It represents diagonal
+    variance not captured by the graph covariance, including sampling
+    variation and model mismatch. It is not a smoothing scale or a direct
+    estimate of genetic drift or population size.}
 }
 
 The fitted covariance is \eqn{\Sigma = \tau E + \exp(\sigma) I}.  The model
 evaluates the generalized Wishart log-likelihood for the observed
-squared-distance matrix \code{S} after projecting out the grand mean, as
+admissible squared-distance matrix \code{S} after projecting out the grand mean, as
 described in McCullagh (2009).
 
 \code{generalized_wishart} and \code{\link{wishart_covariance}} share the
 same \eqn{\Sigma} parameterization but differ in what \code{S} represents:
-this function takes a \strong{distance} matrix; \code{wishart_covariance}
+this function takes a \strong{squared-distance} matrix; \code{wishart_covariance}
 takes a \strong{covariance} matrix.  When the covariance and its implied
-distance matrix carry the same information (i.e. no information is lost in
-the conversion), the two models give identical likelihoods up to a constant.
+distance representation carry the same information under the same centering,
+scaling, sites, and \code{nu}, the two models give likelihoods that differ
+only by a data-dependent constant. This equivalence does not make AIC values
+from arbitrary distance and covariance fits interchangeable.
 
 \strong{The role of \code{nu} (read this before choosing a value).}
 The generalized Wishart log-likelihood scales linearly with \code{nu}, so
@@ -111,8 +118,8 @@ model parameter:
     conductance parameters \eqn{\theta} and nuisance parameters
     \eqn{(\tau, \sigma)} are invariant to \code{nu}, because scaling the
     objective by a positive constant does not move its optimum.
-  \item \strong{Standard errors scale as} \eqn{1/\sqrt{\nu}}: more markers
-    give tighter confidence intervals.
+  \item \strong{Standard errors scale as} \eqn{1/\sqrt{\nu}}: larger
+    effective degrees of freedom give tighter confidence intervals.
   \item \strong{Model selection and likelihood-ratio tests depend strongly
     on \code{nu}.}  Because the log-likelihood scales with \code{nu} while
     the AIC/BIC penalty (and the \eqn{\chi^2} reference distribution) does
@@ -121,12 +128,16 @@ model parameter:
 }
 For biallelic SNPs, set \code{nu} to the retained polymorphic SNP count,
 reduced for linkage disequilibrium.  For microsatellites, use the number of
-loci \eqn{L} as a conservative default: within-locus allele frequencies are
-correlated, so \eqn{\sum_l (K_l - 1)} overstates the true degrees of freedom
-and can yield over-confident inference.  The true effective \eqn{\nu} is
-likely between \eqn{L} and \eqn{\sum_l (K_l - 1)}, and a sensitivity
-analysis across that range is recommended.  See \code{\link{wishart_covariance}}
+loci \eqn{L} as a conservative primary value: within-locus allele frequencies
+are correlated, so \eqn{\sum_l (K_l - 1)} can yield over-confident inference
+if treated as independent information. Examine larger plausible values in a
+sensitivity analysis. See \code{\link{wishart_covariance}}
 for the same discussion in the covariance-response setting.
+
+The function checks \code{S} with \code{\link{check_distance_response}}
+before evaluating the likelihood. Substantive violations stop the fit. Tiny
+structural deviations within the numerical tolerance are symmetrized and
+set to zero where appropriate. No Euclidean correction is applied.
 }
 \examples{
 
@@ -141,14 +152,19 @@ covariates <- c(melip.altitude, melip.forestcover)
 names(covariates) <- c("altitude", "forestcover")
 surface <- conductance_surface(covariates, melip.coords, directions = 8)
 
-# inverse of graph Laplacian at null model (IBD) 
+# Inverse of the graph Laplacian at the null conductance model.
 laplacian_inv <- terradish_distance(theta = matrix(0, 1, 2), 
                                  formula = ~forestcover + altitude,
                                  data = surface,
                                  terradish::loglinear_conductance, 
                                  covariance = TRUE)$covariance[,,1]
 
-generalized_wishart(laplacian_inv, melip.Fst, nu = 1000, phi = c(0.1, -0.1))
+# Generate an admissible squared-distance response from a PSD covariance.
+Sigma <- 0.8 * laplacian_inv + 0.2 * diag(nrow(laplacian_inv))
+observed_covariance <- rWishart(1, df = 40, Sigma = Sigma)[, , 1] / 40
+observed_squared_distance <- dist_from_cov(observed_covariance)
+generalized_wishart(laplacian_inv, observed_squared_distance, nu = 40,
+                    phi = c(tau = 0.8, sigma = log(0.2)))
 
 }
 \references{
@@ -156,7 +172,8 @@ McCullagh P. 2009. Marginal likelihood for distance matrices. Statistica
 Sinica 19:631-649.
 }
 \seealso{
-\code{\link{wishart_covariance}}, \code{\link{wishart_covariates}},
+\code{\link{check_distance_response}},
+  \code{\link{wishart_covariance}}, \code{\link{wishart_covariates}},
   \code{\link{wishart_drift_covariates}}, \code{\link{mlpe}},
   \code{\link{terradish}}
 }

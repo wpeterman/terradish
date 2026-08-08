@@ -50,14 +50,14 @@ fitted conductance model automatically.}
 
 \item{distance_per_map_unit}{Optional positive scalar used by
 \code{type = "sigma"} to convert map units into a user-facing distance
-unit such as kilometres.}
+unit such as kilometers.}
 
 \item{distance_unit}{Optional label used with
 \code{distance_per_map_unit} for \code{type = "sigma"}.}
 
 \item{quantile}{Confidence level for interval bands. Default \code{0.95}.}
 
-\item{n}{Number of evaluation points for each marginal effect curve.
+\item{n}{Number of evaluation points for each marginal-association curve.
 Defaults to \code{100} for \code{"marginal_response"} (each point
 requires a full Laplacian solve) and \code{200} for \code{"marginal"}.
 Supply an explicit integer to override.}
@@ -95,7 +95,7 @@ expected:
 }
 }
 \description{
-Three plot types for objects returned by \code{\link{terradish}}:
+Five plot types for objects returned by \code{\link{terradish}}:
 \describe{
   \item{\code{"fit"}}{Observed vs. fitted response values. Distance-response
     models are shown as pairwise genetic distance against fitted resistance
@@ -104,7 +104,7 @@ Three plot types for objects returned by \code{\link{terradish}}:
     against fitted genetic covariance.}
   \item{\code{"surface"}}{Fitted conductance surface with asymptotic confidence
     interval bounds, displayed in three side-by-side panels.}
-  \item{\code{"marginal"}}{Marginal effect of each raster covariate on
+  \item{\code{"marginal"}}{Marginal association of each raster covariate with
     conductance, varying one covariate at a time while averaging over the
     observed values of all other model covariates, with a 95\% pointwise
     confidence band via the delta method. For Gaussian scale-aware
@@ -115,7 +115,7 @@ Three plot types for objects returned by \code{\link{terradish}}:
     original covariate named inside each \code{s()} term rather than against
     the individual basis columns.}
   \item{\code{"marginal_response"}}{Approximate response-scale marginal
-    effects obtained by mapping the marginal conductance curve through the
+    associations obtained by mapping the marginal conductance curve through the
     fitted measurement-model mean and adding predictive bands that combine
     \code{theta} uncertainty, conditional \code{phi} uncertainty, and the
     residual variance implied by \code{tau} for distance-response models.
@@ -125,9 +125,11 @@ Three plot types for objects returned by \code{\link{terradish}}:
     likewise conditional on the fitted \code{sigma} values.}
   \item{\code{"sigma"}}{For Gaussian scale-aware conductance models, plots
     the fitted Gaussian kernel against distance for each \code{sigma} term,
-    with a dashed line at the fitted effective distance containing 90\% of
+    with a dashed line at the fitted distance containing 90\% of
     the one-dimensional kernel mass and a shaded interval from the Wald
-    confidence interval of that effective distance.}
+    confidence interval of that kernel-mass distance. These distances
+    summarize the fitted smoothing kernel and are not movement or dispersal
+    distances.}
 }
 }
 \details{
@@ -137,18 +139,20 @@ requested with \code{support = "focal"} to clamp selected covariates to
 empirical focal-site support before prediction.
 }
 \examples{
-\dontrun{
-library(terra)
+\donttest{
 data(melip)
 melip.altitude    <- terra::unwrap(melip.altitude)
 melip.forestcover <- terra::unwrap(melip.forestcover)
 melip.coords      <- terra::unwrap(melip.coords)
 
-# Build surface with scaled covariates
+# Build surface with scaled covariates. The raster is coarsened so the
+# example runs quickly; use the full resolution in a real analysis.
 covariates_scaled <- c(melip.altitude, melip.forestcover)
 names(covariates_scaled) <- c("altitude", "forestcover")
+covariates_scaled <- terra::aggregate(covariates_scaled, fact = 3, na.rm = TRUE)
 covariates_scaled <- scale_covariates(covariates_scaled)
-surface <- conductance_surface(covariates_scaled, melip.coords, directions = 8)
+surface <- conductance_surface(covariates_scaled, melip.coords,
+                               directions = 8, saveStack = TRUE)
 
 fit <- terradish(melip.Fst ~ altitude + forestcover, surface,
                  loglinear_conductance, mlpe)
@@ -159,10 +163,10 @@ plot(fit, type = "fit")
 # Fitted conductance surface with 95\% CI (three-panel figure)
 plot(fit, type = "surface", data = surface)
 
-# Marginal effect plots on the original covariate scale
+# Marginal-association plots on the original covariate scale
 plot(fit, type = "marginal", data = surface)
 
-# Approximate response-scale marginal effects with predictive bands
+# Approximate response-scale marginal associations with predictive bands
 plot(fit, type = "marginal_response", data = surface)
 
 # For Gaussian scale-aware fits, visualize the fitted sigma kernels

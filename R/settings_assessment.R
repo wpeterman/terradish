@@ -3,7 +3,7 @@
   terms_obj <- terms(formula)
   response <- attr(terms_obj, "response")
   if (!response)
-    stop("`formula` must have a genetic distance matrix on the left-hand side",
+    stop("`formula` must have a response matrix on the left-hand side",
          call. = FALSE)
 
   vars <- as.character(attr(terms_obj, "variables"))[-1L]
@@ -368,10 +368,10 @@
 #'   Should match the model you plan to use for the final fit.
 #' @param nu Effective Wishart degrees of freedom passed to measurement models
 #'   that require it (\code{\link{generalized_wishart}},
-#'   \code{\link{wishart_covariance}}).  For biallelic SNPs this is usually the
-#'   number of retained SNPs; for microsatellites use approximately
-#'   \eqn{\sum_l (K_l - 1)} where \eqn{K_l} is the number of observed alleles at
-#'   locus \eqn{l}.  Ignored by \code{\link{mlpe}} and
+#'   \code{\link{wishart_covariance}}). For biallelic SNPs, use the number of
+#'   approximately independent retained SNPs. For microsatellites, use the
+#'   locus count as the conservative primary value and report sensitivity to
+#'   larger plausible values. Ignored by \code{\link{mlpe}} and
 #'   \code{\link{leastsquares}}.
 #' @param theta Optional starting conductance parameter values.  If
 #'   \code{NULL}, the default all-zero start is used.
@@ -455,8 +455,7 @@
 #' A \code{print} method summarizes the profile and recommendations.
 #'
 #' @examples
-#' \dontrun{
-#' library(terra)
+#' \donttest{
 #' data(melip)
 #' melip.altitude <- terra::unwrap(melip.altitude)
 #' melip.forestcover <- terra::unwrap(melip.forestcover)
@@ -464,6 +463,9 @@
 #'
 #' covariates <- c(melip.altitude, melip.forestcover)
 #' names(covariates) <- c("altitude", "forestcover")
+#' # Coarsened for the example. Assessment is most useful on the large graphs
+#' # where solver choice actually matters, so use the full resolution there.
+#' covariates <- terra::aggregate(covariates, fact = 3, na.rm = TRUE)
 #' covariates <- scale_covariates(covariates)
 #' surface <- conductance_surface(covariates, melip.coords,
 #'                                directions = 8, saveStack = TRUE)
@@ -523,7 +525,7 @@ terradish_assess_settings <- function(formula,
                                       loglik_tolerance = 1e-3,
                                       max_seconds = 120,
                                       cores = 1L,
-                                      verbose = TRUE)
+                                      verbose = FALSE)
 {
   stopifnot(inherits(formula, "formula"))
   stopifnot(inherits(data, c("terradish_graph", "radish_graph")))
@@ -789,6 +791,80 @@ terradish_assess_settings <- function(formula,
   out
 }
 
+#' Print a terradish settings assessment
+#'
+#' Compact display for the object returned by
+#' \code{\link{terradish_assess_settings}}: the graph profile, the recommended
+#' computational settings and why each was chosen, the probe timings behind
+#' them, and any warnings the assessment raised.
+#'
+#' @param x An object of class \code{terradish_setting_assessment}, from
+#'   \code{\link{terradish_assess_settings}}.
+#' @param digits Number of significant digits used when formatting the probe
+#'   timing tables.
+#' @param ... Ignored, present for compatibility with the \code{print} generic.
+#'
+#' @details
+#' \strong{How to read the output.}  It comes in four parts.
+#'
+#' \emph{Graph} reports the size of the problem: vertices (active raster
+#' cells), edges, focal sites, and conductance parameters.  This is the number
+#' that decides whether any of the rest matters.  Below roughly 50,000
+#' vertices the defaults are almost always fine; above a few hundred thousand,
+#' solver choice dominates the runtime.
+#'
+#' \emph{Recommended settings} lists the optimizer, line search, solver, and
+#' approximation the probes favored, each followed by a parenthesized reason.
+#' Pass them straight through with \code{fit <- terradish(..., optimizer =
+#' rec$optimizer, control = rec$control, solver = rec$solver)}, where
+#' \code{rec <- assessment$recommended}.  These choices change only the
+#' computational path, never the estimates.
+#'
+#' \emph{Defaults comparison} is the one-line verdict: whether the assessment
+#' agreed with the package defaults.  If it says it matched, there is nothing
+#' to do and you can drop the assessment from your script.
+#'
+#' \emph{Probes} are the measurements behind the recommendation.  The optimizer
+#' table gives elapsed time and the log-likelihood each candidate reached in
+#' the probe budget, so a candidate that is fast but reaches a worse
+#' log-likelihood is not actually better.  The solver table shows the three
+#' fastest direct factorizations split into setup and solve time; setup
+#' dominates when a fit re-factorizes often, solve time when the focal set is
+#' large.  \emph{Notes} collects anything that needs attention, such as a
+#' solver that failed to converge during probing.
+#'
+#' @return \code{x}, invisibly.  Called for the printed output.  The machine
+#'   readable pieces are \code{x$profile}, \code{x$recommended},
+#'   \code{x$reasons}, \code{x$benchmarks}, \code{x$comparison}, and
+#'   \code{x$notes}.
+#'
+#' @seealso \code{\link{terradish_assess_settings}} for the assessment itself
+#'   and what each component holds, \code{\link{terradish_solver_benchmark}}
+#'   for benchmarking solvers alone, and \code{\link{terradish}} for the fit
+#'   the recommendations feed.  See
+#'   \code{vignette("large-landscapes", package = "terradish")} for when this
+#'   is worth running.
+#'
+#' @examples
+#' \donttest{
+#' data(melip)
+#' covariates <- c(terra::unwrap(melip.altitude), terra::unwrap(melip.forestcover))
+#' names(covariates) <- c("altitude", "forestcover")
+#' # coarsened for the example; assessment earns its keep on large graphs
+#' covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+#'                                                 na.rm = TRUE))
+#' surface <- conductance_surface(covariates, terra::unwrap(melip.coords),
+#'                                directions = 8, saveStack = TRUE)
+#'
+#' assessment <- terradish_assess_settings(
+#'   melip.Fst ~ forestcover + altitude,
+#'   data = surface, measurement_model = mlpe, probe_maxit = 2)
+#'
+#' assessment                      # the four-part report described above
+#' assessment$comparison$summary   # one-line verdict against the defaults
+#' assessment$recommended$solver   # the settings, ready to reuse
+#' }
+#'
 #' @method print terradish_setting_assessment
 #' @export
 print.terradish_setting_assessment <- function(x,

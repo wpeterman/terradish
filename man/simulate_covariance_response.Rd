@@ -39,13 +39,14 @@ matrix.}
 sampling noise in the simulated covariance: larger \code{nu} gives tighter
 draws around \code{Sigma}.  Choose a value that matches what you would use
 when fitting the model to real data.  For biallelic SNP-like simulations
-use the number of retained polymorphic SNPs.  For microsatellite-like
-panels, use the number of loci as the conservative default; the true
-effective degrees of freedom is likely between the locus count \eqn{L} and
+use the number of retained polymorphic SNPs. For microsatellite-like
+panels, use the number of loci as the primary value;
 \eqn{\sum_l (K_l - 1)}, where \eqn{K_l} is the number of observed alleles
-at locus \eqn{l}.  See \code{\link{wishart_covariance}} for how \code{nu}
-propagates into estimation (it scales standard errors and model-selection
-statistics but not point estimates).}
+at locus \eqn{l}, is a larger sensitivity value. The simulation requires
+\code{nu} to be at least the covariance-matrix dimension. See
+\code{\link{wishart_covariance}} for how \code{nu} propagates into
+estimation (it scales standard errors and model-selection statistics but
+not point estimates).}
 
 \item{nsim}{Number of covariance matrices to simulate.}
 

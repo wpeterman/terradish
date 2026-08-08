@@ -1,3 +1,116 @@
+terradish 0.0.46
+---------
+* Reconciled the package overview, function help, examples, vignettes, and
+  benchmark guidance with the shared process-model and measurement-model
+  hierarchy. Documentation now distinguishes conditional conductance
+  associations from causal movement or demographic interpretations, states the
+  admissibility requirements for generalized-Wishart distances, separates the
+  roles of Wishart `tau`, `sigma`, and `nu`, and treats Gaussian `sigma` as a
+  raster-smoothing parameter rather than a movement scale.
+* Added comparison-contract checks to `aic_table()` and `anova()` so models
+  with different responses, likelihood families, pair subsets, or Wishart
+  degrees of freedom are rejected. `AIC.terradish()` now honors its `k`
+  argument, and information-criterion tables retain the correct log likelihood
+  when model labels are duplicated.
+* `simulate_covariance_response()` now rejects Wishart degrees of freedom below
+  the covariance dimension and preserves valid noninteger values instead of
+  silently truncating them.
+* Replaced examples that applied `generalized_wishart` directly to an unchecked
+  FST matrix with admissible simulated distance responses or Gaussian-distance
+  likelihoods.
+* Added `check_distance_response()` and automatic fit-time validation for
+  generalized-Wishart responses. The diagnostic tests the positive
+  semidefiniteness of the centered Gram matrix, reports the magnitude of any
+  violation, and rejects inadmissible or malformed matrices without silently
+  applying a Euclidean correction.
+* Trimmed the vendored `amgcl` header library from 137 files (1.56 MB) to the
+  25 headers `src/` actually compiles against (312 KB), removing the MPI, CUDA,
+  VexCL, Eigen, and Epetra backends the package never builds. The kept set is
+  the transitive `#include` closure of the seven headers included from
+  `src/*.cpp`; the package compiles and the AMG solver tests pass unchanged.
+  This also relieves a Windows `MAX_PATH` hazard, since the deleted
+  `inst/include/amgcl/mpi/...` paths were the deepest in the tarball.
+* `configure` and `cleanup` are now tracked with the execute bit set, so a Unix
+  build straight from a git clone works without `R CMD build` having to correct
+  the mode.
+* Replaced the remaining `1:length()`, `1:nrow()`, and `1:maxit` loop bounds
+  with `seq_along()`, `seq_len()`, and `sample.int()`. The optimizers now
+  validate `maxit` up front instead of relying on `1:maxit` to produce a
+  sensible sequence, so `maxit = 0` errors clearly rather than silently
+  iterating twice.
+* Documented the last two undocumented S3 methods,
+  `print.terradish_covariance_power` and `print.terradish_setting_assessment`,
+  each with a "how to read the output" walkthrough, `\seealso`, and a runnable
+  example. All 47 registered S3 methods now have a help page. Added examples
+  and `\seealso` to `?terradish_methods` and
+  `?terradish_cv_replicates_methods`, which previously had neither; the latter
+  also gained guidance on reading the mean and standard deviation of the
+  held-out log-likelihood.
+* `terradish()` gains a `verbose` argument and **fitting is now quiet by
+  default**. Previously the default `control` carried `verbose = TRUE`, so every
+  fit printed a Newton-Raphson iteration trace, and it did so with `cat()`, which
+  `suppressMessages()` cannot silence. All 27 optimizer and line-search traces
+  now go through `message()`. `verbose = TRUE` restores the per-iteration
+  report; passing it explicitly overrides `control$verbose`, while leaving it
+  alone lets a hand-built `control` object speak for itself. The noisier
+  line-search trace stays a separate opt-in through
+  `NewtonRaphsonControl(ls.control = HagerZhangControl(verbose = TRUE))`.
+  `terradish_hierarchical()`, `terradish_assess_settings()`, and
+  `terradish_scale_optim()` also default to `verbose = FALSE` now.
+* `terradish_hierarchical()` no longer aborts when one `tau2_grid` value fails.
+  A large tau2 weakens the field penalty and can leave the nuisance subproblem
+  numerically singular, so following the package's own "consider widening
+  `tau2_grid`" warning could kill the fit outright. Failing grid points are now
+  skipped with a warning naming them, recorded as `NA` in the `tau2_selection`
+  table, and excluded from the selection; the grid-edge warning now describes
+  the edge of the *usable* range. A fixed `tau2` that fails reports what
+  happened and what to try instead, rather than surfacing a raw LAPACK error.
+* Every `\dontrun{}` example is gone. The eleven that remained referenced
+  objects that were never defined, or were self-contained but slow, so none of
+  them could be copied and run. They are now complete, runnable `\donttest{}`
+  examples on the bundled `melip` data or a small synthetic lattice, each
+  verified to run in a few seconds (the whole set takes about 65 seconds).
+  `terradish_scale_optim()` also gained a much fuller `@return`, and its
+  `lower`/`upper` documentation now states that the default `scale_fun` measures
+  sigma in raster **cells**, not map units; the old example's bounds were far
+  outside a useful range.
+
+* Fixed the profile-likelihood Hessian when a nuisance parameter is estimated on
+  an active box constraint. `radish_subproblem()` applied the implicit-function
+  correction `dphi/dE` to every nuisance parameter, including ones pinned at a
+  bound, which cannot move. The correction is now restricted to the free
+  parameters. This affected `wishart_covariates()` whenever a kernel
+  coefficient was estimated at exactly 0: the reported Hessian, and therefore
+  every standard error, confidence interval, and Wald p-value derived from it,
+  was biased by roughly 1.6% in the bundled example. Estimates, log-likelihoods,
+  and gradients were unaffected.
+* Added `tests/testthat/test-analytic-derivatives.R`, which validates the
+  analytic gradient and Hessian of `terradish_algorithm()` against `numDeriv`
+  for every measurement and conductance model the package ships, and regression
+  tests the constrained-nuisance case above.
+* Documented the S3 methods for `terradish_directed` and `terradish_hierarchical`
+  objects, which previously had no help pages: `?terradish_directed_methods` and
+  `?terradish_hierarchical_methods` now explain what `summary()`, `coef()`,
+  `vcov()`, `confint()`, `AIC()`, and `plot()` return and how to read them.
+* Added the missing `@return` sections to `NewtonRaphsonControl()` and
+  `HagerZhangControl()`.
+* Expanded the `melip` dataset documentation with grid dimensions, value ranges,
+  units, coordinate system, and a runnable example, and corrected the
+  getting-started vignette, which described the data as 34 sites (it is 37) and
+  altitude as meters (the layer is pre-rescaled to roughly the unit interval).
+* Expanded the package-level help (`?terradish`) into a real entry point:
+  main functions grouped by role, plus pointers to every vignette.
+* Made the vignette closings consistent: all ten now end with a quick-reference
+  workflow block, a summary-of-key-functions table, and a see-also list, and
+  `large-landscapes` now uses the same heading levels as the rest.
+* Moved the unused generalized-Wishart benchmark harness out of `R/` to
+  `inst/benchmarks/generalized-wishart-timing.R`. It was dead code that called
+  `set.seed()` without restoring the RNG and depended on the archived
+  `RandomFields` package. Dropped the now-unused `nloptr` and `corMLPE` from
+  `Suggests`; `terradish` implements MLPE itself and never called `corMLPE`.
+* `inst/CITATION` now derives its version and year from the DESCRIPTION instead
+  of hard-coding them, and `Authors@R` records both authors' ORCIDs.
+
 terradish 0.0.44
 ---------
 * Prepared the package for CRAN submission: corrected the `LICENSE` file to the

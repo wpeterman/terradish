@@ -24,8 +24,8 @@ A single-layer \code{SpatRaster} (if \code{data$stack} is available)
   or a numeric vector over active cells.
 }
 \description{
-Returns the smooth residual field \eqn{u} (the conductance variation the
-covariates did not explain) from a \code{\link{terradish_hierarchical}} fit,
+Returns the fitted smooth residual field \eqn{u} from a
+\code{\link{terradish_hierarchical}} fit,
 as a \code{terra::SpatRaster} when the graph stored its raster stack, or as a
 per-cell numeric vector otherwise.
 }

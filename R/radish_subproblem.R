@@ -3,6 +3,39 @@
   tryCatch(solve(x), error = function(e) ginv(x))
 }
 
+# Which nuisance parameters are free to move at the profiled optimum? A
+# parameter sitting on an active box constraint is pinned: perturbing E (or S)
+# does not move it, so its implicit derivative is zero.
+.free_parameter_index <- function(phi, lower = NULL, upper = NULL)
+{
+  phi <- as.numeric(phi)
+  p <- length(phi)
+  if (is.null(lower))
+    lower <- rep(-Inf, p)
+  if (is.null(upper))
+    upper <- rep(Inf, p)
+  lower <- rep_len(as.numeric(lower), p)
+  upper <- rep_len(as.numeric(upper), p)
+
+  tol <- sqrt(.Machine$double.eps) * pmax(1, abs(phi))
+  at_lower <- is.finite(lower) & phi <= lower + tol
+  at_upper <- is.finite(upper) & phi >= upper - tol
+  !(at_lower | at_upper)
+}
+
+# Invert the free-parameter block of the nuisance Hessian and pad the pinned
+# rows and columns with zeros, so the profile-likelihood correction contributes
+# nothing along directions the optimizer cannot move.
+.constrained_inverse_hessian <- function(hessian, free)
+{
+  hessian <- .as_base_matrix(hessian)
+  p <- nrow(hessian)
+  out <- matrix(0, p, p, dimnames = dimnames(hessian))
+  if (any(free))
+    out[free, free] <- .safe_invert(hessian[free, free, drop = FALSE])
+  out
+}
+
 .as_base_matrix <- function(x)
 {
   if (is.null(x))
@@ -79,10 +112,12 @@ radish_subproblem <- function(g, E, S, nu, phi = NULL, nonnegative = TRUE, valid
                          upper = phi_start$upper,
                          control = control)
   }
-  subproblem <- tryCatch(fit_subproblem(phi),
+  phi_start  <- phi
+  subproblem <- tryCatch(fit_subproblem(phi_start),
                          error = function(e) {
-                           if (identical(phi, phi_default))
+                           if (identical(phi_start, phi_default))
                              stop(e)
+                           phi_start <<- phi_default
                            fit_subproblem(phi_default)
                          })
 
@@ -94,14 +129,23 @@ radish_subproblem <- function(g, E, S, nu, phi = NULL, nonnegative = TRUE, valid
   # for hessian, need to get d(dg/dE)/dE via adjoint method,
   #   dg/dE = \partial (dg/dE)/\partial E + \partial (dg/dE)/\partial \hat{phi} \times \partial \hat{\phi}/\partial E
   # where
-  #   dg/dphi = 0 ==> d(dg/dphi)/dE = 0 ==> 
-  #       \partial (dg/dphi)/\partial E + \partial (dg/dphi)/\partial phi \times dphi/dE = 0 ==>
+  #   dg/dphi = 0 ==> d(dg/dphi)/dE = 0 ==>
+  #       \partial (dg/dphi)/\partial phi \times dphi/dE = 0 ==>
   #       dphi/dE = -[\partial (dg/dphi)/\partial phi]^-1 \partial (dg/dphi)/\partial E
+  #
+  # That stationarity argument only holds for nuisance parameters that are free
+  # to move. A parameter pinned at an active box constraint (for example a
+  # non-negative kernel coefficient estimated at exactly 0) has dphi/dE = 0, so
+  # it must be dropped from the correction; including it inflates the implied
+  # curvature and biases the standard errors. `.free_parameter_index()` finds
+  # the inactive set and `.constrained_inverse_hessian()` inverts only that
+  # block, padding the rest with zeros.
   partial_E   <- .as_base_matrix(fit$partial_E)
-  invhess     <- .as_base_matrix(.safe_invert(fit$hessian))
+  bounds      <- if (is.list(phi_start)) phi_start else phi_default
+  free_phi    <- .free_parameter_index(phi, bounds$lower, bounds$upper)
+  invhess     <- .constrained_inverse_hessian(fit$hessian, free_phi)
   jacobian_E  <- function(dotdotE)
-  { 
-    #why is this nonzero when on boundary?
+  {
     dotdotE_matrix <- .as_base_matrix(dotdotE)
     dphi_dE        <- -matrix(.as_base_vector(dotdotE_matrix) %*% partial_E %*% invhess %*% t(partial_E),
                               nrow(dotdotE_matrix), ncol(dotdotE_matrix))
@@ -116,8 +160,7 @@ radish_subproblem <- function(g, E, S, nu, phi = NULL, nonnegative = TRUE, valid
   partial_S   <- .as_base_matrix(fit$partial_S)
   partial_S_format <- .response_partial_format(partial_S, S)
   jacobian_S  <- function(dotdotE)
-  { 
-    #why is this nonzero when on boundary?
+  {
     dotdotE_matrix <- .as_base_matrix(dotdotE)
     dphi_dS <- .expand_response_partials(
       -.as_base_vector(dotdotE_matrix) %*% partial_E %*% invhess %*% partial_S,

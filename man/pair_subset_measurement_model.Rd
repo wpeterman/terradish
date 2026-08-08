@@ -35,7 +35,7 @@ models such as \code{\link{generalized_wishart}} and
 \code{\link{wishart_covariance}} are intentionally not supported. Wishart
 models evaluate a full distance or covariance matrix likelihood, so dropping
 selected pair entries would change the model contract. For site-level
-environmental effects in Wishart models, use
+environmental associations in Wishart models, use
 \code{\link{wishart_covariates}()} instead.
 }
 \examples{

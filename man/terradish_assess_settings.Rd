@@ -24,7 +24,7 @@ terradish_assess_settings(
   loglik_tolerance = 0.001,
   max_seconds = 120,
   cores = 1L,
-  verbose = TRUE
+  verbose = FALSE
 )
 }
 \arguments{
@@ -41,10 +41,10 @@ Should match the model you plan to use for the final fit.}
 
 \item{nu}{Effective Wishart degrees of freedom passed to measurement models
 that require it (\code{\link{generalized_wishart}},
-\code{\link{wishart_covariance}}).  For biallelic SNPs this is usually the
-number of retained SNPs; for microsatellites use approximately
-\eqn{\sum_l (K_l - 1)} where \eqn{K_l} is the number of observed alleles at
-locus \eqn{l}.  Ignored by \code{\link{mlpe}} and
+\code{\link{wishart_covariance}}). For biallelic SNPs, use the number of
+approximately independent retained SNPs. For microsatellites, use the
+locus count as the conservative primary value and report sensitivity to
+larger plausible values. Ignored by \code{\link{mlpe}} and
 \code{\link{leastsquares}}.}
 
 \item{theta}{Optional starting conductance parameter values.  If
@@ -150,8 +150,7 @@ fit <- terradish(formula, data,
 }
 }
 \examples{
-\dontrun{
-library(terra)
+\donttest{
 data(melip)
 melip.altitude <- terra::unwrap(melip.altitude)
 melip.forestcover <- terra::unwrap(melip.forestcover)
@@ -159,6 +158,9 @@ melip.coords <- terra::unwrap(melip.coords)
 
 covariates <- c(melip.altitude, melip.forestcover)
 names(covariates) <- c("altitude", "forestcover")
+# Coarsened for the example. Assessment is most useful on the large graphs
+# where solver choice actually matters, so use the full resolution there.
+covariates <- terra::aggregate(covariates, fact = 3, na.rm = TRUE)
 covariates <- scale_covariates(covariates)
 surface <- conductance_surface(covariates, melip.coords,
                                directions = 8, saveStack = TRUE)

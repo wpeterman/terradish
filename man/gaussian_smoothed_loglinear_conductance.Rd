@@ -20,7 +20,7 @@ gaussian_smoothed_loglinear_conductance(
 smoothing domain during optimization.}
 
 \item{scale_vars}{Optional character vector naming the raster layers whose
-Gaussian scales of effect should be estimated. Defaults to all numeric
+Gaussian smoothing scales should be estimated. Defaults to all numeric
 raster variables present in the model formula.}
 
 \item{standardize}{Should each smoothed layer be centered and scaled across
@@ -73,6 +73,9 @@ conversion so coarse-stage starts remain interpretable in map units.
 Internally, the sigma parameters may be optimized on a converted scale
 (for example, approximate cell widths) and are then converted back to map
 units before they are returned to users.
+These parameters describe Gaussian smoothing of the supplied raster in its
+map units. They are not direct estimates of dispersal distance, movement
+distance, home-range size, or the scale of a causal ecological process.
 
 Unlike the standard fixed-raster workflow, users generally should not call
 \code{\link{scale_covariates}} before fitting this model. The original raster
@@ -97,8 +100,7 @@ parameters and design-matrix covariates, which does not hold once separate
 Gaussian \code{sigma} parameters are introduced.
 }
 \examples{
-\dontrun{
-library(terra)
+\donttest{
 data(melip)
 melip.forestcover <- terra::unwrap(melip.forestcover)
 melip.coords <- terra::unwrap(melip.coords)
@@ -106,6 +108,11 @@ melip.coords <- terra::unwrap(melip.coords)
 # Use the raw raster here. The Gaussian model smooths first and then
 # standardizes internally.
 names(melip.forestcover) <- "forestcover"
+
+# Coarsened so the example runs quickly: the raster is re-smoothed at every
+# candidate sigma. Use the full resolution in a real analysis.
+melip.forestcover <- terra::aggregate(melip.forestcover, fact = 3,
+                                      na.rm = TRUE)
 surface <- conductance_surface(
   melip.forestcover,
   melip.coords,
@@ -126,15 +133,16 @@ fit <- terradish(
 gaussian_scale_summary(fit)
 plot(fit, type = "sigma")
 
-# Optional coarse-raster warm start for larger rasters. With exact_refine =
-# TRUE, the reported fit is refined on the original graph.
+# On a full-resolution raster, a coarse-raster warm start cuts the cost of
+# the scale search. With exact_refine = TRUE the reported fit is refined
+# back on the original graph, so the estimates stay exact.
 fit_coarse <- terradish(
   melip.Fst ~ forestcover,
   data = surface,
   conductance_model = gaussian_model,
   measurement_model = mlpe,
   approximation = "coarse_raster",
-  approximation_control = list(factor = c(4, 2), exact_refine = TRUE),
+  approximation_control = list(factor = 2, exact_refine = TRUE),
   optimizer = "auto",
   leverage = FALSE
 )

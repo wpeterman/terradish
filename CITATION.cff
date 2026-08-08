@@ -1,8 +1,8 @@
 cff-version: 1.2.0
 message: "If you use terradish, please cite it as below."
 title: "terradish: Fast Gradient-Based Optimization of Resistance Surfaces"
-version: 0.0.44
-date-released: "2026-07-02"
+version: 0.0.46
+date-released: "2026-09-08"
 license: BSD-3-Clause
 type: software
 repository-code: "https://github.com/wpeterman/terradish"

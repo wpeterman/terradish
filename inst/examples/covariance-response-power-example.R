@@ -51,9 +51,9 @@ run_covariance_response_power_example <- function(sample_sizes = c(6, 8, 10),
 
   # Candidate model 1: the correctly specified natural-spline model.
   #
-  # Candidate model 2: a Gaussian-smoothed model that estimates the scale of
-  # altitude before fitting the log-linear conductance relationship. This is not
-  # the data-generating model here, but it is useful as a competing flexible
+  # Candidate model 2: a Gaussian-smoothed model that jointly estimates the
+  # altitude smoothing scale and its log-linear conductance association. This is
+  # not the data-generating model here, but it is useful as a competing flexible
   # strategy.
   gaussian_model <- gaussian_smoothed_loglinear_conductance(
     surface,
@@ -95,7 +95,8 @@ run_covariance_response_power_example <- function(sample_sizes = c(6, 8, 10),
   # Scenario-level interpretation:
   # - fit_rate should be near 1 before trusting power estimates.
   # - conductance_power is the fraction of simulations where the recovered
-  #   full conductance surface correlated with truth above the chosen threshold.
+  #   full conductance surface correlated with the generating surface above the
+  #   chosen threshold.
   # - selected_AICc_rate is the fraction of simulations where each candidate
   #   was the best-supported model by AICc.
   scenario_summary <- power$summary[
@@ -146,7 +147,7 @@ run_covariance_response_power_example <- function(sample_sizes = c(6, 8, 10),
     parameter_summary = parameter_summary,
     planning = planning,
     interpretation = c(
-      "Start with rows where fit_rate is 1; low fit_rate means the optimizer settings need attention before interpreting power.",
+      "Start with rows where fit_rate is 1; low fit_rate can reflect weak information, boundary fits, model mismatch, or numerical difficulty and must be diagnosed before interpreting power.",
       "Prefer conductance_power and mean_conductance_cor for spline recovery because basis coefficients are not directly biological parameters.",
       "Use selected_AICc_rate to ask whether the design can distinguish the flexible candidate from simpler alternatives.",
       "Increase nsim and n_designs before making final sample-size decisions."

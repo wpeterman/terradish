@@ -35,9 +35,8 @@ conductances by a constant leaves resistance distances unchanged).
 \strong{When to prefer \code{linear_conductance} over
 \code{loglinear_conductance}:}
 \itemize{
-  \item When you want conductance to be a direct, additive mixture of
-    raster layers (e.g. habitat suitability scores that already live on a
-    natural additive scale).
+  \item When the chosen covariate transformations support a direct additive
+    parameterization of fitted conductance.
   \item When theory predicts a linear relationship.
 }
 

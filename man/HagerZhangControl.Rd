@@ -55,6 +55,16 @@ produce unit-scale search directions.}
 \item{verbose}{Should line-search progress (trial step lengths and objective
 values) be printed to the console?}
 }
+\value{
+A named list of class \code{"HagerZhangControl"} holding the line
+  search settings.  The elements are the arguments above, stored unchanged:
+  \code{delta}, \code{sigma}, \code{alphamax}, \code{rho}, \code{epsilon},
+  \code{gamma}, \code{linesearchmax}, \code{psi3}, \code{c}, and
+  \code{verbose}.  Pass the object to the \code{ls.control} argument of
+  \code{\link{NewtonRaphsonControl}} rather than to \code{\link{terradish}}
+  directly; inspect it with \code{str()}.  The list carries no fitted
+  quantities, so nothing in it needs back-transforming.
+}
 \description{
 Tuning parameters for the Hager-Zhang line-search implementation.
 }

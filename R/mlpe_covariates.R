@@ -20,8 +20,9 @@
 #'   \describe{
 #'     \item{\code{"absdiff"}}{Absolute difference between endpoints:
 #'       \eqn{|x_i - x_j|}.  One output column per covariate.  Symmetric;
-#'       suitable when you expect environmental dissimilarity (regardless of
-#'       direction) to drive differentiation.}
+#'       suitable when the hypothesis concerns an association between
+#'       environmental dissimilarity and differentiation, regardless of
+#'       direction.}
 #'     \item{\code{"sqdiff"}}{Squared difference:
 #'       \eqn{(x_i - x_j)^2}.  One output column per covariate.  Like
 #'       \code{"absdiff"} but penalizes large differences more heavily.}
@@ -127,10 +128,18 @@ pairwise_endpoint_covariates <- function(x,
 #' (IBE).  The residuals follow the MLPE correlation structure of Clarke et al.
 #' (2002).
 #'
+#' The \eqn{\gamma} coefficients are conditional on resistance distance, the
+#' other pairwise covariates, and the MLPE correlation model. They describe
+#' associations with the genetic-distance response. They do not cleanly
+#' separate IBE from IBR, establish causality, or identify a unique ecological
+#' mechanism when spatial predictors are correlated.
+#'
 #' The nuisance parameters (intercept \eqn{\alpha}, IBR slope \eqn{\beta},
-#' IBE coefficients \eqn{\gamma}, log-precision \code{tau}, and logit MLPE
-#' correlation \code{rho}) are all profiled out during optimization; only the
-#' conductance parameters in the formula are optimized by the outer loop.
+#' IBE coefficients \eqn{\gamma}, log-precision \code{tau}, and the
+#' unconstrained correlation parameter \code{rho}) are all profiled out during
+#' optimization; only the conductance parameters in the formula are optimized
+#' by the outer loop. The actual MLPE shared-site correlation is
+#' \eqn{\text{plogis}(\rho)/2}.
 #'
 #' When \code{x} is site-level data or the output of
 #' \code{pairwise_endpoint_covariates()}, the pairwise covariate matrix is
@@ -398,6 +407,7 @@ mlpe_covariates <- function(x,
   }
 
   attr(g, "pairwise_covariates") <- pairwise_covariates
+  attr(g, "base_model") <- "mlpe"
   attr(g, "subsetter") <- function(index)
     mlpe_covariates(.subset_pairwise_endpoint_covariates(pairwise_covariates, index),
                     rho_start = rho_start)

@@ -3,7 +3,9 @@
 #' A function of class \code{"terradish_measurement_model"} that evaluates the
 #' maximum likelihood population effects (MLPE) likelihood.  MLPE accounts for
 #' the non-independence of pairwise genetic distances that share a sampling
-#' site, and is the recommended measurement model for distance-matrix data.
+#' site. It is the preferred distance-response likelihood when a defensible
+#' effective Wishart degrees-of-freedom value is unavailable or the response is
+#' not admissible for \code{\link{generalized_wishart}}.
 #'
 #' @param E Conductance-implied covariance matrix: the generalized inverse of
 #'   the graph Laplacian, evaluated at the current conductance parameters.
@@ -12,9 +14,10 @@
 #' @param S Square, symmetric matrix of observed pairwise genetic distances
 #'   (e.g. F\eqn{_{ST}}). Must have the same dimensions as \code{E}.
 #' @param phi Named numeric vector of nuisance parameters \code{(alpha, beta,
-#'   tau, rho)}.  Omit to obtain starting values: \code{alpha}, \code{beta},
-#'   and \code{tau} from a least-squares fit, and \code{rho} initialized at a
-#'   weak positive correlation.
+#'   tau, rho)}. The stored \code{tau} is log precision and the stored
+#'   \code{rho} is an unconstrained, logit-scale parameter. Omit to obtain
+#'   starting values from a least-squares fit and a weak positive MLPE
+#'   correlation.
 #' @param nu Unused; present for a common interface with Wishart measurement
 #'   models.
 #' @param gradient Logical. Compute gradient of the negative log-likelihood
@@ -32,22 +35,26 @@
 #' The nuisance parameters are:
 #' \describe{
 #'   \item{\code{alpha}}{Intercept of the mean structure.}
-#'   \item{\code{beta}}{IBR slope (resistance-distance effect); constrained
+#'   \item{\code{beta}}{Resistance-distance (IBR) slope; constrained
 #'     \eqn{\geq 0} when \code{nonnegative = TRUE}.}
 #'   \item{\code{tau}}{Log-precision parameter: residual variance is
 #'     \eqn{\exp(-\tau)}.}
-#'   \item{\code{rho}}{Logit-transformed MLPE correlation parameter; the
-#'     actual correlation is \eqn{\text{plogis}(\rho)/2 \in (0, 0.5)}.}
+#'   \item{\code{rho}}{Unconstrained optimization-scale parameter. The actual
+#'     shared-site correlation is
+#'     \eqn{\rho_{MLPE} = \text{plogis}(\rho)/2 \in (0, 0.5)}.}
 #' }
 #'
 #' The mean structure is \eqn{S_{ij} = \alpha + \beta R_{ij} + e_{ij}}, where
 #' \eqn{R_{ij}} is the resistance distance derived from \code{E}.  The
 #' residual vector \eqn{e} follows the MLPE correlation structure of Clarke
 #' et al. (2002): two pairs \eqn{(i,j)} and \eqn{(i,k)} sharing site \eqn{i}
-#' have correlation \eqn{\rho}, while pairs sharing no site are uncorrelated.
+#' have correlation \eqn{\rho_{MLPE}}, while pairs sharing no site are
+#' uncorrelated.
 #'
 #' Use \code{\link{mlpe_covariates}} to extend the mean structure with
 #' additional fixed pairwise covariates (isolation by environment).
+#' Coefficients describe conditional associations under the specified mean and
+#' correlation structure; they do not isolate causal environmental effects.
 #'
 #' @references
 #' Clarke RT, Rothery P, Raybould AF. 2002. Confidence limits for regression
@@ -92,7 +99,9 @@
 #'                                  covariance = TRUE)$covariance[,,1]
 #' 
 #' mlpe(laplacian_inv, melip.Fst) #without 'phi': return MLE of phi
-#' mlpe(laplacian_inv, melip.Fst, phi = c(0., 0.5, -0.1, qlogis(0.2)))
+#' # Set the actual shared-site correlation to 0.2 with qlogis(2 * 0.2)
+#' mlpe(laplacian_inv, melip.Fst,
+#'      phi = c(0, 0.5, -0.1, qlogis(2 * 0.2)))
 #'
 #' @export
 
@@ -133,7 +142,7 @@ mlpe <- function(E, S, phi, nu = NULL, gradient = TRUE, hessian = TRUE, partial 
   Ind <- which(lower.tri(R), arr.ind = TRUE)
 
   unos   <- matrix(1, length(Sl), 1)
-  U      <- sparseMatrix(i = rep(1:length(Sl), 2), j = c(Ind), x = c(unos))
+  U      <- sparseMatrix(i = rep(seq_along(Sl), 2), j = c(Ind), x = c(unos))
 
   eigUtU <- .get_mlpe_eigen(nrow(E))
   D      <- eigUtU$values

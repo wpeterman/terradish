@@ -30,7 +30,8 @@ terradish_parameters(
 \item{...}{Reserved for future use.}
 }
 \value{
-A data frame of fitted and, when available, true effect sizes.
+A data frame of fitted coefficients and, when available, generating
+  or target coefficients stored under the legacy name \code{effect_size}.
 }
 \description{
 Reads a saved fitted \code{terradish} model from a simulation results
@@ -52,13 +53,14 @@ conductance coefficients of the saved fitted model rather than any
 simulation-wide uncertainty summary.
 }
 \examples{
-\dontrun{
+\donttest{
 data(melip)
 melip.altitude <- terra::unwrap(melip.altitude)
 melip.forestcover <- terra::unwrap(melip.forestcover)
 melip.coords <- terra::unwrap(melip.coords)
 covariates <- c(terra::scale(melip.altitude), terra::scale(melip.forestcover))
 names(covariates) <- c("altitude", "forestcover")
+covariates <- terra::aggregate(covariates, fact = 3, na.rm = TRUE)
 surface <- conductance_surface(covariates, melip.coords, directions = 8)
 fit <- terradish(melip.Fst ~ altitude + forestcover, surface,
               loglinear_conductance, leastsquares)

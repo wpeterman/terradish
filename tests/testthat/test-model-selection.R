@@ -99,3 +99,95 @@ test_that("default model labels append [mlpe:n] when pairwise covariates are pre
   expect_true(any(cv_out$loglik_tab$model == "altitude + forestcover [mlpe:3]"))
   expect_true(any(cv_out$AIC_tab$model == "altitude + forestcover [mlpe:3]"))
 })
+
+test_that("aic_table rejects incomparable likelihoods, responses, pairs, and nu", {
+  make_fit <- function(model, response, nu = NULL, pairs = NULL) {
+    if (!is.null(pairs))
+      model <- pair_subset_measurement_model(model, pairs)
+
+    list(
+      formula = stats::as.formula("response ~ altitude"),
+      dim = c(vertices = 20, focal = nrow(response), edge = 30),
+      loglik = -10,
+      aic = 26,
+      df = 3,
+      fit = list(response = response),
+      submodels = list(g = model),
+      comparison = terradish:::.terradish_comparison_contract(model, nu, response)
+    )
+  }
+
+  S <- diag(4)
+  expect_error(
+    aic_table(list(make_fit(mlpe, S),
+                   make_fit(generalized_wishart, S, nu = 20))),
+    "different likelihood families"
+  )
+  expect_error(
+    aic_table(list(make_fit(mlpe, S), make_fit(mlpe, S + 1))),
+    "same response matrix"
+  )
+  expect_error(
+    aic_table(list(make_fit(generalized_wishart, S, nu = 20),
+                   make_fit(generalized_wishart, S, nu = 40))),
+    "same effective degrees"
+  )
+  expect_error(
+    aic_table(list(make_fit(mlpe, S, pairs = rbind(c(1, 2), c(2, 3))),
+                   make_fit(mlpe, S, pairs = rbind(c(1, 2), c(3, 4))))),
+    "same selected pairs"
+  )
+
+  unknown_model <- function(...) NULL
+  class(unknown_model) <- c("terradish_measurement_model",
+                            "radish_measurement_model")
+  expect_error(
+    aic_table(list(make_fit(unknown_model, S), make_fit(unknown_model, S))),
+    "Could not identify every model's likelihood family"
+  )
+})
+
+test_that("aic_table uses selected pair rows as the pair-subset BIC convention", {
+  response <- diag(4)
+  pairs <- rbind(c(1, 2), c(2, 3))
+  pair_mlpe <- pair_subset_measurement_model(mlpe, pairs)
+  make_fit <- function(loglik, df) {
+    list(
+      formula = stats::as.formula("response ~ altitude"),
+      dim = c(vertices = 20, focal = 4, edge = 30),
+      loglik = loglik,
+      aic = -2 * loglik + 2 * df,
+      df = df,
+      fit = list(response = response),
+      submodels = list(g = pair_mlpe),
+      comparison = terradish:::.terradish_comparison_contract(
+        pair_mlpe, response = response
+      )
+    )
+  }
+
+  tab <- aic_table(list(make_fit(-10, 3), make_fit(-12, 4)),
+                   BIC = TRUE, mod_names = c("fit 1", "fit 2"))
+  expect_equal(tab$BIC[match("fit 1", tab$model)],
+               round(20 + 3 * log(nrow(pairs)), 4))
+})
+
+test_that("aic_table keeps log-likelihoods aligned when model labels repeat", {
+  response <- diag(4)
+  make_fit <- function(loglik, aic) {
+    list(
+      formula = stats::as.formula("response ~ altitude"),
+      dim = c(vertices = 20, focal = 4, edge = 30),
+      loglik = loglik,
+      aic = aic,
+      df = 3,
+      fit = list(response = response),
+      submodels = list(g = mlpe),
+      comparison = terradish:::.terradish_comparison_contract(mlpe)
+    )
+  }
+
+  tab <- aic_table(list(make_fit(-20, 46), make_fit(-10, 26)),
+                   mod_names = c("duplicate", "duplicate"))
+  expect_equal(tab$loglik, c(-10, -20))
+})

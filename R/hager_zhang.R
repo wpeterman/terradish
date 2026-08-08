@@ -48,6 +48,15 @@
 #'     larger backtracking steps when \code{c} is too large.
 #' }
 #'
+#' @return A named list of class \code{"HagerZhangControl"} holding the line
+#'   search settings.  The elements are the arguments above, stored unchanged:
+#'   \code{delta}, \code{sigma}, \code{alphamax}, \code{rho}, \code{epsilon},
+#'   \code{gamma}, \code{linesearchmax}, \code{psi3}, \code{c}, and
+#'   \code{verbose}.  Pass the object to the \code{ls.control} argument of
+#'   \code{\link{NewtonRaphsonControl}} rather than to \code{\link{terradish}}
+#'   directly; inspect it with \code{str()}.  The list carries no fitted
+#'   quantities, so nothing in it needs back-transforming.
+#'
 #' @references
 #' Hager WW, Zhang H. 2006. Algorithm 851: \code{CG_DESCENT}, a conjugate gradient
 #' method with guaranteed descent. ACM Transactions on Mathematical Software
@@ -108,7 +117,7 @@ HagerZhang <- function (dphifn, phi_0, dphi_0, control = HagerZhangControl())
   iterfinitemax = ceiling(-log(.Machine$double.eps, 2))
   st <- new("HagerZhangStorage", alphas = c(0), values = c(phi_0), slopes = c(dphi_0))
   if (verbose)
-    cat("New linesearch\n")
+    message("New linesearch")
 
   phi_lim = phi_0 + epsilon * abs(phi_0)
   stopifnot(c >= 0)
@@ -158,7 +167,7 @@ HagerZhang <- function (dphifn, phi_0, dphi_0, control = HagerZhangControl())
   while(!isbracketed && iter < linesearchmax)
   {
     if(verbose)
-      cat("bracketing: ia = ", ia, ", ib = ", ib, ", c = ", c, ", phi_c = ", phi_c, ", dphi_c = ", dphi_c, "\n")
+      message("bracketing: ia = ", ia, ", ib = ", ib, ", c = ", c, ", phi_c = ", phi_c, ", dphi_c = ", dphi_c)
     if(dphi_c >= 0)
     {
       # We've reached the upward slope, so we have b; examine
@@ -209,7 +218,7 @@ HagerZhang <- function (dphifn, phi_0, dphi_0, control = HagerZhangControl())
       {
         c = alphamax
         if (verbose)
-          cat("bracket: exceeding alphamax, using c = alphamax = ", alphamax, ", cold = ", cold, "\n")
+          message("bracket: exceeding alphamax, using c = alphamax = ", alphamax, ", cold = ", cold)
       }
       fit = dphifn(c)
       phi_c = fit$objective
@@ -220,7 +229,7 @@ HagerZhang <- function (dphifn, phi_0, dphi_0, control = HagerZhangControl())
         alphamax = c # shrinks alphamax, assumes that steps >= c can never have finite phi_c and dphi_c
         iterfinite = iterfinite + 1
         if (verbose)
-          cat("bracket: non-finite value, bisection\n")
+          message("bracket: non-finite value, bisection")
         c = (cold + c) / 2
         fit = dphifn(c)
         phi_c = fit$objective
@@ -230,8 +239,8 @@ HagerZhang <- function (dphifn, phi_0, dphi_0, control = HagerZhangControl())
       {
         if (verbose)
         {
-          cat("Warning: failed to expand interval to bracket with finite values. If this happens frequently, check your function and gradient.\n")
-          cat("c = ", c, ", alphamax = ", alphamax, ", phi_c = ", phi_c, ", dphi_c = ", dphi_c, "\n")
+          message("Warning: failed to expand interval to bracket with finite values. If this happens frequently, check your function and gradient.")
+          message("c = ", c, ", alphamax = ", alphamax, ", phi_c = ", phi_c, ", dphi_c = ", dphi_c)
         }
         return(cold) #return(list(cold, phi_cold))
       }
@@ -247,7 +256,7 @@ HagerZhang <- function (dphifn, phi_0, dphi_0, control = HagerZhangControl())
     b = st$alphas[ib]
     stopifnot(b > a)
     if (verbose)
-      cat("linesearch: ia = ", ia, ", ib = ", ib, ", a = ", a, ", b = ", b, ", phi(a) = ", st$values[ia], ", phi(b) = ", st$values[ib], "\n")
+      message("linesearch: ia = ", ia, ", ib = ", ib, ", a = ", a, ", b = ", b, ", phi(a) = ", st$values[ia], ", phi(b) = ", st$values[ib])
     if (b - a <= .Machine$double.eps)
     {
       return(a) #return(c(a, st$values[ia])) 
@@ -267,12 +276,12 @@ HagerZhang <- function (dphifn, phi_0, dphi_0, control = HagerZhangControl())
     if (B - A < gamma * (b - a))
     {
       if (verbose)
-        cat("Linesearch: secant succeeded\n")
+        message("Linesearch: secant succeeded")
       if (nextfloat(st$values[ia]) >= st$values[ib] && nextfloat(st$values[iA]) >= st$values[iB])
       {
         # It's so flat, secant didn't do anything useful, time to quit
         if (verbose)
-          cat("Linesearch: secant suggests it's flat\n")
+          message("Linesearch: secant suggests it's flat")
         return(A) #return(list(A, st$values[iA]))
       }
       ia = iA
@@ -282,7 +291,7 @@ HagerZhang <- function (dphifn, phi_0, dphi_0, control = HagerZhangControl())
     {
       # Secant is converging too slowly, use bisection
       if(verbose)
-        cat("Linesearch: secant failed, using bisection\n")
+        message("Linesearch: secant failed, using bisection")
       c = (A + B) / 2
 
       fit = dphifn(c)
@@ -342,7 +351,7 @@ secant2 <- function(dphifn, st, ia, ib, phi_lim, delta, sigma, verbose)
         stop("Search direction is not a direction of descent; this error may indicate that user-provided derivatives are inaccurate.\n(dphi_a = ", dphi_a, "dphi_b = ", dphi_b)
     c = secant0(a, b, dphi_a, dphi_b)
     if (verbose)
-      cat("secant2: a = ", a, ", b = ", b, ", c = ", c, "\n")
+      message("secant2: a = ", a, ", b = ", b, ", c = ", c)
     stopifnot(is.finite(c))
     fit = dphifn(c)
     phi_c = fit$objective
@@ -357,7 +366,7 @@ secant2 <- function(dphifn, st, ia, ib, phi_lim, delta, sigma, verbose)
     if (satisfies_wolfe(c, phi_c, dphi_c, phi_0, dphi_0, phi_lim, delta, sigma))
     {
       if (verbose)
-        cat("secant2: first c satisfied Wolfe conditions\n")
+        message("secant2: first c satisfied Wolfe conditions")
       return(list(TRUE, ic, ic))
     }
 
@@ -365,7 +374,7 @@ secant2 <- function(dphifn, st, ia, ib, phi_lim, delta, sigma, verbose)
     iA = upd[[1]]
     iB = upd[[2]]
     if (verbose)
-      cat("secant2: iA = ", iA, ", iB = ", iB, ", ic = ", ic, "\n")
+      message("secant2: iA = ", iA, ", iB = ", iB, ", ic = ", ic)
     a = st$alphas[iA]
     b = st$alphas[iB]
     doupdate = FALSE
@@ -382,7 +391,7 @@ secant2 <- function(dphifn, st, ia, ib, phi_lim, delta, sigma, verbose)
     if ((iA == ic || iB == ic) && a <= c && c <= b)
     {
         if (verbose)
-            cat("secant2: second c = ", c, "\n")
+            message("secant2: second c = ", c)
         fit = dphifn(c)
         phi_c = fit$objective
         dphi_c = fit$gradient
@@ -397,7 +406,7 @@ secant2 <- function(dphifn, st, ia, ib, phi_lim, delta, sigma, verbose)
         if (satisfies_wolfe(c, phi_c, dphi_c, phi_0, dphi_0, phi_lim, delta, sigma))
         {
             if (verbose)
-                cat("secant2: second c satisfied Wolfe conditions\n")
+                message("secant2: second c satisfied Wolfe conditions")
             return (list(TRUE, ic, ic))
         }
         upd = hzupdate(dphifn, st, iA, iB, ic, phi_lim, verbose) 
@@ -405,7 +414,7 @@ secant2 <- function(dphifn, st, ia, ib, phi_lim, delta, sigma, verbose)
         iB = upd[[2]]
     }
     if (verbose)
-        cat("secant2 output: a = ", st$alphas[iA], ", b = ", st$alphas[iB], "\n")
+        message("secant2 output: a = ", st$alphas[iA], ", b = ", st$alphas[iB])
     return(list(FALSE, iA, iB))
 }
 
@@ -427,7 +436,7 @@ hzupdate <- function(dphifn, st, ia, ib, ic, phi_lim, verbose)
     phi_c = st$values[ic]
     dphi_c = st$slopes[ic]
     if (verbose)
-        cat("update: ia = ", ia, ", a = ", a, ", ib = ", ib, ", b = ", b, ", c = ", c, ", phi_c = ", phi_c, ", dphi_c = ", dphi_c)
+        message("update: ia = ", ia, ", a = ", a, ", ib = ", ib, ", b = ", b, ", c = ", c, ", phi_c = ", phi_c, ", dphi_c = ", dphi_c)
     if (c < a || c > b)
         return (list(ia, ib)) #, 0, 0  # it's out of the bracketing interval
     if (dphi_c >= 0)
@@ -468,7 +477,7 @@ bisect <- function(dphifn, st, ia, ib, phi_lim, verbose)
     while (b - a > tol)
     {
         if (verbose)
-            cat("bisect: a = ", a, ", b = ", b, ", b - a = ", b - a, "\n")
+            message("bisect: a = ", a, ", b = ", b, ", b - a = ", b - a)
         d = (a + b) / 2.
         if (d <= a || d >= b)          # midpoint cannot produce a new interior point
             break

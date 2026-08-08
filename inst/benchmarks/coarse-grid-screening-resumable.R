@@ -25,7 +25,7 @@ CONFIG <- list(
 )
 
 .synthetic_helpers <- new.env(parent = globalenv())
-source("C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/inst/benchmarks/synthetic-solver-scaling.R",
+source(file.path("inst", "benchmarks", "synthetic-solver-scaling.R"),
        local = .synthetic_helpers)
 
 .coarse_screening_defaults <- function()
@@ -372,8 +372,7 @@ source("C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/ter
       fst ~ cont1 + cont2,
       data = surface_case$surface,
       conductance_model = terradish::loglinear_conductance,
-      measurement_model = terradish::generalized_wishart,
-      nu = base_config$n_loci,
+      measurement_model = terradish::mlpe,
       control = terradish::NewtonRaphsonControl(maxit = 6, verbose = FALSE),
       solver = "direct"
     )
@@ -390,8 +389,7 @@ source("C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/ter
     formula = fst ~ cont1 + cont2,
     data = surface_case$surface,
     conductance_model = terradish::loglinear_conductance,
-    measurement_model = terradish::generalized_wishart,
-    nu = base_config$n_loci,
+    measurement_model = terradish::mlpe,
     cores = 1,
     approximation = "none"
   ))
@@ -405,8 +403,7 @@ source("C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/ter
     formula = fst ~ cont1 + cont2,
     data = surface_case$surface,
     conductance_model = terradish::loglinear_conductance,
-    measurement_model = terradish::generalized_wishart,
-    nu = base_config$n_loci,
+    measurement_model = terradish::mlpe,
     cores = 1,
     approximation = "coarse_raster",
     approximation_control = list(factor = as.integer(factor))
@@ -421,8 +418,7 @@ source("C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/ter
       fst ~ cont1 + cont2,
       data = surface_case$surface,
       conductance_model = terradish::loglinear_conductance,
-      measurement_model = terradish::generalized_wishart,
-      nu = base_config$n_loci,
+      measurement_model = terradish::mlpe,
       theta = theta_start,
       control = terradish::NewtonRaphsonControl(maxit = 6, verbose = FALSE),
       solver = "direct"

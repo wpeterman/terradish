@@ -28,9 +28,13 @@ covariates (as in \code{\link{terradish}}).}
 \item{directional}{Directional edge covariates from \code{\link{edge_gradient}}
 (or a list with \code{edges} and \code{d}).}
 
-\item{measurement_model}{A \code{terradish} measurement model
-(e.g. \code{\link{generalized_wishart}}, \code{\link{leastsquares}},
-\code{\link{mlpe}}).}
+\item{measurement_model}{A \code{terradish} measurement model. It must match
+the response representation: \code{\link{wishart_covariance}} for a
+positive semidefinite covariance matrix,
+\code{\link{generalized_wishart}} for an admissible squared-distance
+representation coherently related to a centered positive semidefinite
+covariance matrix, or \code{\link{leastsquares}} / \code{\link{mlpe}} for
+other pairwise distance responses.}
 
 \item{nu}{Effective Wishart degrees of freedom, if required by the model.}
 
@@ -70,27 +74,27 @@ An object of class \code{"terradish_directed"} with the symmetric
   maximized log-likelihood, and the fit details.
 }
 \description{
-Fits a conductance surface in which gene flow can be \strong{directional}:
-the movement rate from cell \eqn{a} to neighbor \eqn{b} need not equal the
-reverse rate.  Movement is modeled as a covariate-parameterized continuous-
-time Markov generator
+Fits a non-reversible graph in which the modeled edge rate from cell \eqn{a}
+to neighbor \eqn{b} need not equal the reverse rate. Edge rates are
+parameterized with a continuous-time Markov generator
 \deqn{\log G_{a\to b} = \tfrac12(\eta_a + \eta_b) + d_{ab}^\top \gamma,\quad \eta_k = x_k^\top\theta,}
-where \eqn{\theta} are the usual (symmetric) conductance effects and
-\eqn{\gamma} are directional effects on antisymmetric edge covariates
+where \eqn{\theta} are symmetric conductance coefficients and \eqn{\gamma}
+are edge-rate coefficients on antisymmetric edge covariates
 \eqn{d_{ab} = -d_{ba}} (e.g. elevation drop, flow, wind; see
 \code{\link{edge_gradient}}).  The genetic response is linked through the
 symmetric \strong{commute time} of the chain, so any \code{terradish}
 measurement model applies unchanged.  With \eqn{\gamma = 0} the generator is
-reversible and the model reduces to isolation by resistance.
+reversible and the model reduces to the symmetric resistance formulation.
 }
 \details{
 \strong{Scope.} This is the tractable directional model (directed commute
-time): a single-lineage hitting-time formulation, reducing to resistance
-distance when reversible.  It is not the full structured-coalescent model
-(intractable on fine rasters).  Whether directional effects are identifiable
-depends on the data: asymmetry leaves a signature in the symmetric commute
-time on bounded landscapes, but it can be weak; report \eqn{\gamma} with its
-uncertainty and check sensitivity.
+time): a single-lineage hitting-time formulation that reduces to resistance
+distance when reversible. It is not a structured-coalescent or migration-rate
+model. Directional edge-rate bias is inferred only through a symmetric
+commute-time response and can be weakly or nonuniquely identified. Report
+\eqn{\gamma} with uncertainty and sensitivity to bounds, graph construction,
+and directional covariates. Do not interpret arrows as observed migration
+paths, directions, or absolute rates.
 }
 \examples{
 \donttest{

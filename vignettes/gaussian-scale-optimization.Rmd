@@ -25,7 +25,7 @@ knitr::opts_chunk$set(
 
 ## Why optimize sigma inside the model?
 
-The original `radish` workflow for scale of effect usually worked in two steps:
+The original `radish` workflow for raster smoothing usually worked in two steps:
 
 1. Smooth each raster at several candidate scales.
 2. Fit a resistance model to each smoothed raster surface and compare the fits.
@@ -60,8 +60,11 @@ where:
 - $\beta$ is the conductance coefficient
 - $\sigma$ controls how broad the smoothing kernel is
 
-Small `sigma` means a very local scale of effect. Large `sigma` means the
-covariate is averaged over a broader neighborhood.
+Small `sigma` means that the raster is averaged over a narrow neighborhood.
+Large `sigma` means that it is averaged over a broader neighborhood. Here,
+`sigma` is a Gaussian smoothing scale in the raster's map units. It is not an
+estimate of dispersal distance, home-range size, movement distance, or the
+spatial scale of a causal ecological process.
 
 ### Are there limits on sigma?
 
@@ -147,7 +150,7 @@ Two details matter here:
 
 - `saveStack = TRUE` is required, because the Gaussian conductance model needs
   the retained raster stack as its smoothing domain.
-- We are fitting the scale of effect for the raster itself, so the original
+- We are fitting a smoothing scale for the raster itself, so the original
   raster values need to be available.
 
 ### Step 2: Create the Gaussian scale-aware conductance model
@@ -246,19 +249,20 @@ coef(fit_gaussian)[["sigma.forestcover"]]
 gaussian_scale_summary(fit_gaussian)
 ```
 
-That table is often the quickest way to interpret the scale of effect. For
+That table is often the quickest way to interpret the fitted smoothing scale.
+For
 example, `radial_95` is the radius that contains approximately 95% of the
 Gaussian kernel mass, while `sigma_cells_x` and `sigma_cells_y` show how broad
-the effect is relative to the raster resolution.
+the smoothing kernel is relative to the raster resolution.
 
 You can also visualize the fitted kernel directly. The `sigma` plot shows the
 Gaussian weight curve over distance for each fitted scale parameter, with a
-vertical dashed line at the fitted effective distance containing 90% of the
+vertical dashed line at the fitted distance containing 90% of the
 one-dimensional kernel mass and a shaded uncertainty band for that distance.
 Each panel is also annotated with:
 
 - the fitted `sigma`
-- the fitted effective 90% distance
+- the fitted 90% kernel-mass distance
 - the corresponding confidence interval bounds
 
 ```{r sigma-plot, fig.cap = "***Fitted Gaussian kernel with uncertainty band. The dashed line marks the distance containing 90% of the one-dimensional kernel mass.***"}
@@ -268,9 +272,9 @@ plot(fit_gaussian, type = "sigma")
 If you already know how to convert your map units into a more interpretable
 distance scale, you can relabel the plot directly. For example, if one map
 unit corresponds to one metre, then multiplying by `0.001` reports distances
-in kilometres:
+in kilometers:
 
-```{r sigma-plot-km, fig.cap = "***Fitted Gaussian kernel with x-axis relabelled in kilometres.***"}
+```{r sigma-plot-km, fig.cap = "***Fitted Gaussian kernel with x-axis relabeled in kilometers.***"}
 plot(
   fit_gaussian,
   type = "sigma",
@@ -299,19 +303,24 @@ fit_fixed
 ```
 
 ```{r compare-table}
-data.frame(
-  model = c("Gaussian scale-aware", "Fixed raster"),
-  logLik = c(fit_gaussian$loglik, fit_fixed$loglik),
-  AIC = c(fit_gaussian$aic, fit_fixed$aic)
+aic_table(
+  list(fit_gaussian, fit_fixed),
+  mod_names = c("Gaussian scale-aware", "Fixed raster")
 )
 ```
+
+The two fits use the same response, sites, graph, and MLPE likelihood, so their
+AIC values have a common basis. The scale-aware model's parameter count includes
+the estimated smoothing scale. In a larger analysis, declare the candidate
+scale and formula set before comparing it, and report the search that was
+performed.
 
 At this stage, the main question is not simply "which AIC is smaller?" A more
 useful question is:
 
 - does `sigma.forestcover` stay away from the bounds?
-- does the fitted scale look biologically plausible relative to the raster
-  resolution?
+- is the fitted smoothing scale distinguishable from the bounds and supported
+  by the raster resolution and sampled domain?
 - is the scale-aware fit at least competitive with the simpler fixed-raster
   version?
 
@@ -432,7 +441,7 @@ It does **not yet** support:
 - factor-valued raster layers
 - leverage / `partial_X` diagnostics
 
-It does now support conditional-on-sigma marginal-effect plotting, so you can
+It does now support conditional-on-sigma marginal-association plotting, so you can
 inspect conductance and response-scale curves after fitting, but the leverage
 machinery is still intentionally disabled.
 
@@ -448,20 +457,66 @@ If this workflow looks reasonable for your data, practical steps are:
    sensibly.
 4. Treat boundary-hitting sigma estimates as a model-selection signal, not just
    an optimization nuisance.
-5. Reproject rasters before making ecological distance interpretations, because
+5. Reproject rasters before interpreting smoothing distances, because
    longitude/latitude rasters report sigma in degrees.
 
-This staged approach makes it easier to tell whether the data are truly
-identifying a landscape scale of effect, rather than letting multiple scale
-parameters compete in an over-complex first model.
+This staged approach makes it easier to assess whether the likelihood identifies
+an interior Gaussian smoothing scale under the fitted model. An identified
+smoothing scale is not, by itself, an identified movement or ecological-process
+scale.
 
 ---
 
-## Companion vignettes
+
+## Quick reference: the full scale-optimization workflow
+
+```{r qref-gs, eval = FALSE}
+library(terradish)
+
+# 1. Build the surface from the ORIGINAL raster; do not pre-smooth it
+surface <- conductance_surface(covariates, coords, directions = 8,
+                               saveStack = TRUE)
+
+# 2. Scale-aware conductance model: sigma is estimated, not fixed. The model
+#    is built from the surface itself; sigma_upper bounds the search in map
+#    units, and defaults to the retained raster extent's diagonal when left NULL.
+cm <- gaussian_smoothed_loglinear_conductance(surface)
+
+# 3. Fit; theta and sigma.<layer> are estimated jointly
+fit <- terradish(melip.Fst ~ altitude, data = surface,
+                 conductance_model = cm, measurement_model = mlpe)
+
+# 4. Read the fitted scale. `sigma` is in map units, so reproject a
+#    longitude/latitude raster first or it will be reported in degrees.
+gaussian_scale_summary(fit)   # sigma + kernel-mass distances in map units
+
+# 5. Sanity check against a fixed-raster fit of the same covariate
+fit_fixed <- terradish(melip.Fst ~ altitude, data = surface,
+                       conductance_model = loglinear_conductance,
+                       measurement_model = mlpe)
+aic_table(list(fit, fit_fixed),
+          mod_names = c("Scale-aware", "Fixed raster"))
+
+# 6. Recover the conductance surface at the estimated scale
+plot(conductance(surface, fit))
+```
+
+## Summary of key functions
+
+| Function | Purpose |
+|----------|---------|
+| `conductance_surface()` | Build the graph from the original, unsmoothed raster |
+| `gaussian_smoothed_loglinear_conductance()` | Conductance model that estimates sigma jointly with theta |
+| `terradish()` | Fit the scale-aware model |
+| `gaussian_scale_summary()` | Fitted sigma per layer and corresponding Gaussian kernel-mass distances |
+| `conductance()` | Extract the fitted conductance surface at the estimated scale |
+| `aic_table()` | Compare the scale-aware fit against a fixed-raster fit |
+
+## See also
 
 - **`vignette("getting-started", package = "terradish")`**: the core
   `terradish` workflow: scaling covariates, building a conductance surface,
-  fitting and interpreting models, and the four plot types.
+  fitting and interpreting models, and the five plot types.
 - **`vignette("model-comparison", package = "terradish")`**: likelihood ratio
   tests, AIC/AICc/BIC tables, likelihood surface visualization, and
   cross-validation.

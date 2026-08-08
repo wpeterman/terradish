@@ -108,7 +108,7 @@ Armijo <- function(phifn, phi_0, dphi_0, control = ArmijoControl())
     }
 
     if (isTRUE(control$verbose))
-      cat("Armijo backtracking: alpha =", alpha, "objective =", phi_alpha, "\n")
+      message("Armijo backtracking: alpha = ", alpha, " objective = ", phi_alpha)
 
     alpha <- alpha * control$contraction
     if (alpha < control$min_alpha)

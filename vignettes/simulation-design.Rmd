@@ -20,6 +20,15 @@ knitr::opts_chunk$set(
   warning  = FALSE,
   message  = FALSE
 )
+# The power runs below are far too slow to execute during a package build, so
+# their results are precomputed by vignettes/precompute.R and loaded here. The
+# .rds artifacts are excluded from the built tarball, so a re-build of the
+# vignette will not find them; every chunk that needs them is guarded on
+# `have_power`, and the vignette still renders (without those results) when
+# they are absent.
+.art   <- tryCatch(readRDS("vignette-nu-power.rds"), error = function(e) NULL)
+.power <- tryCatch(readRDS("vignette-power.rds"), error = function(e) NULL)
+have_power <- !is.null(.art) && !is.null(.power)
 ```
 
 ## Why simulate before you sample?
@@ -28,23 +37,26 @@ Landscape-genetic studies are expensive: every additional sampling site means
 field time and cost. Before
 committing to a design it is worth asking, in advance:
 
-- **How many sampling sites** do I need to detect the landscape effect I predict?
-- **How many genetic markers** (the `nu` parameter) do I need?
+- **How many sampling sites** do I need to detect the conditional conductance
+  association specified in my scenario?
+- **How much approximately independent marker information** (represented by
+  the supplied `nu`) do I need?
 - **Where should the sites go**: spread evenly across the landscape, or placed
   some other way?
-- If I run the analysis, **how often will I recover the truth**, and how often
-  will I be fooled by sampling noise?
+- If I run the analysis, **how often will I recover the generating parameters
+  under this model**, and how often will sampling variation obscure them?
 
 `terradish` answers these questions by simulation. Because the Wishart
 covariance model has a tractable generative form, you can draw synthetic
 covariance matrices from a *known* conductance surface, refit the model, and
-measure how reliably the truth is recovered, all without any forward-time
+measure how reliably the generating parameters are recovered, all without any forward-time
 genetic simulation. This vignette shows how.
 
 This is a **design tool**, not a replacement for individual-based or
 coalescent simulation. It assumes the fitted model is correctly specified and
-asks: given that model, how much data do I need? That is exactly the question a
-power analysis should answer.
+asks: given that model and this set of scenarios, how much data do I need? The
+answer is conditional on the graph, parameters, candidate set, likelihood,
+optimizer, and sampling strategies evaluated here.
 
 ---
 
@@ -64,11 +76,13 @@ where:
   inverse of the graph Laplacian at conductance parameters $\theta$. This is
   the part that carries the landscape signal.
 - $\tau \ge 0$ scales that signal.
-- $\sigma \ge 0$ is a **nugget** absorbing drift and other non-landscape
-  variation.
-- $\nu$ is the **effective number of genetic markers**. It controls the amount
-  of sampling noise: large $\nu$ gives draws tightly clustered around $\Sigma$;
-  small $\nu$ gives noisy draws.
+- $\sigma \ge 0$ is a diagonal residual-variance term for covariance variation
+  not represented by $E(\theta)$. It is not a direct estimate of drift,
+  population size, or a Gaussian smoothing scale.
+- $\nu$ is the supplied **effective Wishart degrees of freedom**, not a fitted
+  parameter. It can be interpreted as the effective number of approximately
+  independent marker contributions. Large $\nu$ gives draws tightly clustered
+  around $\Sigma$; small $\nu$ gives noisier draws.
 
 `simulate_covariance_response()` draws from exactly this model, and
 `covariance_response_power()` automates the simulate-refit-summarize loop across
@@ -87,8 +101,11 @@ its meaning.
 > *effective sample size*. It does not change the *point estimates* recovered
 > from a given covariance matrix, but it controls their precision (standard
 > errors scale as $1/\sqrt{\nu}$) and therefore the **statistical power** to
-> detect an effect. Sample size (number of sites) and `nu` (number of markers)
-> are the two main levers a study designer controls.
+> detect a nonzero coefficient under the simulated model. Sample size and
+> marker design are important study-design levers, but the effective `nu` may
+> be smaller than the raw marker count because of dependence. For
+> microsatellites, use the locus count as the primary value and
+> $\sum_l(K_l-1)$ only as a larger sensitivity value.
 
 ---
 
@@ -118,8 +135,9 @@ surface <- conductance_surface(covariates, melip.coords,
 cat("Candidate focal sites:", length(surface$demes), "\n")
 ```
 
-We also fix the **truth** we want to recover: a moderate positive forest-cover
-effect and a moderate negative altitude effect on conductance.
+We also fix the **generating parameters** we want to recover: a moderate
+positive forest-cover coefficient and a moderate negative altitude coefficient
+for log conductance.
 These are illustrative simulation settings, not estimates from the bundled
 *Melipona* genetic response. The bundled rasters provide a realistic landscape
 template, while the synthetic covariance response is generated from the values
@@ -147,7 +165,7 @@ sim <- simulate_covariance_response(
   conductance_model = loglinear_conductance,
   tau               = tau_true,
   sigma             = sigma_true,
-  nu                = 100,     # pretend we genotyped 100 independent markers
+  nu                = 100,     # 100 effective independent marker contributions
   seed              = 1
 )
 
@@ -155,7 +173,8 @@ dim(sim$covariance)        # one row/column per focal site
 round(sim$covariance[1:4, 1:4], 3)
 ```
 
-Refitting recovers the parameters used to generate the data:
+Refitting estimates the parameters used to generate the data. One draw may
+depart substantially from the generating values:
 
 ```{r single-fit}
 fit <- terradish(
@@ -175,11 +194,12 @@ design you must repeat the draw many times.
 
 ---
 
-## The role of markers (`nu`) in statistical power
+## The role of effective `nu` in statistical power
 
-Holding the sampling design fixed, more markers means more precise estimates
-and higher power. The amount of landscape signal also matters. To make both
-effects easy to see, we temporarily isolate a modest altitude effect and vary
+Holding the sampling design fixed, larger effective `nu` means more precise
+estimates and higher model-based power. The amount of conductance-implied
+covariance signal also matters. To make both patterns easy to see, we
+temporarily isolate a modest altitude coefficient and vary
 the signal-to-nugget ratio while holding the landscape template fixed.
 
 ```{r nu-power, eval = FALSE}
@@ -228,9 +248,8 @@ marker_power <- screen_grid(sample_sizes = 20,
 marker_power
 ```
 
-```{r nu-power-load, echo = FALSE}
-# Load pre-computed results (see vignettes/precompute.R to regenerate)
-.art <- readRDS("vignette-nu-power.rds")
+```{r nu-power-load, echo = FALSE, eval = have_power}
+# Pre-computed results (see vignettes/precompute.R to regenerate)
 marker_power  <- .art$marker_power
 site_power    <- .art$site_power
 signal_ratios <- .art$signal_ratios
@@ -238,12 +257,13 @@ screen_nsim   <- .art$screen_nsim
 marker_power
 ```
 
-```{r nu-power-plot, fig.cap = "***Power responds to marker count and the tau / sigma signal ratio.*** Each point is the proportion of 10 simulated data sets in which the altitude coefficient had the correct sign and was significant at alpha = 0.05. The 20 sampling sites are held fixed. The small demonstration grid leaves visible Monte Carlo variation."}
+```{r nu-power-plot, eval = have_power, fig.cap = "***Power responds to effective Wishart degrees of freedom and the tau / sigma signal ratio.*** Each point is the proportion of 10 simulated data sets in which the altitude coefficient had the correct sign and a two-sided Wald p-value below alpha = 0.05. The 20 sampling sites are held fixed. The small demonstration grid leaves visible Monte Carlo variation."}
 cols <- setNames(c("#7570b3", "#1b9e77", "#d95f02", "#e7298a"),
                  signal_ratios)
 plot(NA, xlim = range(marker_power$nu), ylim = c(0, 1), log = "x",
-     xlab = "Number of markers (nu)", ylab = "Power to detect altitude",
-     main = "Power vs. marker count")
+     xlab = "Effective Wishart degrees of freedom (nu)",
+     ylab = "Model-based power for altitude",
+     main = "Power vs. effective nu")
 for (signal_ratio in signal_ratios) {
   sub <- marker_power[marker_power$signal_ratio == signal_ratio, ]
   lines(sub$nu, sub$power, type = "b", pch = 19,
@@ -254,9 +274,10 @@ legend("bottomright", legend = paste("tau / sigma =", signal_ratios),
        col = cols, lty = 1, pch = 19, bty = "n")
 ```
 
-The curves make the cost-benefit tradeoff explicit. Extra markers help, but
-they cannot fully rescue a weak landscape signal. Conversely, stronger
-landscape signal reduces the marker count needed to reach useful power.
+The curves show the conditional tradeoff in this simulation. Additional
+independent marker information helps, but it cannot fully rescue a weak
+conductance-implied covariance signal. Conversely, stronger simulated signal
+reduces the effective `nu` needed to reach a specified power target.
 
 For covariance simulation, use `nu` values at least as large as the number of
 sampled sites. `simulate_covariance_response()` uses `stats::rWishart()`, which
@@ -267,8 +288,9 @@ dimension.
 
 ## The role of sample size in statistical power
 
-Now hold marker count fixed at `nu = 100` and vary the number of sampling
-sites. Each curve again represents a different $\tau / \sigma$ ratio.
+Now hold the effective Wishart degrees of freedom fixed at `nu = 100` and vary
+the number of sampling sites. Each curve again represents a different
+$\tau / \sigma$ ratio.
 
 ```{r site-power, eval = FALSE}
 sample_grid <- c(8, 12, 20, 34)
@@ -278,13 +300,13 @@ site_power <- screen_grid(sample_sizes = sample_grid,
 site_power
 ```
 
-```{r site-power-load, echo = FALSE}
+```{r site-power-load, echo = FALSE, eval = have_power}
 site_power
 ```
 
-```{r site-power-plot, fig.cap = "***Power responds to sampling sites and the tau / sigma signal ratio.*** Each point is the proportion of 10 simulated data sets in which the altitude coefficient had the correct sign and was significant at alpha = 0.05. Marker count is held fixed at nu = 100. The small demonstration grid leaves visible Monte Carlo variation."}
+```{r site-power-plot, eval = have_power, fig.cap = "***Power responds to sampling sites and the tau / sigma signal ratio.*** Each point is the proportion of 10 simulated data sets in which the altitude coefficient had the correct sign and a two-sided Wald p-value below alpha = 0.05. Effective Wishart degrees of freedom are held fixed at nu = 100. The small demonstration grid leaves visible Monte Carlo variation."}
 plot(NA, xlim = range(site_power$sample_size), ylim = c(0, 1),
-     xlab = "Number of sampling sites", ylab = "Power to detect altitude",
+     xlab = "Number of sampling sites", ylab = "Model-based power for altitude",
      main = "Power vs. sample size")
 for (signal_ratio in signal_ratios) {
   sub <- site_power[site_power$signal_ratio == signal_ratio, ]
@@ -342,9 +364,9 @@ power <- covariance_response_power(
 power
 ```
 
-```{r power-run-load, echo = FALSE}
+```{r power-run-load, echo = FALSE, eval = have_power}
 # Load pre-computed results (see vignettes/precompute.R to regenerate)
-power <- readRDS("vignette-power.rds")
+power <- .power
 power
 ```
 
@@ -352,7 +374,7 @@ power
 
 The `summary` table has one row per (strategy, sample size, model):
 
-```{r power-summary}
+```{r power-summary, eval = have_power}
 power$summary[, c("strategy", "sample_size", "model",
                   "fit_rate", "conductance_power",
                   "mean_conductance_cor", "selected_AIC_rate")]
@@ -363,21 +385,23 @@ Key columns:
 - **`fit_rate`**: fraction of replicates that converged. Values below 1 flag a
   design where the model is hard to fit (often too few sites).
 - **`conductance_power`**: fraction of replicates whose fitted conductance
-  surface correlates with the truth above `conductance_cor_threshold`
-  (default 0.9). This is a holistic "did we recover the surface?" measure that
-  works even for spline models where individual coefficients are not
+  surface has a Pearson correlation with the generating surface above
+  `conductance_cor_threshold` (default 0.9). This measures recovery of the
+  relative spatial pattern, not its absolute scale or an ecological mechanism.
+  It is useful for spline models whose basis coefficients are not individually
   interpretable.
 - **`mean_conductance_cor`**: average correlation between the fitted and true
   conductance surfaces.
-- **`selected_AIC_rate`**: how often each model was the AIC winner. For the
-  `full` model this is the rate at which the true model was correctly selected.
+- **`selected_AIC_rate`**: how often each model had the lowest AIC within the
+  specified, comparable candidate set. For the `full` model, this is the rate
+  at which the generating formula ranked first among those candidates.
 
 ### Parameter-level summary
 
 `parameter_summary` reports per-coefficient power, bias, RMSE, and confidence
 interval coverage:
 
-```{r power-params}
+```{r power-params, eval = have_power}
 power$parameter_summary[
   power$parameter_summary$model == "full",
   c("strategy", "sample_size", "parameter",
@@ -387,17 +411,19 @@ power$parameter_summary[
 
 What to look for:
 
-- **`power`**: probability of detecting a truly non-zero effect. Aim for
-  $\ge 0.8$.
-- **`bias`**: average estimate minus truth. Should be near zero; persistent bias
-  signals model misspecification or a design too small for the asymptotics to
-  hold.
+- **`power`**: proportion of all simulated replicates in which the coefficient
+  had the generating sign and a two-sided Wald p-value below `alpha`. Failed or
+  boundary fits count as non-detections. Choose a target such as 0.8 before the
+  assessment rather than treating it as a universal threshold.
+- **`bias`**: average estimate minus the generating value. Persistent bias can
+  reflect model misspecification, boundary behavior, optimization failures, or a
+  design too small for the asymptotic approximation.
 - **`rmse`**: typical estimation error; should shrink as sample size grows.
 - **`coverage`**: fraction of 95% confidence intervals that contain the truth.
   Well-calibrated intervals give ~0.95. Coverage well below 0.95 means the
   reported uncertainty is too optimistic for that design.
 
-```{r power-plot, fig.cap = "***Power to recover each conductance coefficient as a function of sample size (spacefill design, true model).*** The dashed line marks 80% power.", fig.height = 4.5}
+```{r power-plot, eval = have_power, fig.cap = "***Power to recover each conductance coefficient as a function of sample size (spacefill design, generating formula).*** The dashed line marks 80% power.", fig.height = 4.5}
 ps <- power$parameter_summary
 ps <- ps[ps$model == "full" & ps$strategy == "spacefill", ]
 
@@ -423,8 +449,8 @@ A design assessment usually answers one of three questions:
 
 | Question | Column(s) to read | Decision rule |
 |----------|-------------------|---------------|
-| Enough sites? | `parameter_summary$power`, `conductance_power` | Pick the smallest sample size with power $\ge 0.8$ for the effects you care about. |
-| Enough markers? | power-vs-`nu` curves | Pick the smallest `nu` past the power elbow under a conservative $\tau / \sigma$ ratio. |
+| Enough sites? | `parameter_summary$power`, `conductance_power` | Pick the smallest sample size that reaches your predeclared recovery target under conservative scenarios. |
+| Enough marker information? | power-vs-`nu` curves | Identify the smallest plausible effective `nu` past the power elbow under conservative scenarios. |
 | Which site placement? | compare `strategy` rows | Prefer the strategy with higher power / surface correlation at equal cost. |
 | Trustworthy intervals? | `parameter_summary$coverage` | Require coverage near 0.95 before trusting reported CIs. |
 
@@ -437,9 +463,11 @@ A few practical notes:
   `theta`, `tau`, and `sigma`. If you are unsure, run the assessment across a
   grid of plausible effect sizes and $\tau / \sigma$ ratios, then report the
   range.
-- **Use a conservative `nu`.** Markers in linkage disequilibrium are not
-  independent, so the effective `nu` is smaller than the raw marker count.
-  Planning with an optimistic `nu` overstates power.
+- **Use and report defensible `nu` values.** Markers in linkage disequilibrium
+  are not independent, so the effective `nu` can be smaller than the raw marker
+  count. Planning with an optimistic `nu` overstates precision and power. Use
+  locus count as the primary microsatellite value and report a sensitivity
+  analysis.
 - **Spline and Gaussian models.** For non-linear conductance models the
   individual coefficients are not interpretable; lean on
   `conductance_power` and `mean_conductance_cor` rather than per-parameter
@@ -457,7 +485,7 @@ library(terra)
 surface <- conductance_surface(covariates, coords,
                                directions = 8, saveStack = TRUE)
 
-# 2. One simulated covariance matrix from a known truth
+# 2. One simulated covariance matrix from specified generating parameters
 sim <- simulate_covariance_response(
   theta = c(x1 = 0.6, x2 = -0.4), formula = ~ x1 + x2,
   data = surface, tau = 2, sigma = 1, nu = 100, seed = 1
@@ -476,9 +504,21 @@ power <- covariance_response_power(
   strategies = c("spacefill", "random"),
   tau = 2, sigma = 1, nu = 100, nsim = 200, seed = 1
 )
-power$summary            # fit rate, surface recovery, model selection
+power$summary            # fit rate, conductance recovery, model selection
 power$parameter_summary  # power, bias, RMSE, coverage per coefficient
 ```
+
+
+## Summary of key functions
+
+| Function | Purpose |
+|----------|---------|
+| `conductance_surface()` | Build the landscape template; `saveStack = TRUE` enables site subsetting |
+| `simulate_covariance_response()` | One covariance matrix simulated from known parameters |
+| `terradish()` | Refit a simulated data set to check parameter recovery |
+| `covariance_response_power()` | Full design sweep across sample sizes, strategies, and models |
+| `$summary` | Per-scenario fit rate, conductance recovery, and model-selection rate |
+| `$parameter_summary` | Per-coefficient power, bias, RMSE, and interval coverage |
 
 ## See also
 

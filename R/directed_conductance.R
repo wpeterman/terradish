@@ -141,7 +141,7 @@ terradish_directed_algorithm <- function(gen, g, data, S, par, nu = NULL,
                        error = function(e) NULL)
       if (is.null(hred))
         stop("Directed generator is numerically singular at these parameters ",
-             "(very strong asymmetry). Reduce the directional effect or bounds.",
+             "(very strong asymmetry). Reduce the directional coefficient or bounds.",
              call. = FALSE)
       hfull <- numeric(n); hfull[idx] <- hred
       H[, fj] <- hfull
@@ -204,27 +204,30 @@ terradish_directed_algorithm <- function(gen, g, data, S, par, nu = NULL,
 
 #' Directional (non-reversible) conductance surface
 #'
-#' Fits a conductance surface in which gene flow can be \strong{directional}:
-#' the movement rate from cell \eqn{a} to neighbor \eqn{b} need not equal the
-#' reverse rate.  Movement is modeled as a covariate-parameterized continuous-
-#' time Markov generator
+#' Fits a non-reversible graph in which the modeled edge rate from cell \eqn{a}
+#' to neighbor \eqn{b} need not equal the reverse rate. Edge rates are
+#' parameterized with a continuous-time Markov generator
 #' \deqn{\log G_{a\to b} = \tfrac12(\eta_a + \eta_b) + d_{ab}^\top \gamma,\quad \eta_k = x_k^\top\theta,}
-#' where \eqn{\theta} are the usual (symmetric) conductance effects and
-#' \eqn{\gamma} are directional effects on antisymmetric edge covariates
+#' where \eqn{\theta} are symmetric conductance coefficients and \eqn{\gamma}
+#' are edge-rate coefficients on antisymmetric edge covariates
 #' \eqn{d_{ab} = -d_{ba}} (e.g. elevation drop, flow, wind; see
 #' \code{\link{edge_gradient}}).  The genetic response is linked through the
 #' symmetric \strong{commute time} of the chain, so any \code{terradish}
 #' measurement model applies unchanged.  With \eqn{\gamma = 0} the generator is
-#' reversible and the model reduces to isolation by resistance.
+#' reversible and the model reduces to the symmetric resistance formulation.
 #'
 #' @param formula Genetic response matrix \code{~} symmetric conductance
 #'   covariates (as in \code{\link{terradish}}).
 #' @param data A \code{terradish_graph} from \code{\link{conductance_surface}}.
 #' @param directional Directional edge covariates from \code{\link{edge_gradient}}
 #'   (or a list with \code{edges} and \code{d}).
-#' @param measurement_model A \code{terradish} measurement model
-#'   (e.g. \code{\link{generalized_wishart}}, \code{\link{leastsquares}},
-#'   \code{\link{mlpe}}).
+#' @param measurement_model A \code{terradish} measurement model. It must match
+#'   the response representation: \code{\link{wishart_covariance}} for a
+#'   positive semidefinite covariance matrix,
+#'   \code{\link{generalized_wishart}} for an admissible squared-distance
+#'   representation coherently related to a centered positive semidefinite
+#'   covariance matrix, or \code{\link{leastsquares}} / \code{\link{mlpe}} for
+#'   other pairwise distance responses.
 #' @param nu Effective Wishart degrees of freedom, if required by the model.
 #' @param gamma_bound Symmetric bound on the directional coefficients during
 #'   optimization (guards the ill-conditioned strong-asymmetry regime).
@@ -251,12 +254,13 @@ terradish_directed_algorithm <- function(gen, g, data, S, par, nu = NULL,
 #'
 #' @details
 #' \strong{Scope.} This is the tractable directional model (directed commute
-#' time): a single-lineage hitting-time formulation, reducing to resistance
-#' distance when reversible.  It is not the full structured-coalescent model
-#' (intractable on fine rasters).  Whether directional effects are identifiable
-#' depends on the data: asymmetry leaves a signature in the symmetric commute
-#' time on bounded landscapes, but it can be weak; report \eqn{\gamma} with its
-#' uncertainty and check sensitivity.
+#' time): a single-lineage hitting-time formulation that reduces to resistance
+#' distance when reversible. It is not a structured-coalescent or migration-rate
+#' model. Directional edge-rate bias is inferred only through a symmetric
+#' commute-time response and can be weakly or nonuniquely identified. Report
+#' \eqn{\gamma} with uncertainty and sensitivity to bounds, graph construction,
+#' and directional covariates. Do not interpret arrows as observed migration
+#' paths, directions, or absolute rates.
 #'
 #' @return An object of class \code{"terradish_directed"} with the symmetric
 #'   conductance estimates \code{theta}, the directional estimates \code{gamma}
@@ -316,6 +320,7 @@ terradish_directed <- function(formula, data, directional,
   response <- attr(tm, "response")
   if (!response) stop("'formula' must have the genetic response matrix on the LHS")
   S <- as.matrix(eval(attr(tm, "variables")[[response + 1L]], parent.frame()))
+  S <- .validate_measurement_response(measurement_model, S)
   rhs <- if (length(attr(tm, "term.labels"))) reformulate(attr(tm, "term.labels")) else formula(~1)
 
   gen <- .directed_generator(rhs, data, directional)
@@ -512,6 +517,153 @@ terradish_directed <- function(formula, data, directional,
   out
 }
 
+#' Methods for fitted directional conductance models
+#'
+#' S3 methods for objects of class \code{terradish_directed} returned by
+#' \code{\link{terradish_directed}}, and for the summary objects they produce.
+#' A directional model splits the fitted conductance into a symmetric part
+#' (\code{theta}, the fitted association of each raster covariate with relative
+#' conductance) and a directional part (\code{gamma}, fitted edge-rate asymmetry
+#' along a covariate such as an elevation gradient).
+#'
+#' @param x A fitted \code{terradish_directed} object, or a
+#'   \code{summary.terradish_directed} object for the corresponding
+#'   \code{print()} method.
+#' @param object A fitted \code{terradish_directed} object.
+#' @param digits Number of significant digits used when printing coefficient
+#'   tables.
+#' @param signif.stars Should significance stars be printed alongside the
+#'   coefficient table?
+#' @param k Penalty multiplier supplied to \code{AIC()}.  The default
+#'   \code{k = 2} gives Akaike's Information Criterion; \code{k = log(n)} gives
+#'   the BIC, where you supply \code{n} yourself.
+#' @param parm Optional character or numeric selection of parameters for
+#'   \code{confint()}.  Omit it to get intervals for every parameter.
+#' @param level Confidence level for \code{confint()}, and the level used to
+#'   flag significant edges when \code{significant_only = TRUE} in
+#'   \code{plot()}.
+#' @param conf.level Confidence level used by \code{summary()}.
+#' @param data The \code{\link{conductance_surface}} graph used to fit the
+#'   model.  Required by \code{plot()} because the fitted object stores only
+#'   per-cell values, not the raster template.  For the raster plot types the
+#'   graph must have been built with \code{saveStack = TRUE}.
+#' @param type Which plot to draw: \code{"conductance"} (the symmetric fitted
+#'   conductance surface, on the natural scale), \code{"logconductance"} (the
+#'   same surface on the log scale, where covariate associations are linear),
+#'   \code{"directional"} (arrows on the graph edges showing the direction and
+#'   strength of the rate asymmetry), or \code{"combined"} (arrows drawn over
+#'   the conductance surface).
+#' @param directional The edge covariate matrix used at fitting time, as
+#'   returned by \code{\link{edge_gradient}}.  Needed only for the plot types
+#'   that draw arrows.
+#' @param min_abs_log_ratio Numeric; edges whose absolute log rate ratio
+#'   \code{|log(rate_ab / rate_ba)|} falls below this value are omitted from
+#'   the arrow plots.  Raise it to declutter a dense graph.  The default
+#'   \code{0} keeps every edge.
+#' @param significant_only Logical.  If \code{TRUE}, draw only the edges whose
+#'   log rate ratio differs from zero at the requested \code{level}.
+#' @param ... Additional arguments passed to the underlying generic or, for
+#'   \code{plot()}, to \code{terra::plot()}.
+#'
+#' @details
+#' \strong{How to read the \code{summary()} output.}  The coefficient table
+#' stacks the symmetric and directional parameters in one block.  Rows named
+#' after your raster covariates are \code{theta}: these live on the
+#' \strong{log-conductance} scale, so \code{exp(theta)} is the multiplicative
+#' change in conductance for a one-unit increase in the (scaled) covariate.
+#' Rows named \code{gamma_*} are the directional coefficients, also on a log
+#' scale: \code{gamma = 0} means equal modeled rates in both directions along
+#' that edge covariate, so the model collapses to its reversible form. A
+#' positive \code{gamma} favors the direction of increasing edge covariate in
+#' the fitted generator. Because \code{gamma} enters
+#' the rate as \code{exp(gamma * d)} for an edge covariate value \code{d}, the
+#' ratio of forward to backward rates on that edge is \code{exp(2 * gamma * d)}.
+#'
+#' The \code{z value} and \code{Pr(>|z|)} columns are Wald tests against zero,
+#' computed from the observed-information standard errors.  Treat the
+#' \code{gamma} p-value as conditional evidence about that specified edge
+#' covariate, not as a general test for all biological directionality. For a
+#' likelihood-ratio version, refit the same model with \code{gamma} fixed at
+#' zero. Wishart likelihood-ratio evidence is conditional on the supplied
+#' \code{nu}.
+#'
+#' Standard errors come from the inverse observed information, so they are
+#' asymptotic and conditional on the fitted nuisance parameters (\code{phi}).
+#' They can be optimistic when the number of focal sites is small.
+#'
+#' @return
+#' \itemize{
+#'   \item \code{print()} returns its input invisibly, after printing the
+#'     measurement model, the log-likelihood, and the stacked
+#'     \code{theta}/\code{gamma} estimates with standard errors.
+#'   \item \code{summary()} returns an object of class
+#'     \code{summary.terradish_directed}: a list with \code{ztable} (a matrix
+#'     with columns \code{Estimate}, \code{Std. Error}, \code{z value}, and
+#'     \code{Pr(>|z|)}, all on the log scale described above), \code{loglik},
+#'     \code{df} (number of estimated parameters), \code{aic}, \code{phi}
+#'     (fitted nuisance parameters of the measurement model), \code{npar},
+#'     \code{solver}, \code{measurement_model}, \code{nu}, \code{dim} (the
+#'     number of graph vertices and focal sites), and the matched \code{call}.
+#'   \item \code{print()} on that summary object returns it invisibly.
+#'   \item \code{coef()} returns a named numeric vector concatenating
+#'     \code{theta} and \code{gamma}, on the log scale.
+#'   \item \code{vcov()} returns the estimated variance-covariance matrix of
+#'     \code{coef()}, again on the log scale, or \code{NULL} when the fit was
+#'     run with \code{estimate_vcov = FALSE}.
+#'   \item \code{confint()} returns a two-column matrix of Wald confidence
+#'     limits on the log scale, with one row per parameter.  Exponentiate a
+#'     \code{theta} row to get a conductance ratio.
+#'   \item \code{logLik()} returns a \code{\link[stats]{logLik}} object with a
+#'     \code{df} attribute, so \code{AIC()} and \code{BIC()} work on it.
+#'   \item \code{AIC()} returns Akaike's Information Criterion as a single
+#'     number. Compare only fits using the same response, sites, graph domain,
+#'     measurement likelihood, and, for Wishart fits, the same \code{nu}.
+#'   \item \code{plot()} draws the requested panel and invisibly returns what
+#'     it drew: a \code{terra::SpatRaster} for the surface types, or the
+#'     underlying \code{ggplot2} object for the arrow types.
+#' }
+#'
+#' @seealso \code{\link{terradish_directed}} for fitting,
+#'   \code{\link{directed_rates}} for the per-edge rate table that the arrow
+#'   plots are built from, and \code{\link{edge_gradient}} for constructing the
+#'   directional edge covariate.  See
+#'   \code{vignette("directional-conductance", package = "terradish")} for a
+#'   worked example with interpretation.
+#'
+#' @examples
+#' \donttest{
+#' # small synthetic lattice with a west-to-east elevation gradient
+#' r  <- terra::rast(nrows = 6, ncols = 6, xmin = 0, xmax = 6, ymin = 0, ymax = 6)
+#' gx <- terra::xFromCell(r, seq_len(terra::ncell(r)))
+#' gy <- terra::yFromCell(r, seq_len(terra::ncell(r)))
+#' covs <- c(terra::setValues(r, scale(gx + 0.5 * gy)[, 1]),
+#'           terra::setValues(r, scale(gx)[, 1]))
+#' names(covs) <- c("v1", "elev")
+#' coords  <- terra::xyFromCell(r, c(1, 6, 36, 31, 18, 20))
+#' surface <- conductance_surface(covs, coords, directions = 8, saveStack = TRUE)
+#' dir_cov <- edge_gradient(covs[["elev"]], surface)
+#'
+#' # simulate a directional response from the model so the example has signal
+#' gen <- terradish:::.directed_generator(~ v1, surface, dir_cov)
+#' E   <- terradish_directed_algorithm(gen, NULL, surface, NULL,
+#'                                     par = c(0.5, 0.6))$covariance
+#' S   <- outer(diag(E), rep(1, nrow(E))) + outer(rep(1, nrow(E)), diag(E)) - 2 * E
+#' diag(S) <- 0
+#'
+#' fit <- terradish_directed(S ~ v1, data = surface, directional = dir_cov,
+#'                           measurement_model = leastsquares)
+#'
+#' summary(fit)          # theta (symmetric) and gamma (directional), log scale
+#' coef(fit)             # same estimates as a plain named vector
+#' exp(coef(fit)["v1"])  # multiplicative conductance change per unit of v1
+#' confint(fit)          # Wald intervals, still on the log scale
+#' AIC(fit)              # compare against a gamma = 0 refit
+#' }
+#'
+#' @name terradish_directed_methods
+NULL
+
+#' @rdname terradish_directed_methods
 #' @export
 print.terradish_directed <- function(x, ...)
 {
@@ -522,29 +674,34 @@ print.terradish_directed <- function(x, ...)
   cat(sprintf("  loglik = %.3f\n", x$loglik))
   tab <- cbind(Estimate = c(x$theta, x$gamma),
                `Std. Error` = x$se)
-  cat("\nSymmetric conductance (theta) and directional (gamma) effects:\n")
+  cat("\nSymmetric conductance (theta) and directional (gamma) coefficients:\n")
   print(round(tab, 4))
   cat("\n(gamma = 0 => reversible / isolation-by-resistance)\n")
   invisible(x)
 }
 
+#' @rdname terradish_directed_methods
 #' @export
 coef.terradish_directed <- function(object, ...) c(object$theta, object$gamma)
 
+#' @rdname terradish_directed_methods
 #' @export
 logLik.terradish_directed <- function(object, ...) {
   val <- object$loglik; attr(val, "df") <- object$df; class(val) <- "logLik"; val
 }
 
+#' @rdname terradish_directed_methods
 #' @export
 AIC.terradish_directed <- function(object, ..., k = 2) {
   if (identical(k, 2)) return(object$aic)
   -2 * object$loglik + k * object$df
 }
 
+#' @rdname terradish_directed_methods
 #' @export
 vcov.terradish_directed <- function(object, ...) object$vcov
 
+#' @rdname terradish_directed_methods
 #' @export
 confint.terradish_directed <- function(object, parm, level = 0.95, ...) {
   est <- c(object$theta, object$gamma); se <- object$se
@@ -556,6 +713,7 @@ confint.terradish_directed <- function(object, parm, level = 0.95, ...) {
   ci
 }
 
+#' @rdname terradish_directed_methods
 #' @export
 summary.terradish_directed <- function(object, conf.level = 0.95, ...) {
   est <- c(object$theta, object$gamma); se <- object$se
@@ -571,6 +729,7 @@ summary.terradish_directed <- function(object, conf.level = 0.95, ...) {
   out
 }
 
+#' @rdname terradish_directed_methods
 #' @export
 print.summary.terradish_directed <- function(x, digits = max(3L, getOption("digits") - 3L),
                                              signif.stars = getOption("show.signif.stars"), ...) {
@@ -610,8 +769,9 @@ print.summary.terradish_directed <- function(x, digits = max(3L, getOption("digi
 #'   log(rate_ab / rate_ba)}, and arrow-ready coordinates from the lower-rate
 #'   endpoint toward the higher-rate endpoint. If \code{object} contains a
 #'   finite covariance matrix for \code{gamma}, standard errors, z statistics,
-#'   p-values, and Wald significance indicators are also returned for
-#'   \code{log_rate_ratio}.
+#'   p-values, and Wald threshold indicators are also returned for
+#'   \code{log_rate_ratio}. These are model-based edge summaries, not direct
+#'   observations of organismal movement or migration.
 #'
 #' @seealso \code{\link{terradish_directed}}, \code{\link{edge_gradient}}
 #' @examples
@@ -734,6 +894,7 @@ directed_rates <- function(object, data, directional, level = 0.95)
   out
 }
 
+#' @rdname terradish_directed_methods
 #' @export
 plot.terradish_directed <- function(x, data,
                                     type = c("conductance", "logconductance",

@@ -2,7 +2,7 @@
 % Please edit documentation in R/terradish_scale_optim.R
 \name{terradish_scale_optim}
 \alias{terradish_scale_optim}
-\title{Optimize raster scales of effect around a terradish fit}
+\title{Optimize raster smoothing scales around a terradish fit}
 \usage{
 terradish_scale_optim(
   formula,
@@ -22,7 +22,7 @@ terradish_scale_optim(
   postprocess = scale_covariates,
   directions = 8L,
   theta = NULL,
-  verbose = TRUE,
+  verbose = FALSE,
   ...
 )
 }
@@ -30,16 +30,21 @@ terradish_scale_optim(
 \item{formula}{A terradish model formula.}
 
 \item{covariates}{A \code{terra::SpatRaster} containing the raster layers
-whose scales of effect will be optimized.}
+whose smoothing scales will be optimized.}
 
 \item{coords}{Focal coordinates passed to \code{\link{conductance_surface}}.}
 
 \item{scales}{Optional starting values for the scale parameters. Required for
 \code{search = "coordinate"} unless \code{scale_grid} is supplied.}
 
-\item{lower, upper}{Lower and upper bounds for each scale parameter. Used to
-construct \code{scale_grid} when not supplied, and required for
-\code{search = "coordinate"}.}
+\item{lower, upper}{Lower and upper bounds for each scale parameter, in
+whatever units \code{scale_fun} expects.  The default \code{scale_fun} is
+\code{multiScaleR::kernel_scale.raster()}, whose \code{sigma} is measured
+in \strong{raster cells}, not map units, so a bound below 1 barely smooths
+at all and a bound approaching the raster dimensions flattens the layer.
+A useful starting range is roughly 1 cell up to a tenth of the smaller
+raster dimension.  Used to construct \code{scale_grid} when that is not
+supplied, and required for \code{search = "coordinate"}.}
 
 \item{scale_grid}{Optional named list of candidate scale values for
 \code{search = "grid"}.}
@@ -81,14 +86,29 @@ each outer evaluation.}
 \item{...}{Additional arguments passed to \code{\link{terradish}}.}
 }
 \value{
-A list with components including:
-\item{par}{The best scale vector found.}
-\item{value}{The best outer objective value.}
-\item{fit}{The best terradish fit.}
-\item{surface}{The conductance surface used by the best fit.}
-\item{evaluations}{A data frame of all outer evaluations.}
-\item{search}{The search strategy used.}
-\item{objective}{The outer objective used for ranking candidate scales.}
+An object of class \code{"terradish_scale_optim"}, a list with:
+\item{par}{The selected scale for each raster layer, in the units
+  \code{scale_fun} uses (cells for the default \code{kernel_scale.raster}).}
+\item{value}{The outer objective at \code{par}.  Lower is better, whichever
+  objective was used.}
+\item{fit}{The fitted \code{terradish} model at \code{par}.  Read its
+  conductance coefficients with \code{coef()} the same way as any other fit;
+  they are on the log-conductance scale.}
+\item{surface}{The conductance surface built from the rasters smoothed at
+  \code{par}, ready to pass to \code{conductance()} or \code{plot()}.}
+\item{evaluations}{A data frame with one row per candidate scale
+  combination: the scale for each layer, the \code{objective} value,
+  \code{aic}, \code{loglik}, and a \code{status} column that records
+  \code{"OK"} or the error for candidates that failed to fit.  Inspect this
+  to see how sharply the objective distinguishes the scales; a flat column
+  means the objective does not identify a smoothing scale within the searched
+  range.}
+\item{search}{The search strategy used, \code{"grid"} or
+  \code{"coordinate"}.}
+\item{objective}{The name of the objective minimized, \code{"aic"} or
+  \code{"logLik"}.}
+\item{iterations, convergence}{Number of outer iterations, and \code{0} if
+  the coordinate search converged (always \code{0} for a grid search).}
 }
 \description{
 Performs an outer optimization over raster scale parameters by repeatedly
@@ -101,6 +121,12 @@ This helper treats scale optimization as an outer problem around the usual
 That makes it compatible with raster-scaling approaches such as
 \code{multiScaleR::kernel_scale.raster()}, while keeping the terradish core
 optimizer unchanged.
+The selected values describe the transformation performed by
+\code{scale_fun} in that function's units. They are tuning parameters for the
+raster representation, not direct estimates of dispersal distance,
+home-range size, organismal movement, or a causal ecological-process scale.
+Report the search range and objective, and account for this outer selection
+when describing model-selection uncertainty.
 
 Coordinate search updates one raster scale at a time using
 \code{\link[stats]{optimize}} while holding the others fixed. Grid search
@@ -109,7 +135,7 @@ terradish fits receive an infinite outer objective and are retained in the
 returned evaluation table.
 }
 \examples{
-\dontrun{
+\donttest{
 data(melip)
 melip.altitude <- terra::unwrap(melip.altitude)
 melip.forestcover <- terra::unwrap(melip.forestcover)
@@ -117,18 +143,29 @@ melip.coords <- terra::unwrap(melip.coords)
 covariates <- c(melip.altitude, melip.forestcover)
 names(covariates) <- c("altitude", "forestcover")
 
+# Every candidate scale re-smooths the rasters and refits, so coarsen the
+# grid for the example. Use the full resolution in a real analysis.
+covariates <- terra::aggregate(covariates, fact = 3, na.rm = TRUE)
+
+# The default scale_fun smooths in RASTER CELLS, so these bounds span
+# 1 to 6 cells of the coarsened grid. A 2-point grid over two layers is 4
+# candidate fits; use a wider grid in practice.
 fit_scale <- terradish_scale_optim(
   melip.Fst ~ altitude + forestcover,
   covariates = covariates,
   coords = melip.coords,
-  lower = c(altitude = 50, forestcover = 50),
-  upper = c(altitude = 500, forestcover = 500),
+  lower = c(altitude = 1, forestcover = 1),
+  upper = c(altitude = 6, forestcover = 6),
   search = "grid",
-  grid_points = 3,
-  measurement_model = mlpe,
+  grid_points = 2,
+  measurement_model = leastsquares,
   optimizer = "bfgs"
 )
-fit_scale$par
+fit_scale$par          # selected smoothing scale per layer, in cells
+fit_scale$value        # objective value there (lower is better)
+fit_scale$objective    # which objective was minimized ("aic" by default)
+fit_scale$evaluations  # every candidate tried, with its AIC and loglik
+coef(fit_scale$fit)    # conductance coefficients at the selected scale
 }
 
 }

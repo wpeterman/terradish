@@ -9,20 +9,88 @@
 \alias{melip.Fst}
 \title{Melipona Example Data}
 \format{
-A collection of objects:
+Four objects, loaded together by \code{data(melip)}:
 \describe{
-  \item{\code{melip.altitude}}{A wrapped \code{terra::SpatRaster} giving altitude.}
-  \item{\code{melip.forestcover}}{A wrapped \code{terra::SpatRaster} giving forest cover.}
-  \item{\code{melip.coords}}{A wrapped \code{terra::SpatVector} of focal-point coordinates.}
-  \item{\code{melip.Fst}}{A symmetric matrix of pairwise genetic distances among focal points.}
+  \item{\code{melip.altitude}}{A wrapped \code{terra::SpatRaster},
+    156 rows by 180 columns at 0.045 degree resolution, covering roughly
+    42.9 to 34.8 degrees west and 9.5 to 2.5 degrees south in unprojected
+    longitude/latitude.  Values are altitude already rescaled to roughly the
+    unit interval (range 0 to 1.06), not meters.  Of the 28,080 cells,
+    22,443 are land and 5,637 are \code{NA} (ocean), and only the non-\code{NA}
+    cells enter the conductance graph.}
+  \item{\code{melip.forestcover}}{A wrapped \code{terra::SpatRaster} on the
+    same grid, giving forest cover as a proportion (range 0.004 to 0.948).}
+  \item{\code{melip.coords}}{A wrapped \code{terra::SpatVector} of 37 point
+    locations, one per sampled population, in the same longitude/latitude
+    coordinate system as the rasters.}
+  \item{\code{melip.Fst}}{A symmetric 37 by 37 numeric matrix of pairwise
+    \eqn{F_{ST}} among the same 37 populations, with a zero diagonal and no
+    dimnames.  Values range from -0.062 to 0.280.  Four off-diagonal entries
+    are slightly negative, which is a normal outcome of unbiased
+    \eqn{F_{ST}} estimators when true differentiation is near zero.
+    Gaussian distance models such as \code{\link{mlpe}} can retain these
+    estimates. Their presence is one reason not to treat this matrix as
+    automatically admissible for \code{\link{generalized_wishart}}.}
 }
+}
+\source{
+Redistributed from the \code{radish} package, where the data were
+  assembled for the original resistance-surface optimizer.  A primary
+  citation for the underlying \emph{Melipona} sampling and genotyping is not
+  recorded in the package sources.
 }
 \usage{
 data(melip)
 }
 \description{
-Example data bundled with \pkg{terradish} for demonstrating raster-based
-conductance modeling. The objects are distributed separately in the package
-data so they can be loaded individually or together via \code{data(melip)}.
+Landscape and genetic data for 37 sampled populations of the stingless bee
+genus \emph{Melipona} in Brazil, bundled with \pkg{terradish} so every help
+page and vignette can run a complete worked example.  The four objects are
+stored separately in the package data, so \code{data(melip)} loads all of
+them into the calling environment at once.
+}
+\details{
+The two rasters are stored as \code{terra::wrap()}ped objects because a live
+\code{SpatRaster} holds an external pointer that cannot be serialized into a
+package.  Call \code{terra::unwrap()} on each one before use; the same
+applies to the \code{SpatVector} of coordinates.
+
+
+The rasters are unprojected, so distances are in degrees rather than meters.
+That matters for any function whose output carries a distance unit: the
+\code{sigma} reported by \code{\link{gaussian_scale_summary}}, for instance,
+is in degrees for this data set. Reproject before interpreting the fitted
+Gaussian raster-smoothing scale as a distance.
+
+The altitude layer arrives pre-rescaled, but the two layers are still on
+different scales, so run \code{\link{scale_covariates}} before fitting, as
+every example here does.
+}
+\examples{
+data(melip)
+
+# rasters and points are wrapped for storage; unwrap before use
+altitude    <- terra::unwrap(melip.altitude)
+forestcover <- terra::unwrap(melip.forestcover)
+coords      <- terra::unwrap(melip.coords)
+
+altitude                      # 156 x 180 grid, values on ~[0, 1]
+nrow(coords)                  # 37 sampled populations
+dim(melip.Fst)                # 37 x 37 pairwise Fst
+range(melip.Fst)              # note the small negative values
+
+# MLPE can retain the negative estimates in this pairwise-distance response
+Fst <- melip.Fst
+round(Fst[1:4, 1:4], 3)
+
+terra::plot(altitude, main = "Altitude (rescaled)")
+terra::points(coords, pch = 19, cex = 0.7, col = "red")
+
+}
+\seealso{
+\code{\link{conductance_surface}} for turning these layers into a
+  graph, and \code{\link{terradish}} for fitting a model to them.  See
+  \code{vignette("getting-started", package = "terradish")} for the full
+  worked example.
 }
 \keyword{datasets}

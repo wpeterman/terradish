@@ -3,7 +3,7 @@
 # Focused curvature benchmark for the large-landscape workflow.
 #
 # This script compares curvature = "exact" and curvature = "gauss_newton" on a
-# synthetic heterogeneous raster with a generalized Wishart distance response.
+# synthetic heterogeneous raster with a generalized Wishart squared-distance response.
 # The default problem is intentionally modest so the script is reviewable and
 # can run on a laptop. Increase CONFIG$side and set CONFIG$solver = "amg" to
 # repeat the same comparison in the million-cell large-N regime.
@@ -194,9 +194,9 @@ CONFIG <- list(
   cat("  want positive-semidefinite, information-based standard errors, or when the\n")
   cat("  exact Hessian is indefinite or unstable near the fit.\n")
   cat("- Re-run both settings when the Gauss-Newton and exact standard errors differ\n")
-  cat("  materially; a large gap means the residual-weighted second-derivative terms\n")
-  cat("  are carrying information, often because the fit is not close to the model\n")
-  cat("  mean or the model is misspecified.\n")
+  cat("  materially; a large gap means the omitted residual-weighted terms matter\n")
+  cat("  numerically and can reflect residual structure, model mismatch, or\n")
+  cat("  instability that warrants diagnosis.\n")
   cat(sprintf("- In this run, max |coefficient difference| was %.3g and the\n",
               comparison$max_abs_coef_diff))
   cat(sprintf("  log-likelihood difference was %.3g, so the curvature choice did\n",

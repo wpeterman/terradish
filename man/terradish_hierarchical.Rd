@@ -20,7 +20,7 @@ terradish_hierarchical(
   solver_control = NULL,
   maxit = 500L,
   factr = 1e+07,
-  verbose = TRUE
+  verbose = FALSE
 )
 }
 \arguments{
@@ -44,8 +44,9 @@ measurement models.}
 
 \item{field_resolution}{Integer \eqn{G}: the field lives on a coarse
 \eqn{G \times G} grid over the graph extent (piecewise-constant within each
-occupied coarse cell).  A coarser field than the covariate grid is the main
-identifiability safeguard.  Default \code{6}.}
+occupied coarse cell). A coarser field than the covariate grid reduces, but
+does not eliminate, spatial confounding. Report sensitivity to this value.
+Default \code{6}.}
 
 \item{tau2}{Field variance.  Either a positive number (fit at that fixed
 value) or \code{"reml"} (default), which selects \eqn{\tau^2} by maximizing
@@ -77,23 +78,22 @@ An object of class \code{"terradish_hierarchical"} containing the
   \code{\link{conductance_field}}.
 }
 \description{
-Fits a conductance surface whose log-conductance is the sum of a mechanistic
-covariate term and a spatially smooth Gaussian random field,
+Fits a conductance surface whose log-conductance is the sum of a covariate
+term and a spatially smooth Gaussian random field,
 \eqn{\log c = X\theta + u}.  This nests the standard \code{\link{terradish}}
-model (recovered as the field variance \eqn{\tau^2 \to 0}) and a
-FEEMS-style free surface (recovered when no covariates are supplied), and it
-protects the covariate effects \eqn{\theta} from omitted-variable bias by
-letting the field \eqn{u} absorb spatial structure the covariates do not
-explain.  The fitted field is itself a deliverable: a map of conductance
-variation your covariates failed to capture.
+model as the field variance \eqn{\tau^2 \to 0} and allows a field-only fit
+when no covariates are supplied. The field is a diagnostic residual
+log-conductance surface. It can absorb omitted, misspecified, or spatially
+confounded structure, so it does not guarantee unbiased \eqn{\theta}, identify
+a missing mechanism, or establish that the supplied covariates are causal.
 }
 \details{
 The penalized objective is
 \deqn{J(\theta, u) = -\ell(\theta, u \mid \phi) + \frac{1}{2\tau^2} u^\top (L_{coarse} + \epsilon I)\, u,}
 where \eqn{\ell} is the measurement-model log-likelihood (with nuisance
 parameters \eqn{\phi} profiled out) and \eqn{L_{coarse}} is the Laplacian of
-the coarse-field adjacency graph, so the penalty is exactly the FEEMS spatial
-smoothness prior written as a proper GMRF.  Optimization is by \code{L-BFGS-B}
+the coarse-field adjacency graph, giving a proper GMRF smoothness penalty.
+Optimization is by \code{L-BFGS-B}
 over \eqn{(\theta, u)} using only the gradient, which flows through the same
 single sparse-Cholesky solve that \code{\link{terradish_algorithm}} already
 uses; the dense Hessian over the field is never formed during fitting.
@@ -110,30 +110,44 @@ clean marginal over the field alone, so it is appropriate for selecting
 \eqn{\tau^2} within one model but should not be compared as an absolute
 evidence across models with different numbers of covariates.
 
-If the measurement model profiles to \eqn{\tau^2 = 0} (no detectable
-resistance-distance signal), the conductance surface is unidentified; the fit
+Interpret \eqn{u} as fitted residual spatial structure on the
+log-conductance scale, conditional on the selected field resolution,
+\eqn{\tau^2} grid, covariates, graph, response, and measurement model. A
+prominent field feature may reflect an omitted landscape variable, an
+incorrect covariate transformation, sampling structure, historical signal,
+or residual model mismatch. Check field-resolution and \eqn{\tau^2}
+sensitivity before interpreting it.
+
+If the measurement model profiles its graph-kernel weight to zero (no
+detectable graph contribution), the conductance surface is unidentified; the fit
 is returned with a warning and \code{NA} standard errors, effective degrees of
 freedom, and AIC.
 }
 \examples{
-\dontrun{
-library(terra)
+\donttest{
 data(melip)
-covs <- c(terra::scale(terra::unwrap(melip.altitude)),
-          terra::scale(terra::unwrap(melip.forestcover)))
+covs <- c(terra::unwrap(melip.altitude), terra::unwrap(melip.forestcover))
 names(covs) <- c("altitude", "forestcover")
+
+# Coarsen the raster and the field grid so the example runs quickly: the
+# inner L-BFGS solves the Laplacian system once per (theta, u) evaluation,
+# at every tau^2 on the grid. Use the full resolution and the default
+# field_resolution = 6 in a real analysis.
+covs <- scale_covariates(terra::aggregate(covs, fact = 3, na.rm = TRUE))
 surface <- conductance_surface(covs, terra::unwrap(melip.coords),
-                               directions = 8)
+                               directions = 8, saveStack = TRUE)
 
 fit <- terradish_hierarchical(
   melip.Fst ~ altitude + forestcover,
   data              = surface,
-  measurement_model = generalized_wishart,
-  nu                = 1000,
-  field_resolution  = 6
+  measurement_model = leastsquares,
+  field_resolution  = 3,
+  tau2_grid         = c(0.1, 1)
 )
-summary(fit)
-plot(conductance_field(fit, surface))   # map of unexplained conductance
+summary(fit)   # theta, field sd/edf, and the tau^2 profile
+
+# diagnostic map of fitted residual log-conductance structure
+terra::plot(conductance_field(fit, surface))
 }
 
 }

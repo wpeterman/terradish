@@ -101,6 +101,10 @@ fit_melip_spline_example <- function(keep = 1:12,
                                      maxit = 8,
                                      measurement_model = mlpe)
 {
+  if (!identical(measurement_model, mlpe) &&
+      !identical(measurement_model, leastsquares))
+    stop("The bundled melip.Fst example supports only `mlpe` or `leastsquares`; use an independently verified admissible response for a Wishart likelihood.")
+
   data(melip, package = "terradish")
   melip.altitude <- terra::unwrap(melip.altitude)
   melip.forestcover <- terra::unwrap(melip.forestcover)

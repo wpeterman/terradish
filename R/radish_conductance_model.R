@@ -8,7 +8,7 @@ assemble_model_matrix <- function(formula, spdat)
   if (length(formula_covariates) > 0)
   {
     # Use all.vars() so that in-line transformations such as I(x^2) or
-    # interactions x:z do not appear as required column names — only the
+    # interactions x:z do not appear as required column names; only the
     # underlying raw variables need to be present in the data frame.
     stopifnot(all.vars(formula) %in% colnames(spdat))
     formula <- reformulate(colnames(formula_covariates))
@@ -311,12 +311,17 @@ NULL
 #' \strong{Interpreting \eqn{\theta}:}
 #' \itemize{
 #'   \item \eqn{\theta_j > 0}: higher values of covariate \eqn{j} increase
-#'     conductance (easier movement, lower resistance distance).
-#'   \item \eqn{\theta_j < 0}: higher values act as a barrier.
-#'   \item \eqn{\theta_j = 0}: the covariate has no effect on conductance.
+#'     fitted relative conductance and tend to lower graph resistance distance,
+#'     conditional on the other terms and graph domain.
+#'   \item \eqn{\theta_j < 0}: higher values lower fitted relative conductance.
+#'   \item \eqn{\theta_j = 0}: the fitted conductance is locally unchanged by
+#'     that term, conditional on the model.
 #'   \item A one-standard-deviation increase in covariate \eqn{j} multiplies
-#'     conductance by \eqn{\exp(\theta_j)}.
+#'     fitted conductance by \eqn{\exp(\theta_j)} when the covariate was
+#'     standardized and the term is linear.
 #' }
+#' These are model-based associations, not direct estimates of movement rate,
+#' habitat suitability, or a causal landscape effect.
 #'
 #' The exponential link guarantees strictly positive conductances for any real
 #' \eqn{\theta}, making \code{loglinear_conductance} more numerically stable
@@ -555,9 +560,8 @@ attr(smooth_loglinear_conductance, "link") <- "log"
 #' \strong{When to prefer \code{linear_conductance} over
 #' \code{loglinear_conductance}:}
 #' \itemize{
-#'   \item When you want conductance to be a direct, additive mixture of
-#'     raster layers (e.g. habitat suitability scores that already live on a
-#'     natural additive scale).
+#'   \item When the chosen covariate transformations support a direct additive
+#'     parameterization of fitted conductance.
 #'   \item When theory predicts a linear relationship.
 #' }
 #'

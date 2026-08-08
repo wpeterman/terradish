@@ -15,7 +15,8 @@ terradish(
   nonnegative = TRUE,
   conductance = TRUE,
   optimizer = c("newton", "bfgs", "auto"),
-  control = NewtonRaphsonControl(verbose = TRUE, ctol = 1e-06, ftol = 1e-06),
+  verbose = FALSE,
+  control = NewtonRaphsonControl(ctol = 1e-06, ftol = 1e-06),
   validate = FALSE,
   cores = 1L,
   curvature = c("exact", "gauss_newton"),
@@ -26,7 +27,9 @@ terradish(
 )
 }
 \arguments{
-\item{formula}{A formula with a matrix of observed genetic distances on the lhs, and covariates used in the creation of \code{data} on the rhs}
+\item{formula}{A formula with an observed genetic distance or covariance
+matrix on the left-hand side and conductance covariates from \code{data} on
+the right-hand side.}
 
 \item{data}{An object of class \code{terradish_graph} (see
 \code{\link{conductance_surface}})}
@@ -41,11 +44,11 @@ terradish(
 
 \item{nu}{Effective Wishart degrees of freedom passed to measurement models
 that require it, such as \code{\link{generalized_wishart}} and
-\code{\link{wishart_covariance}}.  For biallelic SNPs this is usually the
-number of retained SNPs.  For microsatellites, use the independent
-allele-frequency count, approximately \eqn{\sum_l (K_l - 1)} where
-\eqn{K_l} is the number of observed alleles at locus \eqn{l}.  Ignored by
-non-Wishart measurement models.}
+\code{\link{wishart_covariance}}. It must be supplied and is not estimated.
+For biallelic SNPs, use the number of approximately independent retained
+SNPs. For microsatellites, use the number of loci as the conservative
+primary value and examine larger plausible values in a sensitivity
+analysis. Ignored by non-Wishart measurement models.}
 
 \item{theta}{Starting values for optimization}
 
@@ -63,8 +66,20 @@ Hessian during optimization with cheaper iterations but often more steps;
 and \code{auto} selects \code{bfgs} when there are more than three
 conductance parameters and \code{newton} otherwise. Regardless of the
 optimizer, \code{terradish()} evaluates the fitted model once more at the
-final parameter values with the exact Hessian so standard errors and
-summaries use the same final derivative machinery.}
+final parameter values using the requested \code{curvature}, so standard
+errors and summaries use the selected final derivative machinery.}
+
+\item{verbose}{Logical.  Should the optimizer report its progress?  The
+default \code{FALSE} fits silently.  Set \code{TRUE} to see the iteration
+count, objective value, gradient norm, and Hessian determinant at each
+step, which is what you want when a fit fails to converge or you are
+tuning \code{control}.  The trace is emitted with \code{message()}, so you
+can also capture or silence it with \code{suppressMessages()}.  Setting
+\code{verbose} explicitly overrides the \code{verbose} field of
+\code{control}; leaving it alone lets a hand-built \code{control} object
+speak for itself.  The much noisier line-search trace stays separate: turn
+it on with
+\code{control = NewtonRaphsonControl(ls.control = HagerZhangControl(verbose = TRUE))}.}
 
 \item{control}{A list containing options for the optimization routine (see \code{\link{NewtonRaphsonControl}} for list)}
 
@@ -74,11 +89,11 @@ summaries use the same final derivative machinery.}
 
 \item{curvature}{Curvature used for optimization steps and for the returned
 covariance matrix. \code{"exact"} (default) uses the exact Hessian.
-\code{"gauss_newton"} uses the Gauss-Newton / Fisher-information
-approximation, which equals the Fisher information at the optimum (where it
-is positive semidefinite, giving a well-defined \code{vcov}), requires only
-first derivatives of the conductance model, and equals the exact Hessian at
-a well-fitting optimum.
+\code{"gauss_newton"} uses an information-based approximation that drops
+residual-weighted second-derivative terms and requires only first
+derivatives of the conductance model. It equals the exact Hessian only when
+those omitted terms are zero or negligible; convergence alone does not
+guarantee agreement.
 Standard errors from \code{summary()} are then the asymptotic
 information-based errors. With \code{leverage = TRUE} the leverage
 diagnostics inherit the same approximation.}
@@ -151,19 +166,19 @@ An object of class \code{terradish} containing the fitted conductance
 \description{
 Uses maximum likelihood to fit a parameterized conductance surface to genetic data,
 given a function relating spatial data to conductance (a "conductance model")
-and a function relating resistance distance (covariance) to genetic distance
-(a "measurement model").
+and a function linking the graph kernel to an observed genetic distance or
+covariance matrix (a "measurement model").
 }
 \details{
 \figure{terradish-sticker.png}{options: style='float: right; width: 150px; margin-left: 12px;'}
-By "parameterized conductance surface", what is meant is a model
-where the per-vertex conductance (and thus resistance distance) is a function of
-spatial covariates. The choice of function is referred to in this package as
-the "conductance model". The inverse problem (and the purpose of this
-package) is to estimate the parameters of the conductance model, by relating
-the (unknown, modeled) resistance distance to observed genetic dissimilarity
-via a probability model (referred to as the "measurement model" throughout
-this package).
+A parameterized conductance surface maps raster covariates to positive vertex
+conductance. Vertex values define weighted edges and a graph Laplacian
+\eqn{L(\theta)}. Its generalized inverse \eqn{E(\theta) = L(\theta)^+} is the
+shared graph-process kernel. Distance likelihoods use resistance distances
+derived from \eqn{E(\theta)}, whereas covariance likelihoods use the kernel
+directly. The selected probability model is called the measurement model.
+These alternatives describe how related genetic summaries are observed; they
+are not competing biological process theories.
 
 
 For example, a log-linear choice of conductance model is:
@@ -186,16 +201,20 @@ so \code{conductance} must be \code{TRUE}. This differs by a factor of two
 from CIRCUITSCAPE, where the edge 
 conductance/resistance is the average of the vertex conductance/resistance.
 
-\code{terradish} estimates \code{theta} (and thus the conductance) by maximum
-likelihood; by finding the
-values of \code{theta} (and associated conductance) that result in
-resistance distances that are closest to the observed genetic distances,
-according to some measure of fit (like least squares). The optimization is
+\code{terradish} estimates \code{theta} by maximizing the selected
+measurement likelihood for the observed response. The optimization is
 done via Newton's method (default; requires computation of Hessian during
 optimization), via the BFGS algorithm (requires gradient only during
 optimization) if \code{optimizer = "bfgs"}, or via a simple parameter-count
 heuristic if \code{optimizer = "auto"}. In all cases, the final returned fit
-is evaluated with the exact Hessian at the optimized parameters for inference.
+is evaluated at the optimized parameters using the requested
+\code{curvature} for inference.
+
+Conductance coefficients are conditional model associations. Their sign and
+magnitude depend on covariate coding, other terms, graph construction,
+response, measurement likelihood, and candidate set. They are not direct
+estimates of causal effects, habitat suitability, migration, dispersal, or
+organismal movement rates.
 
 For an explanation of how categorical spatial covariates are handled, see
 \code{details} of \code{\link{conductance_surface}} and the examples below.
@@ -258,7 +277,7 @@ summary(fit_nnls)
 
 # a different "measurement_model" that incorporates dependence
 # among pairwise measurements
-fit_mlpe <- terradish(melip.Fst ~ altitude * forestcover, data = surface, 
+fit_mlpe <- terradish(melip.Fst ~ altitude + forestcover, data = surface,
                    terradish::loglinear_conductance, terradish::mlpe)
 summary(fit_mlpe)
 

@@ -106,8 +106,9 @@
 #' using the estimate from each coarser raster as the starting value for the
 #' next finer raster.
 #'
-#' @param formula A formula with a genetic-distance matrix on the left-hand
-#'   side and raster covariates on the right-hand side.
+#' @param formula A formula with a response matrix compatible with the selected
+#'   measurement model on the left-hand side and raster covariates on the
+#'   right-hand side.
 #' @param covariates A \code{SpatRaster} of covariates on the finest grid.
 #' @param coords Focal coordinates passed to \code{\link{conductance_surface}}.
 #' @param factors Integer aggregation factors, ordered from coarse to fine.
@@ -153,8 +154,7 @@
 #'   coords = melip.coords,
 #'   factors = c(2, 1),
 #'   conductance_model = loglinear_conductance,
-#'   measurement_model = generalized_wishart,
-#'   nu = 1000,
+#'   measurement_model = mlpe,
 #'   control = NewtonRaphsonControl(maxit = 3, verbose = FALSE)
 #' )
 #' fit$multiscale$factors
@@ -180,7 +180,7 @@ terradish_multiscale <- function(formula,
   terms_obj <- terms(formula)
   response_idx <- attr(terms_obj, "response")
   if (!response_idx)
-    stop("`formula` must have a genetic distance matrix on the left-hand side")
+    stop("`formula` must have a response matrix on the left-hand side")
   response_name <- all.vars(formula[[2]])
   if (length(response_name) != 1L)
     stop("The left-hand side of `formula` must be a single matrix object")

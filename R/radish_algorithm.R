@@ -652,15 +652,17 @@
 #'   \code{"gauss_newton"} returns the Gauss-Newton / Fisher-information
 #'   approximation, obtained by dropping the two residual-weighted
 #'   second-derivative terms (the second derivative of the resistance covariance
-#'   \eqn{E} and of conductance with respect to \code{theta}). The Gauss-Newton
-#'   curvature equals the Fisher information at the optimum, where it is positive
-#'   semidefinite and yields a well-defined \code{vcov} (away from the optimum
-#'   the measurement model's observed curvature can be indefinite). It equals the
-#'   exact Hessian at a well-fitting optimum, and the gap between them measures
-#'   model misspecification. It also requires only first derivatives of the
-#'   conductance model, which is useful for Gaussian scale-aware and spline
-#'   conductance models whose second derivatives are expensive or unstable. The
-#'   number of linear solves is the same as for the exact Hessian.
+#'   \eqn{E} and of conductance with respect to \code{theta}). It is an
+#'   information-based approximation and is positive semidefinite when the
+#'   retained measurement-model curvature is positive semidefinite. It equals
+#'   the exact Hessian only when the omitted terms are zero or negligible;
+#'   convergence alone does not guarantee equality. A large gap can reflect
+#'   residual structure, model mismatch, or numerical instability and should be
+#'   investigated rather than assigned a unique cause. It also requires only
+#'   first derivatives of the conductance model, which is useful for Gaussian
+#'   scale-aware and spline conductance models whose second derivatives are
+#'   expensive or unstable. The number of linear solves is the same as for the
+#'   exact Hessian.
 #' @param solver Linear-system solver used for the reduced Laplacian. \code{"direct"} uses the cached sparse Cholesky factorization, \code{"auto"} conservatively chooses between the direct and AMG backends based on graph size and right-hand-side count, \code{"amg"} uses smoothed-aggregation algebraic multigrid preconditioned conjugate gradients, \code{"pcg"} uses incomplete-Cholesky preconditioned conjugate gradients, and \code{"pcg_jacobi"} keeps the older Jacobi-preconditioned prototype.
 #' @param solver_control Optional named list of solver settings. For \code{solver = "direct"}, supported entries include \code{factorization} (\code{"auto"}, \code{"simplicial_ldl"}, \code{"simplicial_ll"}, or \code{"supernodal_ll"}), \code{solve_backend} (\code{"matrix"} or the experimental \code{"cholmod_cpp"} and \code{"cholmod_cpp_cached"} backends), \code{supernodal_min_vertices}, \code{supernodal_max_rhs}, and \code{perm}. For \code{solver = "auto"}, supported selection entries include \code{auto_direct_max_vertices}, \code{auto_amg_min_vertices}, and \code{auto_direct_max_rhs}. For \code{solver = "amg"}, supported entries include \code{tol}, \code{maxit}, \code{coarse_enough}, \code{npre}, \code{npost}, \code{sa_relax}, \code{aggr_eps_strong}, \code{estimate_spectral_radius}, \code{power_iters}, and \code{reuse_preconditioner}. For \code{solver = "pcg"} or \code{"pcg_jacobi"}, supported entries are \code{tol} and \code{maxit}.
 #'   \code{reuse_preconditioner_max_age} can be set to a finite nonnegative
@@ -708,8 +710,7 @@
 #' conductance_model <- loglinear_conductance(~ altitude + forestcover, surface$x)
 #'
 #' terradish_algorithm(conductance_model, terradish::leastsquares,
-#'                  surface, ifelse(melip.Fst < 0, 0, melip.Fst),
-#'                  nu = 1000, theta = c(-0.3, 0.3))
+#'                     surface, melip.Fst, theta = c(-0.3, 0.3))
 #'
 #' }
 #' @export
@@ -726,6 +727,7 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
 
   stopifnot(length(s$demes) == nrow(S)  )
   stopifnot(        nrow(S) == ncol(S)  )
+  S <- .validate_measurement_response(g, S)
   solver <- match.arg(solver)
   curvature <- match.arg(curvature)
   gauss_newton <- identical(curvature, "gauss_newton")
@@ -783,10 +785,18 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
           partial_S <- array(0, c(nrow(S), ncol(S), length(theta)))
         }
         idx <- seq_along(theta)
+        # Workers attach the installed package and receive `state` by
+        # serialization, so this branch is only safe when (a) we really are an
+        # installed namespace and (b) the solver state contains no external
+        # pointer. Note environmentName() on a namespace returns the bare
+        # package name ("terradish"), not "namespace:terradish"; testing for the
+        # latter silently disabled this branch entirely.
+        serializable_solver <- !identical(solver_state$type, "amg") &&
+          !identical(solver_state$solve_backend, "cholmod_cpp_cached")
         can_parallel <- as.integer(cores) > 1L &&
           length(idx) > 1L &&
-          !identical(solver_state$type, "amg") &&
-          identical(environmentName(environment(terradish_algorithm)), "namespace:terradish")
+          serializable_solver &&
+          .use_namespace_workers()
 
         if (can_parallel)
         {

@@ -29,6 +29,9 @@
 #' The interval uses the conditional standard error for the MLPE covariate
 #' coefficient from \code{summary(object)} and treats the selected covariate
 #' contrast as fixed.
+#' The reported contrast is a conditional association under the fitted MLPE
+#' model. It is not a causal effect or proof that IBE has been separated from
+#' IBR or other spatially correlated predictors.
 #'
 #' @return A data frame with one row per covariate and columns describing the
 #'   low and high covariate values, the contrast, estimated response-scale
@@ -38,12 +41,34 @@
 #'   \code{\link{pairwise_endpoint_covariates}}, \code{\link{terradish}}
 #'
 #' @examples
-#' \dontrun{
+#' \donttest{
+#' data(melip)
+#' altitude    <- terra::unwrap(melip.altitude)
+#' forestcover <- terra::unwrap(melip.forestcover)
+#' coords      <- terra::unwrap(melip.coords)
+#'
+#' covariates <- c(altitude, forestcover)
+#' names(covariates) <- c("altitude", "forestcover")
+#' covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+#'                                                 na.rm = TRUE))
+#' surface <- conductance_surface(covariates, coords, directions = 8)
+#'
+#' # site-level altitude, turned into a pairwise |difference| IBE predictor
+#' site_altitude <- data.frame(altitude = terra::extract(altitude, coords)[, 2])
+#' g_joint <- mlpe_covariates(site_altitude)
+#'
+#' # joint isolation by environment and isolation by resistance
+#' fit_joint <- terradish(melip.Fst ~ altitude + forestcover, data = surface,
+#'                        conductance_model = loglinear_conductance,
+#'                        measurement_model = g_joint)
+#'
+#' # Expected change in genetic distance across the covariate's 10th-to-90th
+#' # percentile spread, on the response scale rather than the log scale.
 #' change <- mlpe_response_change(fit_joint)
 #' change
 #'
-#' mlpe_response_change(fit_joint, covariate = "absdiff_altitude",
-#'                      probs = c(0.25, 0.75))
+#' # A narrower, interquartile contrast
+#' mlpe_response_change(fit_joint, probs = c(0.25, 0.75))
 #' }
 #'
 #' @export

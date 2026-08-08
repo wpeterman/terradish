@@ -82,11 +82,76 @@ tables?}
   \item \code{simulate()} returns one or more simulated response matrices.
   \item \code{anova()} returns a likelihood-ratio comparison table.
   \item \code{logLik()} returns a \code{logLik} object.
-  \item \code{AIC()} returns Akaike's Information Criterion.
-  \item \code{residuals()} returns the residual genetic-distance matrix.
+  \item \code{AIC()} returns \eqn{-2\ell + kK}; the default \code{k = 2}
+    gives Akaike's Information Criterion.
+  \item \code{residuals()} returns the residual response matrix.
 }
 }
 \description{
 S3 methods for working with fitted objects returned by \code{\link{terradish}}
 and summaries returned by \code{\link[base:summary]{summary()}}.
+}
+\details{
+Nuisance-parameter estimates and intervals from \code{summary()} remain on
+the parameterization used by the measurement model. For example, MLPE
+\code{tau} is log precision and its stored \code{rho} is unconstrained; the
+actual shared-site correlation is \eqn{\text{plogis}(\rho)/2}. Consult the
+selected measurement-model help page before interpreting \code{phi}.
+
+\code{anova()} is a likelihood-ratio test for nested conductance formulas
+fitted to the same response, sites, graph domain, conductance-model factory,
+measurement model, and pair subset; Wishart fits must also use the same
+\code{nu}. The function checks formula-term nesting, but the analyst must
+still verify that the full measurement and conductance parameterization is
+substantively nested. Its chi-squared reference distribution assumes the
+tested parameters are regular interior parameters. It can be unreliable when
+a null value is on a parameter boundary or other regularity conditions fail;
+use a justified alternative or simulation calibration in those cases.
+}
+\examples{
+\donttest{
+data(melip)
+covariates <- c(terra::unwrap(melip.altitude), terra::unwrap(melip.forestcover))
+names(covariates) <- c("altitude", "forestcover")
+covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+                                                na.rm = TRUE))
+surface <- conductance_surface(covariates, terra::unwrap(melip.coords),
+                               directions = 8)
+
+fit <- terradish(melip.Fst ~ altitude + forestcover, data = surface,
+                 conductance_model = loglinear_conductance,
+                 measurement_model = mlpe)
+
+fit                    # coefficients, log-likelihood, and AIC
+summary(fit)           # adds standard errors, Wald tests, and the phi table
+
+# Conductance coefficients are on the LOG scale, so exponentiate for a
+# multiplicative reading: exp(theta) is the change in conductance per
+# one-unit (one standard deviation, here) increase in the covariate.
+coef(fit)
+exp(coef(fit))
+
+logLik(fit)            # carries a df attribute, so AIC()/BIC() work
+AIC(fit)               # compare only fits using the same response and likelihood family
+head(fitted(fit)[, 1:4])     # fitted genetic distances
+head(residuals(fit)[, 1:4])  # observed minus fitted
+
+# A nested comparison: is forest cover worth its parameter?
+fit_alt <- terradish(melip.Fst ~ altitude, data = surface,
+                     conductance_model = loglinear_conductance,
+                     measurement_model = mlpe)
+anova(fit_alt, fit)
+}
+
+}
+\seealso{
+\code{\link{terradish}} for fitting, \code{\link{conductance}} for
+  the fitted surface as a raster, \code{\link{plot.terradish}} for the five
+  diagnostic plot types, \code{\link{aic_table}} for ranking a model set,
+  and \code{\link{mlpe_response_change}} for putting an MLPE covariate
+  association on the response scale.  See
+  \code{vignette("getting-started", package = "terradish")} for a walkthrough
+  of reading these outputs and
+  \code{vignette("model-comparison", package = "terradish")} for
+  \code{anova()} and \code{AIC()} in context.
 }

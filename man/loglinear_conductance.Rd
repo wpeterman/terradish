@@ -43,12 +43,17 @@ is non-identifiable.
 \strong{Interpreting \eqn{\theta}:}
 \itemize{
   \item \eqn{\theta_j > 0}: higher values of covariate \eqn{j} increase
-    conductance (easier movement, lower resistance distance).
-  \item \eqn{\theta_j < 0}: higher values act as a barrier.
-  \item \eqn{\theta_j = 0}: the covariate has no effect on conductance.
+    fitted relative conductance and tend to lower graph resistance distance,
+    conditional on the other terms and graph domain.
+  \item \eqn{\theta_j < 0}: higher values lower fitted relative conductance.
+  \item \eqn{\theta_j = 0}: the fitted conductance is locally unchanged by
+    that term, conditional on the model.
   \item A one-standard-deviation increase in covariate \eqn{j} multiplies
-    conductance by \eqn{\exp(\theta_j)}.
+    fitted conductance by \eqn{\exp(\theta_j)} when the covariate was
+    standardized and the term is linear.
 }
+These are model-based associations, not direct estimates of movement rate,
+habitat suitability, or a causal landscape effect.
 
 The exponential link guarantees strictly positive conductances for any real
 \eqn{\theta}, making \code{loglinear_conductance} more numerically stable

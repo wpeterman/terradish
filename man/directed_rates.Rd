@@ -26,8 +26,9 @@ A data frame with one row per undirected graph edge. Columns include
   log(rate_ab / rate_ba)}, and arrow-ready coordinates from the lower-rate
   endpoint toward the higher-rate endpoint. If \code{object} contains a
   finite covariance matrix for \code{gamma}, standard errors, z statistics,
-  p-values, and Wald significance indicators are also returned for
-  \code{log_rate_ratio}.
+  p-values, and Wald threshold indicators are also returned for
+  \code{log_rate_ratio}. These are model-based edge summaries, not direct
+  observations of organismal movement or migration.
 }
 \description{
 Computes fitted forward and reverse edge rates from a

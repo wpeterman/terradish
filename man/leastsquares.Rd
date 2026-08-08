@@ -44,7 +44,7 @@ respect to \code{phi}?}
 
 \item{nonnegative}{Logical. Constrain the IBR slope \code{beta} to be
 nonnegative? Default \code{TRUE} prevents a nonsensical negative
-resistance-distance effect.}
+resistance-distance slope.}
 
 \item{validate}{Logical. Numerically validate gradients and Hessians via
 \pkg{numDeriv}? Very slow; intended for debugging small examples only.}
@@ -68,16 +68,16 @@ When \code{phi} is missing, a list with elements \code{phi}
 A function of class \code{"terradish_measurement_model"} that evaluates a
 Gaussian likelihood with independent errors and a linear mean structure
 relating observed genetic distances to resistance distances.  This is the
-fastest measurement model and a useful first-pass choice; prefer
-\code{\link{mlpe}} for inference because it correctly accounts for the
-non-independence of pairwise measurements.
+fastest measurement model and a useful exploratory or diagnostic choice.
+For distance-response inference, \code{\link{mlpe}} represents shared-site
+dependence that this model omits.
 }
 \details{
 The nuisance parameters are:
 \describe{
   \item{\code{alpha}}{Intercept of the regression of genetic distance on
     resistance distance.}
-  \item{\code{beta}}{Slope (IBR effect); constrained \eqn{\geq 0} when
+  \item{\code{beta}}{IBR slope; constrained \eqn{\geq 0} when
     \code{nonnegative = TRUE}.}
   \item{\code{tau}}{Log-precision of the Gaussian errors: residual variance
     is \eqn{\exp(-\tau)}.}
@@ -88,10 +88,10 @@ The mean structure is \eqn{S_{ij} = \alpha + \beta R_{ij} + e_{ij}}, where
 with common precision \eqn{\exp(\tau)}.
 
 Pairwise genetic distances are not independent: any two pairs sharing a
-sampling site are correlated.  \code{leastsquares} ignores this, which
-underestimates standard errors.  For inferential purposes, \code{\link{mlpe}}
-is strongly preferred.  Use \code{leastsquares} when speed matters more than
-precision, or for initial parameter exploration.
+sampling site can be correlated. \code{leastsquares} ignores this dependence,
+so its standard errors can be too small. Use it for fast exploration,
+diagnostics, or initial parameter searches rather than as the default basis
+for distance-response inference.
 }
 \examples{
 

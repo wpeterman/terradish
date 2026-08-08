@@ -29,7 +29,10 @@ CONFIG <- list(
   mutation_rate = 0,
   directions = 8L,
   formula = fst ~ cont1 + cont2,
-  measurement_model = "generalized_wishart",
+  # Pairwise FST from the population simulation is not automatically an
+  # admissible generalized-Wishart distance representation, so use MLPE for this
+  # solver benchmark.
+  measurement_model = "mlpe",
   nu = NULL,
   true_theta = c(cont1 = 0.8, cont2 = -0.8),
   reps = 2L,
@@ -230,7 +233,11 @@ fit_once <- function(surface_case, solver, config)
   fit <- NULL
   error_message <- NULL
   measurement_model <- get(config$measurement_model, envir = asNamespace("terradish"))
-  nu <- if (is.null(config$nu)) config$n_loci else config$nu
+  nu <- if (identical(config$measurement_model, "generalized_wishart") ||
+            identical(config$measurement_model, "wishart_covariance"))
+    if (is.null(config$nu)) config$n_loci else config$nu
+  else
+    NULL
   solver_control <- switch(
     solver,
     auto = config$auto_control,

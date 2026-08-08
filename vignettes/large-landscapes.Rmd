@@ -51,7 +51,7 @@ surface    <- conductance_surface(covariates, melip.coords, directions = 8)
 
 ---
 
-# When a landscape is "large"
+## When a landscape is "large"
 
 `terradish` builds a weighted graph over the raster grid and solves a linear
 system on that graph to get resistance distances among focal sites. The cost of
@@ -60,9 +60,10 @@ grows into the hundreds of thousands and beyond:
 
 1. The linear **solver** that computes resistance distances can run out of
    memory. Picking the right one (Section 3) is what keeps a fit feasible.
-2. The **inference** machinery (standard errors, confidence intervals) is
-   unchanged in form, but at scale you can afford more focal sites and more
-   genetic markers, and it helps to know how that buys precision (Section 4).
+2. The **inference** machinery (standard errors and confidence intervals) is
+   unchanged in form, but larger analyses can include more focal sites. Wishart
+   precision also depends on the supplied effective degrees of freedom, `nu`
+   (Section 4).
 3. An exact, **memory-bounded reduction** onto the focal sites becomes useful as
    a diagnostic and as an out-of-core building block (Section 5).
 
@@ -72,12 +73,14 @@ binding constraint. On a 64 GB workstation that boundary falls between roughly
 
 ---
 
-# Choosing a solver
+## Choosing a solver
 
 Both `terradish()` (the fitting wrapper) and `terradish_algorithm()` (one
 likelihood and gradient evaluation) take a `solver` argument. The solver only
 changes **how** the resistance-distance linear system is solved; it does not
-change the model, and the parameter estimates are identical across solvers.
+change the statistical model. Iterative solvers should agree with the direct
+solver within their numerical tolerances, but estimates need not be bitwise
+identical.
 
 ```{r solver-calls, eval = FALSE}
 # direct (the default): exact sparse Cholesky factorization
@@ -131,55 +134,63 @@ once the raster is large enough that `direct` fails or thrashes.
 This applies to every symmetric resistance model: any `conductance_model`
 (`loglinear_conductance`, `smooth_loglinear_conductance`, the Gaussian
 scale-aware and hierarchical models) paired with any measurement model (`mlpe`,
-`leastsquares`, the `generalized_wishart` family). The solver sits underneath
+`leastsquares`, `generalized_wishart`, and `wishart_covariance`). The solver sits underneath
 all of them. The one exception is the directional model
 (`terradish_directed()`), which runs a different algorithm on an asymmetric
 generator; see `vignette("directional-conductance", package = "terradish")`.
 
 ---
 
-# Inference at scale
+## Inference at scale
 
-Scaling the solver lets you afford larger problems, which is worth doing because
-larger problems buy tighter inference. Two levers matter.
+Scaling the solver lets you fit larger graph domains and sampling designs. More
+informative designs can tighten inference, but cell count alone does not. Two
+settings matter here.
 
 ## Curvature for standard errors
 
 `terradish()` and `terradish_algorithm()` take `curvature = c("exact",
-"gauss_newton")`. Both give the same point estimates and the same gradient; they
-differ only in the Hessian used for standard errors.
+"gauss_newton")`. The objective and gradient are the same; the options differ
+in the Hessian approximation used for optimization and standard errors. Fits
+should be compared for numerical agreement rather than assumed identical.
 
 ```{r curvature-calls, eval = FALSE}
+# Generalized Wishart requires an admissible squared-distance response that is
+# coherently related to a centered positive-semidefinite covariance matrix.
 # exact (default): full observed Hessian
-fit <- terradish(melip.Fst ~ forestcover + altitude, surface,
-                 measurement_model = generalized_wishart, nu = 1000,
+fit <- terradish(admissible_squared_distance ~ forestcover + altitude, surface,
+                 measurement_model = generalized_wishart,
+                 nu = effective_marker_df,
                  curvature = "exact")
 
-# gauss_newton: Fisher-information curvature
-fit <- terradish(melip.Fst ~ forestcover + altitude, surface,
-                 measurement_model = generalized_wishart, nu = 1000,
+# gauss_newton: information-based curvature
+fit <- terradish(admissible_squared_distance ~ forestcover + altitude, surface,
+                 measurement_model = generalized_wishart,
+                 nu = effective_marker_df,
                  curvature = "gauss_newton")
 ```
 
 - **`exact`** uses the full observed Hessian.
 - **`gauss_newton`** drops the two residual-weighted second-derivative terms,
-  leaving the **Gauss-Newton (Fisher information)** curvature. It needs only the
-  first derivatives of conductance, is always positive semidefinite (so the
-  Newton step and the variance-covariance matrix are well behaved), and equals
-  the exact Hessian at a well-fitting optimum. It flows unchanged into `vcov()`,
-  `summary()`, and `confint()`, so the standard errors become the asymptotic,
-  information-based errors.
+  leaving the **Gauss-Newton information** curvature. It needs only the
+  first derivatives of conductance and is positive semidefinite when the
+  retained measurement-model curvature is positive semidefinite. It flows
+  unchanged into `vcov()`, `summary()`, and `confint()`, so the standard errors
+  become asymptotic, information-based errors. It approaches the exact Hessian
+  when the omitted residual-weighted terms are negligible; equality is not
+  guaranteed merely because a fit has converged.
 
 **How to choose.** Both are validated for `leastsquares` and the
 `generalized_wishart` measurement model. Use the `exact` default for routine
 work. Reach for `gauss_newton` when the optimizer struggles with an indefinite
 Hessian far from the optimum, or when you want strictly information-based
-standard errors. At a good fit the two agree, so the choice rarely changes
-conclusions.
+standard errors. At a well-behaved fit they may agree closely. Compare them as
+a sensitivity check when curvature choice materially changes uncertainty or
+convergence.
 
 The focused benchmark in `inst/benchmarks/benchmark-curvature-large-landscape.R`
 makes this comparison reproducible. It builds a synthetic heterogeneous raster,
-simulates a `generalized_wishart` distance response from known conductance
+simulates a `generalized_wishart` squared-distance response from known conductance
 parameters, then fits the same model with `curvature = "exact"` and
 `curvature = "gauss_newton"`.
 
@@ -219,9 +230,10 @@ residuals or misspecification are affecting the observed curvature.
 
 ## Markers and sites buy precision
 
-With the `generalized_wishart` measurement model, `nu` is the number of genetic
-markers (the effective degrees of freedom). Holding the model fixed and varying
-`nu` shows a textbook pattern (focal sites held at 80):
+With the `generalized_wishart` measurement model, `nu` is the supplied effective
+Wishart degrees of freedom, not an estimated parameter or automatically the raw
+marker count. Holding the response and model fixed while varying `nu` shows the
+theoretical scaling pattern (focal sites held at 80):
 
 | `nu`  | mean standard error |
 |-------|---------------------|
@@ -232,15 +244,17 @@ markers (the effective degrees of freedom). Holding the model fixed and varying
 
 **How to read this.** The point estimates do not change with `nu`; only their
 precision does. The standard error falls as `1 / sqrt(nu)`: increasing the
-markers eightfold (500 to 4,000) tightens the standard error about 2.9-fold,
+effective degrees of freedom eightfold (500 to 4,000) tightens the standard
+error about 2.9-fold,
 which is close to `sqrt(8) = 2.83`. Standard errors also shrink as you add focal
-sites. So the payoff from scaling the solver to afford a larger problem is
-direct: more markers and more sites translate into proportionally tighter
-confidence intervals.
+sites in many designs, but the amount depends on their placement, covariate
+support, and the graph. Report a justified primary `nu` and sensitivity values;
+for microsatellites, use locus count as primary and $\sum_l(K_l-1)$ only as a
+larger sensitivity value.
 
 ---
 
-# An exact, memory-bounded reduction
+## An exact, memory-bounded reduction
 
 `terradish_kron_reduce_tiled()` reduces the full graph Laplacian onto the focal
 sites exactly, returning the focal effective-resistance structure while keeping
@@ -307,23 +321,27 @@ the symmetric resistance models only, not the directional model.
 
 ---
 
-# Quick reference
+## Quick reference
 
 ```{r quick-ref, eval = FALSE}
 # 1. Build the surface as usual
 surface <- conductance_surface(covariates, coords, directions = 8)
 
 # 2. Fit at scale: use amg once the raster is too large for the direct solver
-fit <- terradish(genetic_distance ~ cov1 + cov2, surface,
+# Generalized Wishart requires an admissible squared-distance response.
+fit <- terradish(admissible_squared_distance ~ cov1 + cov2, surface,
                  conductance_model = loglinear_conductance,
-                 measurement_model = generalized_wishart, nu = 2000,
+                 measurement_model = generalized_wishart,
+                 nu = effective_marker_df,
                  solver    = "amg",            # large-N linear solver
                  curvature = "gauss_newton")   # information-based standard errors
 
-summary(fit)                                   # estimates + SEs (se ~ 1/sqrt(nu))
+summary(fit)                                   # conditional estimates and SEs
 
 # 3. (Advanced) exact memory-bounded reduction onto the focal sites
-cond <- conductance(surface, fit)              # per-vertex conductance from the fit
+cond_map <- conductance(surface, fit)[["est"]]
+cond <- terra::values(cond_map, mat = FALSE)
+cond <- cond[is.finite(cond)]                   # active-cell conductance vector
 red  <- terradish_kron_reduce_tiled(surface, cond)  # auto: fast unless it would not fit
 red$method                                     # "direct" or "nested"
 ```
@@ -342,8 +360,8 @@ red$method                                     # "direct" or "nested"
 
 - **`vignette("getting-started", package = "terradish")`** the core workflow:
   data in, model fit, interpretation out.
-- **`vignette("wishart-covariance", package = "terradish")`** the generalized
-  Wishart measurement model and the role of `nu`.
+- **`vignette("wishart-covariance", package = "terradish")`** the distance and
+  covariance Wishart measurement models and the role of `nu`.
 - **`vignette("model-comparison", package = "terradish")`** ranking competing
   models with AIC and likelihood ratio tests.
 - **`vignette("directional-conductance", package = "terradish")`** the

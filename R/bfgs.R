@@ -48,12 +48,13 @@ BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = 
   use_armijo <- .terradish_is_armijo_control(ls.control)
 
   if (verbose)
-  {
-    if (use_armijo)
-      cat("BFGS with objective-only Armijo line search\n")
-    else
-      cat("BFGS with Hager-Zhang line search\n")
-  }
+    message("BFGS with ",
+            if (use_armijo) "objective-only Armijo" else "Hager-Zhang",
+            " line search")
+
+  # `maxit` must be at least one step: the loop below defines `fit` and `i`,
+  # and the convergence check after it reads both.
+  maxit <- .terradish_validate_maxit(maxit)
 
   convergence <- 0
   line_search_failed <- FALSE
@@ -61,7 +62,7 @@ BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = 
   par <- as.matrix(par)
   fit_from_line_search <- NULL
 
-  for (i in 1:maxit)
+  for (i in seq_len(maxit))
   {
     if (is.null(fit_from_line_search))
       fit <- fn(par, gradient = TRUE, hessian = FALSE)
@@ -73,11 +74,10 @@ BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = 
     delta <- if (i > 1) abs(oldfit$objective - fit$objective) else 0
 
     if (verbose)
-      cat(paste0("[", i, "]"), 
-          "f(x) =", prettify(-fit$objective),
-          "  |f(x) - fold(x)| =", prettify(delta),
-          "  max|f'(x)| =", prettify(max(abs(fit$gradient))),
-          "\n")
+      message(paste0("[", i, "]"),
+              " f(x) = ", prettify(-fit$objective),
+              "  |f(x) - fold(x)| = ", prettify(delta),
+              "  max|f'(x)| = ", prettify(max(abs(fit$gradient))))
 
     if (max(abs(fit$gradient)) < ctol || (i > 1 && delta < ftol))
       break
@@ -100,7 +100,7 @@ BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = 
       sBs   <- c(t(ss) %*% hess %*% ss)
       theta <- if (irho >= 0.2 * sBs) 1.0 else (0.8 * sBs)/(sBs - irho)
       if (verbose && theta < 1.0)
-        cat("... damped BFGS update\n")
+        message("... damped BFGS update")
       rr    <- theta * yy + (1 - theta) * hess %*% ss
       rho   <- 1./c(t(rr) %*% ss) 
       upd   <- diag(nrow(ihess)) - rho * ss %*% t(rr)
@@ -179,7 +179,8 @@ BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = 
       alpha <- tryCatch({
         HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
       }, error = function(err) {
-        message("Hager-Zhang line search failed; switching to bounded backtracking.")
+        if (verbose)
+          message("Hager-Zhang line search failed; switching to bounded backtracking.")
         Backtracking(dphi_fn, phi0, dphi0, control = ls.control)
       })
       if (!is.finite(alpha) || alpha <= 0 ||
@@ -201,10 +202,9 @@ BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = 
 
   boundary_fit <- any(par == lower | par == upper)
   if (verbose)
-    if (boundary_fit)
-      cat ("Solution on boundary with `max(abs(gradient))` ==", max(abs(fit$gradient)), "and `diff(f)` ==", delta, "\n")
-    else
-      cat ("Solution on interior with `max(abs(gradient))` ==", max(abs(fit$gradient)), "and `diff(f)` ==", delta, "\n")
+    message("Solution on ", if (boundary_fit) "boundary" else "interior",
+            " with `max(abs(gradient))` == ", max(abs(fit$gradient)),
+            " and `diff(f)` == ", delta)
 
   if (!line_search_failed && i == maxit)
   {

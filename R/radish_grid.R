@@ -103,25 +103,34 @@
   fun
 }
 
+# Can the parallel workers just attach the installed package, or do they have to
+# source the R files (the devtools::load_all development case)?
+#
+# The test is whether this function is running from a real installed namespace.
+# Do not probe the working directory: a maintainer sitting in the package source
+# tree while using the *installed* package would then send workers down the
+# source-the-files path, silently mixing two copies of the code. The same
+# namespace test is used in `terradish_algorithm()` before it forks.
 .use_namespace_workers <- function(namespace = "terradish")
 {
-  if (file.exists(file.path(getwd(), "R", "radish_grid.R")))
-    return(FALSE)
-
   if (!(namespace %in% loadedNamespaces()))
     return(FALSE)
 
+  # environmentName() on a namespace gives the bare package name, so compare
+  # against `namespace`, not "namespace:<pkg>"
+  env <- environment(.use_namespace_workers)
+  if (!isNamespace(env) || !identical(environmentName(env), namespace))
+    return(FALSE)
+
+  # An installed package keeps a lazy-load stub at R/<pkgname>; a dev-loaded one
+  # points at the source tree, whose R/ holds .R files instead.
   ns_path <- tryCatch(getNamespaceInfo(asNamespace(namespace), "path"),
                       error = function(e) NULL)
   if (is.null(ns_path))
     return(FALSE)
 
-  cwd <- tryCatch(normalizePath(getwd(), winslash = "/", mustWork = FALSE),
-                  error = function(e) NULL)
-  ns_path <- tryCatch(normalizePath(ns_path, winslash = "/", mustWork = FALSE),
-                      error = function(e) ns_path)
-
-  !identical(ns_path, cwd)
+  !dir.exists(file.path(ns_path, "R")) ||
+    file.exists(file.path(ns_path, "R", namespace))
 }
 
 .validate_theta_grid <- function(theta, parameter_names)
@@ -292,7 +301,8 @@
   {
     worker_files <- c("R/backtracking.R", "R/hager_zhang.R", "R/newton_raphson.R",
                       "R/radish_conductance_model.R", "R/leastsquares.R",
-                      "R/mlpe.R", "R/generalized_wishart.R", "R/wishart_covariance.R",
+                      "R/mlpe.R", "R/check_distance_response.R",
+                      "R/generalized_wishart.R", "R/wishart_covariance.R",
                       "R/radish_subproblem.R", "R/radish_algorithm.R")
     worker_wd <- getwd()
     clusterExport(cl, varlist = c("worker_files", "worker_wd"), envir = environment())
@@ -452,7 +462,9 @@
 #' point on the grid).
 #'
 #' @param theta A matrix of dimension (grid size) x (number of parameters)
-#' @param formula A formula with the name of a matrix of observed genetic distances on the lhs, and covariates in the creation of \code{data} on the rhs
+#' @param formula A formula with the name of a response matrix compatible with
+#'   the selected measurement model on the left-hand side, and covariates used
+#'   to create \code{data} on the right-hand side.
 #' @param data An object of class \code{terradish_graph} (see
 #'   \code{\link{conductance_surface}})
 #' @param conductance_model A function of class
@@ -462,10 +474,10 @@
 #'   \code{terradish_measurement_model} (see
 #'   \code{\link{terradish_measurement_model}})
 #' @param nu Effective Wishart degrees of freedom passed to measurement models
-#'   that require it.  For biallelic SNPs this is usually the number of
-#'   retained SNPs; for microsatellites use approximately
-#'   \eqn{\sum_l (K_l - 1)} where \eqn{K_l} is the number of observed alleles at
-#'   locus \eqn{l}.
+#'   that require it. For biallelic SNPs, use the number of approximately
+#'   independent retained SNPs. For microsatellites, use the number of loci as
+#'   the conservative primary value and report sensitivity to larger plausible
+#'   values.
 #' @param nonnegative Force regression-like \code{measurement_model} to have nonnegative slope?
 #' @param conductance Retained for backward compatibility. Only
 #'   \code{conductance = TRUE} is currently implemented.
@@ -551,7 +563,8 @@ terradish_grid <- function(theta,
   vars <- as.character(attr(trm, "variables"))[-1]
   response <- attr(trm, "response")
   S <- if (response) get(vars[response], parent.frame())
-       else stop("'formula' must have genetic distance matrix on lhs")
+       else stop("'formula' must have a response matrix on the left-hand side")
+  S <- .validate_measurement_response(measurement_model, S)
   stopifnot(length(vars) > 1)
 
   term_labels <- attr(trm, "term.labels")

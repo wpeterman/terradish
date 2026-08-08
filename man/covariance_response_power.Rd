@@ -71,14 +71,14 @@ during simulation.}
 \item{nu}{Effective Wishart degrees of freedom, passed to both simulation
 and \code{\link{wishart_covariance}} fitting.  For biallelic SNPs use the
 number of retained polymorphic SNPs (reduced for linkage disequilibrium).
-For microsatellites, use the number of loci \eqn{L} as the conservative
-default; the true effective degrees of freedom is likely between \eqn{L}
-and \eqn{\sum_l (K_l - 1)}, where \eqn{K_l} is the number of observed
-alleles at locus \eqn{l}.  Because \code{nu} acts as an effective sample
-size, it is a primary lever for power: vary \code{nu} across the plausible
-range \eqn{[L, \sum_l (K_l - 1)]} to see how sensitive your power
-conclusions are to the choice.  See \code{\link{wishart_covariance}} for
-details on how \code{nu} scales inference.}
+For microsatellites, use the number of loci \eqn{L} as the primary value;
+\eqn{\sum_l (K_l - 1)}, where \eqn{K_l} is the number of observed alleles
+at locus \eqn{l}, is a larger sensitivity value rather than a default.
+Because \code{nu} acts as an effective sample size, it is a primary lever
+for power. Report the primary value and sensitivity analysis. See
+\code{\link{wishart_covariance}} for details on how \code{nu} scales
+inference. For simulation, \code{nu} must also be at least the largest
+assessed covariance-matrix dimension.}
 
 \item{nsim}{Number of covariance-response simulations per sampling design.}
 
@@ -147,8 +147,7 @@ basis-level behavior, but prefer \code{summary$conductance_power},
 whether the non-linear conductance surface was recovered.
 }
 \examples{
-\dontrun{
-library(terra)
+\donttest{
 data(melip)
 melip.altitude <- terra::unwrap(melip.altitude)
 melip.forestcover <- terra::unwrap(melip.forestcover)
@@ -157,6 +156,9 @@ melip.coords <- terra::unwrap(melip.coords)
 covariates <- c(melip.altitude, melip.forestcover)
 names(covariates) <- c("altitude", "forestcover")
 covariates <- scale_covariates(covariates)
+# Coarsen the raster: a power sweep refits many times, so cell count is the
+# dominant cost. Use the full resolution for a real design study.
+covariates <- terra::aggregate(covariates, fact = 3, na.rm = TRUE)
 surface <- conductance_surface(covariates, melip.coords,
                                directions = 8, saveStack = TRUE)
 
@@ -174,8 +176,8 @@ power <- covariance_response_power(
   theta = theta,
   formula = ~ forestcover + s(altitude, df = 4),
   data = surface,
-  sample_sizes = c(8, 12, 16),
-  strategies = c("spacefill", "random"),
+  sample_sizes = c(8, 12),
+  strategies = "spacefill",
   conductance_model = smooth_loglinear_conductance,
   fit_models = list(
     spline = list(formula = ~ forestcover + s(altitude, df = 4),
@@ -186,8 +188,8 @@ power <- covariance_response_power(
   tau = 0.8,
   sigma = 0.12,
   nu = 150,
-  nsim = 50,
-  n_designs = 5,
+  nsim = 3,          # raise to 200+ for a real power estimate
+  n_designs = 1,
   seed = 1,
   control = NewtonRaphsonControl(maxit = 12, verbose = FALSE)
 )

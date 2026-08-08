@@ -1,12 +1,12 @@
 ---
-title: "Directional gene flow: non-reversible conductance"
+title: "Non-reversible conductance and directional edge-rate bias"
 author: "Bill Peterman"
 output:
   rmarkdown::html_vignette:
     number_sections: true
     toc: true
 vignette: >
-  %\VignetteIndexEntry{Directional gene flow: non-reversible conductance}
+  %\VignetteIndexEntry{Non-reversible conductance and directional edge-rate bias}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -36,28 +36,30 @@ if (have_res) {
 
 ## Why directional conductance?
 
-Standard isolation-by-resistance treats movement as **symmetric**: the cost of
-moving from cell *a* to cell *b* equals the cost from *b* to *a*. But gene flow is
-frequently **directional**: downstream in a riverscape, downhill, downwind, or
-along a source-sink gradient. Accounting for asymmetric movement is one of the
-most-requested capabilities in landscape genetics, and symmetric resistance
-distance cannot represent it (Lundgren & Ralph 2019; Thomaz et al. 2019).
+Standard isolation-by-resistance uses symmetric edge weights. That structure
+cannot represent a fitted rate from cell *a* to cell *b* that differs from the
+reverse rate. Such asymmetry may be relevant to hypotheses about rivers,
+elevation gradients, wind, or source-sink structure.
 
-`terradish_directed()` models movement as a **directed, non-reversible** Markov
-generator whose edge rates depend on directional covariates:
+`terradish_directed()` fits a **directed, non-reversible** Markov generator whose
+edge rates depend on directional covariates:
 
-\deqn{\log G_{a\to b} = \tfrac12(\eta_a + \eta_b) + d_{ab}^\top \gamma, \qquad \eta_k = x_k^\top \theta,}
+$$
+\log G_{a\to b} = \tfrac12(\eta_a + \eta_b) + d_{ab}^\top \gamma,
+\qquad \eta_k = x_k^\top \theta.
+$$
 
-where \eqn{\theta} are the usual (symmetric) conductance effects and \eqn{\gamma}
-are directional effects on **antisymmetric** edge covariates \eqn{d_{ab} = -d_{ba}}
+where $\theta$ are symmetric conductance coefficients and $\gamma$ are
+edge-rate coefficients on **antisymmetric** edge covariates
+$d_{ab} = -d_{ba}$
 (elevation drop, flow accumulation, wind). The genetic data are linked through the
 **commute time** of the chain, which is symmetric, so every `terradish`
-measurement model is used unchanged. With \eqn{\gamma = 0} the generator is
+measurement model is used unchanged. With $\gamma = 0$ the generator is
 reversible and the model reduces to isolation by resistance.
 
 > **Scope.** This is the tractable directional model (a directed commute time
 > reducing to resistance distance when reversible), not the full structured
-> coalescent (intractable on fine rasters). It is most useful at deme scale or
+> coalescent or a direct migration-rate model. It is most useful at deme scale or
 > on coarse rasters; full-resolution use should start with the SparseLU backend
 > and careful sensitivity checks (see "Performance and scope" below).
 
@@ -70,7 +72,7 @@ from `vignettes/vignette-directional.rds`. To refresh the cached fit, run
 ## Directional edge covariates
 
 `edge_gradient()` turns a spatial layer (e.g. elevation) into the antisymmetric
-per-directed-edge covariate \eqn{d_{ab} = x_a - x_b}:
+per-directed-edge covariate $d_{ab} = x_a - x_b$:
 
 ```{r edges, eval = FALSE}
 library(terradish)
@@ -94,34 +96,42 @@ fit <- terradish_directed(
   S ~ habitat,                    # symmetric conductance covariate(s)
   data              = surface,
   directional       = dir_cov,    # directional covariate(s)
-  measurement_model = wishart_covariance,   # or generalized_wishart / mlpe
+  measurement_model = wishart_covariance,   # match this to the response type
   nu                = nu,
   solver            = "sparse_lu_cpp"
 )
 summary(fit)        # theta (symmetric) + gamma (directional), z-tests, AIC
 ```
 
+The response requirements do not change in the directed extension.
+`wishart_covariance` requires a positive semidefinite covariance matrix,
+`generalized_wishart` requires an admissible squared-distance response
+coherently related to a centered positive semidefinite covariance matrix, and
+`mlpe` or `leastsquares` accepts a pairwise distance response. Use
+`check_distance_response()` before a generalized-Wishart fit;
+`terradish_directed()` performs the same check automatically.
+
 The fitted object carries the full S3 suite: `print`, `summary`, `coef`,
 `logLik`, `AIC`, `vcov`, `confint`, and `plot`. The cached example below was
 simulated from a known directional model on a 7 by 7 lattice, with six focal
-sites, 156 undirected graph edges, \eqn{\theta = 0.5}, and
-\eqn{\gamma = 0.6}.
+sites, 156 undirected graph edges, $\theta = 0.5$, and $\gamma = 0.6$.
 
 ```{r cached-summary, eval = have_res}
 summary(res$fit)
 ```
 
 **How to read the `summary()` output:** The `theta` row is the reversible
-conductance effect. It is on the log-conductance scale, so a one-unit increase
+conductance coefficient. It is on the log-conductance scale, so a one-unit increase
 in `v1` multiplies the symmetric conductance by `exp(theta)`. The `gamma` row is
-the directional effect. It is also on a log-rate scale, but it applies to an
+the directional edge-rate coefficient. It is also on a log-rate scale, but it applies to an
 antisymmetric edge covariate: positive `gamma_elev` means edges with positive
 `elev` gradient have higher fitted rate in the positive-gradient direction and
 lower fitted rate in the reverse direction. The z table is a Wald approximation;
-use it as evidence for detectability, then use the edge-rate plots below to see
-where that detectable directional mechanism is expressed on the graph.
+use it as conditional evidence for that specified covariate, then use the
+edge-rate plots below to see where the fitted component is expressed on the
+graph. Neither the coefficient nor the arrows directly observe migration.
 
-A likelihood-ratio test of the directional effect compares the model against its
+A likelihood-ratio test of the directional term compares the model against its
 reversible (${\gamma = 0}$) special case:
 
 ```{r lrt, eval = FALSE}
@@ -157,17 +167,18 @@ knitr::kable(
 ```
 
 **How to read the likelihood-ratio test:** The reduced model keeps the same
-symmetric conductance structure but fixes \eqn{\gamma = 0}. The test statistic
+symmetric conductance structure but fixes $\gamma = 0$. The test statistic
 is twice the log-likelihood gain from allowing directionality. The degrees of
 freedom are the number of directional coefficients fixed at zero in the reduced
-model. A small p-value means the directed generator fits better than its
-reversible special case for this response.
+model. A small p-value indicates stronger conditional evidence for the specified
+directed component than for its reversible special case. For Wishart fits, the
+strength of this evidence depends on the supplied `nu`.
 
 ## Visualizing directional results
 
-Use the coefficient table and the map together. The coefficient table answers
-whether the directional mechanism is supported; the map shows where that fitted
-mechanism has the strongest edge-level expression on the graph.
+Use the coefficient table and the map together. The coefficient table summarizes
+conditional support for the specified edge-rate term; the map shows where that
+fitted term has the strongest edge-level expression on the graph.
 
 ```{r recovery-table, echo = FALSE, eval = have_res}
 knitr::kable(
@@ -180,7 +191,7 @@ knitr::kable(
 **How to read the coefficient table:** The `truth` column is the parameter value
 used to generate the synthetic response. The `estimate` column is what
 `terradish_directed()` recovered from that response. Here the fitted symmetric
-conductance effect and the directional effect are both close to the generating
+conductance coefficient and directional coefficient are both close to the generating
 values, which is what this controlled example is meant to demonstrate.
 
 ```{r directional-visuals, eval = FALSE}
@@ -228,9 +239,9 @@ plot(res$fit, type = "combined", data = surface, directional = dir_cov,
 **How to read the combined map:** The background raster is the reversible
 conductance component, `exp(x theta)`. The arrows show the directional bias on
 top of that surface. Read the two layers separately first: the background says
-where movement is generally easy or difficult, and the arrows say which
-direction is favored along each edge after accounting for the symmetric
-component.
+where fitted relative conductance is high or low, and the arrows show which
+direction the fitted generator favors along each edge after accounting for the
+symmetric component. Neither layer is a direct movement map.
 
 The directional map is inspired by effective-migration surface displays such as
 EEMS and FEEMS, but the interpretation is model-specific. In
@@ -246,12 +257,12 @@ plot(fit, type = "combined", data = surface, directional = dir_cov,
 ### Worked example (simulated from the directed model)
 
 To create the cached result, we simulated a covariance response from the
-directed model on a small lattice with a positive directional effect and refit
-the model:
+directed model on a small lattice with a positive directional coefficient and
+refit the model with the covariance Wishart likelihood:
 
 ```{r recovery-show, eval = FALSE}
 fit <- terradish_directed(S ~ v1, data = surface, directional = dir_cov,
-                          measurement_model = generalized_wishart, nu = nu,
+                          measurement_model = wishart_covariance, nu = nu,
                           solver = "sparse_lu_cpp")
 coef(fit)           # theta (~truth) and gamma (~truth, positive)
 ```
@@ -269,27 +280,28 @@ so only a symmetric function of the directed generator (the commute time) is
 observable. One might fear this erases direction. It does for perfectly
 symmetric/periodic geometry, but **landscape boundaries break that symmetry**, so
 direction *does* leave a signature in the symmetric commute time. On a bounded
-lattice the commute-time pattern at \eqn{+\gamma} and \eqn{-\gamma} are
-distinguishable, and \eqn{\gamma} (sign and magnitude) is recovered from
-model-simulated data.
+lattice the commute-time patterns at $+\gamma$ and $-\gamma$ can differ. The
+controlled example above recovers the generating sign and magnitude, but this
+does not establish unique identification for other graphs or responses.
 
 **In practice: it is hard, and requires strong spatial structure.** Real genetic
 data are generated by a coalescent process, not by the commute-time model, and
 the directional component is a perturbation on top of (much larger) symmetric
-isolation by distance. Detecting \eqn{\gamma} therefore needs:
+isolation by distance. Detecting $\gamma$ is therefore more plausible with:
 
-- **strong differentiation** (low effective migration / high \eqn{F_{ST}}); when
-  populations are well mixed the spatial signal, and with it any directional
-  signal, is weak, and the resistance scale itself collapses
-  (\eqn{\tau \to 0});
-- **many markers and sites**, since the directional signature is second-order.
+- a response with a detectable spatial signal; when the fitted resistance scale
+  approaches $\tau = 0$, neither symmetric nor directional conductance is
+  identified;
+- enough sites and effective marker information to resolve the weak commute-time
+  signature, while recognizing that more data do not guarantee uniqueness.
 
-Treat a non-significant \eqn{\gamma} as "not detectable here," not "no
-directionality," and report \eqn{\gamma} with its uncertainty and a sensitivity
-check. Where direction is the primary question and differentiation is modest,
-data summaries that carry directional information directly (allele-frequency
-clines, identity-by-descent asymmetries) are more powerful than any symmetric
-distance. This is a fundamental limit, not a limitation of this implementation.
+Treat an interval for $\gamma$ that includes zero as "not distinguishable here,"
+not "no biological directionality," and report $\gamma$ with its uncertainty
+and a sensitivity check. Where direction is the primary question and
+differentiation is modest, data summaries that carry directional information
+directly (allele-frequency clines, identity-by-descent asymmetries) are more
+powerful than any symmetric distance. This is a fundamental limit, not a
+limitation of this implementation.
 
 ## Performance and scope
 
@@ -303,7 +315,7 @@ full-resolution raster fits (hundreds of thousands of cells) can be slow, and
 strongly heterogeneous rates can ill-condition the solves. Practical guidance:
 
 - coarsen the raster (`terra::aggregate`) or work at the deme scale;
-- keep covariates scaled and directional effects moderate;
+- keep covariates scaled and directional coefficients moderate;
 - check that estimates are stable across resolutions.
 
 ## Quick-reference
@@ -321,3 +333,27 @@ edge_rates <- directed_rates(fit, data = surface, directional = dir_cov)
 head(edge_rates)                   # fitted edge rates and log-rate ratios
 plot(fit, type = "combined", data = surface, directional = dir_cov)
 ```
+
+## Summary of key functions
+
+| Function | Purpose |
+|----------|---------|
+| `conductance_surface()` | Build the weighted graph; use a coarse/deme-scale grid here |
+| `edge_gradient()` | Turn a raster into a signed directional edge covariate |
+| `terradish_directed()` | Fit the non-reversible model, estimating theta and gamma |
+| `summary()` | Coefficient table; `gamma = 0` is the reversible case for the specified edge covariates |
+| `anova()` | Likelihood ratio test of the directional model against `gamma = 0` |
+| `directed_rates()` | Per-edge forward and backward rates and their log ratio |
+| `plot(type = "combined")` | Directional arrows drawn over the conductance surface |
+
+## See also
+
+- **`vignette("getting-started", package = "terradish")`**, the core workflow
+  this vignette assumes: scaling covariates, building a surface, fitting and
+  reading a symmetric model.
+- **`vignette("wishart-covariance", package = "terradish")`**, the covariance
+  measurement model used here and how to choose `nu`.
+- **`vignette("model-comparison", package = "terradish")`**, likelihood-ratio
+  tests and AIC under their comparability conditions.
+- **`vignette("large-landscapes", package = "terradish")`**, why the directed
+  engine costs more per evaluation and how far it scales.

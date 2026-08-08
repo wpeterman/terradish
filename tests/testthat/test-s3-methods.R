@@ -30,6 +30,8 @@ test_that("S3 methods for terradish objects return consistent outputs", {
   expect_equal(dim(simulate(fit, nsim = 2)), c(nrow(fit$fit$response), ncol(fit$fit$response), 2))
   expect_s3_class(logLik(fit), "logLik")
   expect_equal(AIC(fit), fit$aic)
+  expect_equal(AIC(fit, k = log(fit$dim[["focal"]])),
+               -2 * fit$loglik + log(fit$dim[["focal"]]) * fit$df)
 })
 
 test_that("anova compares fitted terradish models", {
@@ -54,6 +56,22 @@ test_that("anova compares fitted terradish models", {
 
   tab <- anova(fit1, fit2)
   expect_true(is.matrix(tab) || is.data.frame(tab))
+
+  different_factory <- fit2
+  different_factory$submodels$f_factory <- function(...) NULL
+  expect_error(anova(fit1, different_factory),
+               "same conductance-model factory")
+
+  same_df <- fit1
+  same_df$loglik <- fit1$loglik + 1
+  expect_error(anova(fit1, same_df),
+               "must add at least one estimated parameter")
+
+  expect_setequal(
+    terradish:::.canonical_formula_terms(~ altitude * forestcover),
+    terradish:::.canonical_formula_terms(~ forestcover * altitude)
+  )
+  expect_equal(terradish:::.canonical_formula_terms(~ 1), character())
 })
 
 test_that("legacy radish wrapper warns and keeps compatibility classes", {

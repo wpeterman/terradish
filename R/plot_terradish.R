@@ -1,6 +1,6 @@
 #' Plot methods for fitted terradish models
 #'
-#' Three plot types for objects returned by \code{\link{terradish}}:
+#' Five plot types for objects returned by \code{\link{terradish}}:
 #' \describe{
 #'   \item{\code{"fit"}}{Observed vs. fitted response values. Distance-response
 #'     models are shown as pairwise genetic distance against fitted resistance
@@ -9,7 +9,7 @@
 #'     against fitted genetic covariance.}
 #'   \item{\code{"surface"}}{Fitted conductance surface with asymptotic confidence
 #'     interval bounds, displayed in three side-by-side panels.}
-#'   \item{\code{"marginal"}}{Marginal effect of each raster covariate on
+#'   \item{\code{"marginal"}}{Marginal association of each raster covariate with
 #'     conductance, varying one covariate at a time while averaging over the
 #'     observed values of all other model covariates, with a 95\% pointwise
 #'     confidence band via the delta method. For Gaussian scale-aware
@@ -20,7 +20,7 @@
 #'     original covariate named inside each \code{s()} term rather than against
 #'     the individual basis columns.}
 #'   \item{\code{"marginal_response"}}{Approximate response-scale marginal
-#'     effects obtained by mapping the marginal conductance curve through the
+#'     associations obtained by mapping the marginal conductance curve through the
 #'     fitted measurement-model mean and adding predictive bands that combine
 #'     \code{theta} uncertainty, conditional \code{phi} uncertainty, and the
 #'     residual variance implied by \code{tau} for distance-response models.
@@ -30,9 +30,11 @@
 #'     likewise conditional on the fitted \code{sigma} values.}
 #'   \item{\code{"sigma"}}{For Gaussian scale-aware conductance models, plots
 #'     the fitted Gaussian kernel against distance for each \code{sigma} term,
-#'     with a dashed line at the fitted effective distance containing 90\% of
+#'     with a dashed line at the fitted distance containing 90\% of
 #'     the one-dimensional kernel mass and a shaded interval from the Wald
-#'     confidence interval of that effective distance.}
+#'     confidence interval of that kernel-mass distance. These distances
+#'     summarize the fitted smoothing kernel and are not movement or dispersal
+#'     distances.}
 #' }
 #'
 #' For \code{type = "surface"}, \code{"marginal"}, and
@@ -62,11 +64,11 @@
 #'   fitted conductance model automatically.
 #' @param distance_per_map_unit Optional positive scalar used by
 #'   \code{type = "sigma"} to convert map units into a user-facing distance
-#'   unit such as kilometres.
+#'   unit such as kilometers.
 #' @param distance_unit Optional label used with
 #'   \code{distance_per_map_unit} for \code{type = "sigma"}.
 #' @param quantile Confidence level for interval bands. Default \code{0.95}.
-#' @param n Number of evaluation points for each marginal effect curve.
+#' @param n Number of evaluation points for each marginal-association curve.
 #'   Defaults to \code{100} for \code{"marginal_response"} (each point
 #'   requires a full Laplacian solve) and \code{200} for \code{"marginal"}.
 #'   Supply an explicit integer to override.
@@ -104,18 +106,20 @@
 #'   \code{\link{smooth_loglinear_conductance}}
 #'
 #' @examples
-#' \dontrun{
-#' library(terra)
+#' \donttest{
 #' data(melip)
 #' melip.altitude    <- terra::unwrap(melip.altitude)
 #' melip.forestcover <- terra::unwrap(melip.forestcover)
 #' melip.coords      <- terra::unwrap(melip.coords)
 #'
-#' # Build surface with scaled covariates
+#' # Build surface with scaled covariates. The raster is coarsened so the
+#' # example runs quickly; use the full resolution in a real analysis.
 #' covariates_scaled <- c(melip.altitude, melip.forestcover)
 #' names(covariates_scaled) <- c("altitude", "forestcover")
+#' covariates_scaled <- terra::aggregate(covariates_scaled, fact = 3, na.rm = TRUE)
 #' covariates_scaled <- scale_covariates(covariates_scaled)
-#' surface <- conductance_surface(covariates_scaled, melip.coords, directions = 8)
+#' surface <- conductance_surface(covariates_scaled, melip.coords,
+#'                                directions = 8, saveStack = TRUE)
 #'
 #' fit <- terradish(melip.Fst ~ altitude + forestcover, surface,
 #'                  loglinear_conductance, mlpe)
@@ -126,10 +130,10 @@
 #' # Fitted conductance surface with 95% CI (three-panel figure)
 #' plot(fit, type = "surface", data = surface)
 #'
-#' # Marginal effect plots on the original covariate scale
+#' # Marginal-association plots on the original covariate scale
 #' plot(fit, type = "marginal", data = surface)
 #'
-#' # Approximate response-scale marginal effects with predictive bands
+#' # Approximate response-scale marginal associations with predictive bands
 #' plot(fit, type = "marginal_response", data = surface)
 #'
 #' # For Gaussian scale-aware fits, visualize the fitted sigma kernels
@@ -953,7 +957,7 @@ print.terradish_plot_list <- function(x, ...)
     # Gradient of mean_R w.r.t. theta via the adjoint (backpropagation) method.
     # This mirrors exactly what terradish_algorithm does for dl/d(theta), but
     # substituting W (the gradient of mean_R w.r.t. E) in place of the
-    # measurement-model gradient dl/dE — no additional Laplacian solves needed.
+    # measurement-model gradient dl/dE, no additional Laplacian solves needed.
     W_dQnG <- W %*% tG
     dl_dC  <- backpropagate_laplacian_to_conductance(W_dQnG, tG, graph_data$adj)
     grad_mean_R_theta <- c(crossprod(df__dtheta_mat, c(dl_dC)))
@@ -978,7 +982,7 @@ print.terradish_plot_list <- function(x, ...)
 }
 
 
-# Marginal effect plots
+# Marginal-association plots
 .plot_terradish_marginal <- function(fit, data, covariates,
                                       conductance_model_factory, quantile, n,
                                       response_scale = FALSE,
@@ -995,7 +999,7 @@ print.terradish_plot_list <- function(x, ...)
          call. = FALSE)
 
   if (fit$fit$boundary || is.null(fit$mle$theta))
-    stop("Cannot plot marginal effects: no conductance parameters estimated ",
+    stop("Cannot plot marginal associations: no conductance parameters estimated ",
          "(IBD or boundary model).",
          call. = FALSE)
 
@@ -1063,7 +1067,7 @@ print.terradish_plot_list <- function(x, ...)
          "(e.g. loglinear_conductance).",
          call. = FALSE)
   if (isTRUE(attr(conductance_model_factory, "requires_fixed_graph", exact = TRUE)))
-    stop("Marginal-effect plots are not yet implemented for conductance models ",
+    stop("Marginal-association plots are not yet implemented for conductance models ",
          "that require the original raster graph during evaluation.",
          call. = FALSE)
 

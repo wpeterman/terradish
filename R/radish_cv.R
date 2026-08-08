@@ -156,8 +156,12 @@
 #'   correction uses \eqn{n} = number of focal sampling sites (not the number
 #'   of pairwise observations).  A common guideline is to prefer AICc over AIC
 #'   when \eqn{n / K < 40}, where \eqn{K} is the number of estimated parameters.
-#' @param BIC Should BIC be used instead of AIC?  BIC uses
-#'   \eqn{n} = number of pairwise observations.
+#' @param BIC Should BIC be used instead of AIC? BIC uses the number of selected
+#'   pair rows for pair-subset fits and otherwise uses
+#'   \eqn{n = n_{sites}(n_{sites}-1)/2} as an implementation convention. Those
+#'   pairs are not independent in MLPE and related designs, so report the
+#'   convention and do not treat it as a uniquely determined effective sample
+#'   size.
 #' @param mod_names Optional model names. By default the right-hand side of
 #'   each fitted formula is used. For MLPE measurement models with additional
 #'   pairwise covariates, the default appends \code{[mlpe:n]}, where \code{n}
@@ -165,14 +169,19 @@
 #' @param verbose Should the table be printed to the console?
 #'
 #' @details
-#' AIC comparison is valid only for models that share the same likelihood
-#' family.  In \pkg{terradish} the Gaussian-based models (\code{\link{leastsquares}}
-#' and \code{\link{mlpe}}) can be compared with one another, and the
-#' Wishart-based models (\code{\link{generalized_wishart}} and
-#' \code{\link{wishart_covariance}}) can be compared with one another, but
-#' cross-family comparisons (e.g. \code{mlpe} vs. \code{generalized_wishart})
-#' produce AIC differences that have no straightforward probabilistic
-#' interpretation.
+#' Information-criterion comparison requires the same observed response,
+#' focal sites, graph domain, likelihood family, and pair subset. Wishart fits
+#' must also use the same effective degrees of freedom, \code{nu}.
+#' \code{leastsquares} and \code{mlpe} are Gaussian likelihoods for the same
+#' pairwise-distance response and can be ranked when those conditions hold.
+#' \code{generalized_wishart} and \code{wishart_covariance} use different
+#' response representations and must not be ranked together. Cross-family
+#' rankings, such as \code{mlpe} versus \code{generalized_wishart}, are invalid.
+#'
+#' The function checks response values, model family, fitted dimensions,
+#' selected pairs, and recorded \code{nu}. It cannot establish that two
+#' separately constructed graphs with the same dimensions have identical
+#' domains, so users must verify that condition.
 #'
 #' @return A data frame containing model ranks, parameter counts, information
 #'   criterion values, delta values, weights, cumulative weights, and
@@ -208,11 +217,7 @@
 #' @export
 aic_table <- function(mod_list, AICc = FALSE, BIC = FALSE, mod_names = NULL, verbose = FALSE)
 {
-  mod_dim_keys <- vapply(mod_list,
-                         function(x) paste(x$dim, collapse = "|"),
-                         character(1))
-  if (length(unique(mod_dim_keys)) != 1L)
-    stop("Models must be fit to the same number of focal points and graph size")
+  .terradish_assert_comparable_fits(mod_list, purpose = "information criterion")
 
   if (is.null(mod_names))
     mod_names <- vapply(mod_list, .default_model_name, character(1))
@@ -230,10 +235,12 @@ aic_table <- function(mod_list, AICc = FALSE, BIC = FALSE, mod_names = NULL, ver
                       AIC = mod_AIC,
                       Delta_AIC = delta,
                       AIC_wt = wt / sum(wt),
+                      .fit_index = seq_along(mod_list),
                       row.names = NULL)
     tab <- tab[order(tab$AIC), , drop = FALSE]
     tab$Cum.wt <- cumsum(tab$AIC_wt)
-    tab$loglik <- mod_loglik[match(tab$model, mod_names)]
+    tab$loglik <- mod_loglik[tab$.fit_index]
+    tab$.fit_index <- NULL
     tab[, 3:7] <- round(tab[, 3:7], digits = 4)
   }
   else if (isTRUE(AICc))
@@ -242,6 +249,9 @@ aic_table <- function(mod_list, AICc = FALSE, BIC = FALSE, mod_names = NULL, ver
       stop("Set only one of `AICc` or `BIC` to TRUE")
 
     mod_n <- vapply(mod_list, function(x) x$dim[["focal"]], numeric(1))
+    if (any(mod_n <= mod_df + 1))
+      stop("AICc is undefined when the number of focal sites is not greater than K + 1.",
+           call. = FALSE)
     mod_AICc <- -2 * mod_loglik + 2 * mod_df * (mod_n / (mod_n - mod_df - 1))
     delta <- mod_AICc - min(mod_AICc)
     wt <- exp(-0.5 * delta)
@@ -251,16 +261,24 @@ aic_table <- function(mod_list, AICc = FALSE, BIC = FALSE, mod_names = NULL, ver
                       AICc = mod_AICc,
                       Delta_AICc = delta,
                       AICc_wt = wt / sum(wt),
+                      .fit_index = seq_along(mod_list),
                       row.names = NULL)
     tab <- tab[order(tab$AICc), , drop = FALSE]
     tab$Cum.wt <- cumsum(tab$AICc_wt)
-    tab$loglik <- mod_loglik[match(tab$model, mod_names)]
+    tab$loglik <- mod_loglik[tab$.fit_index]
+    tab$.fit_index <- NULL
     tab[, 3:8] <- round(tab[, 3:8], digits = 4)
   }
   else
   {
     mod_n <- vapply(mod_list, function(x) x$dim[["focal"]], numeric(1))
-    mod_pairs <- mod_n * (mod_n - 1) / 2
+    mod_pairs <- vapply(seq_along(mod_list), function(i) {
+      contract <- .terradish_fit_comparison_contract(mod_list[[i]])
+      if (is.null(contract$pairs))
+        mod_n[[i]] * (mod_n[[i]] - 1) / 2
+      else
+        nrow(contract$pairs)
+    }, numeric(1))
     mod_BIC <- -2 * mod_loglik + mod_df * log(mod_pairs)
     delta <- mod_BIC - min(mod_BIC)
     wt <- exp(-0.5 * delta)
@@ -270,10 +288,12 @@ aic_table <- function(mod_list, AICc = FALSE, BIC = FALSE, mod_names = NULL, ver
                       BIC = mod_BIC,
                       Delta_BIC = delta,
                       BIC_wt = wt / sum(wt),
+                      .fit_index = seq_along(mod_list),
                       row.names = NULL)
     tab <- tab[order(tab$BIC), , drop = FALSE]
     tab$Cum.wt <- cumsum(tab$BIC_wt)
-    tab$loglik <- mod_loglik[match(tab$model, mod_names)]
+    tab$loglik <- mod_loglik[tab$.fit_index]
+    tab$.fit_index <- NULL
     tab[, 3:8] <- round(tab[, 3:8], digits = 4)
   }
 
@@ -371,13 +391,17 @@ aic_table <- function(mod_list, AICc = FALSE, BIC = FALSE, mod_names = NULL, ver
 #' with \code{\link{terradish_parameters}}.
 #'
 #' @examples
-#' \dontrun{
-#' tmp <- tempfile()
-#' dir.create(tmp)
+#' # a saved-results directory, written under tempdir() so nothing is left
+#' # behind, holding the minimal object terradish_results() looks for
+#' tmp <- file.path(tempdir(), "terradish-results-example")
+#' dir.create(tmp, showWarnings = FALSE)
 #' saveRDS(list(effect_size = c(altitude = 0.2)),
 #'         file.path(tmp, "AllResults_list.rds"))
-#' terradish_results(tmp)
-#' }
+#'
+#' res <- terradish_results(tmp)
+#' res$effect_size   # the true/target effect sizes recorded alongside the fits
+#'
+#' unlink(tmp, recursive = TRUE)
 #'
 #' @seealso \code{\link{terradish_parameters}}
 #'
@@ -403,7 +427,8 @@ terradish_results <- function(Results_dir)
 #' @param conv Optional convergence flag or vector to append to the output.
 #' @param ... Reserved for future use.
 #'
-#' @return A data frame of fitted and, when available, true effect sizes.
+#' @return A data frame of fitted coefficients and, when available, generating
+#'   or target coefficients stored under the legacy name \code{effect_size}.
 #'
 #' @details
 #' This helper is intended for saved-results workflows rather than core model
@@ -422,13 +447,14 @@ terradish_results <- function(Results_dir)
 #' @seealso \code{\link{terradish_results}}
 #'
 #' @examples
-#' \dontrun{
+#' \donttest{
 #' data(melip)
 #' melip.altitude <- terra::unwrap(melip.altitude)
 #' melip.forestcover <- terra::unwrap(melip.forestcover)
 #' melip.coords <- terra::unwrap(melip.coords)
 #' covariates <- c(terra::scale(melip.altitude), terra::scale(melip.forestcover))
 #' names(covariates) <- c("altitude", "forestcover")
+#' covariates <- terra::aggregate(covariates, fact = 3, na.rm = TRUE)
 #' surface <- conductance_surface(covariates, melip.coords, directions = 8)
 #' fit <- terradish(melip.Fst ~ altitude + forestcover, surface,
 #'               loglinear_conductance, leastsquares)
@@ -514,10 +540,9 @@ radish_parameters <- function(...)
 #' @param model Measurement model, either as a function or one of
 #'   \code{"mlpe"}, \code{"wishart"}, or \code{"ls"}.
 #' @param nu Effective Wishart degrees of freedom, passed to measurement models
-#'   that require it.  For biallelic SNPs this is usually the number of
-#'   retained SNPs; for microsatellites use approximately
-#'   \eqn{\sum_l (K_l - 1)} where \eqn{K_l} is the number of observed alleles at
-#'   locus \eqn{l}.
+#'   that require it. For biallelic SNPs, use the number of approximately
+#'   independent retained SNPs. For microsatellites, use the locus count as a
+#'   conservative primary value and report a sensitivity analysis.
 #' @param prop_train Proportion of focal points assigned to the training set.
 #' @param seed Optional random seed used for the split. If \code{NULL}, one is
 #'   generated and returned.
@@ -710,10 +735,9 @@ terradish_cv <- function(pts,
 #' @param model Measurement model, either as a function or one of
 #'   \code{"mlpe"}, \code{"wishart"}, or \code{"ls"}.
 #' @param nu Effective Wishart degrees of freedom, passed to measurement models
-#'   that require it.  For biallelic SNPs this is usually the number of
-#'   retained SNPs; for microsatellites use approximately
-#'   \eqn{\sum_l (K_l - 1)} where \eqn{K_l} is the number of observed alleles at
-#'   locus \eqn{l}.
+#'   that require it. For biallelic SNPs, use the number of approximately
+#'   independent retained SNPs. For microsatellites, use the locus count as a
+#'   conservative primary value and report a sensitivity analysis.
 #' @param prop_train Proportion of focal points assigned to the training set.
 #' @param n_reps Number of repeated train/test splits to evaluate.
 #' @param seeds Optional integer vector of seeds to use for each replicate. If
@@ -854,11 +878,65 @@ terradish_cv_replicates <- function(pts,
 #' @param digits Number of digits to print.
 #' @param ... Additional arguments passed through to generic methods.
 #'
+#' @details
+#' \strong{How to read the output.}  \code{print()} reports the number of
+#' replicate train/test splits, then the mean and standard deviation of the
+#' held-out log-likelihood across them, then one row per replicate.
+#'
+#' The mean is the comparable quantity: higher means better out-of-sample
+#' prediction, and it is on the log-likelihood scale, so differences are read
+#' the same way as a log-likelihood difference rather than as a percentage.
+#' The standard deviation says how much the answer depends on which sites
+#' landed in the training set.  When two models' means differ by less than a
+#' standard deviation or so, the data do not separate them, and repeating with
+#' more replicates is more useful than picking the higher mean.
+#'
+#' Because each replicate refits on a different subset, an occasional replicate
+#' can converge poorly; scan the per-replicate column for outliers before
+#' trusting the mean.
+#'
 #' @return
 #' \itemize{
 #'   \item \code{print()} returns its input invisibly.
 #'   \item \code{summary()} returns an object of class
-#'     \code{"summary.terradish_cv_replicates"}.
+#'     \code{"summary.terradish_cv_replicates"}, a list holding the
+#'     per-replicate table plus the mean and standard deviation of the held-out
+#'     log-likelihood.
+#' }
+#'
+#' @seealso \code{\link{terradish_cv_replicates}} for running the replicates,
+#'   \code{\link{terradish_cv}} for a single split,
+#'   \code{\link{cv_model_selection}} for combining cross-validation with an
+#'   AIC table, and \code{\link{aic_table}} for in-sample ranking.  See
+#'   \code{vignette("model-comparison", package = "terradish")} for how these
+#'   fit together.
+#'
+#' @examples
+#' \donttest{
+#' data(melip)
+#' melip.altitude    <- terra::unwrap(melip.altitude)
+#' melip.forestcover <- terra::unwrap(melip.forestcover)
+#' melip.coords      <- terra::unwrap(melip.coords)
+#' covariates <- c(melip.altitude, melip.forestcover)
+#' names(covariates) <- c("altitude", "forestcover")
+#' # coarsened, and only two replicates, so the example stays quick
+#' covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+#'                                                 na.rm = TRUE))
+#'
+#' reps <- terradish_cv_replicates(
+#'   pts        = melip.coords,
+#'   covariates = covariates,
+#'   fmla       = melip.Fst ~ altitude + forestcover,
+#'   model      = leastsquares,
+#'   n_reps     = 2,
+#'   prop_train = 2 / 3,
+#'   seeds      = c(1, 2),
+#'   fit_full   = FALSE,
+#'   control    = NewtonRaphsonControl(maxit = 5))
+#'
+#' reps                 # replicate count, mean and sd, then each replicate
+#' summary(reps)        # the same information as a summary object
+#' reps$mean_loglik     # the number to compare between models
 #' }
 #'
 #' @export

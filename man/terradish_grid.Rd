@@ -22,7 +22,9 @@ terradish_grid(
 \arguments{
 \item{theta}{A matrix of dimension (grid size) x (number of parameters)}
 
-\item{formula}{A formula with the name of a matrix of observed genetic distances on the lhs, and covariates in the creation of \code{data} on the rhs}
+\item{formula}{A formula with the name of a response matrix compatible with
+the selected measurement model on the left-hand side, and covariates used
+to create \code{data} on the right-hand side.}
 
 \item{data}{An object of class \code{terradish_graph} (see
 \code{\link{conductance_surface}})}
@@ -36,10 +38,10 @@ terradish_grid(
 \code{\link{terradish_measurement_model}})}
 
 \item{nu}{Effective Wishart degrees of freedom passed to measurement models
-that require it.  For biallelic SNPs this is usually the number of
-retained SNPs; for microsatellites use approximately
-\eqn{\sum_l (K_l - 1)} where \eqn{K_l} is the number of observed alleles at
-locus \eqn{l}.}
+that require it. For biallelic SNPs, use the number of approximately
+independent retained SNPs. For microsatellites, use the number of loci as
+the conservative primary value and report sensitivity to larger plausible
+values.}
 
 \item{nonnegative}{Force regression-like \code{measurement_model} to have nonnegative slope?}
 
