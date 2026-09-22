@@ -18,7 +18,10 @@ knitr::opts_chunk$set(
   fig.width  = 6,
   fig.height = 4.5,
   warning  = FALSE,
-  message  = FALSE
+  message  = FALSE,
+  # The complete rendered vignette is built into the source tarball. Avoid
+  # repeating its long model fits on CRAN's shared check machines.
+  eval = identical(tolower(Sys.getenv("NOT_CRAN")), "true")
 )
 
 ```
@@ -36,7 +39,7 @@ Both associations can occur at the same time and can be confounded. Fitting IBE 
 
 `terradish` places the two terms in different parts of one measurement model:
 
-```
+```         
                            CONDUCTANCE SIDE
   Raster covariates   -->  loglinear_conductance  -->  resistance distances
   (altitude, forest)         theta parameters               R_ij
@@ -203,7 +206,7 @@ fit_joint <- terradish(
 )
 ```
 
-> **Note on `leverage = FALSE`:** By default, `terradish()` computes influence/leverage diagnostics for each observation, which requires additional linear-algebra work. Setting `leverage = FALSE` skips this step to reduce run time. For a final analysis where you want diagnostics, set this argument to `TRUE`.
+> **Note on `leverage = FALSE`:** `terradish()` can compute influence/leverage diagnostics for each observation, which requires additional linear-algebra work. Setting `leverage = FALSE` (default) skips this step to reduce run time. For a final analysis where you want diagnostics, set this argument to `TRUE`.
 
 ------------------------------------------------------------------------
 

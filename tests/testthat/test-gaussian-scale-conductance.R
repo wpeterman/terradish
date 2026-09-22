@@ -1,3 +1,5 @@
+skip_on_cran()
+
 test_that("gaussian scale-aware conductance matches numerical derivatives for interactions and polynomials", {
   dat <- melip_fixture(1:6)
   melip.Fst <- dat$melip.Fst

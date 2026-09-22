@@ -2,6 +2,8 @@
 # synthetic lattices (the R per-absorber solver is exact but ill-conditions under
 # strongly heterogeneous rates; full-resolution fitting is the C++ backend's job).
 
+skip_on_cran()
+
 mk_directed_fixture <- function(DIM = 7L, directions = 8L) {
   r <- terra::rast(nrows = DIM, ncols = DIM, xmin = 0, xmax = DIM, ymin = 0, ymax = DIM)
   gx <- terra::xFromCell(r, seq_len(terra::ncell(r)))

@@ -68,10 +68,12 @@ melip.altitude <- terra::unwrap(melip.altitude)
 melip.forestcover <- terra::unwrap(melip.forestcover)
 melip.coords <- terra::unwrap(melip.coords)
 
-keep <- 1:12
+keep <- 1:10
 melip.Fst_small <- melip.Fst[keep, keep]
-covariates <- c(terra::scale(melip.altitude),
-                terra::scale(melip.forestcover))
+# Coarsen the rasters so this example remains quick on CRAN.
+covariates <- terra::aggregate(c(melip.altitude, melip.forestcover),
+                               fact = 3, na.rm = TRUE)
+covariates <- scale_covariates(covariates)
 names(covariates) <- c("altitude", "forestcover")
 surface_small <- conductance_surface(covariates, melip.coords[keep], directions = 8)
 

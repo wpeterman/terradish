@@ -23,7 +23,9 @@ terradish_algorithm(
   solver = c("direct", "auto", "amg", "pcg", "pcg_jacobi", "block_cg"),
   solver_control = NULL,
   solver_warm_start = NULL,
-  solver_reuse_state = NULL
+  solver_reuse_state = NULL,
+  measurement_control = NULL,
+  worker_pool = NULL
 )
 }
 \arguments{
@@ -95,6 +97,13 @@ diagnosing the fit.}
 \code{terradish_algorithm()} call. This is used to reuse AMG hierarchy
 information or compatible direct CHOLMOD factorization state across nearby
 evaluations.}
+
+\item{measurement_control}{Optional \code{\link{NewtonRaphsonControl}} object
+used to profile nuisance parameters. The default retains the package's
+high-accuracy profiling tolerances.}
+
+\item{worker_pool}{Optional reusable worker pool created internally by
+\code{\link{terradish}}. Most users should leave this as \code{NULL}.}
 }
 \value{
 A list containing at a minimum:
@@ -102,6 +111,8 @@ A list containing at a minimum:
 Additionally, if 'objective == TRUE':
  \item{objective}{(if 'objective') the negative loglikelihood}
  \item{phi}{(if 'objective') fitted values of the nuisance parameters of 'g'}
+ \item{subproblem}{(if 'objective') convergence code and iteration count
+   for the nuisance-parameter profile}
  \item{boundary}{(if 'objective') is the solution on the boundary (e.g. no genetic structure)?}
  \item{fitted}{(if 'objective') matrix of expected genetic distances among target vertices}
  \item{gradient}{(if 'gradient') gradient of negative loglikelihood with respect to theta}

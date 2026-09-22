@@ -588,19 +588,60 @@
        warm_start = out$solution)
 }
 
-.terradish_algorithm_derivative_results <- function(idx, state, cores, worker_libpaths = .libPaths())
+.terradish_new_worker_pool <- function(cores, worker_libpaths = .libPaths())
+{
+  pool <- new.env(parent = emptyenv())
+  pool$cores <- as.integer(cores)
+  pool$worker_libpaths <- worker_libpaths
+  pool$cluster <- NULL
+  pool
+}
+
+.terradish_worker_pool_cluster <- function(pool, workers)
+{
+  stopifnot(is.environment(pool))
+  workers <- as.integer(workers)
+  if (!is.null(pool$cluster) && length(pool$cluster) != workers)
+  {
+    try(parallel::stopCluster(pool$cluster), silent = TRUE)
+    pool$cluster <- NULL
+  }
+  if (is.null(pool$cluster))
+  {
+    pool$cluster <- parallel::makeCluster(workers)
+    worker_libpaths <- pool$worker_libpaths
+    parallel::clusterExport(pool$cluster, "worker_libpaths", envir = environment())
+    parallel::clusterEvalQ(pool$cluster, {
+      .libPaths(worker_libpaths)
+      library(terradish)
+      NULL
+    })
+  }
+  pool$cluster
+}
+
+.terradish_stop_worker_pool <- function(pool)
+{
+  if (is.environment(pool) && !is.null(pool$cluster))
+  {
+    try(parallel::stopCluster(pool$cluster), silent = TRUE)
+    pool$cluster <- NULL
+  }
+  invisible(NULL)
+}
+
+.terradish_algorithm_derivative_results <- function(idx, state, cores,
+                                                     worker_libpaths = .libPaths(),
+                                                     worker_pool = NULL)
 {
   n_workers <- min(as.integer(cores), length(idx))
   splits <- split(idx, cut(idx, breaks = n_workers, labels = FALSE))
-  cl <- makeCluster(length(splits))
-  on.exit(stopCluster(cl), add = TRUE)
-
-  clusterExport(cl, varlist = c("worker_libpaths"), envir = environment())
-  clusterEvalQ(cl, {
-    .libPaths(worker_libpaths)
-    library(terradish)
-    NULL
-  })
+  if (is.null(worker_pool))
+  {
+    worker_pool <- .terradish_new_worker_pool(n_workers, worker_libpaths)
+    on.exit(.terradish_stop_worker_pool(worker_pool), add = TRUE)
+  }
+  cl <- .terradish_worker_pool_cluster(worker_pool, length(splits))
 
   chunks <- parLapply(cl, splits, .terradish_algorithm_derivative_chunk, state = state)
   out <- unlist(chunks, recursive = FALSE)
@@ -682,12 +723,19 @@
 #'   \code{terradish_algorithm()} call. This is used to reuse AMG hierarchy
 #'   information or compatible direct CHOLMOD factorization state across nearby
 #'   evaluations.
+#' @param measurement_control Optional \code{\link{NewtonRaphsonControl}} object
+#'   used to profile nuisance parameters. The default retains the package's
+#'   high-accuracy profiling tolerances.
+#' @param worker_pool Optional reusable worker pool created internally by
+#'   \code{\link{terradish}}. Most users should leave this as \code{NULL}.
 #'
 #' @return A list containing at a minimum:
 #'  \item{covariance}{rows/columns of the generalized inverse of the graph Laplacian for a subset of target vertices}
 #' Additionally, if 'objective == TRUE':
 #'  \item{objective}{(if 'objective') the negative loglikelihood}
 #'  \item{phi}{(if 'objective') fitted values of the nuisance parameters of 'g'}
+#'  \item{subproblem}{(if 'objective') convergence code and iteration count
+#'    for the nuisance-parameter profile}
 #'  \item{boundary}{(if 'objective') is the solution on the boundary (e.g. no genetic structure)?}
 #'  \item{fitted}{(if 'objective') matrix of expected genetic distances among target vertices}
 #'  \item{gradient}{(if 'gradient') gradient of negative loglikelihood with respect to theta}
@@ -714,7 +762,7 @@
 #'
 #' }
 #' @export
-terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, objective = TRUE, gradient = TRUE, hessian = TRUE, partial = TRUE, nonnegative = TRUE, validate = FALSE, cores = 1L, curvature = c("exact", "gauss_newton"), solver = c("direct", "auto", "amg", "pcg", "pcg_jacobi", "block_cg"), solver_control = NULL, solver_warm_start = NULL, solver_reuse_state = NULL)
+terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, objective = TRUE, gradient = TRUE, hessian = TRUE, partial = TRUE, nonnegative = TRUE, validate = FALSE, cores = 1L, curvature = c("exact", "gauss_newton"), solver = c("direct", "auto", "amg", "pcg", "pcg_jacobi", "block_cg"), solver_control = NULL, solver_warm_start = NULL, solver_reuse_state = NULL, measurement_control = NULL, worker_pool = NULL)
 {
   stopifnot(inherits(f, c("terradish_conductance_model",
                           "radish_conductance_model")))
@@ -756,11 +804,13 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
   {
     # measurement model
     E_dense <- as.matrix(E)
+    if (is.null(measurement_control))
+      measurement_control <- NewtonRaphsonControl(verbose = FALSE,
+                                                   ftol = 1e-10,
+                                                   ctol = 1e-10)
     subproblem <- radish_subproblem(g = g, E = E_dense, S = S, nu = nu, phi = phi,
                                     nonnegative = nonnegative,
-                                    control = NewtonRaphsonControl(verbose = FALSE, 
-                                                                   ftol = 1e-10, 
-                                                                   ctol = 1e-10))
+                                    control = measurement_control)
     phi        <- subproblem$phi
     loglik     <- subproblem$loglikelihood
 
@@ -818,7 +868,8 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
             idx = idx,
             state = derivative_state,
             cores = cores,
-            worker_libpaths = .libPaths()
+            worker_libpaths = .libPaths(),
+            worker_pool = worker_pool
           )
         }
         else
@@ -906,6 +957,9 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
   list (covariance    = E,
          objective     = if(!objective) NULL else loglik,
          phi           = if(!objective) NULL else phi,
+         subproblem    = if(!objective) NULL else
+           list(convergence = subproblem$convergence,
+                iters = subproblem$iters),
          phi_hessian   = if(!objective) NULL else subproblem$fit$hessian,
          boundary      = if(!objective) NULL else subproblem$boundary, # the solution is on the boundary (e.g. no genetic structure) so all derivatives wrt theta are 0
          fitted        = if(!objective) NULL else subproblem$fit$fitted,

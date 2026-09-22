@@ -638,10 +638,12 @@ radish_grid <- function(...)
 #' melip.forestcover <- terra::unwrap(melip.forestcover)
 #' melip.coords <- terra::unwrap(melip.coords)
 #' 
-#' covariates <- c(terra::scale(melip.altitude),
-#'                 terra::scale(melip.forestcover))
+#' keep <- 1:10
+#' covariates <- terra::aggregate(c(melip.altitude, melip.forestcover),
+#'                                fact = 5, na.rm = TRUE)
+#' covariates <- scale_covariates(covariates)
 #' names(covariates) <- c("altitude", "forestcover")
-#' surface <- conductance_surface(covariates, melip.coords, directions = 8)
+#' surface <- conductance_surface(covariates, melip.coords[keep], directions = 8)
 #'
 #' theta <- as.matrix(expand.grid(forestcover = seq(-0.5, 0.5, length.out = 3),
 #'                                altitude = seq(-0.5, 0.5, length.out = 3)))

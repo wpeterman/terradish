@@ -201,6 +201,8 @@ radish_subproblem <- function(g, E, S, nu, phi = NULL, nonnegative = TRUE, valid
        loglikelihood  = fit$objective,
        boundary       = fit$boundary,
        phi            = phi,
+       convergence    = subproblem$convergence,
+       iters          = subproblem$iters,
        gradient       = gradient_E,
        jacobian_E     = jacobian_E,
        jacobian_S     = jacobian_S,

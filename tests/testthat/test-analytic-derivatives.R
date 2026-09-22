@@ -2,6 +2,8 @@
 # terradish_algorithm(). These are the derivatives the optimizer follows and the
 # curvature that summary()/confint() turn into standard errors, so they are
 # checked against numDeriv for every measurement model the package ships.
+
+skip_on_cran()
 #
 # The gradient is exact by the envelope theorem even when a nuisance parameter
 # sits on a constraint, but the profile Hessian is not: it needs the implicit

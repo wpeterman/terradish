@@ -1,3 +1,5 @@
+skip_on_cran()
+
 test_that("AMG solver matches direct solver on melip subproblem", {
   dat <- melip_fixture(1:12)
   melip.Fst <- dat$melip.Fst

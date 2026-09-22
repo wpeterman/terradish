@@ -1,3 +1,5 @@
+skip_on_cran()
+
 test_that("landmark approximation subsets focal populations and rhs columns", {
   dat <- melip_fixture(1:10)
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)

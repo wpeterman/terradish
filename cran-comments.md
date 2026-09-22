@@ -5,29 +5,33 @@ parameterized conductance (resistance) surfaces in landscape genetics.
 
 ## Test environments
 
-* Local: Windows 11, R 4.6.0.
-* (Before submission) win-builder: R-release and R-devel via
-  `devtools::check_win_devel()`.
-* (Before submission) R-hub across the standard CRAN platforms.
+* Local Windows 11, R 4.6.1, checked from the exact source archive:
+  0 errors, 0 warnings, 1 note.
+* R-hub Ubuntu release: Status OK.
+* R-hub Windows R-devel: examples, tests, and vignette rebuilding passed. The
+  only warning was a CRLF line ending in `configure.ac` introduced by R-hub's
+  Git checkout. The submitted source archive was independently verified to
+  contain LF line endings and passed the local Windows check without warnings.
+* win-builder R-release and R-devel: submitted on 2026-09-10; emailed results
+  are pending.
 
 ## R CMD check results
 
-Target: 0 errors | 0 warnings | 1 note.
-
-The one expected note is the "New submission" note. Please update this file with
-the final `R CMD check --as-cran` result from win-builder and R-hub before
-submitting.
+The exact source archive produced 0 errors, 0 warnings, and 1 note under
+`R CMD check --as-cran` on the local Windows environment. The one expected note
+is the "New submission" note.
 
 ## Dependencies
 
-* `landgraph` (Imports) has been submitted to CRAN and should be available before
-  or with this submission; terradish's genetic-summary helpers re-export it.
+* `landgraph` (>= 0.0.1) is available from CRAN; terradish's genetic-summary
+  helpers re-export it.
 * `multiScaleR` (Imports) is on CRAN.
 * All other Imports are CRAN or base packages; Suggests are used conditionally.
 
-## Notes for the maintainer before submitting
+## Additional checks
 
-* Run `spelling::spell_check_package()` and reconcile `inst/WORDLIST`.
-* Run `urlchecker::url_check()` on the README and vignettes.
-* Confirm the PDF manual builds on a clean TeX toolchain (a local MiKTeX
-  `xkeyval` issue produced a spurious PDF-manual error here).
+* `spelling::spell_check_package()` reported no spelling errors.
+* The PDF and HTML manuals built successfully from the exact source archive.
+* `urlchecker::url_check()` found only transient HTTP 504 responses from Zenodo
+  for DOI 10.5281/zenodo.21225712. The DataCite registry reports that DOI as
+  findable and registered to Zenodo.

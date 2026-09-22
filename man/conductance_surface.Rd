@@ -26,8 +26,8 @@ column 1, y in column 2), or a data frame with columns named \code{x} and
 \code{y} (or at least two columns, using the first two).}
 
 \item{directions}{Adjacency rule for the graph.  \code{4} connects each
-cell to its four horizontal/vertical neighbours (rook adjacency);
-\code{8} additionally includes the four diagonal neighbours (queen
+cell to its four horizontal/vertical neighbors (rook adjacency);
+\code{8} additionally includes the four diagonal neighbors (queen
 adjacency).  \strong{\code{8} is recommended} for landscape genetics:
 it allows diagonal movement, produces smoother resistance surfaces, and
 is less sensitive to grid orientation artifacts.}

@@ -164,7 +164,11 @@ plot.terradish <- function(x,
 {
   type <- match.arg(type)
   support <- match.arg(support)
-  conductance_model <- .resolve_plot_conductance_model(x, conductance_model)
+  if (!identical(type, "fit"))
+  {
+    .terradish_require_submodels(x, paste0("plot(type = \"", type, "\")"))
+    conductance_model <- .resolve_plot_conductance_model(x, conductance_model)
+  }
   n <- as.integer(if (is.null(n))
     if (identical(type, "marginal_response")) 100L else 200L
   else
@@ -215,6 +219,8 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
 {
   if (!is.null(conductance_model))
     return(conductance_model)
+
+  .terradish_require_submodels(fit, "Conductance-model plotting")
 
   fitted_model <- fit$submodels$f_internal
   plot_factory <- attr(fitted_model, "plot_factory", exact = TRUE)

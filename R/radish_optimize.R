@@ -290,7 +290,8 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 }
 
 .terradish_assert_comparable_fits <- function(fits, purpose = c("information criterion",
-                                                                 "likelihood-ratio test"))
+                                                                 "likelihood-ratio test",
+                                                                 "cross-validation comparison"))
 {
   purpose <- match.arg(purpose)
   if (length(fits) < 2L)
@@ -665,6 +666,17 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' @param control A list containing options for the optimization routine (see \code{\link{NewtonRaphsonControl}} for list)
 #' @param validate Numerical validation of leverage via package \code{numDeriv} (very slow, use for debugging small examples)
 #' @param cores Number of worker processes to use for Hessian and leverage calculations. \code{1} evaluates serially.
+#'   On Windows, one PSOCK cluster is retained for the duration of the fit
+#'   instead of being rebuilt for every derivative evaluation.
+#' @param measurement_control Optional \code{\link{NewtonRaphsonControl}} object
+#'   for the inner nuisance-parameter profile. This is separate from
+#'   \code{control}, which governs optimization of the conductance parameters.
+#'   The fitted object records the inner optimizer's convergence code and
+#'   iteration count for the final evaluation.
+#' @param slim Logical. If \code{TRUE}, apply \code{\link{slim_terradish}} to
+#'   the returned fit, removing model closures and leverage arrays. Use this for
+#'   durable storage only when later conductance prediction and model
+#'   reevaluation are unnecessary.
 #' @param curvature Curvature used for optimization steps and for the returned
 #'   covariance matrix. \code{"exact"} (default) uses the exact Hessian.
 #'   \code{"gauss_newton"} uses an information-based approximation that drops
@@ -731,7 +743,8 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   guarded and the approximation stage is skipped.
 #'
 #' @details 
-#' \figure{terradish-sticker.png}{options: style='float: right; width: 150px; margin-left: 12px;'}
+#' \if{html}{\figure{terradish-sticker.png}{options: style='float: right; width: 150px; margin-left: 12px;' alt='terradish logo'}}
+#' \if{latex}{\figure{terradish-sticker.png}{options: width=1.5in}}
 #' A parameterized conductance surface maps raster covariates to positive vertex
 #' conductance. Vertex values define weighted edges and a graph Laplacian
 #' \eqn{L(\theta)}. Its generalized inverse \eqn{E(\theta) = L(\theta)^+} is the
@@ -817,8 +830,10 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' @return An object of class \code{terradish} containing the fitted conductance
 #'   parameters, optimized nuisance parameters, log-likelihood, model
 #'   comparison statistics, timing/evaluation diagnostics, and optional
-#'   leverage diagnostics. See \code{\link{terradish_methods}} for the
-#'   available S3 methods.
+#'   leverage diagnostics. The nested \code{fit$subproblem} element records the
+#'   convergence code and iteration count from the final nuisance-parameter
+#'   profile. If \code{slim = TRUE}, a \code{storage} element records what was
+#'   removed. See \code{\link{terradish_methods}} for the available S3 methods.
 #'
 #' @examples
 #' \donttest{
@@ -902,7 +917,9 @@ terradish <- function(formula,
                    solver = c("direct", "auto", "amg", "pcg", "pcg_jacobi", "block_cg"),
                    solver_control = NULL,
                    approximation = c("none", "landmark", "coarse_raster"),
-                   approximation_control = NULL)
+                   approximation_control = NULL,
+                   measurement_control = NULL,
+                   slim = FALSE)
 {
   stopifnot(inherits(formula, "formula"))
   stopifnot(inherits(data, c("terradish_graph", "radish_graph")))
@@ -911,6 +928,8 @@ terradish <- function(formula,
   stopifnot(inherits(measurement_model, c("terradish_measurement_model",
                                           "radish_measurement_model")))
   stopifnot(length(cores) == 1, is.numeric(cores), cores >= 1)
+  if (!is.logical(slim) || length(slim) != 1L || is.na(slim))
+    stop("`slim` must be TRUE or FALSE.", call. = FALSE)
   if (!isTRUE(conductance))
     stop("`conductance = FALSE` is not currently supported.", call. = FALSE)
 
@@ -991,6 +1010,12 @@ terradish <- function(formula,
   fcalls    <- new("FunctionCall", count = 0L)
   diagnostics <- .terradish_new_diagnostics()
   control$diagnostics <- diagnostics
+  worker_pool <- if (as.integer(cores) > 1L && .use_namespace_workers())
+    .terradish_new_worker_pool(cores)
+  else
+    NULL
+  if (!is.null(worker_pool))
+    on.exit(.terradish_stop_worker_pool(worker_pool), add = TRUE)
   make_optfn <- function(eval_data,
                          eval_S,
                          phi_state,
@@ -1025,7 +1050,9 @@ terradish <- function(formula,
                               solver = solver,
                               solver_control = current_solver_control,
                               solver_warm_start = solver_state$warm_start,
-                              solver_reuse_state = solver_state$reuse_state)
+                              solver_reuse_state = solver_state$reuse_state,
+                              measurement_control = measurement_control,
+                              worker_pool = worker_pool)
       phi_state$value <- fit$phi
       solver_state$warm_start <- fit$solver_warm_start
       solver_state$reuse_state <- fit$solver_reuse_state
@@ -1262,7 +1289,9 @@ terradish <- function(formula,
                           curvature = curvature,
                           solver = solver, solver_control = final_solver_control,
                           solver_warm_start = exact_solver_state$warm_start,
-                          solver_reuse_state = exact_solver_state$reuse_state)
+                          solver_reuse_state = exact_solver_state$reuse_state,
+                          measurement_control = measurement_control,
+                          worker_pool = worker_pool)
   .terradish_record_algorithm_diagnostics(
     diagnostics,
     fit,
@@ -1347,7 +1376,7 @@ terradish <- function(formula,
                                                            "X" = num_leverage_X))
               )
   class(out) <- c("terradish", "radish")
-  out
+  if (isTRUE(slim)) slim_terradish(out) else out
 }
 
 #' Legacy radish fit wrapper

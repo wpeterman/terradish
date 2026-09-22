@@ -12,7 +12,7 @@ AC_PREREQ(2.61)
 
 ## Process this file with autoconf to produce a configure script.
 ##AC_INIT([radish], 0.0.1)
-AC_INIT([radish], m4_esyscmd_s([awk -e '/^Version:/ {print $2}' DESCRIPTION]))
+AC_INIT([radish], m4_esyscmd_s([awk '/^Version:/ {print $2}' DESCRIPTION]))
 
 ## Set R_HOME, respecting an environment variable if one is set
 : ${R_HOME=$(R RHOME)}
@@ -35,7 +35,7 @@ openmp_cflag=""
 ## Check for broken systems produced by a corporation based in Cupertino
 AC_MSG_CHECKING([for macOS])
 RSysinfoName=$("${R_HOME}/bin/Rscript" --vanilla -e 'cat(Sys.info()[["sysname"]])')
-if test x"${RSysinfoName}" == x"Darwin"; then
+if test x"${RSysinfoName}" = x"Darwin"; then
    AC_MSG_RESULT([found])
    AC_MSG_WARN([OpenMP unavailable and turned off.])
    openmp_flag="-DARMA_DONT_USE_OPENMP"
@@ -46,13 +46,13 @@ else
    ## if R has -fopenmp we should be good
    allldflags=$(${R_HOME}/bin/R CMD config --ldflags)
    hasOpenMP=$(echo ${allldflags} | grep -- -fopenmp)
-   if test x"${hasOpenMP}" == x""; then
+   if test x"${hasOpenMP}" = x""; then
 	  AC_MSG_RESULT([missing])
 	  openmp_flag="-DARMA_DONT_USE_OPENMP"
    else
 	  AC_MSG_RESULT([found])
 	  openmp_flag='$(SHLIB_OPENMP_CXXFLAGS)'
-	  openmp_cflag='$(SHLIB_OPENMP_CFLAGS)'
+	  openmp_cflag='$(SHLIB_OPENMP_CXXFLAGS)'
    fi
 fi
 

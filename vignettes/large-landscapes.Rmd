@@ -144,8 +144,60 @@ generator; see `vignette("directional-conductance", package = "terradish")`.
 ## Inference at scale
 
 Scaling the solver lets you fit larger graph domains and sampling designs. More
-informative designs can tighten inference, but cell count alone does not. Two
-settings matter here.
+informative designs can tighten inference, but cell count alone does not.
+Several computational choices matter here.
+
+## Reusing Windows workers
+
+On Windows, `cores > 1` uses PSOCK workers for independent derivative
+calculations. `terradish()` now creates that worker pool once and reuses it
+throughout the outer optimization. The workers are stopped before the function
+returns and are never stored in the fitted object. This removes repeated
+cluster startup from derivative evaluations without changing the objective,
+gradient, Hessian, or returned estimates.
+
+Use one level of parallelism at a time. In particular, fixed-domain
+cross-validation evaluates folds serially and passes `cores` to each fit. This
+avoids creating an outer fold cluster whose workers each create another inner
+cluster.
+
+## Controlling the nuisance profile
+
+Each conductance-parameter trial profiles the nuisance parameters of the
+measurement model. Smooth conductance models paired with
+`generalized_wishart` can make that two-level optimization costly because each
+outer step may require many inner Newton steps. The inner optimizer already
+uses the previous nuisance solution as a warm start. Use
+`measurement_control` to inspect or tune it separately from `control`:
+
+```{r measurement-control, eval = FALSE}
+fit_smooth_gw <- terradish(
+  admissible_squared_distance ~ s(forestcover, df = 4) +
+    s(altitude, df = 4),
+  surface,
+  conductance_model = smooth_loglinear_conductance,
+  measurement_model = generalized_wishart,
+  nu = effective_marker_df,
+  optimizer = "bfgs",
+  control = NewtonRaphsonControl(maxit = 80, verbose = TRUE),
+  measurement_control = NewtonRaphsonControl(
+    maxit = 40,
+    ctol = 1e-8,
+    ftol = 1e-10,
+    verbose = FALSE
+  )
+)
+
+fit_smooth_gw$fit$subproblem
+```
+
+The returned `convergence` code and `iters` count describe the final nuisance
+profile. A value of 0 indicates convergence; 1 means the profile reached
+`maxit`; 2 indicates a line-search failure. Do not loosen tolerances simply to
+remove a warning. First inspect coefficient stability, gradient size, the
+likelihood, and sensitivity to tighter settings. The control separates a
+computational decision from the scientific model, but overly loose profiling
+can still change the fitted likelihood surface.
 
 ## Curvature for standard errors
 
@@ -254,6 +306,41 @@ larger sensitivity value.
 
 ---
 
+## Storing large fitted objects
+
+Fitted conductance and measurement-model closures can retain their construction
+environments, including large graph objects. That is useful for prediction but
+can make `saveRDS()` much larger than the visible coefficient table suggests.
+Use `slim_terradish()` when the durable artifact is intended for inference
+summaries rather than later prediction:
+
+```{r slim-fit, eval = FALSE}
+fit_slim <- slim_terradish(fit)
+fit_slim$storage
+
+saveRDS(fit_slim, "terradish-fit-slim.rds")
+
+# Equivalent shorthand at fit time
+fit_slim <- terradish(
+  admissible_squared_distance ~ cov1 + cov2,
+  surface,
+  measurement_model = generalized_wishart,
+  nu = effective_marker_df,
+  slim = TRUE
+)
+```
+
+The default removes `submodels` and `leverage`. Coefficients, likelihood,
+Hessian-based summaries, fitted values, diagnostics, and permutation
+simulation remain available. Conductance prediction and most plot types do not,
+because they must reevaluate the removed closures. Slimming is irreversible.
+Keep the original formula, graph, response, and an unslimmed fit whenever
+prediction or model reconstruction may be needed. Add `"response"` to `drop`
+only when the response itself must also be excluded from the archive; doing so
+also removes the strongest stored check for later model comparison.
+
+---
+
 ## An exact, memory-bounded reduction
 
 `terradish_kron_reduce_tiled()` reduces the full graph Laplacian onto the focal
@@ -338,6 +425,10 @@ fit <- terradish(admissible_squared_distance ~ cov1 + cov2, surface,
 
 summary(fit)                                   # conditional estimates and SEs
 
+# Optional archival copy when prediction from the saved object is unnecessary
+fit_archive <- slim_terradish(fit)
+saveRDS(fit_archive, "fit-archive.rds")
+
 # 3. (Advanced) exact memory-bounded reduction onto the focal sites
 cond_map <- conductance(surface, fit)[["est"]]
 cond <- terra::values(cond_map, mat = FALSE)
@@ -353,6 +444,7 @@ red$method                                     # "direct" or "nested"
 | `conductance_surface()` | Build the weighted graph over the raster grid |
 | `terradish()` | Fit the model; takes `solver` and `curvature` |
 | `terradish_algorithm()` | One likelihood and gradient evaluation; same `solver` and `curvature` |
+| `slim_terradish()` | Remove prediction closures and other optional large components before storage |
 | `terradish_kron_reduce()` | Single-shot exact reduction onto the focal sites |
 | `terradish_kron_reduce_tiled()` | Memory-aware exact reduction (`auto`/`direct`/`nested`) |
 

@@ -1,3 +1,18 @@
+terradish 0.0.47
+----------------
+* Added fixed-domain cross-validation with reproducible spatial or balanced
+  random folds, per-fold nuisance profiling, uniform-conductance baseline
+  scores, checkpoint files, and optional slim fit retention. The documentation
+  states the likelihood-family boundary for interpreting held-out scores.
+* Added `slim_terradish()` and `terradish(..., slim = TRUE)` for removing model
+  closures and other optional large components before serialization while
+  retaining coefficient and likelihood summaries.
+* Reused one PSOCK worker pool across derivative evaluations within a Windows
+  fit instead of starting a new cluster at every evaluation.
+* Added `measurement_control` for the inner nuisance profile and recorded its
+  final convergence code and iteration count, with guidance for smooth
+  generalized-Wishart models.
+
 terradish 0.0.46
 ---------
 * Reconciled the package overview, function help, examples, vignettes, and

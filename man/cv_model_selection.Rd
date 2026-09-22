@@ -37,6 +37,12 @@ Either a ranked cross-validation table or a list containing the
 Creates a ranked log-likelihood table from fitted cross-validation results
 and, optionally, an information-criterion table from the full-data fits.
 }
+\details{
+Candidates must use the same response representation, likelihood family,
+graph dimensions, Wishart degrees of freedom, and, when recorded, identical
+training and test indices. Held-out log-likelihood is not comparable across
+MLPE, generalized-Wishart distance, and covariance-Wishart models.
+}
 \examples{
 \donttest{
 library(terra)

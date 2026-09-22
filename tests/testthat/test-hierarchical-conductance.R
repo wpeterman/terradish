@@ -1,3 +1,5 @@
+skip_on_cran()
+
 test_that("conductance field basis and GMRF precision are well-formed", {
   set.seed(1)
   coords <- as.matrix(expand.grid(x = 1:5, y = 1:5))

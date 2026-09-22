@@ -23,7 +23,9 @@ terradish(
   solver = c("direct", "auto", "amg", "pcg", "pcg_jacobi", "block_cg"),
   solver_control = NULL,
   approximation = c("none", "landmark", "coarse_raster"),
-  approximation_control = NULL
+  approximation_control = NULL,
+  measurement_control = NULL,
+  slim = FALSE
 )
 }
 \arguments{
@@ -85,7 +87,9 @@ it on with
 
 \item{validate}{Numerical validation of leverage via package \code{numDeriv} (very slow, use for debugging small examples)}
 
-\item{cores}{Number of worker processes to use for Hessian and leverage calculations. \code{1} evaluates serially.}
+\item{cores}{Number of worker processes to use for Hessian and leverage calculations. \code{1} evaluates serially.
+On Windows, one PSOCK cluster is retained for the duration of the fit
+instead of being rebuilt for every derivative evaluation.}
 
 \item{curvature}{Curvature used for optimization steps and for the returned
 covariance matrix. \code{"exact"} (default) uses the exact Hessian.
@@ -155,13 +159,26 @@ full-resolution refinement; by default the main \code{control} is reused.
 For
 \code{measurement_model = leastsquares}, landmark exact-refinement is
 guarded and the approximation stage is skipped.}
+
+\item{measurement_control}{Optional \code{\link{NewtonRaphsonControl}} object
+for the inner nuisance-parameter profile. This is separate from
+\code{control}, which governs optimization of the conductance parameters.
+The fitted object records the inner optimizer's convergence code and
+iteration count for the final evaluation.}
+
+\item{slim}{Logical. If \code{TRUE}, apply \code{\link{slim_terradish}} to
+the returned fit, removing model closures and leverage arrays. Use this for
+durable storage only when later conductance prediction and model
+reevaluation are unnecessary.}
 }
 \value{
 An object of class \code{terradish} containing the fitted conductance
   parameters, optimized nuisance parameters, log-likelihood, model
   comparison statistics, timing/evaluation diagnostics, and optional
-  leverage diagnostics. See \code{\link{terradish_methods}} for the
-  available S3 methods.
+  leverage diagnostics. The nested \code{fit$subproblem} element records the
+  convergence code and iteration count from the final nuisance-parameter
+  profile. If \code{slim = TRUE}, a \code{storage} element records what was
+  removed. See \code{\link{terradish_methods}} for the available S3 methods.
 }
 \description{
 Uses maximum likelihood to fit a parameterized conductance surface to genetic data,
@@ -170,7 +187,8 @@ and a function linking the graph kernel to an observed genetic distance or
 covariance matrix (a "measurement model").
 }
 \details{
-\figure{terradish-sticker.png}{options: style='float: right; width: 150px; margin-left: 12px;'}
+\if{html}{\figure{terradish-sticker.png}{options: style='float: right; width: 150px; margin-left: 12px;' alt='terradish logo'}}
+\if{latex}{\figure{terradish-sticker.png}{options: width=1.5in}}
 A parameterized conductance surface maps raster covariates to positive vertex
 conductance. Vertex values define weighted edges and a graph Laplacian
 \eqn{L(\theta)}. Its generalized inverse \eqn{E(\theta) = L(\theta)^+} is the

@@ -2448,7 +2448,7 @@ openmp_cflag=""
 { $as_echo "$as_me:${as_lineno-$LINENO}: checking for macOS" >&5
 $as_echo_n "checking for macOS... " >&6; }
 RSysinfoName=$("${R_HOME}/bin/Rscript" --vanilla -e 'cat(Sys.info()["sysname"])')
-if test x"${RSysinfoName}" == x"Darwin"; then
+if test x"${RSysinfoName}" = x"Darwin"; then
    { $as_echo "$as_me:${as_lineno-$LINENO}: result: found" >&5
 $as_echo "found" >&6; }
    { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: OpenMP unavailable and turned off." >&5
@@ -2463,7 +2463,7 @@ $as_echo_n "checking for OpenMP... " >&6; }
    ## if R has -fopenmp we should be good
    allldflags=$(${R_HOME}/bin/R CMD config --ldflags)
    hasOpenMP=$(echo ${allldflags} | grep -- -fopenmp)
-   if test x"${hasOpenMP}" == x""; then
+   if test x"${hasOpenMP}" = x""; then
 	  { $as_echo "$as_me:${as_lineno-$LINENO}: result: missing" >&5
 $as_echo "missing" >&6; }
 	  openmp_flag="-DARMA_DONT_USE_OPENMP"
@@ -2471,7 +2471,7 @@ $as_echo "missing" >&6; }
 	  { $as_echo "$as_me:${as_lineno-$LINENO}: result: found" >&5
 $as_echo "found" >&6; }
 	  openmp_flag='$(SHLIB_OPENMP_CXXFLAGS)'
-	  openmp_cflag='$(SHLIB_OPENMP_CFLAGS)'
+	  openmp_cflag='$(SHLIB_OPENMP_CXXFLAGS)'
    fi
 fi
 
@@ -3635,4 +3635,3 @@ if test -n "$ac_unrecognized_opts" && test "$enable_option_checking" != no; then
   { $as_echo "$as_me:${as_lineno-$LINENO}: WARNING: unrecognized options: $ac_unrecognized_opts" >&5
 $as_echo "$as_me: WARNING: unrecognized options: $ac_unrecognized_opts" >&2;}
 fi
-

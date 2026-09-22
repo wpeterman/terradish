@@ -196,10 +196,12 @@
 #' melip.forestcover <- terra::unwrap(melip.forestcover)
 #' melip.coords <- terra::unwrap(melip.coords)
 #'
-#' keep <- 1:12
+#' keep <- 1:10
 #' melip.Fst_small <- melip.Fst[keep, keep]
-#' covariates <- c(terra::scale(melip.altitude),
-#'                 terra::scale(melip.forestcover))
+#' # Coarsen the rasters so this example remains quick on CRAN.
+#' covariates <- terra::aggregate(c(melip.altitude, melip.forestcover),
+#'                                fact = 3, na.rm = TRUE)
+#' covariates <- scale_covariates(covariates)
 #' names(covariates) <- c("altitude", "forestcover")
 #' surface_small <- conductance_surface(covariates, melip.coords[keep], directions = 8)
 #'
@@ -571,19 +573,21 @@ radish_parameters <- function(...)
 #' melip.forestcover <- terra::unwrap(melip.forestcover)
 #' melip.coords <- terra::unwrap(melip.coords)
 #'
-#' keep <- 1:12
+#' keep <- 1:10
 #' melip.Fst_small <- melip.Fst[keep, keep]
-#' covariates <- c(terra::scale(melip.altitude),
-#'                 terra::scale(melip.forestcover))
+#' # Coarsen the rasters so this example remains quick on CRAN.
+#' covariates <- terra::aggregate(c(melip.altitude, melip.forestcover),
+#'                                fact = 5, na.rm = TRUE)
+#' covariates <- scale_covariates(covariates)
 #' names(covariates) <- c("altitude", "forestcover")
 #'
 #' cv_fit <- terradish_cv(melip.coords[keep], covariates,
 #'                     melip.Fst_small ~ altitude + forestcover,
 #'                     model = "ls",
-#'                     prop_train = 0.75,
+#'                     prop_train = 0.7,
 #'                     seed = 1,
 #'                     fit_full = FALSE,
-#'                     control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+#'                     control = NewtonRaphsonControl(maxit = 1, verbose = FALSE))
 #' cv_fit$cv_loglik
 #'
 #' @export
@@ -1022,6 +1026,12 @@ radish_cv <- function(...)
 #' @return Either a ranked cross-validation table or a list containing the
 #'   cross-validation table and information-criterion table.
 #'
+#' @details
+#' Candidates must use the same response representation, likelihood family,
+#' graph dimensions, Wishart degrees of freedom, and, when recorded, identical
+#' training and test indices. Held-out log-likelihood is not comparable across
+#' MLPE, generalized-Wishart distance, and covariance-Wishart models.
+#'
 #' @examples
 #' \donttest{
 #' library(terra)
@@ -1059,6 +1069,21 @@ cv_model_selection <- function(cv_list,
                                BIC = FALSE,
                                ...)
 {
+  if (length(cv_list) < 1L ||
+      any(vapply(cv_list, function(x) is.null(x$train_mod), logical(1))))
+    stop("Every element of `cv_list` must contain a `train_mod`.", call. = FALSE)
+
+  .terradish_assert_comparable_fits(lapply(cv_list, `[[`, "train_mod"),
+                                     purpose = "cross-validation comparison")
+  train_indices <- lapply(cv_list, `[[`, "train_index")
+  test_indices <- lapply(cv_list, `[[`, "test_index")
+  have_indices <- !any(vapply(train_indices, is.null, logical(1))) &&
+    !any(vapply(test_indices, is.null, logical(1)))
+  if (have_indices &&
+      (!all(vapply(train_indices[-1L], identical, logical(1), train_indices[[1L]])) ||
+       !all(vapply(test_indices[-1L], identical, logical(1), test_indices[[1L]]))))
+    stop("Cross-validation models must use identical training and test sites.", call. = FALSE)
+
   if (is.null(cv_names))
   {
     cv_names <- vapply(cv_list,

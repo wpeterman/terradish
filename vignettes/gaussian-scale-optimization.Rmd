@@ -271,7 +271,7 @@ plot(fit_gaussian, type = "sigma")
 
 If you already know how to convert your map units into a more interpretable
 distance scale, you can relabel the plot directly. For example, if one map
-unit corresponds to one metre, then multiplying by `0.001` reports distances
+unit corresponds to one meter, then multiplying by `0.001` reports distances
 in kilometers:
 
 ```{r sigma-plot-km, fig.cap = "***Fitted Gaussian kernel with x-axis relabeled in kilometers.***"}

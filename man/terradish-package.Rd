@@ -13,9 +13,8 @@ inverse \eqn{E(\theta)}, and links that shared process layer to the response
 through a selected measurement likelihood.
 }
 \details{
-\if{html}{
-\figure{terradish-sticker.png}{options: width=150 alt='Package logo'}
-}
+\if{html}{\figure{terradish-sticker.png}{options: width=150 alt='terradish logo'}}
+\if{latex}{\figure{terradish-sticker.png}{options: width=1.5in}}
 
 \strong{Where to start.}  \code{\link{conductance_surface}} builds the
 graph, \code{\link{terradish}} fits the model, and the methods documented in
