@@ -1,0 +1,207 @@
+
+AUDIT core/exp1b_wishart_clustered.R 
+1'E1/n^2 = 0.0415332  mean diag(E) = 0.1499828 
+           model rep     x1      x2    tau  sigma se_x1.x1 bnd
+1  wc_uncentered   1 0.7328 -0.4362 1.9946 0.4919   0.1686   0
+2    wc_centered   1 0.7328 -0.4362 1.9946 0.4919   0.1686   0
+3        gw_dist   1 0.7328 -0.4362 1.9946 0.4919   0.1686   0
+4  wc_uncentered   2 0.6037 -0.4078 2.2360 0.4918   0.1594   0
+5    wc_centered   2 0.6037 -0.4078 2.2360 0.4918   0.1594   0
+6        gw_dist   2 0.6037 -0.4078 2.2360 0.4918   0.1594   0
+7  wc_uncentered   3 0.5916 -0.4133 2.1599 0.4801   0.1581   0
+8    wc_centered   3 0.5916 -0.4133 2.1599 0.4801   0.1581   0
+9        gw_dist   3 0.5916 -0.4133 2.1599 0.4801   0.1581   0
+10 wc_uncentered   4 0.7144 -0.3343 1.8527 0.4861   0.1648   0
+11   wc_centered   4 0.7144 -0.3343 1.8527 0.4861   0.1648   0
+12       gw_dist   4 0.7144 -0.3343 1.8527 0.4861   0.1648   0
+13 wc_uncentered   5 0.5866 -0.3351 1.9957 0.4785   0.1620   0
+14   wc_centered   5 0.5866 -0.3351 1.9957 0.4785   0.1620   0
+15       gw_dist   5 0.5866 -0.3351 1.9957 0.4785   0.1620   0
+          model      x1       x2     tau   sigma se_x1.x1 bnd
+1       gw_dist 0.64582 -0.38534 2.04778 0.48568  0.16258   0
+2   wc_centered 0.64582 -0.38534 2.04778 0.48568  0.16258   0
+3 wc_uncentered 0.64582 -0.38534 2.04778 0.48568  0.16258   0
+$started
+[1] "2026-09-24 17:15:09 EDT"
+
+$finished
+[1] "2026-09-24 17:15:14 EDT"
+
+$result
+[1] "completed"
+
+
+AUDIT core/exp7_optim.R 
+start (0,0): theta=(0.6066,-0.2072) loglik=269.7462 |grad|=3.22e-08 steps=6 boundary=FALSE
+start (2,2): theta=(0.6066,-0.2072) loglik=269.7462 |grad|=3.22e-08 steps=6 boundary=FALSE
+start (-2,2): theta=(0.6066,-0.2072) loglik=269.7462 |grad|=3.22e-08 steps=6 boundary=FALSE
+start (-2,-2): theta=(0.6066,-0.2072) loglik=269.7462 |grad|=3.85e-13 steps=10 boundary=FALSE
+start (3,-3): theta=(0.6066,-0.2072) loglik=269.7462 |grad|=9.06e-13 steps=9 boundary=FALSE
+newton spline: loglik 270.7225 |grad| 4.64e-10 steps 7 coef -0.223 4.868 16.868 6.344 
+bfgs spline: loglik 270.7225 |grad| 9.84e-05 steps 24 coef -0.223 4.868 16.868 6.344 
+WC nu=2e4: |grad| = 1.34e-11  steps 5 
+WC nu=20: |grad| = 2.23e-08  steps 4 coef 0.5722597 -0.2591343 
+$started
+[1] "2026-09-24 17:15:14 EDT"
+
+$finished
+[1] "2026-09-24 17:15:26 EDT"
+
+$result
+[1] "completed"
+
+
+AUDIT core/exp9_rho0.R 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+mlpe phi: 0.01031 0.01975 12.58 -19.5  rho_actual = 1.69e-09 
+mlpe theta/SE: 0.8559 -0.2101 0.2231 0.1117 
+LS   theta/SE: 0.8559 -0.2101 0.2231 0.1117 
+         Estimate   Std. Error    Lower 95%   Upper 95%
+alpha  0.01030721 0.0007406545  0.008855556  0.01175887
+beta   0.01974835 0.0024070781  0.015030562  0.02446614
+tau   12.58287169 0.1380131118 12.312370963 12.85337242
+rho    0.00000000           NA           NA          NA
+subproblem: 2 10 
+$started
+[1] "2026-09-24 17:15:26 EDT"
+
+$finished
+[1] "2026-09-24 17:15:29 EDT"
+
+$result
+[1] "completed"
+
+
+AUDIT scale/shift_check.R 
+30x30: max|pkg - brute| (interior) = 2.13e-13; best alignment pkg[i,j]=brute[i+0,j+0] with err 2.13e-13
+31x31: max|pkg - brute| (interior) = 6.27e-15; best alignment pkg[i,j]=brute[i+0,j+0] with err 6.27e-15
+30x31: max|pkg - brute| (interior) = 1.29e-13; best alignment pkg[i,j]=brute[i+0,j+0] with err 1.29e-13
+31x30: max|pkg - brute| (interior) = 1.60e-13; best alignment pkg[i,j]=brute[i+0,j+0] with err 1.60e-13
+$started
+[1] "2026-09-24 17:15:29 EDT"
+
+$finished
+[1] "2026-09-24 17:15:29 EDT"
+
+$result
+[1] "completed"
+
+
+AUDIT scale/ksr_units.R 
+res = 1  sigma=2: center value 0.0402  value 2 cells away 0.0244 
+res = 1  sigma=2*res: center value 0.0402  value 2 cells away 0.0244 
+res = 100  sigma=2: center value 1  value 2 cells away 0 
+res = 100  sigma=2*res: center value 0.0402  value 2 cells away 0.0244 
+[1] 0.045 0.045
+[1] 156 180   1
+SpatExtent : -42.912500000000001, -34.8125, -9.4975000000000005, -2.4775 (xmin, xmax, ymin, ymax)
+[1] 0.135 0.135
+[1] 52 60  1
+$started
+[1] "2026-09-24 17:15:29 EDT"
+
+$finished
+[1] "2026-09-24 17:15:30 EDT"
+
+$result
+[1] "completed"
+
+
+AUDIT flex/exp2_spline_support.R 
+     x2 s(x1).1 s(x1).2 s(x1).3 s(x1).4 
+ -0.066  -2.360  -1.509  -7.580  -3.392 
+focal x1 range: -0.822 1.053  graph x1 range: -2.242 1.949 
+cells whose x1 is unchanged by clamping: 384 of 625 
+max |log ratio| of est on UNCHANGED cells (should be 0): 0 
+cor(log est none, log est focal) on unchanged cells: 1 
+loglinear control max |log ratio| on unchanged cells: 0 
+marginal curve, auto   : 17.507 1.336 1.223 0.784 0.081 
+marginal curve, user f : 17.507 1.336 1.223 0.784 0.081 
+$started
+[1] "2026-09-24 17:15:30 EDT"
+
+$finished
+[1] "2026-09-24 17:15:31 EDT"
+
+$result
+[1] "completed"
+
+
+AUDIT compute/e1_graph.R 
+E1a scale_to_0_1 on 2-layer raster (docs: per-layer):
+         lyr.1     lyr.1
+[1,] 0.0000000 0.0000000
+[2,] 0.3333333 0.3333333
+[3,] 0.6666667 0.6666667
+[4,] 1.0000000 1.0000000
+$started
+[1] "2026-09-24 17:15:31 EDT"
+
+$finished
+[1] "2026-09-24 17:15:31 EDT"
+
+$result
+[1] "completed"
+
+
+AUDIT compute/e4_misc.R 
+==== E4b crop_to_focal_buffer boundary effect ====
+The crop buffer is less than half the maximum distance between focal sites. Cropping can inflate resistance; compare fits with a larger buffer.
+buffer= 0 cells (vertices  169) theta=0.0: mean rel increase in R = 1.059, max = 1.761, cor with full = 0.7361
+buffer= 0 cells (vertices  169) theta=1.5: mean rel increase in R = 1.064, max = 2.320, cor with full = 0.9786
+The crop buffer is less than half the maximum distance between focal sites. Cropping can inflate resistance; compare fits with a larger buffer.
+buffer= 2 cells (vertices  289) theta=0.0: mean rel increase in R = 0.229, max = 0.408, cor with full = 0.9446
+buffer= 2 cells (vertices  289) theta=1.5: mean rel increase in R = 0.152, max = 0.356, cor with full = 0.9965
+The crop buffer is less than half the maximum distance between focal sites. Cropping can inflate resistance; compare fits with a larger buffer.
+buffer= 5 cells (vertices  529) theta=0.0: mean rel increase in R = 0.076, max = 0.149, cor with full = 0.9917
+buffer= 5 cells (vertices  529) theta=1.5: mean rel increase in R = 0.038, max = 0.081, cor with full = 0.9998
+buffer=10 cells (vertices 1089) theta=0.0: mean rel increase in R = 0.015, max = 0.031, cor with full = 0.9996
+buffer=10 cells (vertices 1089) theta=1.5: mean rel increase in R = 0.008, max = 0.022, cor with full = 1.0000
+fit on full: theta_a = 1.057  loglik = 2729.18
+The crop buffer is less than half the maximum distance between focal sites. Cropping can inflate resistance; compare fits with a larger buffer.
+fit on buffer 2: theta_a = 1.029  loglik = 2730.54
+The crop buffer is less than half the maximum distance between focal sites. Cropping can inflate resistance; compare fits with a larger buffer.
+fit on buffer 5: theta_a = 1.094  loglik = 2730.23
+fit on buffer 10: theta_a = 1.068  loglik = 2729.51
+$started
+[1] "2026-09-24 17:15:31 EDT"
+
+$finished
+[1] "2026-09-24 17:15:33 EDT"
+
+$result
+[1] "completed"
+
+
+AUDIT compute/e6_melip_crop.R 
+melip raster: 156 180 res 0.045 0.045  extent -42.9125 -34.8125 -9.4975 -2.4775 
+site bbox: -42.81125 -34.93625 -9.39625 -2.57875 
+The crop buffer is less than half the maximum distance between focal sites. Cropping can inflate resistance; compare fits with a larger buffer.
+vertices full 22443  cropped(0.05) 22099 
+IBD resistance: mean rel increase NaN, max NaN, cor 0.9986
+mlpe coef full   : -0.498 0.085  SE 0.068 0.093 
+mlpe coef cropped: -0.466 0.077  SE 0.065 0.088 
+$started
+[1] "2026-09-24 17:15:33 EDT"
+
+$finished
+[1] "2026-09-24 17:15:50 EDT"
+
+$result
+[1] "completed"
+
+Warning messages:
+1: Two or more focal sites share a raster cell; use a finer raster or review the site coordinates. 
+2: Two or more focal sites share a raster cell; use a finer raster or review the site coordinates. 

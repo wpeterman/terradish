@@ -1,0 +1,5 @@
+   family  nuisance selected tied failures baseline_failures
+1    mlpe     fixed        2    0        1                 0
+2 wishart     fixed        3    1        0                 0
+3    mlpe reprofile        8    0        9                 2
+4 wishart reprofile        8    0        1                 6

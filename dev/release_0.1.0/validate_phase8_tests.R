@@ -1,0 +1,10 @@
+root <- getwd()
+.libPaths(c(file.path(root, "dev/check/phase2-library"), .libPaths()))
+Sys.setenv(NOT_CRAN = "true")
+started <- Sys.time()
+result <- devtools::test("dev/check/phase8-package", reporter = "summary")
+rows <- as.data.frame(result)
+saveRDS(list(started = started, finished = Sys.time(), results = rows),
+  "dev/release_0.1.0/phase8_tests.rds")
+print(colSums(rows[c("passed", "failed", "error", "warning", "skipped")]))
+stopifnot(sum(rows$failed) == 0, !any(rows$error))

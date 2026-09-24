@@ -19,9 +19,9 @@ knitr::opts_chunk$set(
   fig.height = 4.5,
   warning  = FALSE,
   message  = FALSE,
-  # The complete rendered vignette is built into the source tarball. Avoid
-  # repeating its long model fits on CRAN's shared check machines.
-  eval = identical(tolower(Sys.getenv("NOT_CRAN")), "true")
+  # Evaluate fits during ordinary builds so the source tarball includes
+  # the complete rendered guide and its figures.
+  eval = TRUE
 )
 
 ```
@@ -131,10 +131,10 @@ A **likelihood ratio test (LRT)** asks whether adding a covariate
 improves the model fit enough to reject the reduced model under its
 assumptions. The test statistic is:
 
-> 2 × (log-likelihood of larger model − log-likelihood of smaller model)
+> 2 Ã— (log-likelihood of larger model âˆ’ log-likelihood of smaller model)
 
 Under the null hypothesis that the extra parameter does not help, this
-statistic follows asymptotically a χ² distribution with degrees of
+statistic follows asymptotically a Ï‡Â² distribution with degrees of
 freedom equal to the number of extra parameters. This approximation
 improves as sample size (number of focal sites) increases.
 
@@ -259,7 +259,7 @@ common likelihood basis and are rejected.
 aic_table(
   list(fit_ibd, fit_altitude_only, fit_fc_only, fit_full, fit_interaction),
   mod_names = c("IBD", "Altitude only", "Forestcover only",
-                "Full (A + FC)", "Interaction (A × FC)")
+                "Full (A + FC)", "Interaction (A Ã— FC)")
 )
 ```
 
@@ -438,7 +438,7 @@ grid or a final optimization on the full-resolution graph.
 
 `plot(fit, type = "surface", data = surface)` renders the fitted
 conductance alongside its asymptotic lower and upper confidence interval
-bounds in a single three-panel figure. Uncertainty in θ is propagated
+bounds in a single three-panel figure. Uncertainty in Î¸ is propagated
 through the log-linear model via the delta method, and all panels share
 the same color scale:
 

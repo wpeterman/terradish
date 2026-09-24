@@ -6,7 +6,8 @@ import sys
 phase = sys.argv[1]
 assert phase in ('5', '6', '7', '8')
 root = Path.cwd()
-candidate = root / 'dev/check' / f'phase{phase}-package'
+candidate = root / (sys.argv[2] if len(sys.argv) > 2 else f'dev/check/phase{phase}-package')
+assert candidate.resolve().is_relative_to((root / 'dev/check').resolve())
 files = [candidate / name for name in ('DESCRIPTION', 'NEWS.md', 'NAMESPACE', 'README.md')]
 for folder in ('R', 'man', 'tests'):
     files.extend(p for p in (candidate / folder).rglob('*')

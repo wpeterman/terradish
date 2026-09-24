@@ -1,0 +1,9 @@
+gaussian-scale-optimization.html images: 2
+getting-started.html images: 12
+ibe-ibr-workflow.html images: 5
+large-landscapes.html images: 0
+model-comparison.html images: 6
+simulation-design.html images: 0
+spline-conductance.html images: 12
+wishart-covariance.html images: 6
+Ordinary-build spline/model-comparison figures are present.

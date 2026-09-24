@@ -1,0 +1,68 @@
+
+AUDIT cv/e3_converted.R 
+  fold   loglik baseline_loglik error baseline_error
+1    4 14.67621        15.00402                     
+2    3 19.15770        19.39303                     
+3    1 17.42669        19.28227                     
+4    2 17.80435        16.00333                     
+Fold 4 CV 14.67621 internal 14.67621 incorrect external-scale input 14.88342 
+Fold 3 CV 19.1577 internal 19.1577 incorrect external-scale input 19.1577 
+Fold 1 CV 17.42669 internal 17.42669 incorrect external-scale input 17.42669 
+Fold 2 CV 17.80435 internal 17.80435 incorrect external-scale input 18.24484 
+$started
+[1] "2026-09-24 17:18:15 EDT"
+
+$finished
+[1] "2026-09-24 17:18:24 EDT"
+
+$result
+[1] "completed"
+
+
+AUDIT cv/e5.R 
+anova non-nested mlpe covariates:
+[1] "Measurement-model covariate sets are not nested."
+anova non-nested wishart kernels:
+[1] "Measurement-model covariate sets are not nested."
+  fold   loglik baseline_loglik loglik_gain error
+1    4 14.67621        15.00402  -0.3278103      
+2    3 19.15770        19.39303  -0.2353240      
+3    1 17.42669        19.28227  -1.8555737      
+4    2 17.80435        16.00333   1.8010222      
+$started
+[1] "2026-09-24 17:18:24 EDT"
+
+$finished
+[1] "2026-09-24 17:18:33 EDT"
+
+$result
+[1] "completed"
+
+
+AUDIT cv/e6.R 
+Changed-response resume: The existing checkpoint is not compatible with this cross-validation run. 
+$started
+[1] "2026-09-24 17:18:33 EDT"
+
+$finished
+[1] "2026-09-24 17:18:34 EDT"
+
+$result
+$result$error
+[1] "grepl(\"incompatible|match|changed\", message, ignore.case = TRUE) is not TRUE"
+
+
+
+AUDIT cv/e2_modes.R 
+$started
+[1] "2026-09-24 17:18:34 EDT"
+
+$finished
+[1] "2026-09-24 17:18:34 EDT"
+
+$result
+$result$error
+[1] "Reprofiled scores require one measurement model per call; use `nuisance = \"fixed\"` for measurement-model comparisons."
+
+
+There were 23 warnings (use warnings() to see them)

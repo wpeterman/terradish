@@ -1,3 +1,12 @@
+terradish 0.0.57
+----------------
+* Added fast analytic-derivative and AMG agreement tests that run on CRAN.
+* Recorded final core regression audits and release validation evidence.
+* Corrected the spline fit-plot caption to describe its resistance axis and
+  descriptive regression line.
+* Included computed spline and model-comparison guide outputs in ordinary
+  source builds by removing their old environment-dependent evaluation switch.
+
 terradish 0.0.56
 ----------------
 * Rebuilt the eight core guides and README around conditional interpretation,

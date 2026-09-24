@@ -19,9 +19,9 @@ knitr::opts_chunk$set(
   fig.height = 5,
   warning   = FALSE,
   message   = FALSE,
-  # The complete rendered vignette is built into the source tarball. Avoid
-  # repeating its long model fits on CRAN's shared check machines.
-  eval = identical(tolower(Sys.getenv("NOT_CRAN")), "true")
+  # Evaluate fits during ordinary builds so the source tarball includes
+  # the complete rendered guide and its figures.
+  eval = TRUE
 )
 
 ```
@@ -61,7 +61,7 @@ shape.
 
 A spline is a piecewise polynomial function that is constrained to be smooth (continuous and differentiable) at the join points, called **knots**. Instead of estimating a single slope for altitude, we estimate a weighted combination of several basis functions, each capturing part of the altitude range.
 
-The figure below shows centered natural spline and B-spline basis functions look like for a covariate that runs from −2 to 2 (as after `scale_covariates()`):
+The figure below shows centered natural spline and B-spline basis functions look like for a covariate that runs from âˆ’2 to 2 (as after `scale_covariates()`):
 
 ```{r basis-demo, fig.cap = "***Natural spline (ns) and B-spline (bs) basis functions for a standardized covariate.*** Each colored line is one basis column. The fitted conductance association is a weighted combination of all basis functions in a panel.", fig.height = 5}
 library(splines)
@@ -116,11 +116,11 @@ For most landscape-genetics applications, **natural splines are likely the safer
 
 ### How many basis functions (df / k)?
 
-More basis functions → more shape flexibility → more parameters to estimate. With sparse spatial genetic data, overfitting is a real risk. Guidelines:
+More basis functions â†’ more shape flexibility â†’ more parameters to estimate. With sparse spatial genetic data, overfitting is a real risk. Guidelines:
 
 - **df = 3 or 4** is a good starting point for most covariates. This allows a single hump, valley, or threshold-like shape.
 - **df = 2** is a low-flexibility nonlinear curve; it adds one parameter over the linear model and can represent simple curvature.
-- **df ≥ 6** should be reserved for cases where both the data and a clear ecological hypothesis support it; compare against simpler predeclared models with held-out prediction.
+- **df â‰¥ 6** should be reserved for cases where both the data and a clear ecological hypothesis support it; compare against simpler predeclared models with held-out prediction.
 - Use common cross-validation folds for the candidate shapes. AICc is a
   secondary diagnostic under its focal-site sample-size convention; it does
   not make all site pairs independent or calibrate an uncertain Wishart `nu`.
@@ -375,8 +375,8 @@ aic_table(
 
 Interpret this table as a first-pass diagnostic, not a definitive verdict:
 
-- **ΔAICc below about 2**: a common heuristic for similar relative support within this declared candidate set, not proof of equivalence.
-- **Larger ΔAICc**: progressively less support relative to the top-ranked model. Interpret the magnitude together with model complexity, stability, and the predeclared scientific hypotheses.
+- **Î”AICc below about 2**: a common heuristic for similar relative support within this declared candidate set, not proof of equivalence.
+- **Larger Î”AICc**: progressively less support relative to the top-ranked model. Interpret the magnitude together with model complexity, stability, and the predeclared scientific hypotheses.
 
 An AICc improvement should be evaluated alongside the stability and scientific plausibility of the marginal association. A spline with a lower AICc but an implausible shape (oscillating wildly, extreme at the edges) should be treated with skepticism.
 
@@ -454,7 +454,7 @@ Broad agreement between spline families is a useful stability check, but it does
 
 ### All four model marginal associations (altitude)
 
-Setting `marginal_covariates = "altitude"` keeps only the altitude panel from each model (which may otherwise also show forest cover). This makes it easy to arrange all four altitude curves in a single 2 × 2 grid for direct comparison:
+Setting `marginal_covariates = "altitude"` keeps only the altitude panel from each model (which may otherwise also show forest cover). This makes it easy to arrange all four altitude curves in a single 2 Ã— 2 grid for direct comparison:
 
 ```{r marginal-all, fig.cap = "***Altitude marginal association across all four candidate models.*** The linear model constrains the association to a straight line (on the log-conductance scale). Both spline models can represent non-monotone shapes.", fig.height = 6}
 p_lin   <- plot(fit_linear,  type = "marginal", data = surface, n = 80,
@@ -526,9 +526,9 @@ fixed. Unclamped `conductance()` and marginal plots use the same centered
 prediction basis, so they should agree on the relative conductance scale.
 Clamping changes predictions, not the likelihood or the estimated shape.
 
-## Observed vs. fitted genetic distances
+## Observed genetic distance versus fitted resistance
 
-```{r obs-vs-fitted, fig.cap = "***Observed vs. fitted pairwise Fst for all candidate models.*** Each point is a pair of sampling sites. The diagonal (dashed) represents a perfect fit.", fig.height = 5}
+```{r obs-vs-fitted, fig.cap = "***Observed pairwise Fst versus fitted resistance for all candidate models.*** Each point is a pair of sampling sites. The blue line is a descriptive least-squares regression.", fig.height = 5}
 p_fit_linear <- plot(fit_linear,  type = "fit", main = "Linear baseline")
 p_fit_ns_alt <- plot(fit_ns_alt,  type = "fit", main = "Altitude ns (df = 4)")
 p_fit_ns_both <- plot(fit_ns_both, type = "fit", main = "Both ns (df = 4)")
@@ -537,7 +537,7 @@ p_fit_bs_alt <- plot(fit_bs_alt,  type = "fit", main = "Altitude bs (k = 4)")
 (p_fit_linear | p_fit_ns_alt) / (p_fit_ns_both | p_fit_bs_alt)
 ```
 
-All four panels use the same data and MLPE correlation structure. Systematic deviations from the diagonal (e.g. all large-distance pairs systematically under-predicted) indicate lack of fit that could arise from the conductance formula, measurement model, response construction, or other misspecification.
+All four panels use the same data and MLPE correlation structure. Their horizontal axes show resistance, whose scale can differ across fitted conductance models. The blue regression lines summarize the plotted relationship; they do not account for dependence among pairs. Curvature or other systematic departures warrant checking the conductance formula, measurement model, and response construction. Use likelihood diagnostics and cross-validation for model comparison.
 
 ------------------------------------------------------------------------
 
@@ -874,7 +874,7 @@ Even when AICc improves, inspect these warning signs:
 # Quick eigenvalue check: are estimated parameters degenerate?
 hess <- fit_ns_alt$fit$hessian
 ev <- eigen(hess, symmetric = TRUE, only.values = TRUE)$values
-min(ev)   # Should be clearly positive; near-zero → numerical problems
+min(ev)   # Should be clearly positive; near-zero â†’ numerical problems
 
 # Compare ns and bs marginal shapes side by side
 par(mfrow = c(1, 2))

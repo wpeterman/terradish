@@ -1,0 +1,223 @@
+
+AUDIT cv/e6.R 
+Changed-response resume: The existing checkpoint is not compatible with this cross-validation run. 
+$started
+[1] "2026-09-24 17:23:09 EDT"
+
+$finished
+[1] "2026-09-24 17:23:11 EDT"
+
+$result
+[1] "completed"
+
+
+AUDIT cv/e2_modes.R 
+  replicate  family  nuisance extended_minus_base common_folds failures
+1         1 wishart reprofile            6.856837            4        0
+  baseline_failures
+1                 0
+  replicate family  nuisance extended_minus_base common_folds failures
+1         1   mlpe reprofile            1.450117            2        2
+  baseline_failures
+1                 0
+  replicate  family nuisance extended_minus_base common_folds failures
+1         1 wishart    fixed            -10.5584            4        0
+  baseline_failures
+1                 0
+  replicate family nuisance extended_minus_base common_folds failures
+1         1   mlpe    fixed           -1.026479            4        0
+  baseline_failures
+1                 0
+  replicate  family  nuisance extended_minus_base common_folds failures
+1         2 wishart reprofile            42.57521            4        0
+  baseline_failures
+1                 0
+  replicate family  nuisance extended_minus_base common_folds failures
+1         2   mlpe reprofile            2.249383            3        1
+  baseline_failures
+1                 0
+  replicate  family nuisance extended_minus_base common_folds failures
+1         2 wishart    fixed            1.027884            4        0
+  baseline_failures
+1                 0
+  replicate family nuisance extended_minus_base common_folds failures
+1         2   mlpe    fixed           -0.804492            4        0
+  baseline_failures
+1                 0
+  replicate  family  nuisance extended_minus_base common_folds failures
+1         3 wishart reprofile            1.718743            3        1
+  baseline_failures
+1                 3
+  replicate family  nuisance extended_minus_base common_folds failures
+1         3   mlpe reprofile            1.319598            3        1
+  baseline_failures
+1                 0
+  replicate  family nuisance extended_minus_base common_folds failures
+1         3 wishart    fixed           -8.340346            4        0
+  baseline_failures
+1                 0
+  replicate family nuisance extended_minus_base common_folds failures
+1         3   mlpe    fixed          -0.5861127            4        0
+  baseline_failures
+1                 0
+  replicate  family  nuisance extended_minus_base common_folds failures
+1         4 wishart reprofile            53.34088            4        0
+  baseline_failures
+1                 1
+  replicate family  nuisance extended_minus_base common_folds failures
+1         4   mlpe reprofile            5.661102            4        0
+  baseline_failures
+1                 0
+  replicate  family nuisance extended_minus_base common_folds failures
+1         4 wishart    fixed           -30.43992            4        0
+  baseline_failures
+1                 0
+  replicate family nuisance extended_minus_base common_folds failures
+1         4   mlpe    fixed           -3.620133            4        0
+  baseline_failures
+1                 0
+  replicate  family  nuisance extended_minus_base common_folds failures
+1         5 wishart reprofile            2.431151            4        0
+  baseline_failures
+1                 0
+  replicate family  nuisance extended_minus_base common_folds failures
+1         5   mlpe reprofile           0.4686388            2        2
+  baseline_failures
+1                 0
+  replicate  family nuisance extended_minus_base common_folds failures
+1         5 wishart    fixed           -3.830879            4        0
+  baseline_failures
+1                 0
+  replicate family nuisance extended_minus_base common_folds failures
+1         5   mlpe    fixed           -2.388915            4        0
+  baseline_failures
+1                 0
+  replicate  family  nuisance extended_minus_base common_folds failures
+1         6 wishart reprofile            20.98038            4        0
+  baseline_failures
+1                 0
+  replicate family  nuisance extended_minus_base common_folds failures
+1         6   mlpe reprofile            2.454477            3        1
+  baseline_failures
+1                 1
+  replicate  family nuisance extended_minus_base common_folds failures
+1         6 wishart    fixed            10.56329            4        0
+  baseline_failures
+1                 0
+  replicate family nuisance extended_minus_base common_folds failures
+1         6   mlpe    fixed           0.2212807            3        1
+  baseline_failures
+1                 0
+  replicate  family  nuisance extended_minus_base common_folds failures
+1         7 wishart reprofile           0.3691718            4        0
+  baseline_failures
+1                 2
+  replicate family  nuisance extended_minus_base common_folds failures
+1         7   mlpe reprofile           0.7100601            3        1
+  baseline_failures
+1                 0
+  replicate  family nuisance extended_minus_base common_folds failures
+1         7 wishart    fixed        7.851497e-13            4        0
+  baseline_failures
+1                 0
+  replicate family nuisance extended_minus_base common_folds failures
+1         7   mlpe    fixed          -0.1574716            4        0
+  baseline_failures
+1                 0
+  replicate  family  nuisance extended_minus_base common_folds failures
+1         8 wishart reprofile            73.73548            4        0
+  baseline_failures
+1                 0
+  replicate family  nuisance extended_minus_base common_folds failures
+1         8   mlpe reprofile            1.459313            3        1
+  baseline_failures
+1                 1
+  replicate  family nuisance extended_minus_base common_folds failures
+1         8 wishart    fixed            2.578323            4        0
+  baseline_failures
+1                 0
+  replicate family nuisance extended_minus_base common_folds failures
+1         8   mlpe    fixed            1636.756            4        0
+  baseline_failures
+1                 0
+   replicate  family  nuisance extended_minus_base common_folds failures
+1          1 wishart reprofile        6.856837e+00            4        0
+2          1    mlpe reprofile        1.450117e+00            2        2
+3          1 wishart     fixed       -1.055840e+01            4        0
+4          1    mlpe     fixed       -1.026479e+00            4        0
+5          2 wishart reprofile        4.257521e+01            4        0
+6          2    mlpe reprofile        2.249383e+00            3        1
+7          2 wishart     fixed        1.027884e+00            4        0
+8          2    mlpe     fixed       -8.044920e-01            4        0
+9          3 wishart reprofile        1.718743e+00            3        1
+10         3    mlpe reprofile        1.319598e+00            3        1
+11         3 wishart     fixed       -8.340346e+00            4        0
+12         3    mlpe     fixed       -5.861127e-01            4        0
+13         4 wishart reprofile        5.334088e+01            4        0
+14         4    mlpe reprofile        5.661102e+00            4        0
+15         4 wishart     fixed       -3.043992e+01            4        0
+16         4    mlpe     fixed       -3.620133e+00            4        0
+17         5 wishart reprofile        2.431151e+00            4        0
+18         5    mlpe reprofile        4.686388e-01            2        2
+19         5 wishart     fixed       -3.830879e+00            4        0
+20         5    mlpe     fixed       -2.388915e+00            4        0
+21         6 wishart reprofile        2.098038e+01            4        0
+22         6    mlpe reprofile        2.454477e+00            3        1
+23         6 wishart     fixed        1.056329e+01            4        0
+24         6    mlpe     fixed        2.212807e-01            3        1
+25         7 wishart reprofile        3.691718e-01            4        0
+26         7    mlpe reprofile        7.100601e-01            3        1
+27         7 wishart     fixed        7.851497e-13            4        0
+28         7    mlpe     fixed       -1.574716e-01            4        0
+29         8 wishart reprofile        7.373548e+01            4        0
+30         8    mlpe reprofile        1.459313e+00            3        1
+31         8 wishart     fixed        2.578323e+00            4        0
+32         8    mlpe     fixed        1.636756e+03            4        0
+   baseline_failures
+1                  0
+2                  0
+3                  0
+4                  0
+5                  0
+6                  0
+7                  0
+8                  0
+9                  3
+10                 0
+11                 0
+12                 0
+13                 1
+14                 0
+15                 0
+16                 0
+17                 0
+18                 0
+19                 0
+20                 0
+21                 0
+22                 1
+23                 0
+24                 0
+25                 2
+26                 0
+27                 0
+28                 0
+29                 0
+30                 1
+31                 0
+32                 0
+   family  nuisance extended_selected failures
+1    mlpe     fixed                 2        1
+2 wishart     fixed                 4        0
+3    mlpe reprofile                 8        9
+4 wishart reprofile                 8        1
+$started
+[1] "2026-09-24 17:23:11 EDT"
+
+$finished
+[1] "2026-09-24 17:25:33 EDT"
+
+$result
+[1] "completed"
+
+There were 24 warnings (use warnings() to see them)

@@ -1,0 +1,55 @@
+
+AUDIT core/exp9_rho0.R 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+WARN: Optimizer stalled: objective change is small but the projected gradient remains large. 
+mlpe phi: 0.01031 0.01975 12.58 -19.5  rho_actual = 1.69e-09 
+mlpe theta/SE: 0.8559 -0.2101 0.2231 0.1117 
+LS   theta/SE: 0.8559 -0.2101 0.2231 0.1117 
+         Estimate   Std. Error    Lower 95%   Upper 95%
+alpha  0.01030721 0.0007406545  0.008855556  0.01175887
+beta   0.01974835 0.0024070781  0.015030562  0.02446614
+tau   12.58287169 0.1380131118 12.312370963 12.85337242
+rho    0.00000000           NA           NA          NA
+subproblem: 2 10 
+Outer convergence record:
+$code
+[1] 0
+
+$message
+[1] "converged"
+
+$iterations
+[1] 8
+
+$max_abs_projected_gradient
+[1] 2.081179e-08
+
+$criterion
+[1] "projected_gradient"
+
+$boundary
+[1] FALSE
+
+$restarted
+[1] FALSE
+
+$started
+[1] "2026-09-24 17:30:25 EDT"
+
+$finished
+[1] "2026-09-24 17:30:35 EDT"
+
+$result
+[1] "completed"
+

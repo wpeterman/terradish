@@ -1,0 +1,199 @@
+# Final regression audit interpretation
+
+The adapted scripts retain the original audit designs wherever those designs
+apply to the core interface. Their source paths and SHA-256 hashes are in
+`phase8_audits/manifest.json`. Outputs are saved separately from the original
+audit. Successful script completion is not itself a statistical claim.
+
+## Acceptance evidence
+
+- Centered covariance, uncentered covariance, and the corresponding distance
+  response give matching contrast-Wishart estimates in the five clustered
+  simulations. The five-start optimizer experiment reaches the same optimum;
+  Newton and BFGS spline fits agree. The near-zero MLPE correlation experiment
+  recovers the least-squares limit.
+  Its outer optimizer converges (projected gradient 2.08e-8), while the inner
+  nuisance optimizer reports a stall near rho = 1.69e-9. That diagnostic is
+  retained; matching the least-squares limit is not a claim that every inner
+  optimization has a clean exit. The reported natural-scale rho is zero to
+  displayed precision, with unavailable boundary uncertainty.
+- Gaussian impulse checks recover the correct origin on all four even/odd
+  grid combinations, with errors from 6e-15 to 2.13e-13. The external smoothing
+  units experiment is retained as a units check, not evidence that a different
+  kernel is numerically identical to the native Gaussian kernel.
+- Spline prediction retains identical values on unchanged cells (maximum
+  log-ratio zero, correlation one). Layer scaling independently spans zero to
+  one for both layers.
+- The synthetic crop example gives mean resistance increases of 22.9% and
+  15.2% with a two-cell buffer and 1.5% and 0.8% with ten cells. These are
+  case-specific examples. For melip, the mean increase is 1.4%, maximum 7.2%,
+  and correlation 0.9986. Three duplicate-cell pairs have zero resistance and
+  are excluded from relative changes; their presence is reported explicitly.
+- Both Wishart formulations agree with independent contrast-Wishart log
+  density differences within 1e-8. The MLPE objective agrees with the dense
+  Gaussian calculation within 1e-8. The default kernel is the double-centered
+  unscaled absolute difference, and reconstructs that pairwise difference.
+- Non-nested measurement-model comparisons are rejected. The one-component
+  boundary LRT uses the chi-bar-square approximation for positive statistics;
+  a statistic of exactly zero returns p = 1. Wald intervals near a boundary
+  remain an approximation and can extend below zero.
+- Gaussian CV scores match manual scoring with internal-scale parameters
+  within 1e-6. Passing external-scale parameters can change scores. A changed
+  response is rejected when resuming a checkpoint.
+
+## Measurement-extension limitations
+
+The four-seed `ext/check5` run uses the new absolute-difference default.
+Covariance and distance Wishart versions agree. The added environmental term
+has lambda values 0.01290, 0.03640, 0.00848, and 0.00746; its AIC differences
+are -0.636, -15.910, 0.830, and 1.083. Thus reformulating the kernel does not
+make AIC a calibrated mechanism test. The term can absorb misspecification or
+sampling variation. This result is retained rather than replaced by a claim
+that the false association has disappeared.
+
+The eight-replicate noise-covariate CV audit uses identical folds for the two
+models in each replicate. Fixed nuisance scoring favors the extension in 3/8
+Wishart and 2/8 MLPE replicates. Reprofiled scoring favors it in 8/8 for both.
+With a 1e-6 absolute reporting tolerance, a raw positive
+difference of 7.85e-13 in Wishart replicate seven is a numerical tie. The
+unrounded scores and original greater-than-zero tally remain in the raw log.
+This gives the same classification as the earlier audit's scaled machine-
+precision tie rule; no other comparison is close to zero.
+The reprofiled comparison is reconstructed from separate calls solely to
+diagnose the old failure mode; the core API rejects comparing different
+measurement models in one reprofiled call.
+
+Fixed scoring has zero failed Wishart folds and one failed MLPE fold across
+the model fits. Reprofiled scoring has one failed Wishart fold and nine failed
+MLPE folds. Differences use only common successful folds. Failed baseline
+scores are separately recorded and do not invalidate an otherwise valid
+trained-model density. Eight replicates cannot establish a false-positive
+rate, and these results do not support causal interpretation of an IBE term.
+
+## Script corrections and provenance
+
+The first CV attempt failed because its checkpoint-error assertion expected a
+different phrase and because it tried the now-prohibited multi-model
+reprofiled call. `phase8_cv_v2` is the corrected final receipt. The initial
+extension diagnostics mistakenly assumed that scale=TRUE was still the
+default; `phase8_corrections` uses the explicit current default and asserts
+the kernel identity. The original logs remain available. No package code was
+changed to make these audit adaptations pass.
+# Validation environment notes
+
+Windows R 4.6.1 uses the private landgraph 0.0.3 library. RStudio's bundled
+Pandoc is used for all vignette builds. Locale variables inherited as C.UTF-8
+are cleared before starting R.
+
+At approximately 17:31 on September 24, the concurrent source-test and covr
+jobs each had 24 threads on a 20-logical-processor machine, at 100% CPU load.
+The first source-test run was interrupted before it returned test results.
+Its only emitted line was `Testing terradish`; it is not passing evidence.
+Moving that log failed because the shell still held it open. The replacement
+run then reused the log path, so there is no separate original log file.
+
+The replacement source-test run and final check set OMP_NUM_THREADS,
+OPENBLAS_NUM_THREADS, and MKL_NUM_THREADS to 1. The vignette job finished cleanly.
+Coverage had left instrumented .o/.dll/.gc* artifacts in the shared candidate,
+so the replacement source tests loaded those artifacts. That source-test
+attempt was also interrupted before results, with its log retained as
+phase8_tests_instrumented_interrupted.log. Ordinary tests now use the separate
+phase8-source-tests copy, built from clean sources.
+
+The initial coverage process still had its large thread pool, with substantial
+CPU use and no completed coverage receipt after about thirty minutes. It was
+stopped and restarted in its own phase8-coverage copy with the same one-thread
+limits. The initial runner and log are retained with initial/interrupted names.
+The final archive check was already using clean source files in its own build
+directory. Only completed replacement receipts establish final validation.
+These environment controls do not change the package API or stopping criteria.
+
+The final check runs through Rscript with vignette rebuilding enabled. A
+literal interactive RStudio check has not been performed. The same RStudio
+Pandoc executable is used, but this does not establish a GUI-session check.
+# Experimental terradish features
+
+This branch preserves the implementation from commit `6a2c13f` (version
+0.0.47), before the 0.1.0 core split. It is a research snapshot. It does not
+include the numerical, inference, or documentation repairs subsequently made
+on `release/0.1.0`. The .48 update on this branch adds these notes only.
+
+The September 24, 2026 package audit and the owner's release plan identify the
+limitations below. The source locations refer to this snapshot. Historical
+simulation results are reported as audit evidence, not as new validation of
+this branch. The release branch retains the plan and audit receipts in
+`dev/release_0.1.0/`.
+
+## Features retained here
+
+| Feature | Status |
+|---|---|
+| Directed conductance, directed rates, and edge-gradient/edge-flow re-exports | Identification problems with gradient fields; other fields untested |
+| Hierarchical conductance fields | Residual-field prototype with unresolved inference and memory costs |
+| Site-specific Wishart drift covariates | Confounded with isolation and sampling effects |
+| Pair-subset measurement models | Incomplete composition and cross-validation support |
+| Linear conductance | Scale constraint needed |
+| Joint multiscale conductance models | Prototype retained for further investigation |
+| Kron reduction and tiled reduction | Graph diagnostics; not the fitting covariance kernel |
+| PCG, Jacobi-PCG, and block-CG solvers | Experimental alternatives; block-CG has a known failure |
+| Legacy CV and results-directory helpers | Superseded or unaudited interfaces |
+| Grid screening approximations and fits without exact refinement | Approximate results lack the core release's exact-refinement requirement |
+
+Install this branch explicitly only when reproducing or investigating those
+features. Pin the commit in any reproducibility record. Do not treat a feature's
+presence, or a successful optimizer exit, as evidence that it is identified or
+its uncertainty calibrated.
+
+## Directed model
+
+For `edge_gradient` covariates, the chain is reversible for every gamma. Only
+the combination theta/2 - s*gamma is identified. This prevents separate
+interpretation of the two effects. `edge_flow` has not been validated. Further
+work needs an identifiability analysis for non-gradient fields and a guard
+against placing the same covariate in both terms.
+
+## Hierarchical field
+
+The implementation ignores the supplied `conductance_model` argument
+(`R/hierarchical_conductance.R`, including the construction near lines 259,
+295, and 536). It forms the full Hessian at each tau-squared grid point and
+uses conditional AIC with a naive effective degrees of freedom. `aic_table()`
+rejects these fits. Non-convergence is not adequately surfaced, and there is
+no restricted spatial regression.
+
+The audit did not find over-selection under the correctly specified model and
+nu, but the field absorbed process misspecification. In the audit's
+`identifiability/field_info.R` experiment, adding the field increased a
+covariate standard error about fivefold. Interpret this component as a generic
+residual pattern until its identification and inference are resolved.
+
+## Drift covariates
+
+A site-specific diagonal covariance contribution is algebraically equivalent
+to site-specific additive distance. A low-conductance halo, sampling variance,
+and within-deme diversity can all contribute to it. In the audit's
+`identifiability/halo.R` experiment, a site constant explained 99.9% of a halo's
+effect. Rare-variant weighting reversed the sign, and unequal sample sizes
+introduced a 1/n_i artifact. Sampling-variance offsets, a minor-allele-frequency
+filter, and a name that does not imply identified drift are needed.
+
+## Pair subsets
+
+Wrapping `mlpe_covariates` drops gamma. There is no CV subsetter, and the pair
+order guard rejects some otherwise valid inputs. Composition with measurement
+covariates and fold-specific pair alignment need dedicated tests.
+
+## Other limitations
+
+- `linear_conductance` needs a constraint on one coefficient or on the scale.
+- Kron reduction does not provide out-of-core fitting. Its covariance output
+  is not the covariance kernel used by the likelihood.
+- `block_cg` fails with six or more right-hand sides.
+- Legacy CV scores external-scale theta (`R/radish_cv.R:691`) and re-profiles
+  nuisance parameters in a way that favors measurement extensions.
+- Screening approximations inside `terradish_grid` lack exact refinement.
+- Legacy results-directory helpers have not been audited for the core release.
+
+The supported core path is developed on `release/0.1.0`. Its release remains
+subject to owner sign-off and the landgraph dependency being published first.
+

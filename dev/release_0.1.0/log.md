@@ -115,3 +115,85 @@ The Phase 2 runner saved its test/check RDS receipts before a trailing top-level
 else parse error in reporting. Both complete R CMD check and structured test
 results independently establish the results above. Runner corrected after both
 processes finished; no running script was edited.
+
+## C3-C7: completed implementation and documentation
+
+C3 (.52) adds inference methods and corrects numerical stopping, with the
+owner-authorized Gaussian repair preserving the specified thresholds. C4 (.53)
+adds fixed-domain predictive CV, common-fold accounting, and checkpoint safety.
+Their detailed evidence is in `phase3_phase4_validation.md`. The exact C4
+archive check passed with zero errors, warnings, or notes.
+
+C5 (.54, 9b75ff4) implements robustness and prediction. C6 (.55, e81acdb)
+revises function documentation. Both checks are clean; C6 skips redundant tests
+on unchanged code. See `phase5_phase6_validation.md`. C7 (.56, ab6c020) rewrites
+README and all eight core guides. All guides and standalone examples run; the
+examples/vignette check has zero errors, warnings, or notes. The small power
+example yields no defensible sample-size recommendation. See
+`phase7_validation.md` for the precise scope of verification.
+
+## Final numerical regression report (C8 candidate)
+
+The final nine fits use the original explicit four-direction baseline settings.
+All have convergence code zero. `core_phase8.rds`, `phase8_baseline.log`, and
+`phase8_baseline_comparison.csv` retain parameters, nuisance estimates, standard
+errors, and comparisons with both .47 and the corrected C2 reference.
+
+| Model | Original log likelihood | Final log likelihood | Interpretation |
+|---|---:|---:|---|
+| a: MLPE | 2160.184078 | 2160.184078 | Unchanged |
+| b: least squares | 1960.571248 | 1960.571248 | Unchanged |
+| c: generalized Wishart | -609.884981 | -609.884981 | Unchanged |
+| d: covariance Wishart | -664.826513 | -609.884981 | Intended site-contrast correction |
+| e: spline | 2182.350172 | 2182.350172 | Same theta and likelihood; centered basis |
+| f: Gaussian, odd | 1517.628227 | 1517.628227 | Unchanged within tolerance |
+| g: Gaussian, even | 1549.991372 | 1517.537750 | Intended alignment correction |
+| h: MLPE covariates | 2222.044115 | 2222.044115 | Unchanged |
+| i: Wishart covariates | -609.880167 | -609.880167 | Historical sqdiff comparison; lambda rescales |
+
+The largest final-minus-C2 differences are 9.73e-10 in log likelihood,
+2.85e-6 in theta, 8.33e-6 in nuisance parameters, and 5.66e-6 in standard
+errors. All satisfy the declared tolerances. The kernel baseline deliberately
+retains sqdiff to compare with the old kernel; separate default-absdiff audits
+are in `phase8_audit_interpretation.md`. No unexplained numerical difference
+was found.
+
+The final noise-CV audit gives 3/8 substantive Wishart and 2/8 MLPE selections
+under fixed nuisance scoring, versus 8/8 for both when nuisance parameters are
+reprofiled. One Wishart difference is a numerical tie. Failed model and
+baseline folds remain explicit. The detailed audit report also records the
+remaining AIC and near-zero-rho limitations.
+
+The experimental branch now has documentation commit 38f57d8 (.48), with its
+implementation unchanged from .47. Neither branch has been pushed or merged.
+The landgraph CRAN prerequisite and owner release approval remain open.
+
+## C8 final local validation and adoption (0.0.57)
+
+Adopted phase8-final-package after its caption-corrected archive check passed
+0 errors, 0 warnings, 0 notes (12m21.7s). Tests were deliberately skipped in
+that final documentation check; byte-identical R/C++/test sources passed the
+complete .57 check (27m29.3s), including 990 installed assertions, 197 diagnostic
+warnings, and no skips. Clean source tests passed 988 assertions with the same
+warnings and one intentional parallel skip. All nine numerical baselines meet
+C2 tolerances. Eight fast CRAN assertions passed in 1.21 seconds combined.
+
+R line coverage: 86.79266% overall, 88.02621% across 25 changed files. Individual
+coverage below 80% is disclosed in RELEASE_REVIEW.md. Native gcov collection
+failed with exit code 6; no native line-coverage result is claimed. Earlier
+interrupted attempts are distinguished in phase8_validation_environment.md.
+The final archive contains all 43 figures across eight guides. Representative
+plots were inspected; no complete browser-layout inspection is claimed.
+
+Final archive SHA-256:
+dade1f8982f39ae55cf9e5f8a5b32cc87e0c3d55c5140cb74801c4797981d5cc.
+See phase8_final_fingerprint.json. No numerical implementation changed in C8.
+The interactive RStudio check (or owner acceptance of its command-line
+equivalent), companion landgraph publication before CRAN submission, and owner
+release sign-off remain open. No master merge, push, final release tag, or
+submission has been performed.
+
+Final diff cleanup corrected two obsolete setup comments in the spline and
+model-comparison vignette sources. This comment-only change followed the final
+archive check; evaluation settings, executable chunks, and rendered prose are
+unchanged. The archive fingerprint refers to the preserved checked candidate.

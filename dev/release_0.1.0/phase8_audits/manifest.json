@@ -1,0 +1,122 @@
+[
+  {
+    "source": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\Research\\R_packages\\terradish\\review_work_20260924\\package_audit\\core\\helper.R",
+    "source_sha256": "1d513312c6dd6ae55dd96677fceed6d21b7b7032030215be9c9bc6eb68aa798b",
+    "adapted": "dev\\release_0.1.0\\phase8_audits\\core\\helper.R",
+    "adapted_sha256": "27d72983e5ef4d6407aa407d300cc0aaa8c6ec9d2dfcd1c35bbf9fa1bb0a5646"
+  },
+  {
+    "source": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\Research\\R_packages\\terradish\\review_work_20260924\\package_audit\\core\\exp1b_wishart_clustered.R",
+    "source_sha256": "8ea09db306fb55d2339f237a1939b9204e0c111e4961f4c07fe5503bd1061f56",
+    "adapted": "dev\\release_0.1.0\\phase8_audits\\core\\exp1b_wishart_clustered.R",
+    "adapted_sha256": "4ce2eeaf2648eb3409cdc5843619ed00bb1c61b0de35d99f27f070a9f9caf2c7"
+  },
+  {
+    "source": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\Research\\R_packages\\terradish\\review_work_20260924\\package_audit\\core\\exp7_optim.R",
+    "source_sha256": "62aa258d77d1ffcb999b69d71117e42b832b7c25ab003e2cdb05e4218bb337a2",
+    "adapted": "dev\\release_0.1.0\\phase8_audits\\core\\exp7_optim.R",
+    "adapted_sha256": "5420ba80e09f58ef6042d43c72262931a49bb60e4c5c1589328bf3bcaf84ab3a"
+  },
+  {
+    "source": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\Research\\R_packages\\terradish\\review_work_20260924\\package_audit\\core\\exp9_rho0.R",
+    "source_sha256": "9702a5ea45c0827b1eb785b480c14f4246103ce309ade9c6674d9c29e8f1c0d8",
+    "adapted": "dev\\release_0.1.0\\phase8_audits\\core\\exp9_rho0.R",
+    "adapted_sha256": "b3aa47b93065cc9619f40d63ad1b2b5d759b361050e67d4c1e4b7b07ca0ef5f9"
+  },
+  {
+    "source": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\Research\\R_packages\\terradish\\review_work_20260924\\package_audit\\scale\\shift_check.R",
+    "source_sha256": "b0c9a06e325a1e7ba4acca6cfe867f5b2b26e40ac482ed351e4e39f3592cd4af",
+    "adapted": "dev\\release_0.1.0\\phase8_audits\\scale\\shift_check.R",
+    "adapted_sha256": "274031a1a6bf46fa791d30eed8d943390bd7dfb3b67aa3b185f58e9ef70888e4"
+  },
+  {
+    "source": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\Research\\R_packages\\terradish\\review_work_20260924\\package_audit\\scale\\ksr_units.R",
+    "source_sha256": "84c71cd1d82a86cf812dba62392cf1b5e054bdba57ad2e4f67c62cf290a31cc6",
+    "adapted": "dev\\release_0.1.0\\phase8_audits\\scale\\ksr_units.R",
+    "adapted_sha256": "20a8288f3c8fd5f6bdbcbc0e6de63afbbfd2d2732da0672689e7c90a1de6e5c3"
+  },
+  {
+    "source": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\Research\\R_packages\\terradish\\review_work_20260924\\package_audit\\flex\\common.R",
+    "source_sha256": "6d53be9ddbe92c2ad340c910ee49db1b3960dace641a0658d1476906507f9b52",
+    "adapted": "dev\\release_0.1.0\\phase8_audits\\flex\\common.R",
+    "adapted_sha256": "cad3f0109b07a78be03bb17fcd1ce5779915117db2abc69b51cfa6b23bd00e99"
+  },
+  {
+    "source": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\Research\\R_packages\\terradish\\review_work_20260924\\package_audit\\flex\\exp2_spline_support.R",
+    "source_sha256": "c584ea97a0e7e475e0e14a4c702cfb739ae8f44ee3d392cbaac4f9ed81e11e0f",
+    "adapted": "dev\\release_0.1.0\\phase8_audits\\flex\\exp2_spline_support.R",
+    "adapted_sha256": "fe40a2c6e633b128fc657950d2dd3b1a29b40636050bc46c67cdc5b278f4c3fc"
+  },
+  {
+    "source": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\Research\\R_packages\\terradish\\review_work_20260924\\package_audit\\compute\\common.R",
+    "source_sha256": "921f6a7d4ea05644046444cec1cedb62ef8445022787c876db37f74e2950c055",
+    "adapted": "dev\\release_0.1.0\\phase8_audits\\compute\\common.R",
+    "adapted_sha256": "ff37ac7d83425d061f573ec6517777a4e2d4d8e3dcdbdc73ec9a3cb308a8e4d5"
+  },
+  {
+    "source": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\Research\\R_packages\\terradish\\review_work_20260924\\package_audit\\compute\\e1_graph.R",
+    "source_sha256": "26db67515e840e7e30008818c8b5adeea66ec755cb9bd14f6a8b502b8b751f50",
+    "adapted": "dev\\release_0.1.0\\phase8_audits\\compute\\e1_graph.R",
+    "adapted_sha256": "2f96c6729f7a34e048f567129ba2b3634fa555506e3d3bb4d8827a3b3475a97a"
+  },
+  {
+    "source": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\Research\\R_packages\\terradish\\review_work_20260924\\package_audit\\compute\\e4_misc.R",
+    "source_sha256": "5ad8ba257ad61b0f163e2f1c6011833c4eab10406b59f179c35203efa19cd864",
+    "adapted": "dev\\release_0.1.0\\phase8_audits\\compute\\e4_misc.R",
+    "adapted_sha256": "36b9a5f67d3cffc6dfb9c0aeb4099640bb0e3e72acd0a1a8deff73540e5cb9df"
+  },
+  {
+    "source": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\Research\\R_packages\\terradish\\review_work_20260924\\package_audit\\compute\\e6_melip_crop.R",
+    "source_sha256": "2139f0f4f5efee83e26eb5e4a239899e09e75ef8799f7a8271727dddb5b40215",
+    "adapted": "dev\\release_0.1.0\\phase8_audits\\compute\\e6_melip_crop.R",
+    "adapted_sha256": "bc62cbfde09042545267b34bbb001fd4d87c1cf7c0ebe3a2c45e2476315a0942"
+  },
+  {
+    "source": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\Research\\R_packages\\terradish\\review_work_20260924\\package_audit\\ext\\check1_bruteforce.R",
+    "source_sha256": "5f230816c5c89c8b6d1b7a580565ab28bcb668fd03487a0c2f25f182ebd4bc7c",
+    "adapted": "dev\\release_0.1.0\\phase8_audits\\ext\\check1_bruteforce.R",
+    "adapted_sha256": "216b1d14ef755339d18f34a4354a8a56db5ec2fa3413ab99cb10f047fa76c383"
+  },
+  {
+    "source": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\Research\\R_packages\\terradish\\review_work_20260924\\package_audit\\ext\\check2_behaviour.R",
+    "source_sha256": "546750d79a20af7d26aec2ce51cf9cbac3108cf45d97ddfebd1fbe07e1e72bb6",
+    "adapted": "dev\\release_0.1.0\\phase8_audits\\ext\\check2_behaviour.R",
+    "adapted_sha256": "ae71155c3d722b98dff54bac4e8f1dc5c49283a074ce40856bff6beae23afc7d"
+  },
+  {
+    "source": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\Research\\R_packages\\terradish\\review_work_20260924\\package_audit\\ext\\check5_kernel_diag.R",
+    "source_sha256": "7df2b07833bf4866e5343efb6ffa05b03430137617fcbc8c2c15acdfeb46d437",
+    "adapted": "dev\\release_0.1.0\\phase8_audits\\ext\\check5_kernel_diag.R",
+    "adapted_sha256": "aac2a0826bd2b77d0d124ff62c45997a02eb28045aeb7526d450baccb2bee42b"
+  },
+  {
+    "source": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\Research\\R_packages\\terradish\\review_work_20260924\\package_audit\\cv\\setup.R",
+    "source_sha256": "d890037f6e4704869c93ff2507124149f74275da9e675ec3a161085c6dffc260",
+    "adapted": "dev\\release_0.1.0\\phase8_audits\\cv\\setup.R",
+    "adapted_sha256": "cc8c8ee1bc4dafcfbeab20c03379fbbabbb6767cb69c58c9149b9178bec81fba"
+  },
+  {
+    "source": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\Research\\R_packages\\terradish\\review_work_20260924\\package_audit\\cv\\e5.R",
+    "source_sha256": "a6a05bc6a730f703b6bc30267bae8ed65f267021e1d9b312075010b3ce1c0ce6",
+    "adapted": "dev\\release_0.1.0\\phase8_audits\\cv\\e5.R",
+    "adapted_sha256": "8ce20689407f99e2ff19a185058416ef4f8e820ee75dd2b903d6150683f58ebc"
+  },
+  {
+    "source": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\Research\\R_packages\\terradish\\review_work_20260924\\package_audit\\cv\\e6.R",
+    "source_sha256": "c514b306349179da532adbc4788465313521abc4169f07ef464aa29b7f7ad0ab",
+    "adapted": "dev\\release_0.1.0\\phase8_audits\\cv\\e6.R",
+    "adapted_sha256": "0510071cd01be7a7656dc5074000f674c1767c3c54b15e1f385dd7e7b616e03a"
+  },
+  {
+    "source": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\Research\\R_packages\\terradish\\review_work_20260924\\package_audit\\cv\\e3.R",
+    "source_sha256": "352b310c2edea9a7c6b40094b0cc386c8e9dcfc70ba39ec7d7ca16b4b36515c9",
+    "adapted": "dev\\release_0.1.0\\phase8_audits\\cv\\e3_converted.R",
+    "adapted_sha256": "584aa910d4f59df094515808253758e37143b0f18bd8231a39f01a6b0141a37d"
+  },
+  {
+    "source": "C:\\Users\\peterman.73\\OneDrive - The Ohio State University\\Research\\R_packages\\terradish\\review_work_20260924\\package_audit\\cv\\e2.R",
+    "source_sha256": "c0686b8d52dab58c860e8653d07549a0003dd2df3b462a10fb407cc45768ff5b",
+    "adapted": "dev\\release_0.1.0\\phase8_audits\\cv\\e2_modes.R",
+    "adapted_sha256": "e8c2a9f9a1f652add6952a1b3870b3ff0ed8bac00820762ce1100a8dae38d1ac"
+  }
+]

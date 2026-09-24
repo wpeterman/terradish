@@ -1,0 +1,95 @@
+
+AUDIT ext/check1_bruteforce.R 
+==== (a) wishart_covariates, covariance model ====
+kernel == centered absdiff: Mean relative difference: 0.4081982 
+kernel rank: 6 
+objective differences (pkg):    4.699382 37.65389 
+-logdens differences (brute):   4.699382 37.65389 
+
+==== (b) wishart_covariates, generalized_wishart model ====
+objective differences (pkg):    4.699382 37.65389 
+-logdens differences (brute):   4.699382 37.65389 
+
+==== (d) mlpe_covariates vs dense MLPE Gaussian ====
+Z row order matches lower.tri pairs: TRUE 
+pkg objective: 101.6484  brute -loglik (no 2pi): 101.6484 
+$started
+[1] "2026-09-24 17:18:04 EDT"
+
+$finished
+[1] "2026-09-24 17:18:04 EDT"
+
+$result
+[1] "completed"
+
+
+AUDIT ext/check2_behaviour.R 
+raster dim: 32 36 
+
+==== (j) `scale changes absdiff kernel magnitude ====
+identical kernels scale=FALSE vs TRUE: FALSE 
+
+==== (k) absdiff kernel uses centered pairwise differences ====
+      [,1]  [,2]  [,3]  [,4]  [,5]  [,6]
+[1,]  1.11  1.11 -0.22 -0.22 -0.89 -0.89
+[2,]  1.11  1.11 -0.22 -0.22 -0.89 -0.89
+[3,] -0.22 -0.22  0.44  0.44 -0.22 -0.22
+[4,] -0.22 -0.22  0.44  0.44 -0.22 -0.22
+[5,] -0.89 -0.89 -0.22 -0.22  1.11  1.11
+[6,] -0.89 -0.89 -0.22 -0.22  1.11  1.11
+sites 3,4 identical env (at mean): K34 = 0.4444444 ; sites 5,6 identical env (extreme): K56 = 1.111111 ; sites 1,5 opposite: K15 = -0.8888889 
+implied squared-distance contribution K_ii+K_jj-2K_ij equals abs difference after site standardization: FALSE 
+
+==== (f) boundary LRT for lambda: anova now uses chi-bar-square ====
+                     seed  lambda       LR p_anova p_chibar  wald_lo wald_hi
+lambda_absdiff_var1     1 0.00001 3.03e-06   0.499    0.499 -0.01120 0.01130
+lambda_absdiff_var11    2 0.00000 1.42e-12   0.500    0.500       NA 0.00793
+lambda_absdiff_var12    3 0.00000 0.00e+00   1.000    0.500       NA 0.01210
+lambda_absdiff_var13    4 0.00650 1.23e+00   0.133    0.133 -0.00545 0.01840
+                      dAIC boundary_flag
+lambda_absdiff_var1  2.000         FALSE
+lambda_absdiff_var11 2.000          TRUE
+lambda_absdiff_var12 2.000          TRUE
+lambda_absdiff_var13 0.765         FALSE
+
+==== (g) anova must reject non-nested measurement models ====
+[1] "ERROR: Measurement-model covariate sets are not nested."
+Corrected README argument order:[1] 190   2
+$started
+[1] "2026-09-24 17:18:04 EDT"
+
+$finished
+[1] "2026-09-24 17:18:10 EDT"
+
+$result
+[1] "completed"
+
+
+AUDIT ext/check5_kernel_diag.R 
+                    seed               model  lambda     dAIC
+lambda_absdiff_env     1  wishart_covariance 0.01290  -0.6356
+lambda_absdiff_env1    1 generalized_wishart 0.01290  -0.6356
+lambda_absdiff_env2    2  wishart_covariance 0.03640 -15.9100
+lambda_absdiff_env3    2 generalized_wishart 0.03640 -15.9100
+lambda_absdiff_env4    3  wishart_covariance 0.00848   0.8295
+lambda_absdiff_env5    3 generalized_wishart 0.00848   0.8295
+lambda_absdiff_env6    4  wishart_covariance 0.00746   1.0830
+lambda_absdiff_env7    4 generalized_wishart 0.00746   1.0830
+$started
+[1] "2026-09-24 17:18:10 EDT"
+
+$finished
+[1] "2026-09-24 17:18:15 EDT"
+
+$result
+[1] "completed"
+
+Warning messages:
+1: Two or more focal sites share a raster cell; use a finer raster or review the site coordinates. 
+2: The null kernel coefficients lie on their zero bounds. 
+3: The null kernel coefficients lie on their zero bounds. 
+4: The null kernel coefficients lie on their zero bounds. 
+5: The null kernel coefficients lie on their zero bounds. 
+6: Two or more focal sites share a raster cell; use a finer raster or review the site coordinates. 
+7: In assemble_model_matrix(formula, x) :
+  Removed unused spatial covariates: forestcover

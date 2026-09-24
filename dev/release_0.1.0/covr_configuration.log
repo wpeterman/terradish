@@ -1,0 +1,190 @@
+function (path = ".", type = c("tests", "vignettes", "examples", 
+    "all", "none"), combine_types = TRUE, relative_path = TRUE, 
+    quiet = TRUE, clean = TRUE, line_exclusions = NULL, function_exclusions = NULL, 
+    code = character(), install_path = temp_file("R_LIBS"), ..., 
+    exclusions, pre_clean = TRUE) 
+{
+    if (!missing(exclusions)) {
+        warning("`exclusions` is deprecated and will be removed in an upcoming release. Please use `line_exclusions` instead.", 
+            call. = FALSE, domain = NA)
+        line_exclusions <- exclusions
+    }
+    pkg <- as_package(path)
+    if (missing(type)) {
+        type <- "tests"
+    }
+    type <- parse_type(type)
+    run_separately <- !isTRUE(combine_types) && length(type) > 
+        1
+    if (run_separately) {
+        called_args <- as.list(match.call())[-1]
+        called_args$type <- NULL
+        res <- list()
+        for (t in type) {
+            res[[t]] <- do.call(Recall, c(called_args, type = t))
+            attr(res[[t]], "type") <- t
+        }
+        attr(res, "package") <- pkg
+        class(res) <- "coverages"
+        return(res)
+    }
+    if (is.character(relative_path)) {
+        stopifnot(length(relative_path) == 1)
+        root <- normalize_path(relative_path)
+    }
+    else if (isTRUE(relative_path)) {
+        root <- pkg$path
+    }
+    else {
+        root <- NULL
+    }
+    install_path <- normalize_path(install_path)
+    dir.create(install_path)
+    if (!uses_icc()) {
+        flags <- getOption("covr.flags")
+    }
+    else if (length(getOption("covr.icov")) > 0L) {
+        flags <- getOption("covr.icov_flags")
+        unlink(file.path(pkg$path, "src", "*.dyn"))
+        unlink(file.path(pkg$path, "src", "pgopti.*"))
+    }
+    else {
+        stop("icc is not available")
+    }
+    if (isTRUE(clean)) {
+        on.exit({
+            clean_objects(pkg$path)
+            clean_gcov(pkg$path)
+            clean_parse_data()
+            unlink(install_path, recursive = TRUE)
+        }, add = TRUE)
+    }
+    if (isTRUE(pre_clean)) 
+        clean_objects(pkg$path)
+    withr::with_envvar(list(R_LIBS = paste(.libPaths(), collapse = .Platform$path.sep)), 
+        withr::with_makevars(flags, assignment = "+=", {
+            args <- c("--vanilla", "CMD", "INSTALL", "-l", shQuote(install_path), 
+                "--example", "--install-tests", "--with-keep.source", 
+                "--with-keep.parse.data", "--no-staged-install", 
+                "--no-multiarch", shQuote(pkg$path))
+            name <- if (.Platform$OS.type == "windows") 
+                "R.exe"
+            else "R"
+            path <- file.path(R.home("bin"), name)
+            res <- system2(path, args, stdout = if (quiet) 
+                NULL
+            else "", stderr = if (quiet) 
+                NULL
+            else "")
+        }))
+    if (res != 0) {
+        stop("Package installation did not succeed.")
+    }
+    add_hooks(pkg$package, install_path, fix_mcexit = should_enable_parallel_mcexit_fix(pkg))
+    libs <- env_path(install_path, .libPaths())
+    withr::with_libpaths(install_path, action = "prefix", {
+        withr::with_envvar(c(R_DEFAULT_PACKAGES = "datasets,utils,grDevices,graphics,stats,methods", 
+            R_LIBS = libs, R_LIBS_USER = libs, R_LIBS_SITE = libs, 
+            R_COVR = "true", R_TESTS = file.path(R.home("share"), 
+                "R", "tests-startup.R")), {
+            withCallingHandlers({
+                if ("vignettes" %in% type) {
+                  type <- type[type != "vignettes"]
+                  run_vignettes(pkg, install_path)
+                }
+                out_dir <- file.path(install_path, pkg$package)
+                if ("examples" %in% type) {
+                  type <- type[type != "examples"]
+                  withr::with_envvar(c(R_LIBS = Sys.getenv("R_LIBS")), 
+                    {
+                      result <- tools::testInstalledPackage(pkg$package, 
+                        outDir = out_dir, types = "examples", 
+                        lib.loc = install_path, ...)
+                      if (result != 0L) {
+                        show_failures(out_dir)
+                      }
+                    })
+                }
+                if ("tests" %in% type) {
+                  result <- tools::testInstalledPackage(pkg$package, 
+                    outDir = out_dir, types = "tests", lib.loc = install_path, 
+                    ...)
+                  if (result != 0L) {
+                    show_failures(out_dir)
+                  }
+                }
+                run_commands(pkg, install_path, code)
+            }, message = function(e) if (quiet) 
+                invokeRestart("muffleMessage")
+            else e, warning = function(e) if (quiet) 
+                invokeRestart("muffleWarning")
+            else e)
+        })
+    })
+    trace_files <- list.files(path = install_path, pattern = "^covr_trace_[^/]+$", 
+        full.names = TRUE)
+    coverage <- merge_coverage(trace_files)
+    if (!uses_icc()) {
+        res <- run_gcov(pkg$path, quiet = quiet, clean = clean)
+    }
+    else {
+        res <- run_icov(pkg$path, quiet = quiet)
+    }
+    coverage <- as_coverage(c(coverage, res), package = pkg, 
+        root = root)
+    if (!clean) {
+        attr(coverage, "library") <- install_path
+    }
+    if (getOption("covr.filter_non_package", TRUE)) {
+        coverage <- filter_non_package_files(coverage)
+    }
+    line_exclusions <- c("src/RcppExports.cpp", "R/RcppExports.R", 
+        "src/cpp11.cpp", "R/cpp11.R", line_exclusions, withr::with_dir(root, 
+            parse_covr_ignore()))
+    exclude(coverage, line_exclusions = line_exclusions, function_exclusions = function_exclusions, 
+        path = root)
+}
+
+Coverage options
+$covr.covrignore
+[1] ".covrignore"
+
+$covr.exclude_end
+#[[:space:]]*nocov[[:space:]]*end
+
+$covr.exclude_pattern
+#[[:space:]]*nocov
+
+$covr.exclude_start
+#[[:space:]]*nocov[[:space:]]*start
+
+$covr.flags
+          CFLAGS         CXXFLAGS       CXX1XFLAGS       CXX11FLAGS 
+"-O0 --coverage" "-O0 --coverage" "-O0 --coverage" "-O0 --coverage" 
+      CXX14FLAGS       CXX17FLAGS       CXX20FLAGS           FFLAGS 
+"-O0 --coverage" "-O0 --coverage" "-O0 --coverage" "-O0 --coverage" 
+         FCFLAGS            FLIBS     SHLIB_LIBADD 
+"-O0 --coverage"         "-lgcov"     "--coverage" 
+
+$covr.gcov
+                                       gcov 
+"C:\\rtools45\\X86_64~1.POS\\bin\\gcov.exe" 
+
+$covr.icov
+codecov 
+     "" 
+
+$covr.icov_flags
+                CFLAGS               CXXFLAGS             CXX1XFLAGS 
+"-O0 -prof-gen=srcpos" "-O0 -prof-gen=srcpos" "-O0 -prof-gen=srcpos" 
+            CXX11FLAGS             CXX14FLAGS             CXX17FLAGS 
+"-O0 -prof-gen=srcpos" "-O0 -prof-gen=srcpos" "-O0 -prof-gen=srcpos" 
+            CXX20FLAGS                 FFLAGS                FCFLAGS 
+"-O0 -prof-gen=srcpos" "-O0 -prof-gen=srcpos" "-O0 -prof-gen=srcpos" 
+               LDFLAGS           SHLIB_LIBADD 
+"-O0 -prof-gen=srcpos" "-O0 -prof-gen=srcpos" 
+
+$covr.icov_prof
+profmerge 
+       "" 
+

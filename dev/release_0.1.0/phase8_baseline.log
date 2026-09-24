@@ -1,0 +1,560 @@
+ℹ Loading terradish
+START a_mlpe 2026-09-24 17:24:02 
+$theta
+   altitude forestcover 
+-0.53775283  0.06571419 
+
+$logLik
+[1] 2160.184
+
+$se
+   altitude forestcover 
+ 0.06643077  0.09594235 
+
+$phi
+             [,1]
+alpha -0.03309757
+beta   0.12020529
+tau    6.23513970
+rho    1.22278644
+
+$iterations
+  newton_steps function_calls 
+             5             17 
+
+$gradient
+     altitude   forestcover 
+-5.179552e-09  2.282692e-09 
+
+$max_abs_gradient
+[1] 5.179552e-09
+
+$boundary
+[1] FALSE
+
+$convergence
+$convergence$code
+[1] 0
+
+$convergence$message
+[1] "converged"
+
+$convergence$iterations
+[1] 5
+
+$convergence$max_abs_projected_gradient
+[1] 5.179552e-09
+
+$convergence$criterion
+[1] "projected_gradient"
+
+$convergence$boundary
+[1] FALSE
+
+$convergence$restarted
+[1] FALSE
+
+
+$seconds
+[1] 8.814473
+
+$warnings
+character(0)
+
+START b_leastsquares 2026-09-24 17:24:11 
+$theta
+   altitude forestcover 
+ -0.1923526   0.2188760 
+
+$logLik
+[1] 1960.571
+
+$se
+   altitude forestcover 
+ 0.01669266  0.03396559 
+
+$phi
+             [,1]
+alpha -0.04530027
+beta   0.12388085
+tau    6.88760135
+
+$iterations
+  newton_steps function_calls 
+             6             18 
+
+$gradient
+    altitude  forestcover 
+9.567952e-11 4.680329e-11 
+
+$max_abs_gradient
+[1] 9.567952e-11
+
+$boundary
+[1] FALSE
+
+$convergence
+$convergence$code
+[1] 0
+
+$convergence$message
+[1] "converged"
+
+$convergence$iterations
+[1] 6
+
+$convergence$max_abs_projected_gradient
+[1] 9.567952e-11
+
+$convergence$criterion
+[1] "projected_gradient"
+
+$convergence$boundary
+[1] FALSE
+
+$convergence$restarted
+[1] FALSE
+
+
+$seconds
+[1] 6.059813
+
+$warnings
+character(0)
+
+START c_generalized_wishart 2026-09-24 17:24:17 
+$theta
+   altitude forestcover 
+  0.3106727  -0.1994653 
+
+$logLik
+[1] -609.885
+
+$se
+   altitude forestcover 
+ 0.03639162  0.04998658 
+
+$phi
+          [,1]
+[1,]  1.011344
+[2,] -2.387405
+
+$iterations
+  newton_steps function_calls 
+             4             13 
+
+$gradient
+     altitude   forestcover 
+-1.168231e-10 -1.400529e-10 
+
+$max_abs_gradient
+[1] 1.400529e-10
+
+$boundary
+[1] FALSE
+
+$convergence
+$convergence$code
+[1] 0
+
+$convergence$message
+[1] "converged"
+
+$convergence$iterations
+[1] 4
+
+$convergence$max_abs_projected_gradient
+[1] 1.400529e-10
+
+$convergence$criterion
+[1] "projected_gradient"
+
+$convergence$boundary
+[1] FALSE
+
+$convergence$restarted
+[1] FALSE
+
+
+$seconds
+[1] 4.71866
+
+$warnings
+character(0)
+
+START d_wishart_covariance 2026-09-24 17:24:21 
+$theta
+   altitude forestcover 
+  0.3106727  -0.1994653 
+
+$logLik
+[1] -609.885
+
+$se
+   altitude forestcover 
+ 0.03639162  0.04998658 
+
+$phi
+           [,1]
+tau    1.011344
+sigma -2.387405
+
+$iterations
+  newton_steps function_calls 
+             4             13 
+
+$gradient
+     altitude   forestcover 
+-1.116708e-10 -1.450239e-10 
+
+$max_abs_gradient
+[1] 1.450239e-10
+
+$boundary
+[1] FALSE
+
+$convergence
+$convergence$code
+[1] 0
+
+$convergence$message
+[1] "converged"
+
+$convergence$iterations
+[1] 4
+
+$convergence$max_abs_projected_gradient
+[1] 1.450239e-10
+
+$convergence$criterion
+[1] "projected_gradient"
+
+$convergence$boundary
+[1] FALSE
+
+$convergence$restarted
+[1] FALSE
+
+
+$seconds
+[1] 4.274906
+
+$warnings
+character(0)
+
+START e_spline 2026-09-24 17:24:26 
+$theta
+s(altitude).1 s(altitude).2 s(altitude).3 s(altitude).4 
+   -0.7708774    -1.4482661     0.7724565    -0.7056948 
+
+$logLik
+[1] 2182.35
+
+$se
+s(altitude).1 s(altitude).2 s(altitude).3 s(altitude).4 
+    0.2672715     0.6266932     0.6786899     1.3771354 
+
+$phi
+             [,1]
+alpha -0.02916761
+beta   0.11663968
+tau    6.61934117
+rho    0.75097911
+
+$iterations
+  newton_steps function_calls 
+             7             32 
+
+$gradient
+s(altitude).1 s(altitude).2 s(altitude).3 s(altitude).4 
+ 3.214967e-12  4.236548e-12 -7.210800e-12  1.735256e-12 
+
+$max_abs_gradient
+[1] 7.2108e-12
+
+$boundary
+[1] FALSE
+
+$convergence
+$convergence$code
+[1] 0
+
+$convergence$message
+[1] "converged"
+
+$convergence$iterations
+[1] 7
+
+$convergence$max_abs_projected_gradient
+[1] 7.2108e-12
+
+$convergence$criterion
+[1] "projected_gradient"
+
+$convergence$boundary
+[1] FALSE
+
+$convergence$restarted
+[1] FALSE
+
+
+$seconds
+[1] 12.31721
+
+$warnings
+character(0)
+
+START f_gaussian_odd 2026-09-24 17:24:38 
+$theta
+      altitude    forestcover sigma.altitude 
+    -0.7039245     -0.1037210      0.1350000 
+
+$logLik
+[1] 1517.628
+
+$se
+      altitude    forestcover sigma.altitude 
+    0.09572053     0.13560846     0.11461277 
+
+$phi
+              [,1]
+alpha -0.009627821
+beta   0.132103890
+tau    6.659928324
+rho    0.688435769
+
+$iterations
+  newton_steps function_calls 
+             9             35 
+
+$gradient
+      altitude    forestcover sigma.altitude 
+ -1.125711e-12  -1.169800e-12  -1.308031e+01 
+
+$max_abs_gradient
+[1] 13.08031
+
+$boundary
+[1] FALSE
+
+$convergence
+$convergence$code
+[1] 0
+
+$convergence$message
+[1] "converged"
+
+$convergence$iterations
+[1] 9
+
+$convergence$max_abs_projected_gradient
+[1] 1.1698e-12
+
+$convergence$criterion
+[1] "projected_gradient"
+
+$convergence$boundary
+[1] TRUE
+
+$convergence$restarted
+[1] FALSE
+
+
+$seconds
+[1] 2.687923
+
+$warnings
+character(0)
+
+START g_gaussian_even 2026-09-24 17:24:41 
+$theta
+      altitude    forestcover sigma.altitude 
+    -0.7076204     -0.1113871      0.1350000 
+
+$logLik
+[1] 1517.538
+
+$se
+      altitude    forestcover sigma.altitude 
+    0.09708853     0.13567997     0.11948443 
+
+$phi
+              [,1]
+alpha -0.009726061
+beta   0.132066047
+tau    6.659113730
+rho    0.689143404
+
+$iterations
+  newton_steps function_calls 
+             8             36 
+
+$gradient
+      altitude    forestcover sigma.altitude 
+ -4.100054e-13  -1.030676e-12  -1.245950e+01 
+
+$max_abs_gradient
+[1] 12.4595
+
+$boundary
+[1] FALSE
+
+$convergence
+$convergence$code
+[1] 0
+
+$convergence$message
+[1] "converged"
+
+$convergence$iterations
+[1] 8
+
+$convergence$max_abs_projected_gradient
+[1] 1.030676e-12
+
+$convergence$criterion
+[1] "projected_gradient"
+
+$convergence$boundary
+[1] TRUE
+
+$convergence$restarted
+[1] FALSE
+
+
+$seconds
+[1] 2.738294
+
+$warnings
+character(0)
+
+START h_mlpe_covariates 2026-09-24 17:24:44 
+$theta
+   altitude forestcover 
+ -0.5687205   0.1250613 
+
+$logLik
+[1] 2222.044
+
+$se
+   altitude forestcover 
+ 0.07008515  0.11043114 
+
+$phi
+                            [,1]
+alpha               -0.038974539
+beta                 0.107420020
+absdiff_altitude     0.012286205
+absdiff_forestcover  0.004815915
+tau                  6.035427789
+rho                  1.731163618
+
+$iterations
+  newton_steps function_calls 
+             6             19 
+
+$gradient
+     altitude   forestcover 
+-5.506483e-11  4.527830e-11 
+
+$max_abs_gradient
+[1] 5.506483e-11
+
+$boundary
+[1] FALSE
+
+$convergence
+$convergence$code
+[1] 0
+
+$convergence$message
+[1] "converged"
+
+$convergence$iterations
+[1] 6
+
+$convergence$max_abs_projected_gradient
+[1] 5.506483e-11
+
+$convergence$criterion
+[1] "projected_gradient"
+
+$convergence$boundary
+[1] FALSE
+
+$convergence$restarted
+[1] FALSE
+
+
+$seconds
+[1] 6.022279
+
+$warnings
+character(0)
+
+START i_wishart_covariates 2026-09-24 17:24:50 
+$theta
+   altitude forestcover 
+  0.3112533  -0.1991568 
+
+$logLik
+[1] -609.8802
+
+$se
+   altitude forestcover 
+ 0.03687785  0.05010764 
+
+$phi
+                                [,1]
+tau                     1.0105122449
+lambda_sqdiff_altitude  0.0002703747
+sigma                  -2.3873188843
+
+$iterations
+  newton_steps function_calls 
+             4             12 
+
+$gradient
+     altitude   forestcover 
+-7.111541e-11 -8.778987e-11 
+
+$max_abs_gradient
+[1] 8.778987e-11
+
+$boundary
+[1] FALSE
+
+$convergence
+$convergence$code
+[1] 0
+
+$convergence$message
+[1] "converged"
+
+$convergence$iterations
+[1] 4
+
+$convergence$max_abs_projected_gradient
+[1] 8.778987e-11
+
+$convergence$criterion
+[1] "projected_gradient"
+
+$convergence$boundary
+[1] FALSE
+
+$convergence$restarted
+[1] FALSE
+
+
+$seconds
+[1] 4.237968
+
+$warnings
+character(0)
+
+Warning messages:
+1: Two or more focal sites share a raster cell; use a finer raster or review the site coordinates. 
+2: Two or more focal sites share a raster cell; use a finer raster or review the site coordinates. 
+3: Two or more focal sites share a raster cell; use a finer raster or review the site coordinates. 
+All nine complete-package Phase 8 baselines converge and agree within tolerance.

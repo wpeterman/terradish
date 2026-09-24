@@ -1,0 +1,17 @@
+ℹ Testing terradish
+Registered S3 methods overwritten by 'RcppEigen':
+  method               from         
+  predict.fastLm       RcppArmadillo
+  print.fastLm         RcppArmadillo
+  summary.fastLm       RcppArmadillo
+  print.summary.fastLm RcppArmadillo
+cran-numerics: ........
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+                                                                  test real
+1 small contrast-Wishart derivatives match central differences on CRAN 0.69
+2         small multilevel AMG solves agree with direct solves on CRAN 0.52
+  passed failed error
+1      2      0 FALSE
+2      6      0 FALSE
+covr available: TRUE 
