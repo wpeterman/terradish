@@ -1,3 +1,8 @@
+terradish 0.0.49
+----------------
+* Relocated shared comparison, cross-validation, and matrix helpers without
+  changing their behavior, preparing the core package split.
+
 terradish 0.0.48
 ----------------
 * Recorded the core-release plan, reproducible numerical baselines, and original

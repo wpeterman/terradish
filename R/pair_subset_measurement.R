@@ -172,11 +172,6 @@ pair_subset_measurement_model <- function(measurement_model = mlpe, pairs)
   pairs
 }
 
-.pair_subset_symm <- function(x)
-{
-  (x + t(x)) / 2
-}
-
 .pair_subset_distance <- function(E, pairs)
 {
   E <- .pair_subset_symm(E)

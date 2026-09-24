@@ -66,3 +66,12 @@ workflow. `pca_dist()` is in terradish, where mean imputation is already
 documented. L3's contrast-model experiment and default decision remain pending.
 No package was installed, pushed, or merged; base terradish validation still
 uses installed landgraph 0.0.1.
+
+## C1a: helper relocation, version 0.0.49
+
+All 414 function bodies, formals, and classes are unchanged. All nine frozen
+numerical baselines are identical. Source tests: 920 passed, zero failures or
+errors, one expected legacy warning and one intentional parallel skip.
+The full vignette-enabled check completed with Status: OK, zero errors,
+warnings, or notes, in 53m48s. See phase1a_00check.log and phase1a_check.rds.
+The check used the frozen source before the metadata-only version bump.

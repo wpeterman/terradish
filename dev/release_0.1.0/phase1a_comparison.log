@@ -1,0 +1,27 @@
+a_mlpe PASS 
+logLik_relative           theta             phi              se 
+              0               0               0               0 
+b_leastsquares PASS 
+logLik_relative           theta             phi              se 
+              0               0               0               0 
+c_generalized_wishart PASS 
+logLik_relative           theta             phi              se 
+              0               0               0               0 
+d_wishart_covariance PASS 
+logLik_relative           theta             phi              se 
+              0               0               0               0 
+e_spline PASS 
+logLik_relative           theta             phi              se 
+              0               0               0               0 
+f_gaussian_odd PASS 
+logLik_relative           theta             phi              se 
+              0               0               0               0 
+g_gaussian_even PASS 
+logLik_relative           theta             phi              se 
+              0               0               0               0 
+h_mlpe_covariates PASS 
+logLik_relative           theta             phi              se 
+              0               0               0               0 
+i_wishart_covariates PASS 
+logLik_relative           theta             phi              se 
+              0               0               0               0 
