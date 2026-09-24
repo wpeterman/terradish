@@ -1,7 +1,7 @@
 Package: terradish
 Type: Package
 Title: Fast Gradient-Based Optimization of Resistance Surfaces
-Version: 0.0.55
+Version: 0.0.56
 Date: 2026-09-24
 Language: en-US
 Authors@R: c(
@@ -20,14 +20,17 @@ Authors@R: c(
     comment = c(ORCID = "0000-0001-8409-7812")
   )
   )
-Description: Maximum likelihood estimation for parameterized conductance models
-  via Newton and quasi-Newton methods, for moderate-sized problems
-  such as spatial grids with fewer than a million cells. Supports
-  'terra'-native workflows, Gaussian distance and Wishart distance or covariance
-  measurement models, spline and scale-aware conductance estimation,
-  environmental and diagonal-variance extensions, cross-validation across
-  supported conductance models, and selected-pair analysis while retaining all
-  focal sites in the resistance graph.
+Description: Maximum likelihood estimation of landscape conductance surfaces
+  from genetic data on raster graphs, using Newton and quasi-Newton optimization
+  with analytic derivatives. Fits log-linear conductance models with optional
+  joint estimation of Gaussian smoothing scales and spline response shapes,
+  linked to pairwise genetic distances through maximum likelihood population
+  effects models or to allele-frequency covariance through a Wishart likelihood
+  on site contrasts, with the same pairwise distance and environment covariates
+  available in both. Provides exact sparse and algebraic multigrid solvers for
+  large rasters, fixed-domain spatial cross-validation for comparing conductance
+  formulas, and simulation tools for study design. Works natively with 'terra'
+  objects.
 URL: https://github.com/wpeterman/terradish,
   https://doi.org/10.5281/zenodo.21225712
 BugReports: https://github.com/wpeterman/terradish/issues

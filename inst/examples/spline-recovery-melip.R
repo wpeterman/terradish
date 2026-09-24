@@ -14,7 +14,7 @@ library(terra)
 
 run_spline_recovery_example <- function(keep = 1:10,
                                         nu = 150,
-                                        maxit = 12,
+                                        maxit = 100,
                                         seed = 11)
 {
   data(melip, package = "terradish")
@@ -98,7 +98,7 @@ run_spline_recovery_example <- function(keep = 1:10,
 }
 
 fit_melip_spline_example <- function(keep = 1:12,
-                                     maxit = 8,
+                                     maxit = 100,
                                      measurement_model = mlpe)
 {
   if (!identical(measurement_model, mlpe) &&

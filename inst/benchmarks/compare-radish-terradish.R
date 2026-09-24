@@ -2,7 +2,8 @@
 
 # Compare original `radish` with `terradish` on 1 and 6 cores using
 # microbenchmark. Each package is benchmarked in its own fresh R session to
-# avoid namespace and S3-method conflicts.
+# avoid namespace and S3-method conflicts. Parallel derivatives are experimental;
+# compare convergence and likelihoods before interpreting elapsed-time ratios.
 #
 # Usage:
 #   source("inst/benchmarks/compare-radish-terradish.R")
@@ -16,7 +17,7 @@ CONFIG <- list(
   terradish_cores = c(1L, 6L),
   measurement_model = "mlpe",
   optimizer = "newton",
-  maxit = 20L,
+  maxit = 100L,
   verbose = FALSE
 )
 
@@ -26,7 +27,7 @@ run_one_benchmark <- function(package_name,
                               times = 5L,
                               measurement_model = "leastsquares",
                               optimizer = "newton",
-                              maxit = 20L,
+                              maxit = 100L,
                               verbose = FALSE) {
   if (!requireNamespace("callr", quietly = TRUE)) {
     stop("Package `callr` is required.")
@@ -172,6 +173,7 @@ run_one_benchmark <- function(package_name,
         time_sec = bench$time / 1e9,
         logLik = unname(fit$loglik),
         df = fit$df,
+        convergence = if (is.list(fit$convergence)) fit$convergence$code else NA_real_,
         stringsAsFactors = FALSE
       )
     },
@@ -203,6 +205,7 @@ summarize_results <- function(results) {
         max_sec = max(x$time_sec),
         logLik = x$logLik[[1]],
         df = x$df[[1]],
+        convergence = x$convergence[[1]],
         stringsAsFactors = FALSE
       )
     })

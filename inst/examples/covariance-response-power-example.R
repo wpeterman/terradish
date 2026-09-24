@@ -19,8 +19,8 @@ run_covariance_response_power_example <- function(sample_sizes = c(6, 8, 10),
                                                   nsim = 5,
                                                   n_designs = 2,
                                                   nu = 150,
-                                                  maxit = 8,
-                                                  seed = 2026)
+                                                  maxit = 100,
+                                                  seed = 2026, nu_fit = nu)
 {
   data(melip, package = "terradish")
   melip.altitude <- terra::unwrap(melip.altitude)
@@ -85,6 +85,7 @@ run_covariance_response_power_example <- function(sample_sizes = c(6, 8, 10),
     tau = 0.8,
     sigma = 0.12,
     nu = nu,
+    nu_fit = nu_fit,
     nsim = nsim,
     n_designs = n_designs,
     seed = seed,
@@ -149,7 +150,7 @@ run_covariance_response_power_example <- function(sample_sizes = c(6, 8, 10),
     interpretation = c(
       "Start with rows where fit_rate is 1; low fit_rate can reflect weak information, boundary fits, model mismatch, or numerical difficulty and must be diagnosed before interpreting power.",
       "Prefer conductance_power and mean_conductance_cor for spline recovery because basis coefficients are not directly biological parameters.",
-      "Use selected_AICc_rate to ask whether the design can distinguish the flexible candidate from simpler alternatives.",
+      "Treat selected_AICc_rate as model-conditional recovery; check held-out prediction and sensitivity to nu_fit before selecting flexibility.",
       "Increase nsim and n_designs before making final sample-size decisions."
     )
   )

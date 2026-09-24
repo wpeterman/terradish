@@ -29,11 +29,10 @@ conductance surfaces, the model formula, and how to read a fitted model. Here we
 assume you already know how to fit a small model and focus on what changes when
 the landscape gets big.
 
-A note on the numbers below. A vignette cannot run a million-cell fit, so the
-runnable code uses the small bundled `melip` data only to show the calls. The
-scaling results are values measured on rasters far larger than `melip`, on a
-64 GB workstation. Absolute times are hardware dependent; the pattern is the
-point.
+The runnable code uses the bundled `melip` data to show the workflow.
+Time and memory depend on graph geometry, conductance contrast, the number of
+focal sites, and hardware. Measure those costs on your own design before
+committing to a large analysis.
 
 ```{r load}
 library(terradish)
@@ -65,9 +64,9 @@ grows into the hundreds of thousands and beyond:
    precision also depends on the supplied effective degrees of freedom, `nu`
    (Section 4).
 
-"Large" here means the regime where the default solver's memory use becomes the
-binding constraint. On a 64 GB workstation that boundary falls between roughly
-1.3 and 2.1 million cells; on a smaller machine it falls sooner.
+"Large" here means that graph factorization or repeated derivative solves
+dominate the analysis. There is no universal cell-count limit: missing cells,
+graph connectivity, and conductance contrast can change the practical limit.
 
 ---
 
@@ -92,39 +91,24 @@ fit <- terradish(melip.Fst ~ forestcover + altitude, surface,
                  solver = "amg")
 ```
 
-The choices:
+The choices are:
 
-- **`direct`** (default): a sparse Cholesky factorization. It is the fastest
-  option through several hundred thousand cells. Its factor "fill" (the nonzeros
-  the factorization adds) grows faster than the graph itself, so past some size
-  the factor no longer fits in memory. That is the **memory wall**.
-- **`amg`**: smoothed-aggregation **algebraic multigrid**, an iterative solver.
-  Each solve costs roughly linear time in `N`, and its iteration count stays
-  nearly constant as `N` grows (this is called mesh-independent convergence), so
-  total cost scales near-linearly. This is the intended path past the wall.
-- **`auto`**: lets `terradish` pick.
+- **`direct`** (default) uses sparse Cholesky factorization. It is a useful
+  reference for checking iterative results. The factor can contain many more
+  nonzero entries than the graph, so its memory requirements can grow rapidly.
+- **`amg`** uses algebraic multigrid as an iterative solver. It can reduce memory
+  demands on large grids, but convergence depends on conductance contrast and
+  graph structure. Strong barriers can require more iterations or tighter
+  solver settings. Check agreement with a direct solve on a manageable case.
+- **`auto`** uses `direct` below 1,500,000 graph vertices and `amg` at or above
+  that threshold with the default controls. The number of focal sites does not
+  override the large-graph switch. `solver_control$auto_amg_min_vertices`
+  changes the threshold; the legacy `auto_direct_max_rhs` is ignored.
 
-Measured behavior on a heterogeneous grid (one likelihood and gradient
-evaluation, 50 focal sites):
-
-| cells     | `direct` time | `amg` time | `amg` iterations |
-|-----------|---------------|------------|------------------|
-| 65,536    | 1.1 s         | 2.9 s      | 10               |
-| 262,144   | 3.9 s         | 7.0 s      | 13               |
-| 524,176   | 6.9 s         | 10.0 s     | 11               |
-| 1,048,576 | 14.4 s        | 21.2 s     | 12               |
-| 1,327,104 | 22.4 s        | 30.1 s     | 14               |
-| 2,096,704 | memory wall   | 39.2 s     | 12               |
-| 4,194,304 | memory wall   | 74.2 s     | 13               |
-
-**How to read this table.** `direct` is faster wherever it fits, but its time
-grows faster than the cell count and it eventually runs out of memory (here
-between 1.3 and 2.1 million cells). `amg` is slower at small sizes because each
-solve carries setup overhead, but its **iteration count barely moves** (10 to 14
-across a 64-fold increase in cells), so doubling the cells roughly doubles the
-time rather than more than doubling it, and it keeps running well past the wall.
-The decision rule: use `direct` while it fits in memory, and switch to `amg`
-once the raster is large enough that `direct` fails or thrashes.
+Use `terradish_assess_settings()` for a local speed and accuracy probe. Its
+recommendation concerns the tested settings and graph, not the scientific
+adequacy of the measurement model. Record the resolved solver and compare
+coefficient estimates and likelihoods when changing solver tolerances.
 
 This applies to every symmetric resistance model: any `conductance_model`
 (`loglinear_conductance`, `smooth_loglinear_conductance`, the Gaussian
@@ -142,12 +126,14 @@ Several computational choices matter here.
 
 ## Reusing Windows workers
 
-On Windows, `cores > 1` uses PSOCK workers for independent derivative
-calculations. `terradish()` now creates that worker pool once and reuses it
-throughout the outer optimization. The workers are stopped before the function
-returns and are never stored in the fitted object. This removes repeated
-cluster startup from derivative evaluations without changing the objective,
-gradient, Hessian, or returned estimates.
+Worker reuse is **experimental**. On Windows, `cores > 1` requests PSOCK
+workers for supported Hessian and partial-derivative calculations. It does
+not parallelize every step of a fit. The pool is reused during optimization
+and stopped before return; fitted objects do not retain live workers.
+AMG and the cached CHOLMOD backend ignore this setting. On small graphs,
+worker startup and data transfer can make multiple cores slower than one.
+Benchmark `cores = 1` first, then compare the elapsed time and numerical
+results with the requested worker count.
 
 Use one level of parallelism at a time. In particular, fixed-domain
 cross-validation evaluates folds serially and passes `cores` to each fit. This
@@ -252,50 +238,73 @@ the same comparison in the large-N solver regime, copy `CONFIG`, increase
 `side`, and set `solver = "amg"` or `solver = "auto"` before calling
 `run_curvature_large_landscape_benchmark()`.
 
-On the development workstation, the default 96 x 96 synthetic case gave:
+**How to read the benchmark.** Compare coefficients and likelihoods first,
+then standard errors, Hessian eigenvalues, and elapsed time. Agreement in
+point estimates does not guarantee agreement in curvature. A large difference
+in uncertainty warrants investigation of residuals, conditioning, and model
+misspecification before choosing the faster option.
 
-| Comparison | Result |
-|------------|--------|
-| Maximum absolute coefficient difference | 0 |
-| Absolute log-likelihood difference | 0 |
-| `ridge` SE ratio, `gauss_newton` / `exact` | 0.997 |
-| `basin` SE ratio, `gauss_newton` / `exact` | 0.994 |
-| Elapsed-time ratio, `gauss_newton` / `exact` | 0.807 |
-| Minimum exact-Hessian eigenvalue | 2363.5 |
-| Minimum Gauss-Newton eigenvalue | 2375.9 |
+## Information and effective degrees of freedom
 
-**How to read this benchmark.** The fitted surface did not move: the
-coefficients and log likelihood were identical. The standard errors were within
-1% because the simulated data were generated from the fitted model and the
-residual-weighted second-derivative terms were small. In this setting,
-`gauss_newton` was slightly faster and returned a positive-definite information
-matrix. If your real data show much larger differences in standard errors, run
-both curvature settings as a sensitivity check; that gap is evidence that model
-residuals or misspecification are affecting the observed curvature.
+For Wishart fits, `nu` is a positive effective degrees-of-freedom value supplied
+by the analyst. It is not estimated from the response and is not automatically
+the marker count. Linkage and shared population history can reduce the
+information represented by many markers. More graph cells alone do not supply
+more independent genetic information.
 
-## Markers and sites buy precision
+Holding the response and model fixed, changing `nu` leaves the likelihood
+optimum unchanged in theory and changes interior standard errors in proportion
+to `1 / sqrt(nu)`. Use `terradish_rescale_nu()` to inspect that sensitivity
+without refitting. Boundary inference needs separate care. Choose conductance
+complexity using held-out prediction and report inference across plausible
+`nu` values; see `vignette("model-comparison", package = "terradish")`.
 
-With the `generalized_wishart` measurement model, `nu` is the supplied effective
-Wishart degrees of freedom, not an estimated parameter or automatically the raw
-marker count. Holding the response and model fixed while varying `nu` shows the
-theoretical scaling pattern (focal sites held at 80):
+## Cropping and coarse warm starts
 
-| `nu`  | mean standard error |
-|-------|---------------------|
-| 500   | 0.0044              |
-| 1,000 | 0.0031              |
-| 2,000 | 0.0022              |
-| 4,000 | 0.0015              |
+Cropping removes routes outside the retained domain and can increase resistance
+between sites even when every site remains inside the crop. The supplied
+release audit found increases of 15–23% with a two-cell buffer and 1–2% with a
+ten-cell buffer. Those are results for that landscape, not universal buffer
+recommendations. Compare progressively wider buffers while retaining the same
+response, sites, formula, and covariate scaling.
 
-**How to read this.** The point estimates do not change with `nu`; only their
-precision does. The standard error falls as `1 / sqrt(nu)`: increasing the
-effective degrees of freedom eightfold (500 to 4,000) tightens the standard
-error about 2.9-fold,
-which is close to `sqrt(8) = 2.83`. Standard errors also shrink as you add focal
-sites in many designs, but the amount depends on their placement, covariate
-support, and the graph. Report a justified primary `nu` and sensitivity values;
-for microsatellites, use locus count as primary and $\sum_l(K_l-1)$ only as a
-larger sensitivity value.
+```{r crop-sensitivity, eval = FALSE}
+# Scale on the original domain once, before cropping.
+buffers <- c(2, 5, 10) * max(terra::res(covariates))
+fits_buffer <- lapply(buffers, function(buffer) {
+  cropped_surface <- conductance_surface(
+    covariates, melip.coords, directions = 8, crop_buffer = buffer
+  )
+  terradish(melip.Fst ~ forestcover + altitude, cropped_surface,
+            measurement_model = mlpe)
+})
+lapply(fits_buffer, coef)
+lapply(fits_buffer, confint)
+```
+
+**How to read the output.** Compare estimates and intervals across buffers,
+and inspect fitted resistance distances with `terradish_distance()`. Continue
+expanding the domain if the substantive conclusion changes. The small-buffer
+message is a diagnostic prompt, not proof that a larger buffer is adequate.
+
+Coarse rasters can provide starting values, but the final fit must be refined
+on the original graph. Coarsening changes both routes and covariate summaries.
+The supported coarse-raster workflow therefore requires exact refinement:
+
+```{r coarse-warm-start, eval = FALSE}
+fit <- terradish(
+  melip.Fst ~ forestcover + altitude, surface,
+  measurement_model = mlpe,
+  approximation = "coarse_raster",
+  approximation_control = list(factor = c(4, 2), exact_refine = TRUE)
+)
+summary(fit)
+```
+
+Inspect convergence after the final refinement. A converged coarse fit does
+not establish convergence on the original graph. `terradish_grid()` accepts
+only `approximation = "none"`; coarse-only likelihoods are not supported
+for ranking models.
 
 ---
 
@@ -334,8 +343,6 @@ also removes the strongest stored check for later model comparison.
 
 ---
 
-<!-- Phase 7: rewrite -->
-
 ## Quick reference
 
 ```{r quick-ref, eval = FALSE}
@@ -366,6 +373,8 @@ saveRDS(fit_archive, "fit-archive.rds")
 | `conductance_surface()` | Build the weighted graph over the raster grid |
 | `terradish()` | Fit the model; takes `solver` and `curvature` |
 | `terradish_algorithm()` | One likelihood and gradient evaluation; same `solver` and `curvature` |
+| `crop_to_focal_buffer()` | Crop with an explicit map-unit buffer; check domain sensitivity |
+| `terradish_assess_settings()` | Compare computational settings on the current graph |
 | `slim_terradish()` | Remove prediction closures and other optional large components before storage |
 
 ## See also
@@ -376,4 +385,3 @@ saveRDS(fit_archive, "fit-archive.rds")
   covariance Wishart measurement models and the role of `nu`.
 - **`vignette("model-comparison", package = "terradish")`** ranking competing
   models with AIC and likelihood ratio tests.
-  directional model, which uses a separate algorithm.

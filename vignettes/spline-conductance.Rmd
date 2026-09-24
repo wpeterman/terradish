@@ -47,7 +47,13 @@ None of these shapes can be captured by a single linear term on the log scale. A
 
 $$C_i = \exp(B_i \boldsymbol{\theta})$$
 
-where $B_i$ is a row of the **expanded design matrix** for raster cell $i$. For covariates not wrapped in `s()`, $B_i$ contains the raw value. For covariates wrapped in `s()`, $B_i$ contains several basis-function evaluations instead of one raw value. The optimizer still sees an ordinary log-linear model; the splines live entirely inside the design matrix, which is computed once and then treated as fixed.
+where $B_i$ is a row of the **expanded design matrix** for raster cell $i$. For covariates not wrapped in `s()`, $B_i$ contains the raw value. For covariates wrapped in `s()`, $B_i$ contains several basis-function evaluations instead of one raw value. The optimizer still sees an ordinary log-linear model; the splines live entirely inside the design matrix, which is computed once and then treated as fixed. These are **unpenalized**
+regression splines with a chosen number of coefficients, not smooths whose
+complexity is estimated by a smoothing penalty. Knots, boundary knots, and
+column-centering offsets are retained from training. Plotting and new-surface
+prediction reuse that basis rather than selecting new knots. Centering removes
+an arbitrary constant conductance multiplier; it does not change the fitted
+shape.
 
 ------------------------------------------------------------------------
 
@@ -55,7 +61,7 @@ where $B_i$ is a row of the **expanded design matrix** for raster cell $i$. For 
 
 A spline is a piecewise polynomial function that is constrained to be smooth (continuous and differentiable) at the join points, called **knots**. Instead of estimating a single slope for altitude, we estimate a weighted combination of several basis functions, each capturing part of the altitude range.
 
-The figure below shows what natural spline and B-spline basis functions look like for a covariate that runs from −2 to 2 (as after `scale_covariates()`):
+The figure below shows centered natural spline and B-spline basis functions look like for a covariate that runs from −2 to 2 (as after `scale_covariates()`):
 
 ```{r basis-demo, fig.cap = "***Natural spline (ns) and B-spline (bs) basis functions for a standardized covariate.*** Each colored line is one basis column. The fitted conductance association is a weighted combination of all basis functions in a panel.", fig.height = 5}
 library(splines)
@@ -64,10 +70,10 @@ library(terradish)
 x_seq <- seq(-2, 2, length.out = 300)
 
 # Natural spline basis with df = 4
-B_ns <- ns(x_seq, df = 4)
+B_ns <- scale(ns(x_seq, df = 4), center = TRUE, scale = FALSE)
 
 # B-spline basis with k = 4 columns, degree 3 (cubic)
-B_bs <- bs(x_seq, df = 4, degree = 3)
+B_bs <- scale(bs(x_seq, df = 4, degree = 3), center = TRUE, scale = FALSE)
 
 par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
 
@@ -114,8 +120,10 @@ More basis functions → more shape flexibility → more parameters to estimate.
 
 - **df = 3 or 4** is a good starting point for most covariates. This allows a single hump, valley, or threshold-like shape.
 - **df = 2** is a low-flexibility nonlinear curve; it adds one parameter over the linear model and can represent simple curvature.
-- **df ≥ 6** should be reserved for cases where both the data and a clear ecological hypothesis support it; compare against simpler models with AICc.
-- Consider **AICc** when the number of focal sites is small relative to the number of estimated parameters. `terradish` uses focal sites, not the number of dependent population pairs, as `n` in its AICc calculation.
+- **df ≥ 6** should be reserved for cases where both the data and a clear ecological hypothesis support it; compare against simpler predeclared models with held-out prediction.
+- Use common cross-validation folds for the candidate shapes. AICc is a
+  secondary diagnostic under its focal-site sample-size convention; it does
+  not make all site pairs independent or calibrate an uncertain Wishart `nu`.
 
 ------------------------------------------------------------------------
 
@@ -347,7 +355,10 @@ The spline coefficients for `s(altitude)` are not directly comparable to the sin
 
 ## Model comparison
 
-Use AICc (small-sample-corrected AIC) to account for the different number of parameters across models:
+Predeclare a small candidate set and compare held-out scores on common folds.
+AIC and AICc can over-select flexible conductance models, especially when
+Wishart `nu` overstates effective information. The following table remains a
+useful in-sample diagnostic, but it should not determine spline complexity:
 
 ```{r aic-table}
 aic_table(
@@ -368,6 +379,45 @@ Interpret this table as a first-pass diagnostic, not a definitive verdict:
 - **Larger ΔAICc**: progressively less support relative to the top-ranked model. Interpret the magnitude together with model complexity, stability, and the predeclared scientific hypotheses.
 
 An AICc improvement should be evaluated alongside the stability and scientific plausibility of the marginal association. A spline with a lower AICc but an implausible shape (oscillating wildly, extreme at the edges) should be treated with skepticism.
+
+------------------------------------------------------------------------
+
+### Cross-validation and monotonicity
+
+```{r spline-cv, eval = FALSE}
+# Center a local distance projection on the sampled Brazilian sites.
+lonlat <- terra::crds(terra::project(melip.coords, "EPSG:4326"))
+local_crs <- sprintf("+proj=aeqd +lat_0=%f +lon_0=%f +datum=WGS84 +units=m",
+                     mean(lonlat[, 2]), mean(lonlat[, 1]))
+coords_projected <- terra::project(melip.coords, local_crs)
+folds <- terradish_folds(coords_projected, k = 5, seed = 42)
+cv_shape <- terradish_cv_folds(
+  data = surface,
+  formulas = list(linear = melip.Fst ~ forestcover + altitude,
+    spline = melip.Fst ~ forestcover + s(altitude, df = 4)),
+  folds = folds, model = mlpe, nuisance = "fixed",
+  conductance_model = list(linear = loglinear_conductance,
+                           spline = smooth_loglinear_conductance)
+)
+cv_shape$summary
+```
+
+**How to read the output.** Compare paired score differences on common
+successful folds. Prefer the simpler shape when the difference is small
+relative to its fold-to-fold uncertainty, and inspect failures before ranking.
+See `vignette("model-comparison", package = "terradish")` for repeated folds
+and the distinction between fixed and reprofiled nuisance parameters.
+
+```{r monotonicity}
+summary(fit_ns_alt)$spline_monotonicity
+```
+
+The monotonicity table checks the derivative of each fitted smooth over its
+focal-site covariate range. It reports direction and derivative sign changes;
+it is a shape diagnostic, not a hypothesis test or evidence of an ecological
+threshold. Even a predictively useful spline can reflect how a population
+process maps onto the graph rather than a direct ecological response to the
+covariate. Inspect the conditional curve and its uncertainty.
 
 ------------------------------------------------------------------------
 
@@ -448,7 +498,7 @@ p_resp_ns | p_resp_bs
 
 Spline models are especially sensitive to sparse support at covariate tails. To keep spline marginals and predicted conductance maps anchored to focal-site support, use `support = "focal"` with quantile bounds:
 
-```{r spline-support-clamp, eval = FALSE}
+```{r spline-support-clamp}
 plot(
   fit_ns_alt,
   type = "marginal",
@@ -469,6 +519,12 @@ cond_ns_alt_focal <- conductance(
 ```
 
 ------------------------------------------------------------------------
+
+Clamping replaces covariate values outside the requested focal-cell
+quantiles with the nearest limit. The fitted spline basis and centering remain
+fixed. Unclamped `conductance()` and marginal plots use the same centered
+prediction basis, so they should agree on the relative conductance scale.
+Clamping changes predictions, not the likelihood or the estimated shape.
 
 ## Observed vs. fitted genetic distances
 
@@ -596,7 +652,10 @@ aic_table(
 )
 ```
 
-**Reading the df comparison**: Start from the most constrained model (df = 2) and add flexibility only if the AICc improves meaningfully *and* the shape is ecologically plausible. Oscillating or extreme-at-boundary curves with high df are likely fitting noise.
+**Reading the df comparison.** Compare these predeclared shapes using the
+same held-out folds. An AICc improvement alone does not justify extra
+coefficients. Inspect monotonicity, uncertainty, boundary behavior, and the
+stability of the selected shape across folds.
 
 ------------------------------------------------------------------------
 
@@ -720,13 +779,13 @@ Use `smooth_loglinear_conductance()` when:
 
 1.  **There is a prior ecological reason** to expect a non-linear landscape association, e.g. an intermediate optimum, a threshold, or a well-documented hump-shaped response in the literature.
 2.  **The linear model's marginal association is implausible**: e.g. a strong negative altitude coefficient that would predict near-zero conductance at high elevations where sampling actually occurs.
-3.  **The design can support the extra parameters.** Pairwise observations are dependent, so do not justify spline complexity by counting all site pairs as independent replicates. Evaluate stability, focal-site support, AICc under its stated convention, and simulation under plausible scenarios.
+3.  **The design can support the extra parameters.** Pairwise observations are dependent, so do not justify spline complexity by counting all site pairs as independent replicates. Evaluate held-out prediction, stability, focal-site support, and simulation under plausible scenarios.
 
 ### When to stay with the linear model
 
 - Designs with sparse focal-site or covariate support relative to the proposed spline complexity.
 - No prior hypothesis about a non-linear association; treat splines as exploratory rather than confirmatory.
-- The spline and linear models give similar AICc; parsimony favors the simpler model.
+- The spline and linear models give similar held-out scores; parsimony favors the simpler model.
 
 ### Suggested workflow
 
@@ -775,34 +834,27 @@ fit_spline <- terradish(
   approximation_control = rec$approximation_control
 )
 
-# Step 4: Compare with AICc
-aic_table(list(fit_linear, fit_spline),
-          mod_names = c("Linear", "Spline df=3"),
-          AICc = TRUE)
+# Step 4: Compare the predeclared shapes on the same folds.
+folds <- terradish_folds(coords_projected, k = 5, seed = 42)
+cv <- terradish_cv_folds(
+  surface,
+  formulas = list(linear = S ~ covar2 + covar1,
+                  spline = S ~ covar2 + s(covar1, df = 3)),
+  folds = folds, model = mlpe, nuisance = "fixed",
+  conductance_model = list(linear = loglinear_conductance,
+                           spline = smooth_loglinear_conductance)
+)
+cv$summary
 
-# Step 5: Inspect the spline marginal association
+# Step 5: Inspect the fitted shape and its derivative sign changes.
+summary(fit_spline)$spline_monotonicity
 plot(fit_spline, type = "marginal", data = surface)
 
-# Step 6: If AICc improved and the curve is plausible, try more flexibility
-fit_spline4 <- terradish(
-  S ~ covar2 + s(covar1, df = 4),
-  data              = surface,
-  conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer         = rec$optimizer,
-  control           = rec$control,
-  solver            = rec$solver,
-  solver_control    = rec$solver_control,
-  approximation     = rec$approximation,
-  approximation_control = rec$approximation_control
-)
-
-aic_table(list(fit_linear, fit_spline, fit_spline4),
-          mod_names = c("Linear", "df=3", "df=4"),
-          AICc = TRUE)
+# Step 6: Prefer the simpler model if predictive differences are inconclusive.
+# Add larger-df models only as a declared sensitivity analysis, not an AIC search.
 
 # Step 7: Visualize the selected model
-best_fit <- fit_spline  # or whichever won
+best_fit <- fit_spline  # choose after reviewing CV, convergence, and shape
 plot(best_fit, type = "fit",             data = surface)
 plot(best_fit, type = "surface",         data = surface)
 plot(best_fit, type = "marginal",        data = surface)

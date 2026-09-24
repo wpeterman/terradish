@@ -1,0 +1,13 @@
+terra 1.9.34
+
+Attaching package: 'terra'
+
+The following objects are masked from 'package:testthat':
+
+    compare, describe
+
+Warning message:
+Two or more focal sites share a raster cell; use a finer raster or review the site coordinates. 
+ base joint 
+    0     0 
+No spelling errors found.

@@ -1,0 +1,21 @@
+ℹ Loading terradish
+  WORD            FOUND IN
+absdiff         NEWS.md:14
+comparator      getting-started.Rmd:530
+estimand        wishart-covariance.Rmd:209
+exponentiate    getting-started.Rmd:669
+gower           NEWS.md:97
+landgraph's     README.md:64
+layerwise       NEWS.md:25
+natively        description:10
+predictively    spline-conductance.Rmd:415
+PSD             NEWS.md:94
+recalibration   ibe-ibr-workflow.Rmd:268
+                model-comparison.Rmd:565
+reoptimizing    gaussian-scale-optimization.Rmd:578
+Reprofiling     ibe-ibr-workflow.Rmd:268
+restandardize   ibe-ibr-workflow.Rmd:91
+unclamped       ibe-ibr-workflow.Rmd:297
+Unclamped       spline-conductance.Rmd:523
+Unsampled       model-comparison.Rmd:516
+45 R files retain their C6 executable expressions.

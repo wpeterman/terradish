@@ -1,0 +1,21 @@
+
+RENDER ibe-ibr-workflow 
+
+
+processing file: ibe-ibr-workflow.Rmd
+1/33                           
+2/33 [setup]                   
+3/33                           
+4/33 [landscape]               
+5/33                           
+6/33 [measurement-models]      
+7/33                           
+8/33 [response]                
+9/33                           
+10/33 [fit-models]              
+
+Quitting from ibe-ibr-workflow.Rmd:126-151 [fit-models]
+Error in vapply(env$fits, function(fit) fit$convergence$code, integer(1)) : 
+  values must be type 'integer',
+ but FUN(X[[3]]) result is type 'double'
+Execution halted

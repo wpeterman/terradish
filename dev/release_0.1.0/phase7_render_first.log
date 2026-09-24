@@ -1,0 +1,406 @@
+
+RENDER getting-started 
+
+
+processing file: getting-started.Rmd
+1/61                             
+2/61 [setup]                     
+3/61                             
+4/61 [unnamed-chunk-1]           
+5/61                             
+6/61 [unnamed-chunk-2]           
+7/61                             
+8/61 [load]                      
+9/61                             
+10/61 [data]                      
+11/61                             
+12/61 [inspect-data]              
+13/61                             
+14/61 [plot-covariates]           
+15/61                             
+16/61 [plot-forestcover]          
+17/61                             
+18/61 [scale]                     
+19/61                             
+20/61 [surface]                   
+21/61                             
+22/61 [surface-check]             
+23/61                             
+24/61 [crop-buffer-example]       
+25/61                             
+26/61 [coarse-raster-example]     
+27/61                             
+28/61 [assess-settings-demo]      
+29/61                             
+30/61 [assess-use]                
+31/61                             
+32/61 [assess-edit]               
+33/61                             
+34/61 [fit-leastsquares]          
+35/61                             
+36/61 [summary-ls]                
+37/61                             
+38/61 [fit-mlpe]                  
+39/61                             
+40/61 [fit-wishart]               
+41/61                             
+42/61 [compare-measurement-models]
+43/61                             
+44/61 [coef]                      
+45/61                             
+46/61 [interpret]                 
+47/61                             
+48/61 [coefficient-uncertainty]   
+49/61                             
+50/61 [plot-fit]                  
+51/61                             
+52/61 [conductance-surface]       
+53/61                             
+54/61 [marginal-effects]          
+55/61                             
+56/61 [marginal-conductance]      
+57/61                             
+58/61 [support-clamp]             
+59/61                             
+60/61 [full-workflow]             
+61/61                             
+output file: getting-started.knit.md
+
+"C:/Program Files/RStudio/resources/app/bin/quarto/bin/tools/pandoc" +RTS -K512m -RTS getting-started.knit.md --to html4 --from markdown+autolink_bare_uris+tex_math_single_backslash --output pandoc13cd816354600.html --lua-filter "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmarkdown\lua\pagebreak.lua" --lua-filter "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmarkdown\lua\latex-div.lua" --lua-filter "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmarkdown\lua\table-classes.lua" --embed-resources --standalone --section-divs --table-of-contents --toc-depth 3 --template "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmd\h\default.html" --syntax-highlighting pygments --number-sections --css "C:/Users/peterman.73/AppData/Local/R/win-library/4.6/rmarkdown/rmarkdown/templates/html_vignette/resources/vignette.css" --mathjax --variable "mathjax-url=https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" --include-in-header "C:\Users\peterman.73\AppData\Local\Temp\Rtmpghcd1T\rmarkdown-str13cd82bf441fe.html" 
+
+Output created: dev/check/phase7-render-first/getting-started.html
+$started
+[1] "2026-09-24 16:57:34 EDT"
+
+$finished
+[1] "2026-09-24 16:58:49 EDT"
+
+$result
+[1] "C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/dev/check/phase7-render-first/getting-started.html"
+
+$warnings
+character(0)
+
+
+RENDER large-landscapes 
+
+
+processing file: large-landscapes.Rmd
+1/21                          
+2/21 [setup]                  
+3/21                          
+4/21 [load]                   
+5/21                          
+6/21 [solver-calls]           
+7/21                          
+8/21 [measurement-control]    
+9/21                          
+10/21 [curvature-calls]        
+11/21                          
+12/21 [curvature-benchmark-run]
+13/21                          
+14/21 [crop-sensitivity]       
+15/21                          
+16/21 [coarse-warm-start]      
+17/21                          
+18/21 [slim-fit]               
+19/21                          
+20/21 [quick-ref]              
+21/21                          
+output file: large-landscapes.knit.md
+
+"C:/Program Files/RStudio/resources/app/bin/quarto/bin/tools/pandoc" +RTS -K512m -RTS large-landscapes.knit.md --to html4 --from markdown+autolink_bare_uris+tex_math_single_backslash --output pandoc13cd841de13b1.html --lua-filter "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmarkdown\lua\pagebreak.lua" --lua-filter "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmarkdown\lua\latex-div.lua" --lua-filter "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmarkdown\lua\table-classes.lua" --embed-resources --standalone --section-divs --table-of-contents --toc-depth 3 --template "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmd\h\default.html" --syntax-highlighting pygments --number-sections --css "C:/Users/peterman.73/AppData/Local/R/win-library/4.6/rmarkdown/rmarkdown/templates/html_vignette/resources/vignette.css" --mathjax --variable "mathjax-url=https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" --include-in-header "C:\Users\peterman.73\AppData\Local\Temp\Rtmpghcd1T\rmarkdown-str13cd833eb10e4.html" 
+
+Output created: dev/check/phase7-render-first/large-landscapes.html
+$started
+[1] "2026-09-24 16:58:49 EDT"
+
+$finished
+[1] "2026-09-24 16:58:50 EDT"
+
+$result
+[1] "C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/dev/check/phase7-render-first/large-landscapes.html"
+
+$warnings
+character(0)
+
+
+RENDER model-comparison 
+
+
+processing file: model-comparison.Rmd
+1/43                            
+2/43 [setup]                    
+3/43                            
+4/43 [load-and-fit]             
+5/43                            
+6/43 [assess-for-comparison]    
+7/43                            
+8/43 [lrt]                      
+9/43                            
+10/43 [ibd-test]                 
+11/43                            
+12/43 [interaction-test]         
+13/43                            
+14/43 [fit-all-candidates]       
+15/43                            
+16/43 [aic-table]                
+17/43                            
+18/43 [nu-sensitivity]           
+19/43                            
+20/43 [aicc-table]               
+21/43                            
+22/43 [bic-table]                
+23/43                            
+24/43 [likelihood-grid]          
+25/43                            
+26/43 [plot-likelihood-surface]  
+27/43                            
+28/43 [likelihood-grid-coarse]   
+29/43                            
+30/43 [ci-conductance]           
+31/43                            
+32/43 [marginal-conductance]     
+33/43                            
+34/43 [support-clamp-marginal]   
+35/43                            
+36/43 [support-clamp-conductance]
+37/43                            
+38/43 [cv-spatial-folds]         
+39/43                            
+40/43 [cv-repeats]               
+41/43                            
+42/43 [qref-mc]                  
+43/43                            
+output file: model-comparison.knit.md
+
+"C:/Program Files/RStudio/resources/app/bin/quarto/bin/tools/pandoc" +RTS -K512m -RTS model-comparison.knit.md --to html4 --from markdown+autolink_bare_uris+tex_math_single_backslash --output pandoc13cd815c62e44.html --lua-filter "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmarkdown\lua\pagebreak.lua" --lua-filter "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmarkdown\lua\latex-div.lua" --lua-filter "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmarkdown\lua\table-classes.lua" --embed-resources --standalone --section-divs --table-of-contents --toc-depth 3 --template "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmd\h\default.html" --syntax-highlighting pygments --number-sections --css "C:/Users/peterman.73/AppData/Local/R/win-library/4.6/rmarkdown/rmarkdown/templates/html_vignette/resources/vignette.css" --mathjax --variable "mathjax-url=https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" --include-in-header "C:\Users\peterman.73\AppData\Local\Temp\Rtmpghcd1T\rmarkdown-str13cd846db6100.html" 
+
+Output created: dev/check/phase7-render-first/model-comparison.html
+$started
+[1] "2026-09-24 16:58:50 EDT"
+
+$finished
+[1] "2026-09-24 16:58:51 EDT"
+
+$result
+[1] "C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/dev/check/phase7-render-first/model-comparison.html"
+
+$warnings
+character(0)
+
+
+RENDER wishart-covariance 
+
+
+processing file: wishart-covariance.Rmd
+1/41                         
+2/41 [setup]                 
+3/41                         
+4/41 [biallelic-example]     
+5/41                         
+6/41 [feature-example]       
+7/41                         
+8/41 [microsatellite-example]
+9/41                         
+10/41 [check-eigenvalues]     
+11/41                         
+12/41 [landscape-setup]       
+13/41                         
+14/41 [simulate-covariance]   
+15/41                         
+16/41 [real-data-sketch]      
+17/41                         
+18/41 [fit-wishart-covariance]
+19/41                         
+20/41 [nu-invariance]         
+21/41                         
+22/41 [nu-se]                 
+23/41                         
+24/41 [recovery]              
+25/41                         
+26/41 [plot-fit]              
+27/41                         
+28/41 [plot-surface]          
+29/41                         
+30/41 [plot-marginal]         
+31/41                         
+32/41 [wishart-support-clamp] 
+33/41                         
+34/41 [check-gw-response]     
+35/41                         
+36/41 [ade4-cross-check]      
+37/41                         
+38/41 [compare-gw]            
+39/41                         
+40/41 [full-workflow]         
+41/41                         
+output file: wishart-covariance.knit.md
+
+"C:/Program Files/RStudio/resources/app/bin/quarto/bin/tools/pandoc" +RTS -K512m -RTS wishart-covariance.knit.md --to html4 --from markdown+autolink_bare_uris+tex_math_single_backslash --output pandoc13cd815a11be3.html --lua-filter "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmarkdown\lua\pagebreak.lua" --lua-filter "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmarkdown\lua\latex-div.lua" --lua-filter "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmarkdown\lua\table-classes.lua" --embed-resources --standalone --section-divs --table-of-contents --toc-depth 3 --template "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmd\h\default.html" --syntax-highlighting pygments --number-sections --css "C:/Users/peterman.73/AppData/Local/R/win-library/4.6/rmarkdown/rmarkdown/templates/html_vignette/resources/vignette.css" --mathjax --variable "mathjax-url=https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" --include-in-header "C:\Users\peterman.73\AppData\Local\Temp\Rtmpghcd1T\rmarkdown-str13cd875de7e92.html" 
+
+Output created: dev/check/phase7-render-first/wishart-covariance.html
+$started
+[1] "2026-09-24 16:58:51 EDT"
+
+$finished
+[1] "2026-09-24 16:59:13 EDT"
+
+$result
+[1] "C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/dev/check/phase7-render-first/wishart-covariance.html"
+
+$warnings
+character(0)
+
+
+RENDER spline-conductance 
+
+
+processing file: spline-conductance.Rmd
+1/61                       
+2/61 [setup]               
+3/61                       
+4/61 [basis-demo]          
+5/61                       
+6/61 [load-data]           
+7/61                       
+8/61 [prepare-covariates]  
+9/61                       
+10/61 [assess-spline]       
+11/61                       
+12/61 [assess-spline-use]   
+13/61                       
+14/61 [fit-models]          
+15/61                       
+16/61 [inspect-design]      
+17/61                       
+18/61 [show-coefs]          
+19/61                       
+20/61 [aic-table]           
+21/61                       
+22/61 [spline-cv]           
+23/61                       
+24/61 [monotonicity]        
+25/61                       
+26/61 [marginal-ns-vs-bs]   
+27/61                       
+28/61 [marginal-all]        
+29/61                       
+30/61 [marginal-response]   
+31/61                       
+32/61 [spline-support-clamp]
+33/61                       
+34/61 [obs-vs-fitted]       
+35/61                       
+36/61 [surface-ns-alt]      
+37/61                       
+38/61 [surface-compare]     
+39/61                       
+40/61 [ns-df-comparison]    
+41/61                       
+42/61 [ns-df-aic]           
+43/61                       
+44/61 [bs-degree-comparison]
+45/61                       
+46/61 [mixed-terms]         
+47/61                       
+48/61 [mixed-marginal]      
+49/61                       
+50/61 [final-aic]           
+51/61                       
+52/61 [workflow]            
+53/61                       
+54/61 [overfit-check]       
+55/61                       
+56/61 [recovery-path]       
+57/61                       
+58/61 [recovery-script]     
+59/61                       
+60/61 [quickref]            
+61/61                       
+output file: spline-conductance.knit.md
+
+"C:/Program Files/RStudio/resources/app/bin/quarto/bin/tools/pandoc" +RTS -K512m -RTS spline-conductance.knit.md --to html4 --from markdown+autolink_bare_uris+tex_math_single_backslash --output pandoc13cd877b72a58.html --lua-filter "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmarkdown\lua\pagebreak.lua" --lua-filter "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmarkdown\lua\latex-div.lua" --lua-filter "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmarkdown\lua\table-classes.lua" --embed-resources --standalone --section-divs --table-of-contents --toc-depth 3 --template "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmd\h\default.html" --syntax-highlighting pygments --number-sections --css "C:/Users/peterman.73/AppData/Local/R/win-library/4.6/rmarkdown/rmarkdown/templates/html_vignette/resources/vignette.css" --mathjax --variable "mathjax-url=https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" --include-in-header "C:\Users\peterman.73\AppData\Local\Temp\Rtmpghcd1T\rmarkdown-str13cd8474e57c1.html" 
+
+Output created: dev/check/phase7-render-first/spline-conductance.html
+$started
+[1] "2026-09-24 16:59:13 EDT"
+
+$finished
+[1] "2026-09-24 16:59:14 EDT"
+
+$result
+[1] "C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/dev/check/phase7-render-first/spline-conductance.html"
+
+$warnings
+character(0)
+
+
+RENDER gaussian-scale-optimization 
+
+
+processing file: gaussian-scale-optimization.Rmd
+1/47                         
+2/47 [setup]                 
+3/47                         
+4/47 [load]                  
+5/47                         
+6/47 [surface]               
+7/47                         
+8/47 [gaussian-model]        
+9/47                         
+10/47 [fit]                   
+11/47                         
+12/47 [gaussian-coarse-start] 
+13/47                         
+14/47 [coef]                  
+15/47                         
+16/47 [sigma]                 
+17/47                         
+18/47 [sigma-profile]         
+19/47                         
+20/47 [sigma-summary]         
+21/47                         
+22/47 [sigma-plot]            
+23/47                         
+24/47 [sigma-plot-km]         
+25/47                         
+26/47 [fixed-fit]             
+27/47                         
+28/47 [compare-table]         
+29/47                         
+30/47 [gaussian-cv]           
+31/47                         
+32/47 [summary]               
+33/47                         
+34/47 [conductance]           
+35/47                         
+36/47 [conductance-plot]      
+37/47                         
+38/47 [gaussian-support-clamp]
+39/47                         
+40/47 [surface-two]           
+41/47                         
+42/47 [fit-two]               
+43/47                         
+44/47 [sigma-two]             
+45/47                         
+46/47 [qref-gs]               
+47/47                         
+output file: gaussian-scale-optimization.knit.md
+
+"C:/Program Files/RStudio/resources/app/bin/quarto/bin/tools/pandoc" +RTS -K512m -RTS gaussian-scale-optimization.knit.md --to html4 --from markdown+autolink_bare_uris+tex_math_single_backslash --output pandoc13cd85fe717cb.html --lua-filter "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmarkdown\lua\pagebreak.lua" --lua-filter "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmarkdown\lua\latex-div.lua" --lua-filter "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmarkdown\lua\table-classes.lua" --embed-resources --standalone --section-divs --table-of-contents --toc-depth 3 --template "C:\Users\peterman.73\AppData\Local\R\win-library\4.6\rmarkdown\rmd\h\default.html" --syntax-highlighting pygments --number-sections --css "C:/Users/peterman.73/AppData/Local/R/win-library/4.6/rmarkdown/rmarkdown/templates/html_vignette/resources/vignette.css" --mathjax --variable "mathjax-url=https://mathjax.rstudio.com/latest/MathJax.js?config=TeX-AMS-MML_HTMLorMML" --include-in-header "C:\Users\peterman.73\AppData\Local\Temp\Rtmpghcd1T\rmarkdown-str13cd8354c9b.html" 
+
+Output created: dev/check/phase7-render-first/gaussian-scale-optimization.html
+$started
+[1] "2026-09-24 16:59:14 EDT"
+
+$finished
+[1] "2026-09-24 17:00:03 EDT"
+
+$result
+[1] "C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/dev/check/phase7-render-first/gaussian-scale-optimization.html"
+
+$warnings
+character(0)
+

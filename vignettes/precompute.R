@@ -1,11 +1,14 @@
 # vignettes/precompute.R
 #
-# Pre-computes slow simulation results for package vignettes.
+# Optional exploratory power-study driver. The current vignettes do not load
+# these artifacts; they contain self-contained examples and explicit recipes.
+# Results are conditional on the generating model and supplied effective nu.
+# Archived outputs from older versions are not validation of the current code.
 # Run this script manually whenever you want to refresh the artifacts:
 #
 #   source("vignettes/precompute.R")
 #
-# Output files (committed to source):
+# Optional local outputs (not included in the built package):
 #   vignettes/vignette-nu-power.rds
 #   vignettes/vignette-power.rds
 #
@@ -52,9 +55,10 @@ screen_power <- function(sample_size, nu, signal_ratio, seed) {
     tau               = signal_ratio * screen_sigma,
     sigma             = screen_sigma,
     nu                = nu,
+    nu_fit            = nu,
     nsim              = screen_nsim,
     seed              = seed,
-    control           = NewtonRaphsonControl(maxit = 10, verbose = FALSE)
+    control           = NewtonRaphsonControl(maxit = 100, verbose = FALSE)
   )
   out <- assessment$parameter_summary
   stopifnot(nrow(out) == 1L, out$parameter == "altitude")
@@ -116,10 +120,11 @@ power <- covariance_response_power(
   tau        = tau_true,
   sigma      = sigma_true,
   nu         = 100,
+  nu_fit     = 100,
   nsim       = 20,
   n_designs  = 2,
   seed       = 1,
-  control    = NewtonRaphsonControl(maxit = 10, verbose = FALSE)
+  control    = NewtonRaphsonControl(maxit = 100, verbose = FALSE)
 )
 
 saveRDS(power, "vignettes/vignette-power.rds")

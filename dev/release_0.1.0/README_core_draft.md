@@ -61,7 +61,7 @@ Spline models are unpenalized regression splines with fixed degrees of freedom. 
 | Allele-frequency covariance | `wishart_covariance` | Coherent covariance and explicit effective information |
 | Squared distances derived from covariance | `generalized_wishart` | Admissible geometry and explicit effective information |
 
-The two Wishart forms use the same site-contrast likelihood for matching covariance and distance representations. Passing `check_distance_response()` does not give an FST ratio estimator a Wishart sampling model. Grouped covariance should use the coherent `gower` diagonal from landgraph; `within` is on a different scale. Rare-variant weighting and unequal group sizes require sensitivity checks.
+The two Wishart forms use the same site-contrast likelihood for matching covariance and distance representations. Passing `check_distance_response()` does not give an FST ratio estimator a Wishart sampling model. Grouped covariance should use landgraph's coherent `gower` diagonal; `within` is on a different scale. Rare-variant weighting and unequal group sizes require sensitivity checks.
 
 ### What `nu` changes
 
@@ -74,12 +74,9 @@ Use `terradish_rescale_nu(fit, nu = ...)` to report conclusions over plausible v
 ```r
 # Raster covariates come first; coordinates come second.
 environment <- pairwise_endpoint_covariates(covariates, sites)
-lonlat <- terra::crds(terra::project(sites, "EPSG:4326"))
-local_crs <- sprintf("+proj=aeqd +lat_0=%f +lon_0=%f +datum=WGS84 +units=m",
-                     mean(lonlat[, 2]), mean(lonlat[, 1]))
-projected_sites <- terra::project(sites, local_crs)
+projected_sites <- terra::project(sites, "EPSG:5070")
 pairwise <- pairwise_covariates(environment,
-  geographic_100km = dist(terra::crds(projected_sites)) / 100000)
+  geographic = dist(terra::crds(projected_sites)))
 
 joint <- terradish(melip.Fst ~ forestcover + altitude, graph,
                    measurement_model = mlpe_covariates(pairwise))
@@ -89,7 +86,7 @@ terradish_ibe_ratio(joint)
 wishart_measurement <- wishart_covariates(pairwise, model = "wishart_covariance")
 ```
 
-Geographic differences in this example are in units of 100 km. The IBE:IBR ratio expresses an environmental difference in resistance-distance units with a joint uncertainty interval. Raw coefficients are not directly comparable across families. Ratios require matching transforms and scaling and are undefined when the resistance coefficient is zero.
+The IBE:IBR ratio expresses an environmental difference in resistance-distance units with a joint uncertainty interval. Raw coefficients are not directly comparable across families. Ratios require matching transforms and scaling and are undefined when the resistance coefficient is zero.
 
 Environmental terms can reflect assortative mating, dispersal filtering, local adaptation, or environmental patterns in site variance. Report conductance fits with and without pairwise terms because signs can change. A uniform `~ 1` surface with environmental terms represents **IBD + IBE**, not IBE alone.
 

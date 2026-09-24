@@ -36,15 +36,21 @@ distance matrix:
 
 1.  Summarize the genetic data as a **covariance matrix** between
     populations.
-2.  Fit the resistance model with `wishart_covariance`, which evaluates
-    the full Wishart likelihood on that covariance matrix using the
-    effective marker degrees of freedom as the parameter `nu`.
+2. Fit the resistance model with `wishart_covariance`, using a declared
+   effective degrees of freedom, `nu`.
 
-Every off-diagonal element and the diagonal contribute to the covariance
-likelihood. A lossless, consistently centered distance transformation
-can carry the same information, so covariance input is not inherently
-superior. It is the natural choice when the scientific summary is
-covariance and its diagonal is meaningful.
+Both Wishart interfaces use the **contrast likelihood**. For an orthonormal
+site-contrast matrix `Q`, the covariance likelihood uses `Q' S Q` and the
+corresponding fitted contrast covariance. Components in the constant-site
+direction are excluded. Centering `S` therefore leaves this likelihood
+unchanged. The previous full-rank formulation was removed because that
+constant direction depends on arbitrary centering conventions and does not
+provide the intended resistance information.
+
+`dist_from_cov(S)` retains the covariance information used by this likelihood.
+Covariance and matching squared-distance inputs are two representations of
+the same contrast model. Neither is inherently more informative. Begin with
+`vignette("getting-started", package = "terradish")` for the graph workflow.
 
 | Model | Input `S` | Requires `nu` | Correlation structure |
 |----|----|----|----|
@@ -77,8 +83,9 @@ covariance matrix:
   scores, or any other numeric encoding.
 
 Both functions return a square, symmetric covariance matrix (one
-row/column per population) that can be passed directly to `terradish` as
-the response `S`.
+row/column per population). Check the construction, sampling design, site
+order, and covariance geometry before using the matrix as response `S`.
+The helpers are provided by the companion `landgraph` package.
 
 ### Biallelic SNPs: `cov_from_biallelic()`
 
@@ -103,6 +110,12 @@ N <- matrix(40L, nrow = n_pop, ncol = n_loci)
 S_biallelic <- cov_from_biallelic(Y, N)
 round(S_biallelic, 3)
 ```
+
+Biallelic standardization can give rare variants large influence. Apply and
+report a defensible minor-allele-frequency filter, then examine sensitivity
+to that filter. Unequal chromosome counts also produce unequal sampling
+variance across populations; a common nugget does not remove that concern.
+Covariance metadata describe the construction, not proof of Wishart sampling.
 
 ### Numeric feature matrix: `cov_from_genetic_data()`
 
@@ -158,59 +171,28 @@ round(S_ms, 3)
 
 ## Choosing `nu`
 
-Wishart models treat `nu` as the degrees of freedom in the empirical
-covariance matrix. It is fixed by the genetic data used to build `S`,
-and it is not estimated by `terradish`.
+`nu` is a positive effective degrees-of-freedom value supplied by the analyst.
+It is not estimated by `terradish`, and it is not fixed automatically by the
+number of markers used to build `S`. Linkage creates dependence among nearby
+markers; shared population history can create dependence even among unlinked
+markers. Counting SNPs, loci, or within-locus allele contrasts does not by
+itself establish effective replication.
 
-For biallelic SNPs, the biological marker count and the statistical
-degrees of freedom are usually the same: each retained SNP contributes
-one independent standardized allele-frequency column. In that case, use
-the number of retained polymorphic SNPs (reduced if markers are in
-linkage disequilibrium).
+A block jackknife can assess how marker blocks contribute to variability.
+Because it need not capture all dependence due to shared history, regard its
+implied information as an upper-bound guide rather than a complete calibration.
+Describe the blocks and the uncertainty sources the procedure represents.
 
-For microsatellites, **use the number of loci as the conservative
-primary value.** Allele frequencies within a locus are correlated
-because they sum to a constant equal to the ploidy, so the locus, not
-the individual allele, is the natural unit of information for a
-conservative analysis.
+Declare a primary value with its rationale and a range of plausible values.
+Use `terradish_rescale_nu()` for sensitivity of intervals and likelihood-based
+comparisons. Use fixed-domain cross-validation to assess conductance terms
+and shape. A stable result over a declared range is evidence of sensitivity
+within that range, not proof that the primary value is correct.
 
-A common alternative formula, `sum(K_l - 1)` where `K_l` is the number
-of observed alleles at locus `l`, counts within-locus allele-frequency
-dimensions more aggressively. Those dimensions are correlated. Treat
-this formula as a larger sensitivity value, not as a known
-independent-marker count. Using it as the primary `nu` can produce
-confidence intervals that are too narrow and model-selection statistics
-that are inflated.
-
-You can compute the larger value for a transparent sensitivity analysis:
-
-```{r microsatellite-nu}
-# Larger sensitivity value: sum(K_l - 1) across loci
-msat_nu_upper <- sum(vapply(split(seq_along(loci_ms), loci_ms), function(j) {
-  alleles_l <- unlist(alleles[, j, drop = FALSE], use.names = FALSE)
-  length(unique(alleles_l[!is.na(alleles_l)])) - 1L
-}, integer(1)))
-
-n_loci <- length(unique(loci_ms))   # conservative primary value
-
-cat("Primary value (number of loci):             nu =", n_loci, "\n")
-cat("Larger sensitivity value (sum(K_l - 1)):   nu =", msat_nu_upper, "\n")
-```
-
-**Recommended practice:**
-
-1.  Set `nu = n_loci` for your primary analysis.
-2.  Report this choice in your methods section.
-3.  Repeat the key inference steps (confidence intervals and model
-    comparison) with `nu = msat_nu_upper` to show how sensitive your
-    conclusions are to the choice.
-4.  If the model rankings and qualitative conclusions are stable across
-    the range, you can report that the results are robust to the
-    specific choice of `nu`.
-
-If only a published F~ST~ matrix is available and allele counts by locus
-are unavailable, the locus count is the only reasonable, conservative
-option.
+If only a published F~ST~ matrix is available, a reported locus count does not
+make that response Wishart. F~ST~ is a ratio estimator; consider MLPE for such
+dissimilarities and evaluate its shared-site assumptions. See
+`vignette("model-comparison", package = "terradish")` for predictive comparisons.
 
 ### Key arguments
 
@@ -221,18 +203,26 @@ option.
 | `loci` | `NULL` | Required for `"allele_calls"`: maps each column to its locus |
 | `center` | `TRUE` | Centers each feature by its global mean before covariance calculation |
 | `scale` | `TRUE` | Scales each feature by its global standard deviation; drops constant features |
-| `diagonal` | `"auto"` | `"within"` replaces the Gower diagonal with within-population variance (Dyer-style); `"gower"` leaves it as-is |
+| `diagonal` | `"auto"` | `"auto"` selects `"gower"`; `"within"` replaces the diagonal with within-population variance |
 | `normalize` | `"none"` | `"features"` divides covariance by number of retained features |
 
-The `diagonal = "within"` setting is useful for Dyer-style
-population-graph workflows. Note, however, that replacing the diagonal
-can produce matrices that are not positive definite for all datasets;
-check eigenvalues when in doubt:
+The default grouped-data construction uses `diagonal = "gower"`. Replacing
+that diagonal with `diagonal = "within"` changes the covariance estimand and
+can change fitted signs; the supplied release simulations recovered the
+expected signs with Gower diagonals but not with the within-population
+replacement. Retain `within` only for a separately justified construction,
+and compare its effect explicitly. It may also produce an indefinite matrix.
 
 ```{r check-eigenvalues}
 ev <- eigen(S_ms, symmetric = TRUE, only.values = TRUE)$values
-all(ev > 0)  # TRUE → positive definite; FALSE → semi-definite or indefinite
+range(ev)
 ```
+
+**How to read the output.** A centered covariance has a zero eigenvalue in
+the constant direction, so strict positive definiteness of the full matrix
+is not the target. Tiny negative values may reflect rounding. Substantive
+negative contrast eigenvalues require investigation; changing the diagonal
+is not a neutral repair.
 
 ------------------------------------------------------------------------
 
@@ -278,7 +268,7 @@ matrix that reflects the same landscape, we use
 ```{r simulate-covariance}
 # Use conductance parameters roughly consistent with the melip fit in the
 # getting-started vignette (forestcover positive, altitude negative).
-# nu = 1000 is an illustrative effective marker count for this simulation.
+# nu = 1000 is an illustrative simulation parameter, not a marker-count rule.
 sim <- simulate_covariance_response(
   theta             = c(forestcover = 1.0, altitude = -0.5),
   formula           = ~ forestcover + altitude,
@@ -290,7 +280,7 @@ sim <- simulate_covariance_response(
   seed              = 123
 )
 
-# This is what would come from cov_from_genetic_data() applied to real genotypes.
+# This draw follows the fitted statistical model; real genotype summaries may not.
 S_cov <- sim$covariance
 dim(S_cov)
 round(S_cov[1:5, 1:5], 4)
@@ -353,8 +343,8 @@ The `wishart_covariance` measurement model fits two nuisance parameters
   model mismatch. It is not the Gaussian raster-smoothing scale and is
   not a direct estimate of drift or population size.
 
-The fitted covariance model is: \> **Sigma = tau · E(theta) + exp(sigma)
-· I**
+The covariance kernel is `Sigma = tau * E(theta) + exp(sigma) * I`.
+The likelihood evaluates its projection into the site-contrast subspace.
 
 where `E(theta)` is the generalized inverse of the graph Laplacian
 evaluated at the estimated conductance parameters `theta`.
@@ -364,7 +354,7 @@ evaluated at the estimated conductance parameters `theta`.
 ## The role of `nu`: an effective sample size
 
 `nu` is the most consequential setting in a covariance-based fit. The
-entire Wishart negative log-likelihood is multiplied by `nu / 2`, so
+parameter-dependent Wishart objective is multiplied by `nu / 2`, so
 `nu` is a global multiplier of the objective surface, which has three
 separate consequences.
 
@@ -375,23 +365,16 @@ to `nu`. Separate numerical fits should agree up to optimization
 tolerance:
 
 ```{r nu-invariance}
+# Reuse the fitted optimum; rescale its likelihood and uncertainty.
 fit_nu <- function(nu) {
-  f <- terradish(
-    S_cov ~ forestcover + altitude,
-    data              = surface,
-    conductance_model = loglinear_conductance,
-    measurement_model = wishart_covariance,
-    nu                = nu
-  )
-  list(theta = coef(f),
-       se    = sqrt(diag(solve(f$fit$hessian))))
+  f <- terradish_rescale_nu(fit_wc, nu = nu)
+  list(theta = coef(f), se = sqrt(diag(vcov(f))))
 }
-
 f100   <- fit_nu(100)
 f1000  <- fit_nu(1000)
 f10000 <- fit_nu(10000)
 
-# Point estimates agree across three orders of magnitude
+# Point estimates agree across this 100-fold range
 rbind(`nu=100`   = f100$theta,
       `nu=1000`  = f1000$theta,
       `nu=10000` = f10000$theta)
@@ -399,7 +382,8 @@ rbind(`nu=100`   = f100$theta,
 
 **2. Standard errors scale as 1 / sqrt(`nu`).** The Hessian scales with
 `nu`, so the asymptotic covariance scales with 1 / `nu` and every
-standard error scales with 1 / sqrt(`nu`). Under the model, more
+interior standard error scales with 1 / sqrt(`nu`). Boundary inference
+requires separate care. Under the model, more
 approximately independent marker information produces tighter intervals:
 
 ```{r nu-se}
@@ -420,22 +404,11 @@ negligible and extra covariates are almost always retained; with small
 `nu`, parsimony dominates. The *same data* can favor a simpler or a more
 complex model purely through the choice of `nu`.
 
-The practical upshot: **`nu` is an effective sample size.** It does not
-change *what* the data say about the shape of the conductance surface,
-but it controls *how strongly* the data speak. Choose it carefully:
-
-- For biallelic SNPs, use the number of retained (polymorphic) SNPs.
-- For microsatellites, use the **number of loci** as a conservative
-  default. Alleles within a locus are correlated (they sum to a
-  constant), so `sum(K_l - 1)` over loci is a larger sensitivity value
-  that counts within-locus dimensions more aggressively (see the
-  "Choosing `nu`" section above).
-- Markers in strong linkage disequilibrium are not independent, so the
-  effective `nu` is **smaller** than the raw marker count. Thin to
-  roughly unlinked loci, or use a deliberately conservative value.
-- When `nu` is uncertain, report a brief sensitivity analysis: refit
-  across a plausible range and check whether your intervals, likelihood
-  evidence, and model rankings are stable.
+Report how intervals and model comparisons depend on `nu`. Rescaling
+does not re-estimate conductance, so this sensitivity is inexpensive and
+separates the fitted surface from the assumed precision. Use the same `nu`
+for every candidate in a comparison. Neither a high AIC weight nor a small
+nominal LRT p-value establishes that `nu` represents independent information.
 
 ------------------------------------------------------------------------
 
@@ -471,13 +444,14 @@ cat("\nFor comparison, exp(phi['sigma']) =",
 
 ### Observed vs. fitted covariance
 
-```{r plot-fit, fig.cap = "***Observed vs. fitted genetic covariance.***"}
+```{r plot-fit, fig.cap = "***Observed and fitted covariance in the site-centered representation.***"}
 plot(fit_wc, type = "fit")
 ```
 
 Each point represents a pair of sites. The x-axis is the fitted
 covariance from the Wishart model; the y-axis is the observed covariance
-in `S_cov`. Points near the diagonal indicate a good fit.
+in the centered representation used by the contrast fit. Points near the
+diagonal indicate agreement for that summary, not calibrated sampling uncertainty.
 
 ### Estimated conductance surface
 
@@ -519,8 +493,6 @@ cond_wc_focal <- conductance(
 ```
 
 ------------------------------------------------------------------------
-
-<!-- Phase 7: rewrite -->
 
 ## Preparing a generalized-Wishart squared-distance response
 
@@ -578,7 +550,7 @@ obtain ${D = d^2}$ before calling `check_distance_response()` or fitting
 | Rogers distance | `adegenet::dist.genpop(method = 4)`, `poppr::rogers.dist()`, `hierfstat::genet.dist(method = "Dr")` | The `adegenet` manual labels method 4 Euclidean. Square ordinary distances and check the resulting matrix. |
 | Nei distances | `adegenet::dist.genpop(method = 1)`, `poppr::nei.dist()`, variants from `hierfstat::genet.dist()` | These names cover different formulas. The `adegenet` manual labels method 1 non-Euclidean, so do not assume admissibility. |
 | Prevosti distance | `adegenet::dist.genpop(method = 5)`, `poppr::prevosti.dist()`, `hierfstat::genet.dist(method = "Cp")` | The `adegenet` manual labels method 5 non-Euclidean. Do not assume admissibility. |
-| Pairwise F~ST~ or F~ST~/(1 - F~ST~) | `hierfstat::pairwise.WCfst()`, `hierfstat::pairwise.neifst()` | These are common landscape-genetic responses, but they have no general squared-Euclidean guarantee. Check the realized matrix or use a Gaussian distance likelihood such as `mlpe`. |
+| Pairwise F~ST~ or F~ST~/(1 - F~ST~) | `hierfstat::pairwise.WCfst()`, `hierfstat::pairwise.neifst()` | These are common landscape-genetic responses, but they have no general squared-Euclidean guarantee. F~ST~ is a ratio estimator without a Wishart sampling justification; passing a geometry check is insufficient. Consider `mlpe` and assess its assumptions. |
 | Euclidean, chord, or Hellinger distances on transformed numeric features | `stats::dist()`, `vegan::vegdist(method = "euclidean")`, `vegan::vegdist(method = "chord")`, `vegan::vegdist(method = "hellinger")` | Geometry depends on the feature representation and transformation. Scientific appropriateness remains study-specific. |
 
 `ade4::is.euclid()` provides an optional independent diagnostic for
@@ -636,20 +608,23 @@ effective information assumptions are identical.
 
 ## Choosing between covariance and distance input
 
-| Consideration | `wishart_covariance` | `generalized_wishart` |
-|----|----|----|
-| Raw genotype data available | **Preferred**: use `cov_from_genetic_data()` | Requires an extra distance-conversion step |
-| Only a pre-computed distance matrix is available | Requires converting to covariance (not always reversible) | Use only if the squared-distance response is admissible; otherwise use MLPE |
-| Site-specific diagonal variance matters | Can retain and model the diagonal, subject to positive-semidefinite checks | Encoded only through an admissible squared-distance representation |
-| Goal is a Dyer-style population graph | Diagonal from within-population variance is natural | Less natural |
-| `nu` is known | Both models require `nu` | Both models require `nu` |
+| Consideration | Guidance |
+|----|----|
+| Raw genotype data available | Construct and document an appropriate covariance summary; assess filtering and unequal sampling. |
+| Covariance and its matching squared distances available | Both Wishart interfaces use the same contrast likelihood. Choose the representation that makes preprocessing clearest. |
+| Only a precomputed dissimilarity is available | Geometry is necessary but insufficient for Wishart sampling; consider MLPE for generic genetic distances. |
+| Site-specific sampling variance matters | A common nugget does not fully address unequal sampling; examine design and sensitivity. |
+| Effective information is uncertain | Declare a range of `nu`, rescale inference, and assess conductance complexity with held-out prediction. |
 
-If you only have a distance matrix and no individual-level data, first
-verify that it is admissible for the generalized Wishart representation.
-If that condition is not defensible and effective `nu` is unavailable,
-use a Gaussian distance likelihood such as `mlpe`. If you have raw
-genotypes and covariance is the intended summary, start with
-`cov_from_genetic_data()` and `wishart_covariance`.
+### Environmental differences between sites
+
+`pairwise_covariates()` combines geographic distances and endpoint environmental
+differences in one design. Both `mlpe_covariates()` and `wishart_covariates()`
+accept that design, while linking it to different response models. For Wishart,
+the nonnegative environmental kernel weights describe conditional contributions
+to covariance structure. They do not identify a particular biological
+mechanism. See `vignette("ibe-ibr-workflow", package = "terradish")` for a
+worked comparison, conditional conductance estimates, and IBE:IBR ratios.
 
 ------------------------------------------------------------------------
 
@@ -728,5 +703,3 @@ plot(fit, type = "marginal", data = surface)   # conductance-scale associations
 - **`vignette("ibe-ibr-workflow", package = "terradish")`**, adding
   environmental kernels to the Wishart likelihood with
   `wishart_covariates()`.
-  adding a diagnostic residual field and evaluating sensitivity to
-  spatial confounding.

@@ -1,0 +1,3147 @@
+FILE README.md
+# terradish <img src="man/figures/terradish-sticker.png" align="right" height="200"/>
+
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21225712.svg)](https://doi.org/10.5281/zenodo.21225712)
+
+terradish estimates landscape conductance surfaces from genetic data by maximum likelihood on a raster graph. It fits log-linear conductance models and can optionally estimate each covariate's Gaussian smoothing scale and spline shape. Models fit pairwise genetic distances through the MLPE likelihood, or allele-frequency covariance and squared distances derived from it through a Wishart likelihood on site contrasts. Both families accept the same pairwise environmental covariates alongside resistance. Exact sparse Cholesky and algebraic multigrid solvers handle large rasters. Fixed-domain spatial cross-validation compares conductance formulas.
+
+Estimated coefficients describe relative conductance and are conditional on the measurement-model terms. They do not directly estimate movement, migration, or causal landscape effects. For Wishart likelihoods, the user-supplied information parameter `nu` controls inferential precision. Using the SNP count overstated information by roughly an order of magnitude in the package's forward-time validation experiments.
+
+## Installation
+
+The supported core requires landgraph version 0.0.3 or later. Install a compatible companion version before terradish:
+
+
+
+For local development with both repositories checked out side by side, install landgraph from its checkout first. The terradish CRAN release depends on that companion version being available on CRAN.
+
+## Quick start
+
+
+
+Check convergence before interpreting the surface. Code 0 meets the stopping rule; code 1 reaches the iteration limit; code 2 reports a stall or failed line search. Also inspect `fit$fit$subproblem` for nuisance optimization. Numerical convergence does not establish model adequacy.
+
+## Interpreting estimates
+
+For a standardized linear covariate, `exp(coef(fit))` is the conductance multiplier for a one-standard-deviation increase, holding other terms fixed. A common conductance scale is absorbed by the measurement model's resistance coefficient, so absolute conductance is unidentified.
+
+Gaussian `sigma` describes raster smoothing in map units. The smoothed layer is re-standardized at every candidate sigma, so its coefficient is per standard deviation of that layer. The half-cell lower bound still smooths, and the upper bound is limited by the retained kernel window. Dispersal averaging can favor positive scales without a separate ecological scale of effect. Use `gaussian_scale_summary()`, `summary(fit)$sigma_table`, and `gaussian_scale_profile()` to examine units, bounds, and uncertainty.
+
+Spline models are unpenalized regression splines with fixed degrees of freedom. Their centered bases and knots are retained for prediction. `summary(fit)$spline_monotonicity` describes shape over the focal-site covariate range. Tails outside that range are poorly identified.
+
+| Response | Measurement model | Main requirement |
+|---|---|---|
+| Pairwise genetic distances, including ratio-estimator FST | `mlpe` or `leastsquares` | A defensible mean structure; MLPE models shared-site correlation |
+| Allele-frequency covariance | `wishart_covariance` | Coherent covariance and explicit effective information |
+| Squared distances derived from covariance | `generalized_wishart` | Admissible geometry and explicit effective information |
+
+The two Wishart forms use the same site-contrast likelihood for matching covariance and distance representations. Passing `check_distance_response()` does not give an FST ratio estimator a Wishart sampling model. Grouped covariance should use landgraph's coherent `gower` diagonal; `within` is on a different scale. Rare-variant weighting and unequal group sizes require sensitivity checks.
+
+### What `nu` changes
+
+Wishart point estimates are invariant to rescaling `nu` at the optimum. Standard errors scale as `1 / sqrt(nu)`, while likelihood-ratio statistics and the likelihood contribution to information criteria scale with `nu`. Linkage and shared population history can make effective information much smaller than the marker count.
+
+Use `terradish_rescale_nu(fit, nu = ...)` to report conclusions over plausible values. Dividing `nu` by 20 increases standard errors by `sqrt(20)` without refitting estimates. AIC at nominal marker information can over-select environmental terms and flexible curves. Use spatial CV for predictive support and rescaling for inferential sensitivity.
+
+## Combine IBE and IBR
+
+
+
+The IBE:IBR ratio expresses an environmental difference in resistance-distance units with a joint uncertainty interval. Raw coefficients are not directly comparable across families. Ratios require matching transforms and scaling and are undefined when the resistance coefficient is zero.
+
+Environmental terms can reflect assortative mating, dispersal filtering, local adaptation, or environmental patterns in site variance. Report conductance fits with and without pairwise terms because signs can change. A uniform `~ 1` surface with environmental terms represents **IBD + IBE**, not IBE alone.
+
+## Model comparison
+
+`terradish_folds()` constructs folds; `terradish_cv_folds()` keeps the landscape graph fixed while withholding sites. It accepts per-formula conductance factories and repeated folds. Reprofiled nuisance parameters compare conductance formulas under one measurement model. Set `nuisance = "fixed"` to retain every measurement parameter from training and score predictive densities when comparing measurement extensions.
+
+Read success counts first. Failed folds make full totals unavailable, and rankings use only folds successful for every candidate. Paired differences and their standard errors are descriptive because folds share data. Checkpoints reject incompatible input or model changes.
+
+MLPE and Wishart scores do not share a common predictive scale. Within one Wishart comparison, changing `nu` rescales scores without changing ranks when the same folds succeed. Likelihood-ratio tests require nested models, matching responses and graphs, and fixed `nu`. Environmental Wishart weights need a boundary reference, not an ordinary chi-square test.
+
+## Prediction and large landscapes
+
+New-landscape prediction reuses fitted log-linear terms, spline knots and centers, or Gaussian post-smoothing scaling. Apply stored input scaling with `scale_covariates(new_rasters, reference = original_scaled_rasters)` before building a new graph. Slim fits retain covariance and interval methods but cannot predict after their model closures are removed.
+
+`solver = "auto"` selects AMG above the large-graph threshold regardless of the number of right-hand sides. AMG iteration counts can increase with conductance contrast. Experimental parallel derivatives use PSOCK workers for Hessian and partial solves; AMG and cached CHOLMOD ignore `cores`.
+
+Cropping changes resistance. One audit found increases of 15–23% with a two-cell buffer and 1–2% with ten cells. These are case-specific results: compare larger-buffer refits. Landmark and coarse-raster starts require exact refinement; `terradish_grid()` supports exact evaluation only. `terradish_assess_settings()` is a speed probe, not a convergence or statistical check.
+
+## Experimental features
+
+Directed conductance, hierarchical fields, site-specific drift terms, pair subsets, Kron reduction, block-CG, and legacy CV remain on the `experimental` branch. Their unresolved limitations are documented in that branch's `EXPERIMENTAL.md`.
+
+
+
+## Changes in 0.1.0
+
+- The supported core concentrates on log-linear, Gaussian, and spline conductance with MLPE and contrast Wishart likelihoods.
+- Graphs use eight directions by default. Gaussian alignment, kernel bounds, spline prediction, and environmental kernels are corrected.
+- Convergence records, covariance and interval methods, Gaussian profiles, IBE ratios, and `nu` sensitivity are available.
+- Fixed-domain CV supports per-formula factories, fixed nuisance prediction, repeated folds, failure accounting, and compatible checkpoints.
+- Stored scaling, new-landscape prediction, combined pairwise covariates, and `nu_fit` sensitivity are supported.
+- Research prototypes and unsupported solvers have moved off the supported core. See `NEWS.md` for migration details.
+
+## Vignettes and attribution
+
+Start with `vignette("getting-started", package = "terradish")`. Other guides cover comparison, IBE and IBR, Wishart covariance, splines, Gaussian scales, large landscapes, and simulation design. Open the collection with `browseVignettes("terradish")`.
+
+Nate Pope developed the sparse graph optimization, reverse-mode derivatives, MLPE, and generalized Wishart foundations in [radish](https://github.com/nspope/radish). terradish extends that framework with terra-native workflows and the supported features above. Selected deprecated `radish*` wrappers remain; full compatibility with every historical entry point is not promised.
+
+Contact Bill Peterman (Peterman.73@osu.edu) or submit an issue on GitHub for bug reports and feature requests.
+
+
+FILE gaussian-scale-optimization.Rmd
+---
+title: "Joint Gaussian Scale Optimization in terradish"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Joint Gaussian Scale Optimization in terradish}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+
+## Why optimize sigma inside the model?
+
+The original `radish` workflow for raster smoothing usually worked in two steps:
+
+1. Smooth each raster at several candidate scales.
+2. Fit a resistance model to each smoothed raster surface and compare the fits.
+
+That approach is still useful, but it treats scale as an **outer** tuning
+parameter. The new native Gaussian conductance system in `terradish` moves the
+scale parameter into the conductance model itself, so the optimizer can update:
+
+- the conductance coefficient(s), and
+- the smoothing scale(s)
+
+in the same likelihood calculation.
+
+This vignette shows the current implementation of that idea using
+`gaussian_smoothed_loglinear_conductance()`.
+
+---
+
+## What sigma means here
+
+For a raster covariate `x`, the Gaussian scale-aware model first smooths the
+raster with a Gaussian kernel and then uses the smoothed values in the usual
+log-linear conductance model.
+
+Conceptually:
+
+$$C_i = \exp(\beta \cdot x_{i,\sigma})$$
+
+where:
+
+- $x_{i,\sigma}$ is the Gaussian-smoothed raster value at cell *i*,
+  standardized over retained cells after smoothing
+- $\beta$ is the conductance coefficient
+- $\sigma$ controls how broad the smoothing kernel is
+
+Small `sigma` means that the raster is averaged over a narrow neighborhood.
+Large `sigma` means that it is averaged over a broader neighborhood. The
+coefficient `beta` describes a one-standard-deviation change in that smoothed
+layer, with standardization recomputed at each trial scale. Its magnitude
+therefore needs to be interpreted jointly with `sigma`. Here,
+`sigma` is a Gaussian smoothing scale in the raster's map units. It is not an
+estimate of dispersal distance, home-range size, movement distance, or the
+spatial scale of a causal ecological process. Dispersal can average exposure
+over a neighborhood, so a fitted positive scale may reflect that averaging
+even when the underlying ecological response is local.
+
+### Are there limits on sigma?
+
+Yes. `terradish` now estimates `sigma` directly on its natural distance scale
+and fits it within explicit lower and upper bounds.
+
+By default, those bounds are data-derived:
+
+- the lower bound is half of the mean raster cell width
+- the upper bound is `min(nrow(raster), ncol(raster)) * mean(res(raster)) / 6`,
+  approximately one-sixth of the smaller raster dimension for square cells
+
+You can override those defaults with `sigma_lower =` and `sigma_upper =` when
+you create the conductance model. The kernel is truncated to a raster-sized
+window. The default upper bound keeps approximately three standard deviations
+inside half the smaller dimension; larger requested bounds issue a truncation
+warning. Near that upper bound the covariate can become almost constant, so
+scale and effect size may be weakly identified. The half-cell lower bound
+still smooths and is not equivalent to an unsmoothed raster.
+
+Internally, the optimizer now works on a converted sigma scale by default,
+using approximate cell-width units. The fitted coefficients and summaries are
+still reported back in map units for users, so the conversion helps the
+optimization without changing the interpretation target.
+
+Two practical caveats are worth keeping in mind:
+
+- factor-valued raster layers are rejected for this Gaussian conductance model
+  rather than being treated as scalable predictors
+- leverage / `partial_X` diagnostics are still unavailable, because the current
+  diagnostic machinery assumes a one-to-one match between conductance
+  parameters and design-matrix covariates
+
+---
+
+## Worked example
+
+We will fit a small staged example using the `melip` data. To keep the vignette
+fast and stable, we will:
+
+- use only eight sampling sites
+- start with one raster covariate (`forestcover`)
+- use `mlpe` as the measurement model, because the response matrix contains
+  non-independent pairwise genetic distances
+
+This is enough to show the practical workflow without making the vignette slow.
+The main goal here is not to maximize model complexity. Instead, we will use
+the staged workflow that is usually safest for real data:
+
+1. fit a one-raster Gaussian scale model
+2. compare it to a standard fixed-raster model
+3. only then add a second raster and inspect whether the fitted scales still
+   behave sensibly
+
+
+
+### Step 1: Build a conductance surface with the original raster
+
+Unlike the standard fixed-raster workflow, we do **not** pre-scale the raster
+with `scale_covariates()` here. The Gaussian conductance model smooths the raw
+raster first, then standardizes the active-cell values internally at each
+parameter evaluation.
+
+
+
+Two details matter here:
+
+- `saveStack = TRUE` is required, because the Gaussian conductance model needs
+  the retained raster stack as its smoothing domain.
+- We are fitting a smoothing scale for the raster itself, so the original
+  raster values need to be available.
+
+### Step 2: Create the Gaussian scale-aware conductance model
+
+
+
+This conductance model will estimate two parameters:
+
+- `forestcover`: the conductance coefficient
+- `sigma.forestcover`: the Gaussian smoothing scale on the natural distance scale
+
+The same mechanism also supports interactions and polynomial terms after
+smoothing, but it is usually better to start with the simplest one-raster model
+you can justify.
+
+### Step 3: Fit the one-raster Gaussian scale model
+
+`optimizer = "auto"` currently resolves to BFGS for this conductance model.
+That is intentional: the native Gaussian scale path supports analytic
+gradients, and BFGS is the stable first optimizer for the joint
+`beta + sigma` parameter vector.
+
+
+
+### Optional speed-up: coarse-raster warm starts
+
+Gaussian scale optimization can be expensive because every likelihood
+evaluation has two costly pieces:
+
+1. smooth the raster at the proposed `sigma`
+2. solve the graph Laplacian to get resistance distances
+
+For large rasters, you can ask `terradish()` to optimize first on one or more
+aggregated rasters and then refine the result on the original surface:
+
+
+
+The coarse stages rebuild the Gaussian smoother on each aggregated raster, but
+they keep the full-resolution `sigma` bounds and unit conversion. That means a
+coarse-stage `sigma` is still interpreted in the original map units. With
+`exact_refine = TRUE`, the final model is not a coarse approximation; it is the
+full-resolution fit initialized from the coarse result.
+
+### Step 4: Inspect the fitted one-raster scale
+
+
+
+The conductance coefficient tells us whether smoothed forest cover is
+associated with higher or lower conductance. The scale parameter is already on
+its natural scale, so we can summarize it directly:
+
+
+
+**How to read the output.** The scale table includes its estimate, standard
+error, and proximity to a fitting bound. Wald intervals from `confint()` are
+limited to those bounds; a bound-limited interval does not establish an
+interior optimum. Inspect the likelihood profile when scale is important:
+
+
+
+The returned fit stores the profile interval. Increase grid resolution when
+the profile is irregular. Failed profile fits stop the calculation rather
+than being silently omitted. Boundary likelihood-ratio calibration remains
+approximate; report a bound-limited interval as such.
+
+`gaussian_scale_summary()` converts the fitted sigma values into:
+
+- the native raster distance scale
+- the internal optimization scale and its conversion factor
+- raster cell widths
+- one-dimensional Gaussian half-widths
+- two-dimensional radial extents that contain a chosen amount of kernel mass
+
+
+
+That table is often the quickest way to interpret the fitted smoothing scale.
+For
+example, `radial_95` is the radius that contains approximately 95% of the
+untruncated Gaussian kernel mass, while `sigma_cells_x` and `sigma_cells_y` show how broad
+the smoothing kernel is relative to the raster resolution. These ideal
+Gaussian radii are descriptive; raster truncation and edge handling can
+change the realized weights.
+
+You can also visualize the fitted kernel directly. The `sigma` plot shows the
+Gaussian weight curve over distance for each fitted scale parameter, with a
+vertical dashed line at the fitted distance containing 90% of the
+one-dimensional kernel mass and a shaded uncertainty band for that distance.
+Each panel is also annotated with:
+
+- the fitted `sigma`
+- the fitted 90% kernel-mass distance
+- the corresponding confidence interval bounds
+
+
+
+If you already know how to convert your map units into a more interpretable
+distance scale, you can relabel the plot directly. For example, if one map
+unit corresponds to one meter, then multiplying by `0.001` reports distances
+in kilometers. This conversion is only valid for a meter-based raster;
+do not apply it to longitude/latitude degrees:
+
+
+
+### Step 5: Compare against a standard fixed-raster fit
+
+The scale-aware fit is easiest to interpret when it is compared directly to the
+same model without an estimated `sigma`.
+
+
+
+
+
+The two fits use the same response, sites, graph, and MLPE likelihood, so their
+AIC values have a common basis. The scale-aware model's parameter count includes
+the estimated smoothing scale. In a larger analysis, declare the candidate
+scale and formula set before comparing it, and report the search that was
+performed.
+
+Assess whether the scale is identified away from its bounds, whether the
+profile supports a useful range, and whether estimating it improves held-out
+prediction. With only eight sites this illustration cannot provide a strong
+spatial-transfer assessment. On a larger sampling design, use common folds
+and a distinct conductance factory for each candidate:
+
+
+
+Inspect failures and paired differences on common successful folds. A scale
+that improves in-sample fit but not prediction needs cautious interpretation.
+
+### Step 6: Summarize the one-raster fit
+
+
+
+For this conductance model, the coefficient table includes both:
+
+- the conductance coefficient, and
+- `sigma`
+
+So the scale parameter is treated just like any other model parameter in the
+joint optimization.
+
+### Step 7: Recover the fitted conductance surface
+
+Once the model is fitted, the usual conductance helper still works.
+
+
+
+And we can plot the fitted conductance layer directly:
+
+
+
+When tails are weakly supported at focal sites, you can request focal-support
+clamping directly in prediction:
+
+
+
+---
+
+## Stage 2: Add a second raster only after sigma looks sensible
+
+Once the one-raster scale parameter looks stable enough to trust, we can add a
+second raster and inspect whether the scale estimates remain interpretable.
+
+
+
+
+
+
+
+This is exactly the point where the staged workflow helps. If one or more
+sigma estimates now collapse to the lower bound, or drift toward the upper
+bound, that is useful information. It suggests one of several things:
+
+- the added raster may not need smoothing at all
+- the data may not support estimating multiple scales simultaneously
+- the smaller one-raster scale was not as stable as it first appeared
+
+Check convergence separately from boundary status. A converged boundary fit
+can indicate limited scale information or preference for an extreme allowed
+scale. A nonconverged fit requires numerical investigation before ecological
+interpretation.
+
+In the small `melip` subset used here, that is exactly the kind of pattern to
+watch for: the one-raster `forestcover` scale can be inspected on its own
+before adding `altitude`. After `altitude` is added, one or both fitted scale
+parameters may move toward the lower bound, which is a cue to
+proceed cautiously rather than immediately adding more landscape terms.
+
+---
+
+## Outer scale searches
+
+`terradish_scale_optim()` remains available for an outer search, while joint
+Gaussian fitting provides derivatives and joint scale inference directly.
+Outer-search radii are in map units and the default outer kernel is Gaussian.
+A Gaussian standard deviation, a uniform-disk radius, and other kernel
+parameters represent different weighting functions even when their numeric
+values match. Record the kernel, units, search bounds, and estimated scales.
+The parameter count includes optimized scales; repeated searching is still
+part of the declared model-selection procedure. Prefer projected rasters
+when distances are to be interpreted in meters or kilometers.
+
+## Important current limitations
+
+This first version is intentionally focused. Right now it supports:
+
+- additive formulas made of raw numeric raster names
+- interactions among numeric raster names
+- polynomial/arithmetic terms such as `I(forestcover^2)`
+- one Gaussian scale parameter per selected raster
+- joint optimization through analytic gradients and BFGS
+- opt-in coarse-raster starts through `approximation = "coarse_raster"`
+
+It does **not yet** support:
+
+- factor-valued raster layers
+- leverage / `partial_X` diagnostics
+
+It does now support conditional-on-sigma marginal-association plotting, so you can
+inspect conductance and response-scale curves after fitting, but the leverage
+machinery is still intentionally disabled.
+
+---
+
+## Where to go with your analysis
+
+If this workflow looks reasonable for your data, practical steps are:
+
+1. Fit a small one-raster model first and inspect `sigma`.
+2. Compare it to a standard fixed-raster `loglinear_conductance` fit.
+3. Add additional rasters only after the one-raster scale parameter behaves
+   sensibly.
+4. Treat boundary-hitting sigma estimates as a model-selection signal, not just
+   an optimization nuisance.
+5. Reproject rasters before interpreting smoothing distances, because
+   longitude/latitude rasters report sigma in degrees.
+
+This staged approach makes it easier to assess whether the likelihood identifies
+an interior Gaussian smoothing scale under the fitted model. An identified
+smoothing scale is not, by itself, an identified movement or ecological-process
+scale.
+
+---
+
+
+## Quick reference: the full scale-optimization workflow
+
+
+
+## Summary of key functions
+
+| Function | Purpose |
+|----------|---------|
+| `conductance_surface()` | Build the graph from the original, unsmoothed raster |
+| `gaussian_smoothed_loglinear_conductance()` | Conductance model that estimates sigma jointly with theta |
+| `terradish()` | Fit the scale-aware model |
+| `gaussian_scale_summary()` | Fitted sigma per layer and corresponding Gaussian kernel-mass distances |
+| `gaussian_scale_profile()` | Profile scale uncertainty while reoptimizing other parameters |
+| `terradish_cv_folds()` | Compare fixed and estimated scales on common held-out sites |
+| `conductance()` | Extract the fitted conductance surface at the estimated scale |
+| `aic_table()` | Compare the scale-aware fit against a fixed-raster fit |
+
+## See also
+
+- **`vignette("getting-started", package = "terradish")`**: the core
+  `terradish` workflow: scaling covariates, building a conductance surface,
+  fitting and interpreting models, and the five plot types.
+- **`vignette("model-comparison", package = "terradish")`**: likelihood ratio
+  tests, AIC/AICc/BIC tables, likelihood surface visualization, and
+  cross-validation.
+- **`vignette("ibe-ibr-workflow", package = "terradish")`**: fitting isolation
+  by environment (IBE) and isolation by resistance (IBR) simultaneously in the
+  same model.
+- **`vignette("spline-conductance", package = "terradish")`**: fitting
+  non-linear conductance responses with spline terms when the response shape is
+  flexible but the raster scale is fixed.
+- **`vignette("wishart-covariance", package = "terradish")`**: fitting
+  covariance-based Wishart IBR models when raw genotype data are available.
+
+
+FILE getting-started.Rmd
+---
+title: "Getting Started with terradish"
+author: "Bill Peterman"
+output: 
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Getting Started with terradish}
+  %\VignetteEncoding{UTF-8}
+  %\VignetteEngine{knitr::rmarkdown}
+editor_options: 
+  markdown: 
+    wrap: 72
+---
+
+
+
+## What is terradish for?
+
+`terradish` estimates conditional associations between raster covariates
+(altitude, forest cover, roads, water bodies, etc.) and genetic distance
+or covariance among sampled populations.
+
+The core idea is **isolation by resistance (IBR)**: instead of assuming
+that genetic distance simply tracks straight-line geographic distance
+(isolation by distance, IBD), IBR represents the landscape as a
+heterogeneous graph. Each cell has a fitted **conductance**, and
+neighboring cells define weighted edges. Conductance is a relative model
+quantity, not a direct observation of movement, migration, habitat
+suitability, or permeability.
+
+If we can map conductance across the landscape as a function of
+measurable covariates (rasters), we can:
+
+1.  Build a **conductance surface**: a weighted graph over the raster
+    grid.
+2.  Build the weighted graph Laplacian $L(\theta)$ and its generalized
+    inverse $E(\theta)=L(\theta)^+$.
+3.  Derive resistance distances from $E(\theta)$ when the measurement
+    model requires them.
+4.  Link $E(\theta)$ or its resistance distances to an observed genetic
+    matrix with a selected measurement likelihood.
+5.  Optimize the conductance and nuisance parameters by maximum
+    likelihood.
+
+Version 0.1.0 focuses on symmetric resistance models with log-linear,
+fixed-degree spline, or jointly estimated Gaussian-scale conductance.
+Environmental differences between sites can enter either MLPE or Wishart
+measurement models. Directional, selected-pair, hierarchical, and other
+experimental extensions are maintained on the `experimental` branch.
+
+`terradish` automates these steps and provides gradients, standard
+errors, model-comparison tools, and visualization helpers.
+
+------------------------------------------------------------------------
+
+## A conceptual road map
+
+Before writing any code, it helps to see how the pieces fit together:
+
+
+
+The **conductance model** maps raster values at each grid cell to a
+conductance value. `loglinear_conductance` is the default: conductance =
+exp(θ₁·altitude + θ₂·forestcover + ...). The parameters θ are what we
+estimate.
+
+The **measurement model** links the graph to the observed genetic summary.
+For pairwise genetic distances, `mlpe` accounts for a shared-site component of
+dependence; `leastsquares` assumes independent errors. For a suitably constructed
+covariance matrix or its corresponding squared-distance matrix, the Wishart
+models use a likelihood on site contrasts. The response construction and
+inferential assumptions determine which family is appropriate. A Wishart fit
+also requires an analyst-supplied effective degrees of freedom, `nu`.
+
+------------------------------------------------------------------------
+
+## Installation
+
+
+
+No other package is required. `terradish` implements the MLPE
+measurement model itself, so you do not need `corMLPE`. One optional
+package, `adegenet`, is used only by `pca_dist()` for turning `genind`
+genotype objects into a distance matrix; install it if you need that
+helper.
+
+
+
+------------------------------------------------------------------------
+
+## Load the package and example data
+
+
+
+`terradish` ships with example data from a study of *Melipona* bees in
+Brazil. Load everything with one call:
+
+
+
+What do we have?
+
+- **`melip.altitude`**: a raster of altitude across the study area,
+  already rescaled to roughly the unit interval rather than left in
+  meters.
+- **`melip.forestcover`**: a raster of forest cover proportion (0-1).
+- **`melip.coords`**: 37 sampling locations as a `SpatVector`.
+- **`melip.Fst`**: a 37 x 37 matrix of pairwise F~ST~ (a standard
+  measure of genetic differentiation; larger values mean more
+  differentiation).
+
+
+
+F~ST~ is symmetric (the differentiation between site A and site B is the
+same as between B and A), so only the lower triangle carries new
+information.
+
+------------------------------------------------------------------------
+
+## Visualize the spatial data
+
+
+
+
+
+------------------------------------------------------------------------
+
+## Scale your rasters: an important step
+
+Conductance in the loglinear model is exp(θ·x). If `x` (e.g. altitude in
+meters) has a very large range, small changes in θ produce enormous
+changes in conductance, making optimization numerically unstable.
+**Always scale continuous covariates** before fitting.
+
+
+
+By default, `scale_covariates()` subtracts each layer's mean and divides
+by its standard deviation, giving every continuous covariate a mean of 0
+and a standard deviation of 1. It also stores the original-scale center
+and scale for each layer, which lets
+`plot(fit, type = "marginal", data = surface)` label x-axes in the
+original units automatically.
+
+------------------------------------------------------------------------
+
+## Build the conductance surface
+
+
+
+`conductance_surface()` does three things:
+
+1.  Reads the raster values at every non-NA grid cell.
+2.  Identifies which cells correspond to the sampling locations.
+3.  Builds a graph where adjacent cells (here, using all 8 neighbors
+    including diagonals) are connected by edges whose weights will be
+    determined by the conductance model.
+
+`directions = 8` is the default; it allows diagonal
+movement and is less sensitive to grid orientation than
+`directions = 4`.
+
+
+
+### Optional: reduce graph size for large rasters
+
+The example raster is small enough that we can fit directly. For larger
+landscapes, graph size becomes the main driver of runtime. If your
+sampling locations occupy only part of the raster, you can crop the
+raster to a buffered sampling extent before the graph is constructed:
+
+
+
+The buffer is measured in the raster's map units. In a projected raster
+this might be meters; in a longitude/latitude raster it is degrees.
+Cropping is a safe speed tool only when the cropped area still contains
+the landscape context needed to estimate resistance distances. A good
+habit is to try a few buffer widths and confirm that the fitted
+coefficients are stable.
+
+Another speed option is a coarse-raster warm start. This fits the same
+model on aggregated rasters first, then refines the estimate on the
+full-resolution surface:
+
+
+
+With `exact_refine = TRUE`, the final reported model is still evaluated
+on the original graph. The coarse fits are only used to find better
+starting values.
+
+------------------------------------------------------------------------
+
+## Checking computational settings
+
+For the small *Melipona* example the default settings run in seconds and
+no tuning is needed. For larger landscapes (e.g., a high-resolution
+raster with hundreds of thousands of graph vertices, or a spline
+conductance model that expands to many parameters), the right optimizer
+and solver can meaningfully reduce wall-clock time.
+
+`terradish_assess_settings()` is an **advisory tool** for this. It:
+
+1.  **Profiles the graph**: counts vertices, edges, focal sites, and
+    conductance parameters, and reports those back without running any
+    optimization.
+2.  **Benchmarks the direct solver**: times several combinations of
+    Cholesky factorization style and solve backend to find the fastest
+    configuration for your specific graph.
+3.  **Runs short optimizer probes**: executes two Newton steps for each
+    of three optimizer/line-search combinations (Newton + Hager-Zhang,
+    BFGS + Hager-Zhang, BFGS + Armijo) and reports which was fastest.
+4.  **Optionally probes coarse-raster warm-starts**: checks whether
+    fitting on an aggregated raster first produces an acceptable
+    speedup.
+5.  **Returns `$recommended`**: a named list of the best settings that
+    can be passed directly to `terradish()`.
+
+The function does **not** change any package defaults and does **not**
+affect parameter estimation; only the computational path differs.
+
+
+
+The printed output has three main parts:
+
+
+
+- **Graph profile**: tells you how large your problem is. A vertex count
+  above \~50 000 is where solver choice starts to matter; above \~500
+  000 it is often the dominant cost.
+- **Recommended settings**: the fastest combination found by the probes.
+  `"(fastest acceptable probe: ...)"` shows which probe won and why.
+- **Defaults comparison**: a one-line summary of whether the assessment
+  recommends anything different from what `terradish()` would use by
+  default. If it says `"Assessment matched terradish defaults"`, just
+  call `terradish()` normally.
+
+### Using `$recommended` in the final fit
+
+The `$recommended` list maps directly onto `terradish()` arguments:
+
+
+
+You can also inspect and edit the list before using it. For example, to
+override the recommended `maxit` without losing the solver
+recommendation:
+
+
+
+### When assessment is most useful
+
+| Situation | Assessment benefit |
+|------------------------------------|------------------------------------|
+| Graph \< 10 000 vertices | Minimal; defaults usually converge in seconds |
+| Graph 10 000 to 100 000 vertices | Solver benchmark often helps |
+| Graph \> 100 000 vertices | All three probes are worthwhile |
+| Spline conductance (`df ≥ 4`) | Parameter expansion can shift optimizer recommendation from Newton to BFGS |
+| Fitting many candidate models | Run assessment once, reuse `$recommended` for all fits |
+| Coarse-raster approximation desired | Set `coarse_probe = TRUE` to check whether warm-start pays off |
+
+### Troubleshooting direct-solver failures
+
+If a fit stops with a `CHOLMOD` warning or a
+`non-positive-definite reduced Laplacian` message, the direct sparse
+Cholesky solver could not factorize the graph at the current conductance
+values. This is usually a numerical or data-preparation problem rather
+than a genetic-distance model result.
+
+Immediate checks:
+
+- Confirm the raster layers used by the conductance model are finite on
+  the retained graph cells. Missing, infinite, or extremely large values
+  can produce unusable conductances after the exponential transform.
+- Scale continuous covariates with `scale_covariates()` and start
+  conductance parameters near zero. Very large positive or negative
+  starts can make some graph edges effectively infinite or zero.
+- Re-run `terradish_assess_settings(..., verbose = TRUE)` to inspect
+  graph size, direct-solver settings, and the optimizer path before
+  launching a long fit.
+- While diagnosing the surface, try `solver = "auto"` or
+  `solver = "amg"`. These paths do not fix invalid conductance values,
+  but they can help separate a direct Cholesky factorization issue from
+  a broader model setup problem.
+
+------------------------------------------------------------------------
+
+## Fit your first model
+
+We will start with the simplest case: are altitude and forest cover
+conditionally associated with genetic differentiation through the fitted
+conductance model?
+
+
+
+The formula works like a standard R formula:
+
+- The **left-hand side** is the matrix of observed genetic distances.
+- The **right-hand side** lists which raster layers parameterize
+  conductance.
+
+`leastsquares` is the quickest measurement model. It treats the pairwise
+genetic distances as independent observations regressed on resistance
+distances. That is not strictly correct (measurements sharing a site are
+correlated), but it gives a useful exploratory or diagnostic fit.
+
+
+
+**How to read the output:**
+
+- **theta**: the conductance parameters. A positive θ for a covariate
+  means that higher values are associated with higher fitted relative
+  conductance, conditional on other terms and the graph. A negative θ
+  means lower fitted relative conductance. Neither sign is a direct
+  estimate of movement or a causal landscape effect.
+- **phi**: nuisance parameters of the measurement model. For MLPE, these
+  are the intercept, slope, log precision, and an unconstrained
+  correlation parameter. The actual residual precision is `exp(tau)`,
+  and the actual shared-site correlation is `plogis(rho) / 2`. These
+  parameters are profiled out automatically and generally are not the
+  primary inferential target.
+- The standard errors and z-statistics help gauge parameter uncertainty.
+
+------------------------------------------------------------------------
+
+## Upgrade to the MLPE measurement model
+
+Pairwise genetic distances are not independent: the distance between
+sites A-B and A-C both involve site A. `mlpe` ("maximum likelihood
+population effects") accounts for this correlation structure and is the
+recommended choice for inference.
+
+
+
+Compare the point estimates and standard errors between `fit_ls` and
+`fit_mlpe`. They are often similar, but MLPE standard errors better
+reflect the shared-site dependence represented by the model.
+
+------------------------------------------------------------------------
+
+## Choosing a measurement model
+
+`terradish` provides four measurement models. The right choice depends
+on the form of your genetic data and how you want to handle the
+non-independence of pairwise observations.
+
+| Model | Input `S` | Requires `nu` | Correlation structure |
+|--------------------|------------------|-------------|---------------------|
+| `leastsquares` | distance matrix | no | none (independent errors) |
+| `mlpe` | distance matrix | no | MLPE shared-site correction |
+| `generalized_wishart` | admissible squared-distance matrix | yes | generalized Wishart |
+| `wishart_covariance` | **covariance** matrix | yes | Wishart |
+
+`leastsquares` is the fastest and simplest. It is a reasonable first
+pass, but its standard errors can be too small because it ignores
+shared-site correlation.
+
+`mlpe` models a shared-site component of dependence because pairs (A-B) and
+(A-C) both involve site A. It uses maximum likelihood, not restricted maximum
+likelihood. This correction does not guarantee calibrated uncertainty for every
+population process. Treat `leastsquares` as a simple comparator rather than a
+general solution to dependence.
+
+`generalized_wishart` requires a squared-distance response coherently related to
+a positive-semidefinite covariance matrix. Use `check_distance_response()` on
+the exact response. Passing that check establishes compatible geometry, not a
+valid sampling model. In particular, F~ST~ is a ratio estimator; it does not
+acquire a Wishart sampling distribution merely by passing the geometry check.
+For a generic genetic dissimilarity, consider MLPE and assess its assumptions.
+
+`wishart_covariance` accepts the covariance directly, for example from
+`cov_from_biallelic()`. Both Wishart interfaces evaluate the same contrast
+likelihood on the site-contrast subspace when their inputs are related by
+`dist_from_cov()`. Centering the covariance does not discard information used
+by that likelihood. The previous full-rank covariance formulation is removed.
+
+### What nu means
+
+`nu` is a positive effective degrees-of-freedom value supplied by the analyst.
+The fit does not estimate it. Raw SNP counts, locus counts, and allele contrasts
+are not automatically effective independent observations: linkage and shared
+population history can reduce the information they contain. A block jackknife
+can diagnose marker dependence, but it does not capture every source of shared
+history and should be treated as an upper-bound guide to precision.
+
+For a fixed response and model, increasing `nu` leaves the theoretical optimum
+unchanged while reducing interior standard errors in proportion to
+`1 / sqrt(nu)`. It also magnifies likelihood differences and can favor flexible
+models. State the chosen value and its rationale, compare plausible values
+with `terradish_rescale_nu()`, and use held-out prediction to assess conductance
+complexity. See `vignette("wishart-covariance", package = "terradish")` and
+`vignette("model-comparison", package = "terradish")`.
+
+### Fitting with `generalized_wishart`
+
+
+
+**How to read the response check:** `admissible = TRUE` means the
+centered Gram matrix is positive semidefinite within the documented
+numerical tolerance. `relative_min_eigenvalue` reports the smallest
+eigenvalue relative to the largest; a tiny negative value can reflect
+rounding. `n_negative` counts only violations that exceed the tolerance.
+This diagnostic establishes mathematical compatibility with the
+likelihood, not biological suitability of the chosen genetic summary.
+
+The nuisance parameters for `generalized_wishart` are `tau` (the weight
+on the graph covariance kernel) and `sigma` (a log-scale identity
+component that captures diagonal variation not represented by that
+kernel). `sigma` is not a Gaussian smoothing scale or a direct estimate
+of genetic drift. A `tau` estimate near zero indicates no detectable
+graph-kernel contribution under this response and model.
+
+You can compare models that use the **same response, sites, graph
+domain, likelihood family, and pair subset** with `aic_table()`; Wishart
+comparisons must also use the same `nu`. `leastsquares` and `mlpe` both
+model pairwise distances with a Gaussian likelihood, so they can be
+compared when those conditions hold. `generalized_wishart` evaluates a
+Wishart likelihood on the same distance matrix, which has a different
+functional form and different normalizing constants; its AIC values are
+not directly comparable to those of `leastsquares` or `mlpe`. Use
+`aic_table()` to rank models within a family (e.g., all `mlpe` fits
+differing in their conductance formula, or all `generalized_wishart`
+fits differing in their conductance formula).
+
+
+
+------------------------------------------------------------------------
+
+## Extract and interpret coefficients
+
+
+
+The log-linear conductance model means:
+
+- θ~forestcover~ \> 0: higher forest cover is associated with higher
+  fitted relative conductance, conditional on altitude and the model.
+- θ~altitude~ \< 0: higher altitude is associated with lower fitted
+  relative conductance, conditional on forest cover and the model.
+
+You can convert back from the log scale to a relative conductance ratio.
+For example, a one standard-deviation increase in forest cover
+multiplies conductance by exp(θ~forestcover~):
+
+
+
+------------------------------------------------------------------------
+
+### Uncertainty and convergence
+
+
+
+**How to read the output.** `vcov()` gives the covariance of the conductance
+coefficient estimates; `confint()` reports intervals on their fitted scale.
+For a log-linear coefficient, exponentiate both interval endpoints to obtain
+an interval for the relative conductance ratio. These are conditional model
+intervals, not direct intervals for migration or movement rates. At a
+no-structure boundary, conductance coefficients are unidentified and their
+inference is unavailable.
+
+### Convergence and starting values
+
+Check convergence before interpreting estimates. Code 0 requires either a
+projected gradient below `ctol`, or an objective change below `ftol` together
+with a projected gradient below `sqrt(ctol)`. The projected gradient omits
+components pointing outside active parameter bounds. Code 1 means the
+iteration limit was reached; code 2 means a stall or failed line search. A
+small likelihood change alone is insufficient. Also inspect the nested
+nuisance fit's convergence code.
+
+If a user-supplied starting point reaches a no-structure boundary, the fitter
+tries the default start and retains the better likelihood. The convergence
+record reports whether that restart occurred. For difficult fits, compare
+scientifically plausible starting values and inspect the final likelihoods,
+gradients, coefficients, and active bounds. Increasing the iteration limit can
+help a progressing fit; weakening tolerances does not resolve a stalled one.
+Numerical convergence alone does not establish model adequacy.
+
+------------------------------------------------------------------------
+
+## Visualize the fit
+
+### Observed vs. fitted genetic distances
+
+The `plot()` S3 method with `type = "fit"` produces an
+observed-vs-fitted scatter plot with a least-squares regression line:
+
+
+
+### Fitted conductance surface
+
+`type = "surface"` renders the point-estimate conductance surface
+alongside its lower and upper confidence interval bounds in a single
+three-panel figure. All panels share the same color scale so relative
+differences are easy to read:
+
+
+
+Brighter cells have higher fitted relative conductance. Panels where the
+lower and upper bounds are close together indicate narrower conditional
+uncertainty under the fitted model; they do not directly measure
+movement or permeability.
+
+### Marginal associations with predicted genetic distance (default)
+
+The default plot (`type = "marginal_response"`) shows how each raster
+covariate is associated with the **predicted genetic distance** (the
+response variable itself) rather than the intermediate conductance
+scale. Because genetic distance is the observed response that the model
+fits, this is usually the most directly interpretable view.
+
+
+
+**How to read these plots**
+
+Each panel sweeps one covariate across its observed range while all
+other covariates are kept at their *observed* values at every grid cell
+(not at a single mean value). The curve is therefore a weighted average
+over the actual landscape, which matters most when the associations of
+different covariates interact.
+
+The **central curve** is the expected genetic distance at the given
+covariate value, marginalized over the rest of the landscape.
+
+The **shaded predictive band** combines three sources of uncertainty:
+
+1.  *Theta (conductance parameter) uncertainty*: imprecision in the
+    estimated conductance parameters θ, propagated through the
+    resistance-distance calculation via the delta method.
+2.  *Phi (measurement-model parameter) uncertainty*: imprecision in the
+    nuisance parameters (intercept α, IBR slope β, log precision τ, and
+    the unconstrained correlation parameter ρ), again via the delta
+    method. The corresponding shared-site correlation is
+    `plogis(rho) / 2`.
+3.  *Residual variation*: the irreducible scatter in pairwise genetic
+    distances around the fitted mean, with variance `exp(-tau)`.
+
+A **rising curve** means that higher covariate values are associated
+with higher predicted genetic distance under the fitted model. A
+**declining curve** means the conditional predicted association is
+negative. These plots do not establish a causal permeability or
+connectivity mechanism.
+
+> **Note:** Quadratic terms (`I(x^2)`) and interactions (`x * z`) in the
+> formula are handled automatically. For an interaction, each panel
+> holds the other covariate at its observed values across all grid
+> cells, so the curve represents the average fitted association of the
+> focal covariate over the joint distribution of the landscape.
+
+### Marginal associations on the conductance scale
+
+If you prefer to see the fitted association on the underlying
+conductance surface (without residual variation in the band, and on the
+conductance rather than genetic distance scale), use
+`type = "marginal"`:
+
+
+
+Here the band is a **confidence interval** (delta-method, 95% pointwise)
+on the mean conductance, not a predictive interval; it reflects only
+parameter uncertainty in θ, not residual variation. A rising curve means
+higher covariate values are associated with higher fitted conductance; a
+declining curve means the fitted conditional association is negative.
+
+### Support-constrained prediction and plotting
+
+If a covariate has sparse focal support at one tail, marginal curves and
+conductance maps can be dominated by extrapolation. `terradish` now
+supports focal-support clamping directly in both `plot()` and
+`conductance()`:
+
+
+
+Focal support means the covariate values in the raster cells containing
+sampled sites. The default `support_probs = c(0, 1)` uses their minimum and
+maximum; the example uses their 1st and 99th percentiles. Values outside those
+limits are set to the nearest limit before conductance is evaluated. For
+splines, evaluation retains the fitted knots and basis definition.
+
+Use `support = "none"` (default) for full-domain evaluation. Clamping with
+`support = "focal"` changes the displayed or predicted surface; it does not
+refit the likelihood, change the fitted graph, or remove uncertainty about
+poorly sampled environments. Report the limits and compare both maps.
+Predictions on new rasters must retain training transformations; use
+`scale_covariates(new_covariates, reference = covariates)` before building the
+new surface rather than scaling each domain independently.
+
+------------------------------------------------------------------------
+
+## Quick-reference: the full workflow in one block
+
+
+
+## Summary of key functions
+
+| Function | Purpose |
+|--------------------------------------|----------------------------------|
+| `scale_covariates()` | Center and scale raster layers to mean 0, sd 1 before fitting |
+| `scale_to_0_1()` | Rescale layers to the unit interval |
+| `crop_to_focal_buffer()` | Trim the raster extent to a buffer around the focal sites |
+| `conductance_surface()` | Build the weighted graph linking raster cells and focal sites |
+| `terradish_assess_settings()` | Profile the graph and recommend solver and optimizer settings |
+| `terradish()` | Fit the model by maximum likelihood |
+| `loglinear_conductance()` | Default conductance model, `c = exp(X theta)` |
+| `leastsquares()`, `mlpe()` | Measurement models for a genetic distance matrix |
+| `check_distance_response()` | Diagnose squared-Euclidean admissibility before a generalized-Wishart fit |
+| `generalized_wishart()`, `wishart_covariance()` | Wishart models for squared-distance and covariance responses, respectively; both need `nu` |
+| `summary()`, `coef()`, `confint()` | Estimates, standard errors, and intervals on the log-conductance scale |
+| `plot()` | Observed vs. fitted, conductance surface, and marginal associations |
+| `conductance()` | Extract the fitted conductance surface as a `SpatRaster` |
+
+## See also
+
+Each companion vignette assumes the workflow above and takes it further.
+
+- **`vignette("model-comparison", package = "terradish")`**, testing and
+  ranking competing models with likelihood ratio tests, AIC, AICc, BIC,
+  and cross-validation.
+- **`vignette("ibe-ibr-workflow", package = "terradish")`**, fitting
+  isolation by environment and isolation by resistance together in one
+  model.
+- **`vignette("wishart-covariance", package = "terradish")`**, building
+  a genetic covariance matrix from raw genotypes and fitting it with
+  `wishart_covariance()`, including how to choose `nu`.
+- **`vignette("spline-conductance", package = "terradish")`**,
+  non-linear conductance responses through spline terms such as
+  `s(altitude, df = 4)`.
+- **`vignette("gaussian-scale-optimization", package = "terradish")`**,
+  estimating a Gaussian raster-smoothing scale inside the model rather
+  than by pre-smoothing.
+  adding a diagnostic residual log-conductance field and evaluating
+  spatial confounding.
+  fitting antisymmetric edge-rate bias through symmetric commute time.
+- **`vignette("large-landscapes", package = "terradish")`**, solvers,
+  curvature, and exact graph reduction for rasters with hundreds of
+  thousands of cells.
+- **`vignette("simulation-design", package = "terradish")`**, simulating
+  covariance data to choose sample sizes and marker counts before
+  fieldwork.
+
+
+FILE ibe-ibr-workflow.Rmd
+---
+title: "Concurrent IBE and IBR in terradish"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Concurrent IBE and IBR in terradish}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+
+## What the joint model estimates
+
+**Isolation by resistance (IBR)** associates genetic structure with resistance
+through a landscape graph. **Isolation by environment (IBE)** associates genetic
+structure with environmental differences between sampled sites. Fitting both
+estimates each association conditional on the other predictors. It does not
+allocate genetic variation to distinct causal mechanisms.
+
+This vignette builds one pairwise design containing geographic distance and
+scaled environmental differences, then uses it in both measurement families.
+A small synthetic example keeps the complete workflow runnable. See
+`vignette("getting-started", package = "terradish")` for preparing real rasters
+and `vignette("wishart-covariance", package = "terradish")` for genotype summaries.
+
+The two families connect the same pairwise differences to their responses:
+
+| Component | MLPE distance regression | Wishart contrast covariance |
+|----|----|----|
+| Landscape | Resistance `R(theta)` with slope `beta` | Graph covariance `E(theta)` with weight `tau` |
+| Pairwise difference `D_k` | Additive mean term `gamma_k * D_k` | Centered kernel `K_k = -H D_k H / 2` with weight `lambda_k` |
+| Environmental constraint | `gamma_k` can have either sign | `lambda_k >= 0` |
+| Remaining variation | Intercept, residual precision, shared-site correlation | Common covariance nugget |
+| Effective information | Determined by the fitted MLPE likelihood | Analyst supplies `nu` |
+
+Here `H` centers sites. For the corresponding covariance-derived distances,
+the Wishart model implies the additive mean
+`tau * R + sum(lambda_k * D_k) + 2 * exp(sigma)`. This makes the distance
+interpretation comparable to MLPE, although the likelihoods and constraints
+differ. The default `absdiff` kernel is not an outer product of site values;
+the `sqdiff` transform gives that special case.
+
+## 1. Build a landscape and one pairwise design
+
+
+
+**How to read the output.** Each row is an unordered site pair in R's
+lower-triangle order. The climate column is the absolute difference after
+standardizing site values; one unit is one site-level standard deviation of
+difference. Geographic distance retains the coordinate units, meters here.
+`pairwise_covariates()` does not scale either input again. In real studies,
+use a projection suitable for the study region and retain the same site order
+in the response, graph, and pairwise design.
+
+The supported transforms are `absdiff`, `sqdiff`, `euclidean`, and `manhattan`.
+Choose the transform before fitting and retain it across families. A Wishart
+kernel must be positive semidefinite in site contrasts; the constructor rejects
+incompatible pairwise geometry rather than silently correcting it.
+
+
+
+These are measurement-model factories. Their coefficients are estimated when
+the resistance model is fitted. Both retain the original pairwise design so
+site subsets do not independently restandardize environmental values.
+
+## 2. Create covariance and matching distance responses
+
+For an interpretable comparison between families, use the same covariance
+information represented in two forms. This example draws from a declared
+Wishart model with landscape, climate, and geographic components. It does
+not imply that a generic genetic distance or F~ST~ follows that distribution.
+
+
+
+The diagnostic checks distance geometry. Here the generating model also
+supplies a sampling justification. For real data, assess that justification
+separately. `nu_demo` is an illustrative simulation setting, not a recommendation
+to use the number of SNPs as effective degrees of freedom.
+
+## 3. Fit the candidate models within each family
+
+The uniform surface still implies resistance among sites. Adding pairwise
+environmental terms to it is therefore **IBD + IBE (uniform surface)**, not
+an IBE-only model. Geographic distance is an additional explicit measurement
+predictor; uniform-graph resistance is generally not Euclidean distance.
+
+
+
+Interpret code 0 as numerical convergence under the stopping criteria.
+Inspect nonzero codes, gradients, inner nuisance convergence, and active
+bounds before comparing fits. A no-resistance boundary makes the conductance
+surface unidentified; a zero environmental weight alone does not.
+
+## 4. Read conditional conductance and environmental associations
+
+
+
+**How to read the output.** A positive `x` coefficient means greater relative
+conductance as `x` increases, conditional on the included pairwise terms.
+The estimated coefficient can change after adding those terms because the
+model can represent the same spatial pattern in more than one way. Neither
+surface is a unique causal map of landscape effects.
+
+In MLPE, an environmental `gamma` gives the conditional change in genetic
+distance per unit of pairwise difference. It is unconstrained, so a negative
+estimate is possible. In Wishart, `lambda` is a nonnegative kernel weight.
+An association in the opposite direction is represented at the zero bound.
+The Wishart summary marks that boundary and gives an approximate one-sided
+upper limit rather than a symmetric interval.
+
+
+
+This reports the MLPE response change over the stored 10th-to-90th-percentile
+pairwise contrast. The nuisance inference includes uncertainty in the fitted
+conductance parameters. It remains conditional on the selected model and
+measurement assumptions.
+
+### Compare IBE:IBR ratios
+
+
+
+The ratio is `gamma / beta` for MLPE and `lambda / tau` for Wishart. It is
+the resistance-distance equivalent of one unit of the pairwise difference.
+These ratios share an interpretation because the response is the same
+covariance-derived distance and both families use the same pairwise transform
+and scaling. Their absolute coefficients are not comparable across likelihoods.
+Each fit also estimates its own conductance surface, so its resistance scale
+can differ. The ratio is undefined when the resistance coefficient is zero.
+The geographic row has the same equivalent-distance interpretation but is
+an explicit IBD term, not an environmental mechanism.
+
+An environmental association can arise from local adaptation, historical
+structure, correlated geography, sampling, or another omitted predictor.
+The fitted term does not distinguish these mechanisms. A precise ratio alone
+does not establish causal IBE.
+
+## 5. Compare predictive support and sensitivity
+
+Information criteria are computed separately within each likelihood family:
+
+
+
+Lower AIC balances fit and parameter count within the declared candidate set.
+Wishart AIC can over-select environmental kernels when `nu` overstates effective
+information. AICc does not repair that problem. Cross-family AIC comparisons
+have no common likelihood basis.
+
+### Nested tests and boundaries
+
+
+
+Adding unconstrained MLPE slopes uses the ordinary chi-square reference under
+its asymptotic assumptions. Adding only nonnegative Wishart kernel weights
+uses a chi-bar-square reference with binomial weights. This reference is exact
+for information-orthogonal kernels and approximate otherwise. The climatic
+and geographic kernels here need not be orthogonal. Wishart test magnitudes
+also depend on supplied `nu`; treat them as descriptive at that value.
+The uniform-surface IBE model and the IBR model are not nested in each other.
+
+
+
+Rescaling retains coefficient estimates and broadens uncertainty when `nu`
+decreases. Rescale every candidate to the same value for a model comparison.
+This is a sensitivity calculation, not estimation of effective information.
+
+### Fixed-nuisance cross-validation
+
+
+
+All nuisance coefficients, including pairwise terms, are learned from training
+sites and held fixed during scoring. Compare candidates within each family,
+using paired differences on common successful folds. Reprofiling on test sites
+would instead assess performance after local recalibration. For spatial
+transfer, use defensible spatial blocks and more sites than this teaching
+example. Repeated folds expose partition sensitivity without creating new
+independent observations.
+
+## 6. Visualize the joint model
+
+
+
+Agreement describes the fitted response summary. It does not show that the
+two spatial predictors identify distinct processes.
+
+
+
+The map and its intervals concern the conductance component after including
+pairwise terms. Compare it with the fit omitting those terms before attributing
+the spatial pattern to landscape `x`.
+
+
+
+For weakly sampled tails, compare unclamped predictions with
+`support = "focal"`. Clamping uses focal-cell covariate limits and changes
+prediction, not the fitted likelihood or the evidence for a mechanism.
+
+## Quick reference
+
+
+
+## Summary of key functions
+
+| Function | Purpose |
+|----|----|
+| `pairwise_endpoint_covariates()` | Transform site attributes into pairwise differences |
+| `pairwise_covariates()` | Combine those differences with geographic or other pairwise matrices |
+| `mlpe_covariates()`, `wishart_covariates()` | Use the same design in two likelihood families |
+| `terradish_ibe_ratio()` | Report resistance-equivalent ratios with joint uncertainty |
+| `mlpe_response_change()` | Express an MLPE pairwise association on the response scale |
+| `terradish_rescale_nu()` | Assess Wishart precision sensitivity without refitting |
+| `terradish_cv_folds()` | Evaluate held-out prediction on a fixed landscape graph |
+
+## See also
+
+- `vignette("getting-started", package = "terradish")`: graph preparation and conductance interpretation.
+- `vignette("wishart-covariance", package = "terradish")`: covariance construction and effective information.
+- `vignette("model-comparison", package = "terradish")`: nesting, repeated folds, and paired comparisons.
+- `vignette("simulation-design", package = "terradish")`: recovery and coverage under declared scenarios.
+
+
+FILE large-landscapes.Rmd
+---
+title: "Large Landscapes"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Large Landscapes}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+
+This vignette covers fitting `terradish` models on large rasters: hundreds of
+thousands to millions of grid cells. If you have not read
+`vignette("getting-started", package = "terradish")`, start there. It explains
+conductance surfaces, the model formula, and how to read a fitted model. Here we
+assume you already know how to fit a small model and focus on what changes when
+the landscape gets big.
+
+The runnable code uses the bundled `melip` data to show the workflow.
+Time and memory depend on graph geometry, conductance contrast, the number of
+focal sites, and hardware. Measure those costs on your own design before
+committing to a large analysis.
+
+
+
+---
+
+## When a landscape is "large"
+
+`terradish` builds a weighted graph over the raster grid and solves a linear
+system on that graph to get resistance distances among focal sites. The cost of
+that solve grows with the number of grid cells, `N`. Two things change as `N`
+grows into the hundreds of thousands and beyond:
+
+1. The linear **solver** that computes resistance distances can run out of
+   memory. Picking the right one (Section 3) is what keeps a fit feasible.
+2. The **inference** machinery (standard errors and confidence intervals) is
+   unchanged in form, but larger analyses can include more focal sites. Wishart
+   precision also depends on the supplied effective degrees of freedom, `nu`
+   (Section 4).
+
+"Large" here means that graph factorization or repeated derivative solves
+dominate the analysis. There is no universal cell-count limit: missing cells,
+graph connectivity, and conductance contrast can change the practical limit.
+
+---
+
+## Choosing a solver
+
+Both `terradish()` (the fitting wrapper) and `terradish_algorithm()` (one
+likelihood and gradient evaluation) take a `solver` argument. The solver only
+changes **how** the resistance-distance linear system is solved; it does not
+change the statistical model. Iterative solvers should agree with the direct
+solver within their numerical tolerances, but estimates need not be bitwise
+identical.
+
+
+
+The choices are:
+
+- **`direct`** (default) uses sparse Cholesky factorization. It is a useful
+  reference for checking iterative results. The factor can contain many more
+  nonzero entries than the graph, so its memory requirements can grow rapidly.
+- **`amg`** uses algebraic multigrid as an iterative solver. It can reduce memory
+  demands on large grids, but convergence depends on conductance contrast and
+  graph structure. Strong barriers can require more iterations or tighter
+  solver settings. Check agreement with a direct solve on a manageable case.
+- **`auto`** uses `direct` below 1,500,000 graph vertices and `amg` at or above
+  that threshold with the default controls. The number of focal sites does not
+  override the large-graph switch. `solver_control$auto_amg_min_vertices`
+  changes the threshold; the legacy `auto_direct_max_rhs` is ignored.
+
+Use `terradish_assess_settings()` for a local speed and accuracy probe. Its
+recommendation concerns the tested settings and graph, not the scientific
+adequacy of the measurement model. Record the resolved solver and compare
+coefficient estimates and likelihoods when changing solver tolerances.
+
+This applies to every symmetric resistance model: any `conductance_model`
+(`loglinear_conductance`, `smooth_loglinear_conductance`, the Gaussian
+scale-aware model) paired with any measurement model (`mlpe`,
+`leastsquares`, `generalized_wishart`, and `wishart_covariance`). The solver sits underneath
+all of them.
+
+---
+
+## Inference at scale
+
+Scaling the solver lets you fit larger graph domains and sampling designs. More
+informative designs can tighten inference, but cell count alone does not.
+Several computational choices matter here.
+
+## Reusing Windows workers
+
+Worker reuse is **experimental**. On Windows, `cores > 1` requests PSOCK
+workers for supported Hessian and partial-derivative calculations. It does
+not parallelize every step of a fit. The pool is reused during optimization
+and stopped before return; fitted objects do not retain live workers.
+AMG and the cached CHOLMOD backend ignore this setting. On small graphs,
+worker startup and data transfer can make multiple cores slower than one.
+Benchmark `cores = 1` first, then compare the elapsed time and numerical
+results with the requested worker count.
+
+Use one level of parallelism at a time. In particular, fixed-domain
+cross-validation evaluates folds serially and passes `cores` to each fit. This
+avoids creating an outer fold cluster whose workers each create another inner
+cluster.
+
+## Controlling the nuisance profile
+
+Each conductance-parameter trial profiles the nuisance parameters of the
+measurement model. Smooth conductance models paired with
+`generalized_wishart` can make that two-level optimization costly because each
+outer step may require many inner Newton steps. The inner optimizer already
+uses the previous nuisance solution as a warm start. Use
+`measurement_control` to inspect or tune it separately from `control`:
+
+
+
+The returned `convergence` code and `iters` count describe the final nuisance
+profile. A value of 0 indicates convergence; 1 means the profile reached
+`maxit`; 2 indicates a line-search failure. Do not loosen tolerances simply to
+remove a warning. First inspect coefficient stability, gradient size, the
+likelihood, and sensitivity to tighter settings. The control separates a
+computational decision from the scientific model, but overly loose profiling
+can still change the fitted likelihood surface.
+
+## Curvature for standard errors
+
+`terradish()` and `terradish_algorithm()` take `curvature = c("exact",
+"gauss_newton")`. The objective and gradient are the same; the options differ
+in the Hessian approximation used for optimization and standard errors. Fits
+should be compared for numerical agreement rather than assumed identical.
+
+
+
+- **`exact`** uses the full observed Hessian.
+- **`gauss_newton`** drops the two residual-weighted second-derivative terms,
+  leaving the **Gauss-Newton information** curvature. It needs only the
+  first derivatives of conductance and is positive semidefinite when the
+  retained measurement-model curvature is positive semidefinite. It flows
+  unchanged into `vcov()`, `summary()`, and `confint()`, so the standard errors
+  become asymptotic, information-based errors. It approaches the exact Hessian
+  when the omitted residual-weighted terms are negligible; equality is not
+  guaranteed merely because a fit has converged.
+
+**How to choose.** Both are validated for `leastsquares` and the
+`generalized_wishart` measurement model. Use the `exact` default for routine
+work. Reach for `gauss_newton` when the optimizer struggles with an indefinite
+Hessian far from the optimum, or when you want strictly information-based
+standard errors. At a well-behaved fit they may agree closely. Compare them as
+a sensitivity check when curvature choice materially changes uncertainty or
+convergence.
+
+The focused benchmark in `inst/benchmarks/benchmark-curvature-large-landscape.R`
+makes this comparison reproducible. It builds a synthetic heterogeneous raster,
+simulates a `generalized_wishart` squared-distance response from known conductance
+parameters, then fits the same model with `curvature = "exact"` and
+`curvature = "gauss_newton"`.
+
+
+
+The default case is deliberately small enough to run during review. To repeat
+the same comparison in the large-N solver regime, copy `CONFIG`, increase
+`side`, and set `solver = "amg"` or `solver = "auto"` before calling
+`run_curvature_large_landscape_benchmark()`.
+
+**How to read the benchmark.** Compare coefficients and likelihoods first,
+then standard errors, Hessian eigenvalues, and elapsed time. Agreement in
+point estimates does not guarantee agreement in curvature. A large difference
+in uncertainty warrants investigation of residuals, conditioning, and model
+misspecification before choosing the faster option.
+
+## Information and effective degrees of freedom
+
+For Wishart fits, `nu` is a positive effective degrees-of-freedom value supplied
+by the analyst. It is not estimated from the response and is not automatically
+the marker count. Linkage and shared population history can reduce the
+information represented by many markers. More graph cells alone do not supply
+more independent genetic information.
+
+Holding the response and model fixed, changing `nu` leaves the likelihood
+optimum unchanged in theory and changes interior standard errors in proportion
+to `1 / sqrt(nu)`. Use `terradish_rescale_nu()` to inspect that sensitivity
+without refitting. Boundary inference needs separate care. Choose conductance
+complexity using held-out prediction and report inference across plausible
+`nu` values; see `vignette("model-comparison", package = "terradish")`.
+
+## Cropping and coarse warm starts
+
+Cropping removes routes outside the retained domain and can increase resistance
+between sites even when every site remains inside the crop. The supplied
+release audit found increases of 15–23% with a two-cell buffer and 1–2% with a
+ten-cell buffer. Those are results for that landscape, not universal buffer
+recommendations. Compare progressively wider buffers while retaining the same
+response, sites, formula, and covariate scaling.
+
+
+
+**How to read the output.** Compare estimates and intervals across buffers,
+and inspect fitted resistance distances with `terradish_distance()`. Continue
+expanding the domain if the substantive conclusion changes. The small-buffer
+message is a diagnostic prompt, not proof that a larger buffer is adequate.
+
+Coarse rasters can provide starting values, but the final fit must be refined
+on the original graph. Coarsening changes both routes and covariate summaries.
+The supported coarse-raster workflow therefore requires exact refinement:
+
+
+
+Inspect convergence after the final refinement. A converged coarse fit does
+not establish convergence on the original graph. `terradish_grid()` accepts
+only `approximation = "none"`; coarse-only likelihoods are not supported
+for ranking models.
+
+---
+
+## Storing large fitted objects
+
+Fitted conductance and measurement-model closures can retain their construction
+environments, including large graph objects. That is useful for prediction but
+can make `saveRDS()` much larger than the visible coefficient table suggests.
+Use `slim_terradish()` when the durable artifact is intended for inference
+summaries rather than later prediction:
+
+
+
+The default removes `submodels` and `leverage`. Coefficients, likelihood,
+Hessian-based summaries, fitted values, diagnostics, and permutation
+simulation remain available. Conductance prediction and most plot types do not,
+because they must reevaluate the removed closures. Slimming is irreversible.
+Keep the original formula, graph, response, and an unslimmed fit whenever
+prediction or model reconstruction may be needed. Add `"response"` to `drop`
+only when the response itself must also be excluded from the archive; doing so
+also removes the strongest stored check for later model comparison.
+
+---
+
+## Quick reference
+
+
+
+## Summary of key functions
+
+| Function | Purpose |
+|----------|---------|
+| `conductance_surface()` | Build the weighted graph over the raster grid |
+| `terradish()` | Fit the model; takes `solver` and `curvature` |
+| `terradish_algorithm()` | One likelihood and gradient evaluation; same `solver` and `curvature` |
+| `crop_to_focal_buffer()` | Crop with an explicit map-unit buffer; check domain sensitivity |
+| `terradish_assess_settings()` | Compare computational settings on the current graph |
+| `slim_terradish()` | Remove prediction closures and other optional large components before storage |
+
+## See also
+
+- **`vignette("getting-started", package = "terradish")`** the core workflow:
+  data in, model fit, interpretation out.
+- **`vignette("wishart-covariance", package = "terradish")`** the distance and
+  covariance Wishart measurement models and the role of `nu`.
+- **`vignette("model-comparison", package = "terradish")`** ranking competing
+  models with AIC and likelihood ratio tests.
+
+
+FILE model-comparison.Rmd
+---
+title: "Model Comparison and Selection in terradish"
+author: "Bill Peterman"
+output: 
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Model Comparison and Selection in terradish}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+
+## Overview
+
+Once you can fit a `terradish` model (see
+`vignette("getting-started", package = "terradish")`), the natural next
+questions are:
+
+1.  Does forest cover have conditional likelihood support after
+    accounting for the other predictors, or could the apparent
+    association be noise? (**hypothesis testing**)
+2.  Is a model with both altitude and forest cover better than one with
+    only altitude? (**model selection**)
+3.  How well does the model predict genetic structure at sites not used
+    for fitting? (**cross-validation**)
+
+This vignette walks through all three.
+
+------------------------------------------------------------------------
+
+## Set up: data and baseline model
+
+
+
+### A note on computational settings
+
+When fitting many candidate models (as this vignette does), it pays to
+profile the graph and identify the fastest optimizer/solver combination
+**once**, then reuse those settings for all fits.
+`terradish_assess_settings()` does this in a few short probe iterations:
+
+
+
+Then pass `rec$optimizer`, `rec$control`, `rec$solver`, and
+`rec$solver_control` to each `terradish()` call below. For the small
+*Melipona* graph the defaults are fine; the pattern becomes important
+for large landscapes where each function evaluation is expensive. See
+`vignette("getting-started", package = "terradish")` for a full
+explanation of the output and all available probe options.
+
+------------------------------------------------------------------------
+
+## Hypothesis testing with likelihood ratio tests
+
+A **likelihood ratio test (LRT)** asks whether adding a covariate
+improves the model fit enough to reject the reduced model under its
+assumptions. The test statistic is:
+
+> 2 × (log-likelihood of larger model − log-likelihood of smaller model)
+
+Under the null hypothesis that the extra parameter does not help, this
+statistic follows asymptotically a χ² distribution with degrees of
+freedom equal to the number of extra parameters. This approximation
+improves as sample size (number of focal sites) increases.
+
+`terradish` provides `anova()` for this:
+
+
+
+A small p-value means that removing altitude worsens the likelihood more
+than expected under the reduced model and its asymptotic reference
+distribution. This result supports a conditional association between
+altitude and genetic structure through the fitted conductance surface.
+It does not by itself establish a causal effect, movement mechanism, or
+absolute permeability.
+
+### Testing against the null model of isolation by distance (IBD)
+
+The formula `~ 1` fits a null conductance surface where all cells have
+equal conductance. Resistance still combines all routes through the graph;
+it is neither shortest-path distance nor necessarily proportional to Euclidean
+distance. This uniform-surface model is the graph-based IBD baseline:
+
+
+
+### Testing for an interaction
+
+An interaction term asks whether the fitted association between altitude
+and conductance depends on forest cover (or vice versa):
+
+
+
+> **Tip:** Always compare nested models (smaller vs. larger). The model
+> with fewer parameters must be a special case of the model with more
+> parameters. `anova()` rejects different measurement models and obvious
+> formula non-nesting, but the analyst must still verify substantive
+> nesting and whether boundary parameters invalidate the usual
+> chi-squared reference distribution. The response, site order, graph,
+> pairwise design, basis definition, and supplied Wishart `nu` must agree.
+> A linear term is not automatically nested in an arbitrary spline basis, and
+> a fitted Gaussian scale changes the model dimension. For Wishart fits,
+> the LRT magnitude depends on `nu`; interpret it descriptively at the declared
+> value and report sensitivity rather than treating nominal marker counts as
+> calibrated replication.
+
+------------------------------------------------------------------------
+
+## Information criteria: AIC, AICc, and BIC
+
+Likelihood ratio tests require nested models. When comparing non-nested
+models (e.g. altitude-only vs. forest-cover-only), use an information
+criterion or held-out prediction instead.
+
+
+
+`aic_table()` ranks fitted `terradish` models only when they use the
+same response, focal sites, graph domain, measurement-model family, and
+pair subset. Wishart fits must also use the same supplied `nu`.
+Cross-family comparisons, such as MLPE versus Wishart, do not have a
+common likelihood basis and are rejected.
+
+
+
+**How to read the table:**
+
+- **logLik**: larger is better (less negative = higher likelihood).
+- **df**: number of estimated parameters; more complex models have
+  higher df.
+- **AIC**: balances fit and complexity. Smaller is better.
+- **delta**: difference from the best model's AIC. Values below about 2
+  are a common heuristic for similar support within the declared
+  candidate set, not proof that the models are equivalent.
+
+### Effective information and over-selection
+
+Wishart AIC can select unnecessary conductance terms when nominal `nu`
+overstates effective information. AICc does not repair an incorrectly scaled
+likelihood. Use the same predeclared candidates in cross-validation and
+compare inference over plausible effective degrees of freedom:
+
+
+
+**How to read the output.** Rescaling changes uncertainty and likelihood-based
+comparisons without changing the fitted coefficients. If conclusions depend
+on a high `nu`, report that dependence. Rescale every candidate to the same
+value before comparing their information criteria.
+
+### When to use AICc
+
+AIC can over-fit when the effective sample size is small relative to the
+number of parameters. `terradish` provides an AICc calculation that uses
+the number of focal sampling sites as `n`:
+
+
+
+The focal-site convention recognizes that pairwise genetic observations
+are dependent, but it is still an approximation. Report the convention
+and use the result as one part of the evidence. A common rule of thumb
+is to prefer AICc when `n / K < 40`, where `K` includes all estimated
+parameters. Predeclare and report the candidate model set and any search
+over Gaussian smoothing scale; an optimized scale is an estimated
+parameter.
+
+### BIC for stricter parsimony
+
+BIC penalizes complexity more heavily than AIC and tends to favor
+simpler models. The implementation uses the number of pairwise
+observations (`n = n_sites * (n_sites - 1) / 2`) as the BIC sample size.
+AICc instead uses the number of focal sites. Which count is the most
+appropriate `n` for landscape-genetic data is debated; treat BIC values
+as one input among several rather than a single definitive arbiter of
+model choice:
+
+
+
+------------------------------------------------------------------------
+
+## Visualizing the likelihood surface
+
+When a model has only one or two conductance parameters, it is
+informative to map how the log-likelihood changes across parameter
+space. This reveals:
+
+- How sharp (or flat) the optimum is.
+- Whether there are multiple local optima.
+- Whether the estimates are well-determined or poorly constrained.
+
+`terradish_grid()` evaluates the model at every point on a parameter
+grid:
+
+
+
+Plot the result as a heat map with contours:
+
+
+
+A well-behaved likelihood surface has a single, sharp peak at the MLE. A
+flat or elongated surface signals that the parameters are poorly
+identified, often because the covariates are highly correlated or the
+signal-to-noise ratio in the genetic data is low.
+
+For large rasters, a full likelihood grid can become expensive. If the
+surface was created with `saveStack = TRUE`, `terradish_grid()` can
+screen a grid on an aggregated raster:
+
+
+
+This is a screening tool rather than an exact replacement for the full
+grid: the log-likelihoods are evaluated on the aggregated graph. Use it
+to locate interesting regions of parameter space, then rerun a smaller
+grid or a final optimization on the full-resolution graph.
+
+------------------------------------------------------------------------
+
+## Confidence intervals on the conductance surface
+
+`plot(fit, type = "surface", data = surface)` renders the fitted
+conductance alongside its asymptotic lower and upper confidence interval
+bounds in a single three-panel figure. Uncertainty in θ is propagated
+through the log-linear model via the delta method, and all panels share
+the same color scale:
+
+
+
+Wide intervals in a region mean that the available genetic data provide
+little constraint on conductance there, either because few sampling
+sites are nearby or because the genetic signal is weak.
+
+## Marginal associations on conductance
+
+`plot(fit, type = "marginal", data = surface)` sweeps each covariate
+across its observed range while averaging over all other covariates. The
+shaded ribbon is a 95% pointwise confidence band from the delta method.
+Because we used `scale_covariates()` to prepare the rasters, x-axes are
+automatically back-transformed to the original measurement units:
+
+
+
+A rising curve means that higher covariate values are associated with
+higher fitted conductance, conditional on the other predictors and the
+model. A declining curve indicates the opposite fitted association.
+These curves do not directly measure permeability, movement, habitat
+suitability, or a causal barrier effect. Flat or wide-interval curves
+suggest that the covariate adds little constraint beyond the other
+predictors already in the model.
+
+### Handling weakly supported tails
+
+When focal sites sparsely cover a covariate tail, unconstrained
+marginals can show unstable extremes that dominate interpretation. Use
+focal-support clamping to inspect predictions within sampled covariate
+ranges. This display choice does not alter the fitted likelihood or model
+comparison:
+
+
+
+The same options are available in `conductance()` when producing raster
+surfaces for map comparison:
+
+
+
+------------------------------------------------------------------------
+
+## Cross-validation
+
+### Spatially blocked, fixed-domain cross-validation
+
+Random splits ask whether a model predicts sites withheld throughout the
+sampled landscape. They do not directly ask whether the fitted
+association transfers across space. For that question, construct spatial
+folds and use `terradish_cv_folds()`.
+
+The fixed-domain method builds the graph once, then changes only which focal sites
+contribute to the training and test responses. Unsampled raster cells,
+graph edges, and raster covariates remain available in every fold. This
+matches the prediction target of transferring to held-out sites within
+the observed landscape.
+
+Use ecological blocks when the study design supplies them. Watersheds,
+barrier units, or sampling campaigns can be more defensible than an
+automated partition. When such blocks are unavailable,
+`terradish_folds()` provides a reproducible k-means partition of
+unscaled projected coordinates:
+
+
+
+With `nuisance = "fixed"`, all measurement-model coefficients are learned
+from training sites and used unchanged to score held-out sites. This tests
+prediction from the trained model. A separately fitted uniform-conductance
+baseline provides `loglik_gain`; positive gain favors the trained landscape
+surface over that baseline on the same held-out response.
+
+The default `nuisance = "reprofile"` instead optimizes nuisance coefficients
+using each test response, separately for the trained surface and baseline.
+That asks whether the learned surface retains useful structure after local
+recalibration. It is a different prediction target. Declare the mode and do
+not compare scores across modes.
+
+### Different models and repeated folds
+
+Each formula can have its own conductance or measurement-model factory. For
+example, compare a linear forest-cover term with a fixed-degree spline using
+the same response and folds:
+
+
+
+**How to read the output.** Inspect convergence and score failures first.
+Rankings use folds on which every candidate succeeded. `mean_difference`
+and `se_difference` describe paired score differences against the best
+candidate on those common folds; `within_one_se` flags a difference no larger
+than its estimated standard error. Prefer a simpler model when its predictive
+performance is indistinguishable under the declared design. Overlapping
+training sets and repeated partitions make these standard errors descriptive,
+not independent-replicate hypothesis tests. Repeats expose split sensitivity;
+they do not create new independent sites.
+
+Checkpoint files retain completed fits and scores. Resume only the identical
+response, graph, formulas, model settings, and folds; changed inputs are
+rejected. Keep failed baseline scores separate from failed trained-model scores:
+a valid held-out score can exist even when its baseline gain is unavailable.
+
+The comparison boundary remains strict. Raw held-out log-likelihood and
+`loglik_gain` are meaningful only when candidates use the same response
+representation, measurement likelihood, folds, graph domain, and Wishart
+degrees of freedom. A gain from MLPE is not on a common scale with a
+gain from the generalized-Wishart or covariance-Wishart likelihood.
+Spatial cross-validation strengthens evidence for transfer under the
+declared blocking design. It does not establish a causal landscape
+effect or prediction beyond the observed landscape domain.
+
+## Combining the evidence
+
+A complete analysis typically uses all three approaches together:
+
+| Tool | Answers | When to use |
+|----|----|----|
+| `anova()` | Does a larger model have incremental likelihood support? | Nested models within one measurement family |
+| `aic_table()` | Which declared candidate has the strongest relative support? | Models satisfying the full comparison contract |
+| `terradish_cv_folds()` | Which candidate transfers best across declared spatial blocks? | Fixed-domain prediction under identical folds and one likelihood family |
+| `mlpe_response_change()` | How large is an MLPE pairwise-covariate association on the response scale? | IBE terms fitted with `mlpe_covariates()` |
+
+Use cross-validation to assess conductance terms and shape, then use `nu`
+sensitivity to describe the uncertainty of Wishart inference. Treat an LRT at
+a fixed `nu` as conditional, descriptive evidence. Information criteria add
+a view of in-sample fit and complexity, but agreement among these summaries
+does not validate the underlying effective sample size. None establishes
+causality, observed movement, absolute permeability, or unique attribution to
+a landscape mechanism.
+
+------------------------------------------------------------------------
+
+## Quick reference: the full comparison workflow
+
+
+
+## Summary of key functions
+
+| Function | Purpose |
+|----|----|
+| `anova(fit1, fit2)` | Likelihood ratio test between two nested models |
+| `aic_table(list(...))` | Rank models by AIC, AICc, or BIC |
+| `terradish_grid()` | Evaluate log-likelihood on a parameter grid |
+| `conductance()` | Fitted conductance with confidence intervals |
+| `mlpe_response_change()` | Response-scale change and confidence interval for MLPE pairwise covariates |
+| `terradish_folds()` | Reproducible spatial or balanced random fold assignment |
+| `terradish_cv_folds()` | Fixed-domain fold fitting with a uniform-conductance baseline |
+
+## See also
+
+- **`vignette("getting-started", package = "terradish")`**, the core
+  workflow and how to read a single fitted model.
+- **`vignette("spline-conductance", package = "terradish")`**, adding
+  non-linear covariate responses to the candidate set compared here.
+- **`vignette("ibe-ibr-workflow", package = "terradish")`**, building an
+  IBD / IBE / IBR / joint model set to rank with these tools.
+- **`vignette("simulation-design", package = "terradish")`**, how design
+  choices affect model discrimination under stated simulation scenarios.
+
+
+FILE simulation-design.Rmd
+---
+title: "Simulating Covariance Data to Plan a Study"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Simulating Covariance Data to Plan a Study}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+
+## Why simulate before you sample?
+
+Landscape-genetic studies are expensive: every additional sampling site means
+field time and cost. Before
+committing to a design it is worth asking, in advance:
+
+- **How many sampling sites** do I need to detect the conditional conductance
+  association specified in my scenario?
+- **How much approximately independent marker information** (represented by
+  the supplied `nu`) do I need?
+- **Where should the sites go**: spread evenly across the landscape, or placed
+  some other way?
+- If I run the analysis, **how often will I recover the generating parameters
+  under this model**, and how often will sampling variation obscure them?
+
+`terradish` answers these questions by simulation. Because the Wishart
+covariance model has a tractable generative form, you can draw synthetic
+covariance matrices from a *known* conductance surface, refit the model, and
+measure how reliably the generating parameters are recovered, all without any forward-time
+genetic simulation. This vignette shows how.
+
+This is a **design tool**, not a replacement for individual-based or
+coalescent simulation. It assumes the fitted model is correctly specified and
+asks: given that model and this set of scenarios, how much data do I need? The
+answer is conditional on the graph, parameters, candidate set, likelihood,
+optimizer, and sampling strategies evaluated here.
+
+---
+
+## The generative model
+
+A covariance-based `terradish` fit (see
+`vignette("wishart-covariance", package = "terradish")`) assumes the observed
+genetic covariance matrix `S` is a noisy realization of a structured
+covariance:
+
+$$\Sigma = \tau \, E(\theta) + \sigma\, I, \qquad
+  \nu\, S \sim \mathrm{Wishart}(\nu, \Sigma)$$
+
+where:
+
+- $E(\theta)$ is the **conductance-implied covariance**: the generalized
+  inverse of the graph Laplacian at conductance parameters $\theta$. This is
+  the part that carries the landscape signal.
+- $\tau \ge 0$ scales that signal.
+- $\sigma \ge 0$ is a diagonal residual-variance term for covariance variation
+  not represented by $E(\theta)$. It is not a direct estimate of drift,
+  population size, or a Gaussian smoothing scale.
+- $\nu$ is the supplied **effective Wishart degrees of freedom**, not a fitted
+  parameter. It can be interpreted as the effective number of approximately
+  independent marker contributions. Large $\nu$ gives draws tightly clustered
+  around $\Sigma$; small $\nu$ gives noisier draws.
+
+`simulate_covariance_response()` draws from exactly this model, and
+`covariance_response_power()` automates the simulate-refit-summarize loop across
+many designs. Fitted `wishart_covariance()` models store the nugget internally
+on the log scale, but both simulation helpers accept $\sigma$ as the
+nonnegative variance added to the diagonal.
+
+For a fixed landscape template, $\tau / \sigma$ is a convenient
+**signal-to-nugget ratio**. Larger values place more weight on the
+landscape-implied covariance relative to diagonal noise. The ratio should be
+interpreted within a fixed template because rescaling $E(\theta)$ also changes
+its meaning.
+
+> **Keep `nu` front of mind.** As explained in
+> `vignette("wishart-covariance", package = "terradish")`, `nu` acts as an
+> *effective sample size*. It does not change the *point estimates* recovered
+> from a given covariance matrix, but it controls their precision (standard
+> errors scale as $1/\sqrt{\nu}$) and therefore the **statistical power** to
+> detect a nonzero coefficient under the simulated model. Sample size and
+> marker design are important study-design levers, but the effective `nu` may
+> be smaller than the raw marker count because of linkage and shared
+> population history. No marker-count rule automatically establishes it.
+> Distinguish the value that generates variation (`nu`) from the value
+> assumed when fitting (`nu_fit`).
+
+---
+
+## Set up a landscape template
+
+We need a landscape to define the conductance surface. Any
+`conductance_surface()` works; here we reuse the bundled *Melipona* rasters as
+a realistic template. Build the surface with `saveStack = TRUE` so the
+simulation tools can subset focal sites efficiently.
+
+
+
+We also fix the **generating parameters** we want to recover: a moderate
+positive forest-cover coefficient and a moderate negative altitude coefficient
+for log conductance.
+These are illustrative simulation settings, not estimates from the bundled
+*Melipona* genetic response. The bundled rasters provide a realistic landscape
+template, while the synthetic covariance response is generated from the values
+below.
+
+
+
+---
+
+## A single simulated data set
+
+`simulate_covariance_response()` returns one covariance matrix (plus the
+ingredients used to build it). It has the same matrix form as a genotype
+covariance summary, but its sampling distribution is generated by the model.
+Real genotype summaries need not follow that distribution.
+
+
+
+Refitting estimates the parameters used to generate the data. One draw may
+depart substantially from the generating values:
+
+
+
+A single replicate only tells you what happened *once*. To characterize a
+design you must repeat the draw many times.
+
+---
+
+## Separate generating information from assumed information
+
+`nu` controls variation among simulated covariance matrices. `nu_fit` controls
+the precision assumed by the fitted likelihood; its default is `nu`. Raising
+`nu_fit` while keeping `nu` fixed does not create more informative data. It
+can make intervals narrower and increase nominal detections while reducing
+coverage. Evaluate that mismatch explicitly:
+
+
+
+**How to read the output.** Compare fit rate, coverage, and power together.
+Similar estimates with narrower intervals under larger `nu_fit` reflect the
+assumed precision, not better recovery of the generating process. A high
+detection rate accompanied by poor coverage is not a successful design.
+Failed and nonconverged fits count as non-detections; inspect their frequency
+before interpreting power. Coverage and bias summaries require checking which
+replicates supplied valid estimates.
+
+These are runnable study-design recipes rather than stored results. Long
+power sweeps are not run during vignette builds, and no hidden precomputed
+files are needed to render this guide. Save your configuration, seeds, full
+assessment objects, package versions, and convergence diagnostics when running
+them. Report Monte Carlo uncertainty: for a proportion `p` estimated from
+`B` independent replicates, its approximate Monte Carlo standard error is
+`sqrt(p * (1 - p) / B)`.
+
+For covariance simulation, the generating `nu` must be at least the covariance
+dimension required by `stats::rWishart()`. That simulation constraint does not
+make raw marker counts appropriate fitted effective degrees of freedom.
+
+## Sampling sites and placement
+
+Compare both site count and placement under the same generating scenarios.
+More sites can improve recovery, but redundant sites or weak covariate coverage
+may add little information. Hold generating and fitting `nu` explicit in each
+comparison, include weak-signal scenarios, and assess whether the fitted model
+is numerically identifiable. Study-design conclusions remain internal to the
+simulated model. Additional validation against misspecified, coalescent, or
+individual-based processes is needed before translating them into field targets.
+
+---
+
+## Comparing sampling strategies and candidate models
+
+`covariance_response_power()` automates the same loop across **sampling
+designs**: it subsets the focal sites in the surface to a target sample size,
+optionally using different placement strategies, simulates responses, refits
+candidate models, and summarizes recovery. The graph is reused across designs, but repeated fitting can still be costly.
+
+Here we compare three sample sizes under two placement strategies, and we fit
+two candidate models per replicate: the true two-covariate model and a reduced
+altitude-only model. This lets us measure both **parameter recovery** and
+**model-selection** performance.
+
+
+
+
+### Scenario-level summary
+
+The `summary` table has one row per (strategy, sample size, model):
+
+
+
+Key columns:
+
+- **`fit_rate`**: fraction of replicates that converged. Values below 1 flag a
+  design where the model is hard to fit (often too few sites).
+- **`conductance_power`**: fraction of replicates whose fitted conductance
+  surface has a Pearson correlation with the generating surface above
+  `conductance_cor_threshold` (default 0.9). This measures recovery of the
+  relative spatial pattern, not its absolute scale or an ecological mechanism.
+  It is useful for spline models whose basis coefficients are not individually
+  interpretable.
+- **`mean_conductance_cor`**: average correlation between the fitted and true
+  conductance surfaces.
+- **`selected_AIC_rate`**: how often each model had the lowest AIC within the
+  specified, comparable candidate set. For the `full` model, this is the rate
+  at which the generating formula ranked first among those candidates.
+
+### Parameter-level summary
+
+`parameter_summary` reports per-coefficient power, bias, RMSE, and confidence
+interval coverage:
+
+
+
+What to look for:
+
+- **`power`**: proportion of all simulated replicates in which the coefficient
+  had the generating sign and a two-sided Wald p-value below `alpha`. Failed or
+  boundary fits count as non-detections. Choose a target such as 0.8 before the
+  assessment rather than treating it as a universal threshold.
+- **`bias`**: average estimate minus the generating value. Persistent bias can
+  reflect model misspecification, boundary behavior, optimization failures, or a
+  design too small for the asymptotic approximation.
+- **`rmse`**: typical estimation error; should shrink as sample size grows.
+- **`coverage`**: fraction of 95% confidence intervals that contain the truth.
+  Well-calibrated intervals give ~0.95. Coverage well below 0.95 means the
+  reported uncertainty is too optimistic for that design.
+
+
+---
+
+## Interpreting and acting on the results
+
+A design assessment usually answers one of three questions:
+
+| Question | Column(s) to read | Decision rule |
+|----------|-------------------|---------------|
+| Enough sites? | `parameter_summary$power`, `conductance_power` | Pick the smallest sample size that reaches your predeclared recovery target under conservative scenarios. |
+| Enough marker information? | power-vs-`nu` curves | Identify the smallest plausible effective `nu` past the power elbow under conservative scenarios. |
+| Which site placement? | compare `strategy` rows | Prefer the strategy with higher power / surface correlation at equal cost. |
+| Trustworthy intervals? | `parameter_summary$coverage` | Require coverage near 0.95 before trusting reported CIs. |
+
+A few practical notes:
+
+- **Increase `nsim`.** The recipes use small pilot counts; no power sweep is executed at build time.
+  For a real assessment use at least 100-500 simulations per design so that
+  power and coverage estimates are stable.
+- **Match the simulation to your expectations.** The answer depends on
+  `theta`, `tau`, and `sigma`. If you are unsure, run the assessment across a
+  grid of plausible effect sizes and $\tau / \sigma$ ratios, then report the
+  range.
+- **Use and report defensible `nu` values.** Markers in linkage disequilibrium
+  are not independent, so the effective `nu` can be smaller than the raw marker
+  count. Planning with an optimistic `nu` overstates precision and power. Use
+  a justified range and report sensitivity to both generating `nu` and
+  assumed `nu_fit`.
+- **Spline and Gaussian models.** For non-linear conductance models the
+  individual coefficients are not interpretable; lean on
+  `conductance_power` and `mean_conductance_cor` rather than per-parameter
+  power. Pass the relevant factory via `conductance_model` and `fit_models`.
+
+---
+
+## Quick reference
+
+
+
+
+## Summary of key functions
+
+| Function | Purpose |
+|----------|---------|
+| `conductance_surface()` | Build the landscape template; `saveStack = TRUE` enables site subsetting |
+| `simulate_covariance_response()` | One covariance matrix simulated from known parameters |
+| `terradish()` | Refit a simulated data set to check parameter recovery |
+| `covariance_response_power()` | Full design sweep across sample sizes, strategies, and models |
+| `$summary` | Per-scenario fit rate, conductance recovery, and model-selection rate |
+| `$parameter_summary` | Per-coefficient power, bias, RMSE, and interval coverage |
+
+## See also
+
+- `vignette("wishart-covariance", package = "terradish")`: the covariance
+  workflow and a full explanation of `nu`.
+- `vignette("getting-started", package = "terradish")`: the core modeling
+  workflow.
+- `vignette("model-comparison", package = "terradish")`: AIC, likelihood
+  ratio tests, and cross-validation for real data.
+
+
+FILE spline-conductance.Rmd
+---
+title: "Spline Conductance Models in terradish"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Spline Conductance Models in terradish}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+
+## Why splines for conductance?
+
+The default `terradish` conductance model is **log-linear**:
+
+$$C_i = \exp(\theta_1 x_{i1} + \theta_2 x_{i2} + \cdots)$$
+
+This model represents a monotone fitted association for each landscape covariate: does relative conductance go up or down as the covariate increases, conditional on the other predictors? That constrained form is useful when a monotone relationship is scientifically defensible.
+
+But ecological responses to landscape features are often more complex. Consider:
+
+- **Elevation**: A prior hypothesis may predict the strongest connectivity at intermediate elevations rather than at either extreme.
+- **Slope**: A prior hypothesis may predict little change until terrain passes a threshold.
+- **Temperature**: Many ectotherms have a thermal optimum; conductance may be highest at intermediate temperatures and fall off steeply in both directions.
+- **Canopy density**: A prior hypothesis may predict lower connectivity at both low and high canopy density.
+
+None of these shapes can be captured by a single linear term on the log scale. A negative coefficient gives a declining fitted conductance association; a positive coefficient gives an increasing association. There is no room for an interior optimum.
+
+`smooth_loglinear_conductance()` extends the log-linear model by expanding selected covariates into **spline basis functions**. The model structure is still:
+
+$$C_i = \exp(B_i \boldsymbol{\theta})$$
+
+where $B_i$ is a row of the **expanded design matrix** for raster cell $i$. For covariates not wrapped in `s()`, $B_i$ contains the raw value. For covariates wrapped in `s()`, $B_i$ contains several basis-function evaluations instead of one raw value. The optimizer still sees an ordinary log-linear model; the splines live entirely inside the design matrix, which is computed once and then treated as fixed. These are **unpenalized**
+regression splines with a chosen number of coefficients, not smooths whose
+complexity is estimated by a smoothing penalty. Knots, boundary knots, and
+column-centering offsets are retained from training. Plotting and new-surface
+prediction reuse that basis rather than selecting new knots. Centering removes
+an arbitrary constant conductance multiplier; it does not change the fitted
+shape.
+
+------------------------------------------------------------------------
+
+## What are spline basis functions?
+
+A spline is a piecewise polynomial function that is constrained to be smooth (continuous and differentiable) at the join points, called **knots**. Instead of estimating a single slope for altitude, we estimate a weighted combination of several basis functions, each capturing part of the altitude range.
+
+The figure below shows centered natural spline and B-spline basis functions look like for a covariate that runs from −2 to 2 (as after `scale_covariates()`):
+
+
+
+Each basis column covers a different part of the covariate range. The optimizer assigns a coefficient to each column; the weighted sum of all columns defines the shape of the association. A hump in the middle of the covariate range is captured by upweighting the middle basis columns relative to the edge ones.
+
+### Natural splines vs. B-splines
+
+Both produce smooth curves, but they differ in behavior outside the observed data range:
+
+| Property | Natural spline (`ns`) | B-spline (`bs`) |
+|------------------------|------------------------|------------------------|
+| Behavior at edges | **Linear** beyond boundary knots | Polynomial (degree-dependent); can extrapolate wildly |
+| Partition of unity | No | Yes (basis sums to 1 everywhere) |
+| Parameter count for `df = k` | `k` columns | `k` columns (knots placed to give `k`) |
+| Default degree | N/A (cubic, fixed) | Cubic (`degree = 3`); user-adjustable |
+| Best for | General use; safe extrapolation | When you know the curve may be non-linear at the edges too |
+
+For most landscape-genetics applications, **natural splines are likely the safer default**. The landscape feature you observe at sampling sites is what matters; extrapolation is usually not meaningful for raster-based conductance models because the graph only covers cells with observed covariate values. Still, B-splines are useful when you have strong prior knowledge that the edge behavior is non-linear, or when you want finer control over the spline degree.
+
+### How many basis functions (df / k)?
+
+More basis functions → more shape flexibility → more parameters to estimate. With sparse spatial genetic data, overfitting is a real risk. Guidelines:
+
+- **df = 3 or 4** is a good starting point for most covariates. This allows a single hump, valley, or threshold-like shape.
+- **df = 2** is a low-flexibility nonlinear curve; it adds one parameter over the linear model and can represent simple curvature.
+- **df ≥ 6** should be reserved for cases where both the data and a clear ecological hypothesis support it; compare against simpler predeclared models with held-out prediction.
+- Use common cross-validation folds for the candidate shapes. AICc is a
+  secondary diagnostic under its focal-site sample-size convention; it does
+  not make all site pairs independent or calibrate an uncertain Wishart `nu`.
+
+------------------------------------------------------------------------
+
+## Data preparation
+
+The rest of this vignette uses the bundled *Melipona* bee example with all 37 sampling sites.
+
+
+
+Scale the raster covariates. This step is important for spline models because: (1) it brings both layers to a comparable scale so spline knots are placed sensibly relative to the data density, and (2) it helps the optimizer converge from a common starting point.
+
+
+
+------------------------------------------------------------------------
+
+## Checking settings before spline fitting
+
+`terradish_assess_settings()` is worth calling before fitting spline conductance models for an additional reason beyond raw graph size: **spline formulas expand the conductance parameter count**. A formula with `s(altitude, df = 4)` has four basis coefficients for altitude alone, plus any other terms. With enough parameters, Newton-Raphson can become slower than BFGS per iteration. The assessment handles this automatically; it probes the expanded model, not the raw formula, and reports the smooth-term expansion in the `$profile` and in its notes.
+
+
+
+The printed summary will include a note such as:
+
+
+
+This confirms that the formula was evaluated on the expanded design matrix (one linear forest-cover column plus four altitude basis columns = five parameters total), and that probes were run with that full parameter count.
+
+Spline expansions can make extreme starting values more risky because the expanded linear predictor is exponentiated into conductance. If a spline fit stops with a `CHOLMOD` warning or a `non-positive-definite reduced Laplacian` message, first scale the input rasters, restart with coefficients closer to zero, and check the retained graph cells for missing or infinite covariate values. During diagnosis, rerun `terradish_assess_settings(..., verbose = TRUE)` and consider `solver = "auto"` or `solver = "amg"` to separate direct-solver factorization problems from the conductance specification.
+
+### Passing `$recommended` to each candidate fit
+
+When the assessment recommends a non-default optimizer (e.g. `bfgs` instead of `newton` because the parameter count after expansion is high), apply it to all candidate models to keep comparisons fair:
+
+
+
+For this vignette we run a lightweight assessment (`probe_maxit = 1`) and reuse its recommendations across the candidate fits so the workflow is exercised in real code while staying fast.
+
+------------------------------------------------------------------------
+
+## Model fitting: from linear to spline
+
+We fit four candidate models, moving from most constrained to most flexible:
+
+1.  **Linear baseline**: one parameter per covariate, standard log-linear
+2.  **Altitude spline (ns)**: altitude enters as a natural spline; forest cover remains linear
+3.  **Both splines (ns)**: both covariates enter as natural splines
+4.  **Altitude spline (bs)**: altitude as a B-spline; forest cover linear (for comparison with model 2)
+
+The coarsened demonstration graph keeps these repeated fits practical. For an applied analysis, use a scientifically justified raster resolution and allow the optimizer to converge.
+
+
+
+------------------------------------------------------------------------
+
+## Inspecting the design matrix
+
+Before examining fits, it is instructive to look at what `smooth_loglinear_conductance()` produces:
+
+
+
+The `s(altitude).*` parameters are the basis coefficients for altitude. Taken individually they are not interpretable. What matters is their combined association on the conductance surface, which is best visualized through marginal plots.
+
+------------------------------------------------------------------------
+
+## Estimated conductance parameters
+
+
+
+The spline coefficients for `s(altitude)` are not directly comparable to the single altitude coefficient in the linear model. The linear model summarizes the conditional altitude association with one number. The spline model allows the fitted association to change direction across the altitude range. The marginal plots in the next sections show the implied shape.
+
+------------------------------------------------------------------------
+
+## Model comparison
+
+Predeclare a small candidate set and compare held-out scores on common folds.
+AIC and AICc can over-select flexible conductance models, especially when
+Wishart `nu` overstates effective information. The following table remains a
+useful in-sample diagnostic, but it should not determine spline complexity:
+
+
+
+Interpret this table as a first-pass diagnostic, not a definitive verdict:
+
+- **ΔAICc below about 2**: a common heuristic for similar relative support within this declared candidate set, not proof of equivalence.
+- **Larger ΔAICc**: progressively less support relative to the top-ranked model. Interpret the magnitude together with model complexity, stability, and the predeclared scientific hypotheses.
+
+An AICc improvement should be evaluated alongside the stability and scientific plausibility of the marginal association. A spline with a lower AICc but an implausible shape (oscillating wildly, extreme at the edges) should be treated with skepticism.
+
+------------------------------------------------------------------------
+
+### Cross-validation and monotonicity
+
+
+
+**How to read the output.** Compare paired score differences on common
+successful folds. Prefer the simpler shape when the difference is small
+relative to its fold-to-fold uncertainty, and inspect failures before ranking.
+See `vignette("model-comparison", package = "terradish")` for repeated folds
+and the distinction between fixed and reprofiled nuisance parameters.
+
+
+
+The monotonicity table checks the derivative of each fitted smooth over its
+focal-site covariate range. It reports direction and derivative sign changes;
+it is a shape diagnostic, not a hypothesis test or evidence of an ecological
+threshold. Even a predictively useful spline can reflect how a population
+process maps onto the graph rather than a direct ecological response to the
+covariate. Inspect the conditional curve and its uncertainty.
+
+------------------------------------------------------------------------
+
+## Marginal conductance associations
+
+Marginal plots vary one covariate while averaging over the observed values of the other model covariates. For spline models this is the primary diagnostic tool because the basis coefficients are not individually interpretable.
+
+### Natural vs. B-spline altitude association
+
+Use `marginal_covariates = "altitude"` to extract only the altitude panel from each model, then combine the ggplot objects side-by-side with `patchwork`, if it is installed:
+
+
+
+Broad agreement between spline families is a useful stability check, but it does not prove that a shape is genuine. Large discrepancies between natural and B-spline estimates at the same df/k indicate sensitivity to the basis choice; a simpler model or more constrained candidate set may be preferable.
+
+### All four model marginal associations (altitude)
+
+Setting `marginal_covariates = "altitude"` keeps only the altitude panel from each model (which may otherwise also show forest cover). This makes it easy to arrange all four altitude curves in a single 2 × 2 grid for direct comparison:
+
+
+
+### Response-scale marginal associations
+
+The `type = "marginal_response"` plot maps the same fitted association to the **response scale**. For the MLPE fits in this vignette, that scale is pairwise genetic distance. The plot includes approximate predictive uncertainty bands and can be easier to interpret than log conductance.
+
+Comparing the ns and bs altitude response-scale associations side-by-side gives an additional stability check. Agreement does not establish causality or a unique ecological mechanism; divergence indicates sensitivity to the spline basis.
+
+
+
+### Robust tails with focal-support clamping
+
+Spline models are especially sensitive to sparse support at covariate tails. To keep spline marginals and predicted conductance maps anchored to focal-site support, use `support = "focal"` with quantile bounds:
+
+
+
+------------------------------------------------------------------------
+
+Clamping replaces covariate values outside the requested focal-cell
+quantiles with the nearest limit. The fitted spline basis and centering remain
+fixed. Unclamped `conductance()` and marginal plots use the same centered
+prediction basis, so they should agree on the relative conductance scale.
+Clamping changes predictions, not the likelihood or the estimated shape.
+
+## Observed vs. fitted genetic distances
+
+
+
+All four panels use the same data and MLPE correlation structure. Systematic deviations from the diagonal (e.g. all large-distance pairs systematically under-predicted) indicate lack of fit that could arise from the conductance formula, measurement model, response construction, or other misspecification.
+
+------------------------------------------------------------------------
+
+## Estimated conductance surfaces
+
+The conductance surface shows the per-cell conductance value across the landscape. `conductance()` returns a three-layer SpatRaster with a point estimate and pointwise 95% confidence bounds from the delta method. These bounds reflect uncertainty in $\theta$ conditional on the fitted model; they do not include nuisance-parameter or model-selection uncertainty.
+
+### Altitude natural-spline model
+
+
+
+### Comparison: linear vs. altitude spline
+
+
+
+Differences between the two surfaces are most informative at intermediate elevations where the spline association departs most from the linear extrapolation.
+
+------------------------------------------------------------------------
+
+## Natural splines: varying degrees of freedom
+
+A key modeling decision is how many basis functions to use. More degrees of freedom allow more flexibility and require more parameters. This section illustrates the consequence of degrees of freedom for the fitted altitude curve using natural splines.
+
+
+
+
+
+**Reading the df comparison.** Compare these predeclared shapes using the
+same held-out folds. An AICc improvement alone does not justify extra
+coefficients. Inspect monotonicity, uncertainty, boundary behavior, and the
+stability of the selected shape across folds.
+
+------------------------------------------------------------------------
+
+## B-spline degree exploration
+
+B-splines allow control over the polynomial degree separately from the number of basis columns. Degree 1 is piecewise linear, degree 2 is quadratic, and degree 3 (the default) is cubic. Higher degrees produce smoother but more globally coupled curves.
+
+
+
+For most conductance problems, degree 3 (cubic) B-splines are a good default when you choose B-splines. They produce smooth second derivatives, which can represent gradual changes in fitted conductance. Use degree 1 when the predeclared candidate set includes abrupt thresholds rather than smooth transitions.
+
+------------------------------------------------------------------------
+
+## Mixing linear and spline terms
+
+You can freely mix linear terms and spline terms in the same formula. This is often the most useful specification: use a spline for the covariate you have prior reason to believe has a non-linear association, and keep all others linear to avoid over-parameterization.
+
+
+
+The `forestcover` coefficient is interpreted as in the linear model: its sign indicates the direction of the fitted conditional association with conductance, and its magnitude is on the log-conductance scale. The `s(altitude).*` coefficients together define the altitude shape. Neither interpretation is a causal effect or direct movement estimate.
+
+When a model contains both linear and spline terms, the default marginal plot produces one panel per covariate. Use `marginal_covariates` to view a single panel in isolation, or to place the two panels side-by-side rather than stacked:
+
+
+
+------------------------------------------------------------------------
+
+## Summary table: all models
+
+
+
+------------------------------------------------------------------------
+
+## Practical recommendations
+
+### When to use spline conductance
+
+Use `smooth_loglinear_conductance()` when:
+
+1.  **There is a prior ecological reason** to expect a non-linear landscape association, e.g. an intermediate optimum, a threshold, or a well-documented hump-shaped response in the literature.
+2.  **The linear model's marginal association is implausible**: e.g. a strong negative altitude coefficient that would predict near-zero conductance at high elevations where sampling actually occurs.
+3.  **The design can support the extra parameters.** Pairwise observations are dependent, so do not justify spline complexity by counting all site pairs as independent replicates. Evaluate held-out prediction, stability, focal-site support, and simulation under plausible scenarios.
+
+### When to stay with the linear model
+
+- Designs with sparse focal-site or covariate support relative to the proposed spline complexity.
+- No prior hypothesis about a non-linear association; treat splines as exploratory rather than confirmatory.
+- The spline and linear models give similar held-out scores; parsimony favors the simpler model.
+
+### Suggested workflow
+
+
+
+### Checking for overfitting
+
+Even when AICc improves, inspect these warning signs:
+
+- **Wild oscillation** in the marginal curve, especially with sign reversals at the edges of the covariate range.
+- **Very large basis coefficients** relative to their standard errors.
+- **Near-singular design matrix** or optimizer warnings about convergence.
+- **Large discrepancy between ns and bs** at the same df/k: if the two spline families give qualitatively different shapes, neither has strong support.
+
+
+
+------------------------------------------------------------------------
+
+## Recoverability example
+
+The package includes an example script that simulates a covariance response from a known non-linear conductance surface and then checks whether spline models recover it:
+
+
+
+Run it interactively:
+
+
+
+This script assesses recoverability for a specified generating scenario on a particular landscape and sampling design. It cannot verify identifiability for all parameter values or guarantee recovery in the real analysis.
+
+------------------------------------------------------------------------
+
+## Quick-reference: the full spline workflow
+
+
+
+## Summary of key functions
+
+| Function | Purpose |
+|--------------------------------------|----------------------------------|
+| `smooth_loglinear_conductance()` | Conductance model with `s()` spline terms |
+| `terradish_assess_settings()` | Recommend solver and optimizer settings once, reuse for every candidate |
+| `terradish()` | Fit each linear and spline candidate |
+| `aic_table()` | Rank comparable candidates using the stated AICc convention |
+| `plot(type = "marginal")` | The fitted conditional association on the conductance scale |
+| `plot(type = "marginal_response")` | The corresponding curve on the MLPE genetic-distance scale |
+| `conductance()` | Extract the fitted surface with confidence intervals |
+
+## See also
+
+- **`vignette("getting-started", package = "terradish")`**, the log-linear baseline these models extend.
+- **`vignette("model-comparison", package = "terradish")`**, AICc, likelihood ratio tests, and cross-validation for choosing among candidates.
+- **`vignette("gaussian-scale-optimization", package = "terradish")`**, Gaussian raster smoothing rather than flexibility in the covariate-response shape.
+
+
+FILE wishart-covariance.Rmd
+---
+title: "Covariance-Based IBR with wishart_covariance"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+vignette: >
+  %\VignetteIndexEntry{Covariance-Based IBR with wishart_covariance}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+
+
+## Overview
+
+The standard `terradish` workflow uses a pre-computed **distance
+matrix** (e.g. F~ST~) as the genetic response. Two measurement models,
+`leastsquares` and `mlpe`, accept such matrices and differ only in how
+they handle the non-independence of pairwise observations.
+
+When raw individual-level genotype data are available, you can retain a
+population covariance summary rather than beginning from a precomputed
+distance matrix:
+
+1.  Summarize the genetic data as a **covariance matrix** between
+    populations.
+2. Fit the resistance model with `wishart_covariance`, using a declared
+   effective degrees of freedom, `nu`.
+
+Both Wishart interfaces use the **contrast likelihood**. For an orthonormal
+site-contrast matrix `Q`, the covariance likelihood uses `Q' S Q` and the
+corresponding fitted contrast covariance. Components in the constant-site
+direction are excluded. Centering `S` therefore leaves this likelihood
+unchanged. The previous full-rank formulation was removed because that
+constant direction depends on arbitrary centering conventions and does not
+provide the intended resistance information.
+
+`dist_from_cov(S)` retains the covariance information used by this likelihood.
+Covariance and matching squared-distance inputs are two representations of
+the same contrast model. Neither is inherently more informative. Begin with
+`vignette("getting-started", package = "terradish")` for the graph workflow.
+
+| Model | Input `S` | Requires `nu` | Correlation structure |
+|----|----|----|----|
+| `leastsquares` | distance matrix | no | none |
+| `mlpe` | distance matrix | no | shared-site |
+| `generalized_wishart` | admissible squared-distance matrix | yes | generalized Wishart |
+| `wishart_covariance` | **covariance matrix** | yes | Wishart |
+
+This vignette covers:
+
+- Converting different types of raw genetic data to a covariance matrix
+  with `cov_from_genetic_data()` (and `cov_from_biallelic()` for
+  biallelic SNPs).
+- Setting up the landscape and conductance surface with the bundled
+  *Melipona* data.
+- Fitting an IBR model with `wishart_covariance`.
+- Interpreting and comparing the fitted model.
+
+------------------------------------------------------------------------
+
+## Preparing genetic covariance data
+
+`terradish` provides two functions for turning raw genotype data into a
+covariance matrix:
+
+- **`cov_from_biallelic(Y, N)`**: fast path for biallelic SNP count
+  matrices.
+- **`cov_from_genetic_data(x, ...)`**: flexible path that handles
+  biallelic dosage, multiallelic SNPs, microsatellite allele calls, PCA
+  scores, or any other numeric encoding.
+
+Both functions return a square, symmetric covariance matrix (one
+row/column per population). Check the construction, sampling design, site
+order, and covariance geometry before using the matrix as response `S`.
+The helpers are provided by the companion `landgraph` package.
+
+### Biallelic SNPs: `cov_from_biallelic()`
+
+If your data are derived-allele counts at biallelic loci, use
+`cov_from_biallelic()`:
+
+
+
+Biallelic standardization can give rare variants large influence. Apply and
+report a defensible minor-allele-frequency filter, then examine sensitivity
+to that filter. Unequal chromosome counts also produce unequal sampling
+variance across populations; a common nugget does not remove that concern.
+Covariance metadata describe the construction, not proof of Wishart sampling.
+
+### Numeric feature matrix: `cov_from_genetic_data()`
+
+For dosage-coded SNPs, PCA scores, or any numeric feature matrix, use
+`cov_from_genetic_data()` with `input = "features"` (the default). The
+function centers and scales each feature, then applies Gower
+double-centering to produce a covariance matrix:
+
+
+
+Setting `normalize = "features"` divides the covariance by the number of
+retained features; this puts the scale on a per-feature basis rather
+than summed across all features, which can make `tau` estimates easier
+to interpret across datasets with different numbers of markers. This
+normalization changes the scale of `S`; it does not automatically
+determine the best `nu` for every genotyping system.
+
+### Microsatellite allele calls: `cov_from_genetic_data()` with `input = "allele_calls"`
+
+For diploid microsatellite data stored as two allele-call columns per
+locus, set `input = "allele_calls"` and supply the `loci` argument to
+identify which column belongs to which locus. The function expands each
+locus into per-allele dosage columns before computing covariance:
+
+
+
+## Choosing `nu`
+
+`nu` is a positive effective degrees-of-freedom value supplied by the analyst.
+It is not estimated by `terradish`, and it is not fixed automatically by the
+number of markers used to build `S`. Linkage creates dependence among nearby
+markers; shared population history can create dependence even among unlinked
+markers. Counting SNPs, loci, or within-locus allele contrasts does not by
+itself establish effective replication.
+
+A block jackknife can assess how marker blocks contribute to variability.
+Because it need not capture all dependence due to shared history, regard its
+implied information as an upper-bound guide rather than a complete calibration.
+Describe the blocks and the uncertainty sources the procedure represents.
+
+Declare a primary value with its rationale and a range of plausible values.
+Use `terradish_rescale_nu()` for sensitivity of intervals and likelihood-based
+comparisons. Use fixed-domain cross-validation to assess conductance terms
+and shape. A stable result over a declared range is evidence of sensitivity
+within that range, not proof that the primary value is correct.
+
+If only a published F~ST~ matrix is available, a reported locus count does not
+make that response Wishart. F~ST~ is a ratio estimator; consider MLPE for such
+dissimilarities and evaluate its shared-site assumptions. See
+`vignette("model-comparison", package = "terradish")` for predictive comparisons.
+
+### Key arguments
+
+| Argument | Default | Effect |
+|----|----|----|
+| `groups` | `NULL` | Population vector; if `NULL`, individual-level covariance is returned |
+| `input` | `"features"` | `"features"` for numeric matrices; `"allele_calls"` for allele-call columns |
+| `loci` | `NULL` | Required for `"allele_calls"`: maps each column to its locus |
+| `center` | `TRUE` | Centers each feature by its global mean before covariance calculation |
+| `scale` | `TRUE` | Scales each feature by its global standard deviation; drops constant features |
+| `diagonal` | `"auto"` | `"auto"` selects `"gower"`; `"within"` replaces the diagonal with within-population variance |
+| `normalize` | `"none"` | `"features"` divides covariance by number of retained features |
+
+The default grouped-data construction uses `diagonal = "gower"`. Replacing
+that diagonal with `diagonal = "within"` changes the covariance estimand and
+can change fitted signs; the supplied release simulations recovered the
+expected signs with Gower diagonals but not with the within-population
+replacement. Retain `within` only for a separately justified construction,
+and compare its effect explicitly. It may also produce an indefinite matrix.
+
+
+
+**How to read the output.** A centered covariance has a zero eigenvalue in
+the constant direction, so strict positive definiteness of the full matrix
+is not the target. Tiny negative values may reflect rounding. Substantive
+negative contrast eigenvalues require investigation; changing the diagonal
+is not a neutral repair.
+
+------------------------------------------------------------------------
+
+## Set up the landscape
+
+The rest of this vignette uses the bundled *Melipona* bee data from the
+getting-started vignette. Steps are identical to those already covered
+there: see `vignette("getting-started", package = "terradish")` for
+explanations.
+
+
+
+------------------------------------------------------------------------
+
+## Generate a covariance response for the demonstration
+
+The bundled *Melipona* data ship with a pairwise F~ST~ matrix
+(`melip.Fst`), not raw genotypes. To produce a realistic **covariance**
+matrix that reflects the same landscape, we use
+`simulate_covariance_response()`. This function:
+
+1.  Computes the conductance-implied covariance matrix `E(theta)` at
+    specified parameter values.
+2.  Forms the Wishart scale matrix `Sigma = tau * E + sigma * I`.
+3.  Draws `S ~ Wishart(nu, Sigma) / nu`.
+
+
+
+In a real analysis you would replace `S_cov` with the output of
+`cov_from_genetic_data()` applied to your actual genotype data, for
+example:
+
+
+
+------------------------------------------------------------------------
+
+## Fit the model with `wishart_covariance`
+
+The only differences from a standard `terradish` call are:
+
+- Pass the **covariance matrix** `S_cov` as the left-hand side of the
+  formula.
+- Set `measurement_model = wishart_covariance`.
+- Supply `nu` (the effective Wishart degrees of freedom for `S_cov`).
+
+
+
+### Understanding the nuisance parameters
+
+The `wishart_covariance` measurement model fits two nuisance parameters
+(`phi`):
+
+- **`tau`** (≥ 0): a nonnegative weight applied to the
+  conductance-implied covariance `E`. If `tau` ≈ 0, there is no
+  detectable graph-covariance signal under this response and model. Its
+  magnitude is not comparable to the Gaussian distance-model `tau`,
+  which is a log precision.
+- **`sigma`** (log-scale): a scalar nugget added as `exp(sigma) * I` to
+  the fitted covariance matrix. It captures diagonal variation not
+  represented by the graph kernel, including sampling variation and
+  model mismatch. It is not the Gaussian raster-smoothing scale and is
+  not a direct estimate of drift or population size.
+
+The covariance kernel is `Sigma = tau * E(theta) + exp(sigma) * I`.
+The likelihood evaluates its projection into the site-contrast subspace.
+
+where `E(theta)` is the generalized inverse of the graph Laplacian
+evaluated at the estimated conductance parameters `theta`.
+
+------------------------------------------------------------------------
+
+## The role of `nu`: an effective sample size
+
+`nu` is the most consequential setting in a covariance-based fit. The
+parameter-dependent Wishart objective is multiplied by `nu / 2`, so
+`nu` is a global multiplier of the objective surface, which has three
+separate consequences.
+
+**1. The likelihood optimum does not depend on `nu`.** Scaling an
+objective by a positive constant does not move its optimum, so the
+theoretical point estimates of `theta`, `tau`, and `sigma` are invariant
+to `nu`. Separate numerical fits should agree up to optimization
+tolerance:
+
+
+
+**2. Standard errors scale as 1 / sqrt(`nu`).** The Hessian scales with
+`nu`, so the asymptotic covariance scales with 1 / `nu` and every
+interior standard error scales with 1 / sqrt(`nu`). Boundary inference
+requires separate care. Under the model, more
+approximately independent marker information produces tighter intervals:
+
+
+
+**3. Model selection and hypothesis tests depend strongly on `nu`.** The
+log-likelihood scales linearly with `nu`, but the AIC/BIC complexity
+penalty (and the chi-squared reference distribution for a
+likelihood-ratio test) does not. With large `nu` the penalty becomes
+negligible and extra covariates are almost always retained; with small
+`nu`, parsimony dominates. The *same data* can favor a simpler or a more
+complex model purely through the choice of `nu`.
+
+Report how intervals and model comparisons depend on `nu`. Rescaling
+does not re-estimate conductance, so this sensitivity is inexpensive and
+separates the fitted surface from the assumed precision. Use the same `nu`
+for every candidate in a comparison. Neither a high AIC weight nor a small
+nominal LRT p-value establishes that `nu` represents independent information.
+
+------------------------------------------------------------------------
+
+## Recover the true parameters
+
+Because we simulated these data with known parameters, we can check how
+well the model recovers them. In practice this comparison is obviously
+not available.
+
+
+
+------------------------------------------------------------------------
+
+## Visualize the fit
+
+### Observed vs. fitted covariance
+
+
+
+Each point represents a pair of sites. The x-axis is the fitted
+covariance from the Wishart model; the y-axis is the observed covariance
+in the centered representation used by the contrast fit. Points near the
+diagonal indicate agreement for that summary, not calibrated sampling uncertainty.
+
+### Estimated conductance surface
+
+
+
+### Marginal associations on conductance
+
+
+
+Response-scale marginal plots are currently defined for regression-style
+measurement models such as `mlpe`. For covariance-response models,
+inspect the conductance-scale marginal associations alongside the
+observed-vs-fitted covariance plot above.
+
+If one covariate has weak focal support at its tails, apply
+focal-support clamping during plotting and surface prediction:
+
+
+
+------------------------------------------------------------------------
+
+## Preparing a generalized-Wishart squared-distance response
+
+The generalized-Wishart likelihood expects a squared-distance response
+${D = d^2}$, not an arbitrary symmetric dissimilarity matrix. For ${n}$
+sites, `terradish` forms the centered Gram matrix
+
+$$B = -\frac{1}{2} H D H, \qquad
+H = I - \frac{1}{n}\mathbf{1}\mathbf{1}^{\mathsf T},$$
+
+and requires ${B}$ to be positive semidefinite within a relative
+numerical tolerance. This geometry is the mathematical support condition
+for the likelihood. It is separate from whether the selected genetic
+summary is biologically appropriate for the sampling design and
+scientific question.
+
+Use `check_distance_response()` on the matrix that you actually intend
+to fit:
+
+
+
+**How to read the diagnostic:** `admissible = TRUE` means the implied
+centered Gram matrix is positive semidefinite within tolerance. A very
+small negative `relative_min_eigenvalue` can reflect floating-point
+rounding. `n_negative` counts only eigenvalues that are more negative
+than the scaled tolerance. `terradish()` performs this check
+automatically before any generalized-Wishart fit and stops on
+substantive violations.
+
+The checker does not select a genetic distance for you. Choose the
+response based on the biology, marker type, sampling design, and
+intended interpretation, then test the realized matrix. The name of a
+distance measure is not enough because scaling, locus aggregation,
+transformations, and missing-data handling can change the resulting
+geometry.
+
+### Potentially relevant distance measures available in R
+
+The table is a navigation aid, not a list of recommended or
+interchangeable responses. Functions can differ in their scaling, input
+class, treatment of missing data, and whether they operate on
+individuals or populations. Confirm what the selected function returns.
+If it returns ordinary Euclidean distances ${d}$, square the matrix to
+obtain ${D = d^2}$ before calling `check_distance_response()` or fitting
+`generalized_wishart`.
+
+| Candidate measure | Example R implementations | Guidance for generalized Wishart |
+|----|----|----|
+| Edwards/angular and Cavalli-Sforza-Edwards chord distances | `adegenet::dist.genpop(method = 2)`, `poppr::edwards.dist()`, `hierfstat::genet.dist(method = "Dch")` | The `adegenet` manual labels method 2 Euclidean. Cavalli-Sforza-Edwards chord distance is one potentially relevant candidate, not a required or preferred response. Verify the exact implementation and square ordinary distances before checking. |
+| Reynolds distance | `adegenet::dist.genpop(method = 3)`, `poppr::reynolds.dist()` | The `adegenet` manual labels its implementation Euclidean. Verify the realized matrix and its scaling. |
+| Rogers distance | `adegenet::dist.genpop(method = 4)`, `poppr::rogers.dist()`, `hierfstat::genet.dist(method = "Dr")` | The `adegenet` manual labels method 4 Euclidean. Square ordinary distances and check the resulting matrix. |
+| Nei distances | `adegenet::dist.genpop(method = 1)`, `poppr::nei.dist()`, variants from `hierfstat::genet.dist()` | These names cover different formulas. The `adegenet` manual labels method 1 non-Euclidean, so do not assume admissibility. |
+| Prevosti distance | `adegenet::dist.genpop(method = 5)`, `poppr::prevosti.dist()`, `hierfstat::genet.dist(method = "Cp")` | The `adegenet` manual labels method 5 non-Euclidean. Do not assume admissibility. |
+| Pairwise F~ST~ or F~ST~/(1 - F~ST~) | `hierfstat::pairwise.WCfst()`, `hierfstat::pairwise.neifst()` | These are common landscape-genetic responses, but they have no general squared-Euclidean guarantee. F~ST~ is a ratio estimator without a Wishart sampling justification; passing a geometry check is insufficient. Consider `mlpe` and assess its assumptions. |
+| Euclidean, chord, or Hellinger distances on transformed numeric features | `stats::dist()`, `vegan::vegdist(method = "euclidean")`, `vegan::vegdist(method = "chord")`, `vegan::vegdist(method = "hellinger")` | Geometry depends on the feature representation and transformation. Scientific appropriateness remains study-specific. |
+
+`ade4::is.euclid()` provides an optional independent diagnostic for
+ordinary distances. Because it squares its input internally, the
+equivalent call for an already squared generalized-Wishart response `D`
+is:
+
+
+
+Do not call `ade4::is.euclid(as.dist(D))` for this purpose because that
+tests whether ${D^2}$, rather than ${D}$, has the required geometry.
+Functions such as `ade4::cailliez()` and `ade4::lingoes()` can make an
+ordinary distance matrix Euclidean for ordination, but `terradish` does
+not apply them automatically. They change the genetic response and can
+change its biological interpretation.
+
+------------------------------------------------------------------------
+
+## Compare with `generalized_wishart`
+
+`generalized_wishart` uses the corresponding generalized Wishart
+formulation for an admissible **squared-distance** representation of the
+same genetic data. Here the response was obtained from the covariance
+matrix with `dist_from_cov()` and checked above:
+
+
+
+When the covariance and admissible squared-distance representations
+contain the same information under identical centering, scaling, sites,
+and `nu`, their fitted conductance parameters should agree up to
+numerical tolerance. The AIC comparison is not meaningful across the two
+models because the responses differ. Standard errors should only be
+compared after confirming that the transformation is lossless and the
+effective information assumptions are identical.
+
+------------------------------------------------------------------------
+
+## Choosing between covariance and distance input
+
+| Consideration | Guidance |
+|----|----|
+| Raw genotype data available | Construct and document an appropriate covariance summary; assess filtering and unequal sampling. |
+| Covariance and its matching squared distances available | Both Wishart interfaces use the same contrast likelihood. Choose the representation that makes preprocessing clearest. |
+| Only a precomputed dissimilarity is available | Geometry is necessary but insufficient for Wishart sampling; consider MLPE for generic genetic distances. |
+| Site-specific sampling variance matters | A common nugget does not fully address unequal sampling; examine design and sensitivity. |
+| Effective information is uncertain | Declare a range of `nu`, rescale inference, and assess conductance complexity with held-out prediction. |
+
+### Environmental differences between sites
+
+`pairwise_covariates()` combines geographic distances and endpoint environmental
+differences in one design. Both `mlpe_covariates()` and `wishart_covariates()`
+accept that design, while linking it to different response models. For Wishart,
+the nonnegative environmental kernel weights describe conditional contributions
+to covariance structure. They do not identify a particular biological
+mechanism. See `vignette("ibe-ibr-workflow", package = "terradish")` for a
+worked comparison, conditional conductance estimates, and IBE:IBR ratios.
+
+------------------------------------------------------------------------
+
+## Quick-reference: the full workflow
+
+
+
+## Summary of key functions
+
+| Function | Purpose |
+|----|----|
+| `cov_from_biallelic()` | Genetic covariance from SNP allele counts and sample sizes |
+| `cov_from_genetic_data()` | Genetic covariance from dosages, PCA scores, or allele calls |
+| `dist_from_cov()` | Convert a covariance matrix to the matching distance matrix |
+| `wishart_covariance()` | Measurement model for a covariance response; needs `nu` |
+| `check_distance_response()` | Diagnose squared-Euclidean admissibility of a proposed generalized-Wishart response |
+| `generalized_wishart()` | Generalized Wishart likelihood for an admissible squared-distance response |
+| `simulate_covariance_response()` | Simulate a covariance matrix from known parameters |
+| `terradish()` | Fit the model and return coefficients, standard errors, and AIC |
+
+## See also
+
+- **`vignette("getting-started", package = "terradish")`**, the core
+  workflow using a distance response.
+- **`vignette("simulation-design", package = "terradish")`**, how `nu`
+  and sample size translate into statistical power before you collect
+  data.
+- **`vignette("ibe-ibr-workflow", package = "terradish")`**, adding
+  environmental kernels to the Wishart likelihood with
+  `wishart_covariates()`.

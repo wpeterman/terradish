@@ -1,0 +1,73 @@
+71 literal matches classified as retained identifiers, S9 helpers, or rejection tests.
+retained CV identifier: README.md:98:`terradish_folds()` constructs folds; `terradish_cv_folds()` keeps the landscape graph fixed while withholding sites. It accepts per-formula conductance factories and repeated folds. Reprofiled nuisance parameters compare conductance formulas under one measurement model. Set `nuisance = "fixed"` to retain every measurement parameter from training and score predictive densities when comparing measurement extensions.
+retained CV identifier: R\aic_table.R:26:#' \code{\link{terradish_cv_folds}} to select conductance terms and
+retained CV identifier: R\inference.R:131:#'   \code{\link{terradish_cv_folds}}
+retained CV identifier: R\mlpe_covariates.R:50:#' transform as attributes, so that \code{\link{terradish_cv_folds}} can
+retained CV identifier: R\mlpe_covariates.R:62:#' @seealso \code{\link{mlpe_covariates}}, \code{\link{terradish_cv_folds}},
+retained CV identifier: R\mlpe_covariates.R:148:#' \code{\link{terradish_cv_folds}} to rebuild the correct pairwise covariates for
+retained CV identifier: R\mlpe_covariates.R:153:#'   \code{\link{terradish_grid}}, and \code{\link{terradish_cv_folds}}.
+retained CV identifier: R\mlpe_covariates.R:156:#'   \code{\link{terradish_cv_folds}}
+S9 shared-file compiled helper, not NAMESPACE-exported: R\RcppExports.R:64:block_cg_reduced_laplacian <- function(rhs, conductance, edge_pairs, x0 = NULL, tol = 1e-8, maxit = 1000L) {
+S9 shared-file compiled helper, not NAMESPACE-exported: R\RcppExports.R:65:    .Call(`_terradish_block_cg_reduced_laplacian`, rhs, conductance, edge_pairs, x0, tol, maxit)
+retained CV identifier: R\spatial_cv.R:49:#' directly to \code{\link{terradish_cv_folds}} when study-specific blocks are
+retained CV identifier: R\spatial_cv.R:122:.terradish_cv_formula <- function(formula)
+retained CV identifier: R\spatial_cv.R:133:.terradish_cv_score <- function(theta, formula, data, response,
+retained CV identifier: R\spatial_cv.R:169:.terradish_cv_prediction_theta <- function(fit, nuisance) {
+retained CV identifier: R\spatial_cv.R:285:#' @return An object of class \code{"terradish_cv_folds"}. Its \code{folds}
+retained CV identifier: R\spatial_cv.R:304:#' cv <- terradish_cv_folds(
+retained CV identifier: R\spatial_cv.R:316:terradish_cv_folds <- function(data, formulas, folds, model = "mlpe", nu = NULL,
+retained CV identifier: R\spatial_cv.R:426:    cv_formula <- .terradish_cv_formula(formulas[[model_i]])
+retained CV identifier: R\spatial_cv.R:455:        prediction_theta <- tryCatch(.terradish_cv_prediction_theta(fit, nuisance),
+retained CV identifier: R\spatial_cv.R:474:          .terradish_cv_score(
+retained CV identifier: R\spatial_cv.R:488:              baseline_training <- .terradish_cv_score(0, baseline_formula, train_data, gd_mat,
+retained CV identifier: R\spatial_cv.R:495:            .terradish_cv_score(
+retained CV identifier: R\spatial_cv.R:595:  class(out) <- "terradish_cv_folds"
+retained CV identifier: R\spatial_cv.R:600:print.terradish_cv_folds <- function(x, ...)
+retained CV identifier: R\terradish-package.R:54:#'     \code{\link{terradish_cv_folds}}, \code{\link{terradish_grid}}, and
+retained CV identifier: R\wishart_covariates.R:94:#' and \code{terradish_cv_folds(..., nuisance = "fixed")} to assess predictive
+S9 shared-file compiled helper, not NAMESPACE-exported: src\radish.cpp:519:arma::vec block_cg_diagonal(const arma::vec& conductance, const arma::umat& edge_pairs)
+S9 shared-file compiled helper, not NAMESPACE-exported: src\radish.cpp:533:arma::mat block_cg_matmat(const arma::vec& conductance, const arma::umat& edge_pairs,
+S9 shared-file compiled helper, not NAMESPACE-exported: src\radish.cpp:552:Rcpp::List block_cg_reduced_laplacian(const arma::mat& rhs,
+S9 shared-file compiled helper, not NAMESPACE-exported: src\radish.cpp:563:    Rcpp::stop("[block_cg_reduced_laplacian] rhs has incompatible number of rows");
+S9 shared-file compiled helper, not NAMESPACE-exported: src\radish.cpp:565:  arma::vec d = block_cg_diagonal(conductance, edge_pairs);
+S9 shared-file compiled helper, not NAMESPACE-exported: src\radish.cpp:567:    Rcpp::stop("[block_cg_reduced_laplacian] non-positive diagonal encountered");
+S9 shared-file compiled helper, not NAMESPACE-exported: src\radish.cpp:572:    Rcpp::stop("[block_cg_reduced_laplacian] x0 must match rhs dimensions");
+S9 shared-file compiled helper, not NAMESPACE-exported: src\radish.cpp:574:  arma::mat R = rhs - block_cg_matmat(conductance, edge_pairs, X);
+S9 shared-file compiled helper, not NAMESPACE-exported: src\radish.cpp:585:    arma::mat Q = block_cg_matmat(conductance, edge_pairs, P);
+S9 shared-file compiled helper, not NAMESPACE-exported: src\RcppExports.cpp:221:// block_cg_reduced_laplacian
+S9 shared-file compiled helper, not NAMESPACE-exported: src\RcppExports.cpp:222:Rcpp::List block_cg_reduced_laplacian(const arma::mat& rhs, const arma::vec& conductance, const arma::umat& edge_pairs, Rcpp::Nullable<arma::mat> x0, const double tol, const int maxit);
+S9 shared-file compiled helper, not NAMESPACE-exported: src\RcppExports.cpp:223:RcppExport SEXP _terradish_block_cg_reduced_laplacian(SEXP rhsSEXP, SEXP conductanceSEXP, SEXP edge_pairsSEXP, SEXP x0SEXP, SEXP tolSEXP, SEXP maxitSEXP) {
+S9 shared-file compiled helper, not NAMESPACE-exported: src\RcppExports.cpp:233:    rcpp_result_gen = Rcpp::wrap(block_cg_reduced_laplacian(rhs, conductance, edge_pairs, x0, tol, maxit));
+S9 shared-file compiled helper, not NAMESPACE-exported: src\RcppExports.cpp:254:    {"_terradish_block_cg_reduced_laplacian", (DL_FUNC) &_terradish_block_cg_reduced_laplacian, 6},
+test asserting rejection of removed option: tests\testthat\test-core-scope.R:2:  unrefined <- list(exact_refine = FALSE)
+retained CV identifier: tests\testthat\test-cv-contracts.R:19:  cv <- terradish_cv_folds(fx$graph, list(linear = S ~ x, gaussian = S ~ x,
+retained CV identifier: tests\testthat\test-cv-contracts.R:26:  single <- terradish_cv_folds(fx$graph, S ~ x, fx$folds, model = wishart_covariance,
+retained CV identifier: tests\testthat\test-cv-contracts.R:35:  cv <- terradish_cv_folds(fx$graph, list(one = S ~ x, two = S ~ x), folds,
+retained CV identifier: tests\testthat\test-cv-contracts.R:37:  resumed <- terradish_cv_folds(fx$graph, list(one = S ~ x, two = S ~ x), folds,
+retained CV identifier: tests\testthat\test-cv-contracts.R:45:  expect_error(terradish_cv_folds(fx$graph, list(one = S ~ x, two = S ~ x), folds,
+retained CV identifier: tests\testthat\test-cv-contracts.R:52:  expect_error(terradish_cv_folds(fx$graph, list(base = S ~ x, env = S ~ x), fx$folds,
+retained CV identifier: tests\testthat\test-cv-contracts.R:54:  cv <- terradish_cv_folds(fx$graph, list(base = S ~ x, env = S ~ x), fx$folds,
+retained CV identifier: tests\testthat\test-cv-contracts.R:85:  theta <- .terradish_cv_prediction_theta(fit, "fixed")
+retained CV identifier: tests\testthat\test-cv-contracts.R:87:  expect_error(.terradish_cv_prediction_theta(fit, "reprofile"), "no conductance")
+retained CV identifier: tests\testthat\test-cv-contracts.R:88:  a <- .terradish_cv_score(theta, S ~ x, fx$graph, S, loglinear_conductance,
+retained CV identifier: tests\testthat\test-cv-contracts.R:90:  b <- .terradish_cv_score(theta + 1, S ~ x, fx$graph, S, loglinear_conductance,
+retained CV identifier: tests\testthat\test-cv-contracts.R:98:  a <- terradish_cv_folds(fx$graph, list(linear = S ~ x, both = S ~ x + z),
+retained CV identifier: tests\testthat\test-cv-contracts.R:100:  b <- terradish_cv_folds(fx$graph, list(linear = S ~ x, both = S ~ x + z),
+retained CV identifier: tests\testthat\test-cv-contracts.R:123:  expect_warning(cv <- terradish_cv_folds(fx$graph,
+retained CV identifier: tests\testthat\test-spatial-cv.R:23:  cv <- suppressWarnings(terradish_cv_folds(
+retained CV identifier: tests\testthat\test-spatial-cv.R:33:  expect_s3_class(cv, "terradish_cv_folds")
+retained CV identifier: tests\testthat\test-spatial-cv.R:43:  resumed <- terradish_cv_folds(
+retained CV identifier: vignettes\gaussian-scale-optimization.Rmd:366:cv_scale <- terradish_cv_folds(
+retained CV identifier: vignettes\gaussian-scale-optimization.Rmd:579:| `terradish_cv_folds()` | Compare fixed and estimated scales on common held-out sites |
+retained CV identifier: vignettes\ibe-ibr-workflow.Rmd:257:cv_mlpe <- terradish_cv_folds(surface,
+retained CV identifier: vignettes\ibe-ibr-workflow.Rmd:260:cv_wishart <- terradish_cv_folds(surface,
+retained CV identifier: vignettes\ibe-ibr-workflow.Rmd:336:| `terradish_cv_folds()` | Evaluate held-out prediction on a fixed landscape graph |
+retained CV identifier: vignettes\model-comparison.Rmd:514:folds and use `terradish_cv_folds()`.
+retained CV identifier: vignettes\model-comparison.Rmd:542:cv_spatial <- terradish_cv_folds(
+retained CV identifier: vignettes\model-comparison.Rmd:581:cv_shape <- terradish_cv_folds(
+retained CV identifier: vignettes\model-comparison.Rmd:627:| `terradish_cv_folds()` | Which candidate transfers best across declared spatial blocks? | Fixed-domain prediction under identical folds and one likelihood family |
+retained CV identifier: vignettes\model-comparison.Rmd:680:cv <- terradish_cv_folds(
+retained CV identifier: vignettes\model-comparison.Rmd:703:| `terradish_cv_folds()` | Fixed-domain fold fitting with a uniform-conductance baseline |
+retained CV identifier: vignettes\spline-conductance.Rmd:394:cv_shape <- terradish_cv_folds(
+retained CV identifier: vignettes\spline-conductance.Rmd:839:cv <- terradish_cv_folds(
+Clean: 139 source/document files scanned.

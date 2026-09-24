@@ -1,3 +1,39 @@
+terradish 0.0.56
+----------------
+* Rebuilt the eight core guides and README around conditional interpretation,
+  effective Wishart information, predictive comparison, and common pairwise inputs.
+* Replaced unavailable precomputed power sections with explicit reproducible
+  study-design recipes, and removed unverified timing claims.
+* Updated package and citation metadata for the supported core scope.
+
+Planned terradish 0.1.0 core release
+----------------------------------
+* Scope: directed, hierarchical, drift, selected-pair, Kron, block-CG, and legacy
+  cross-validation prototypes remain on the experimental branch because their
+  identifiability, statistical assumptions, or numerical behavior need further work.
+* Breaking: covariance Wishart now uses site contrasts. Environmental Wishart
+  kernels use the same pairwise transforms as MLPE, defaulting to absdiff;
+  normalize is removed and shared pairwise objects are accepted.
+* Breaking: graph neighborhoods default to eight directions. Supported solvers
+  are direct, auto, and AMG. Approximate starts require exact refinement;
+  terradish_grid accepts only approximation = "none". Legacy CV is removed.
+* Breaking: Gaussian outer searches default to the terradish kernel, count
+  estimated scales in degrees of freedom, and use map units consistently with
+  simulation. Joint Gaussian upper bounds reflect truncated kernel support.
+* Breaking: spline prediction retains fitted knots and column centering, which
+  can shift absolute conductance by a constant without changing relative shape.
+* Fixes: even-grid Gaussian alignment, layerwise scaling, covariance centering,
+  retained new-raster transformations, nested tests, boundary inference,
+  optimizer stopping, and failed-fold accounting.
+* New: covariance and interval methods, explicit convergence records and boundary
+  restarts, Wishart nu rescaling, Gaussian scale profiles and bound summaries,
+  focal spline monotonicity, stored raster scaling, and IBE:IBR ratio uncertainty.
+* New: per-formula conductance and measurement models, repeated fixed-domain
+  folds, fixed-nuisance prediction, common-fold paired comparisons, and safe
+  checkpoint resumption. Power studies can vary nu_fit separately from nu.
+* Documentation: revised effective-information guidance, educational core
+  workflows, and limitations of environmental, smoothing, and conductance effects.
+
 terradish 0.0.55
 ----------------
 * Rewrote Wishart information guidance and documented covariance construction,

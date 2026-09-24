@@ -1,37 +1,29 @@
-## Submission summary
+## Submission status
 
-This is a new submission of terradish, a maximum-likelihood estimator for
-parameterized conductance (resistance) surfaces in landscape genetics.
+This is preparation for the first CRAN release of terradish 0.1.0.
+The current development version is 0.0.56. No submission has been made for
+this core overhaul; owner release approval remains pending.
 
-## Test environments
+## Validation
 
-* Local Windows 11, R 4.6.1, checked from the exact source archive:
-  0 errors, 0 warnings, 1 note.
-* R-hub Ubuntu release: Status OK.
-* R-hub Windows R-devel: examples, tests, and vignette rebuilding passed. The
-  only warning was a CRLF line ending in `configure.ac` introduced by R-hub's
-  Git checkout. The submitted source archive was independently verified to
-  contain LF line endings and passed the local Windows check without warnings.
-* win-builder R-release and R-devel: submitted on 2026-09-10; emailed results
-  are pending.
-
-## R CMD check results
-
-The exact source archive produced 0 errors, 0 warnings, and 1 note under
-`R CMD check --as-cran` on the local Windows environment. The one expected note
-is the "New submission" note.
+Windows, R 4.6.1: the .54 robustness candidate passed a complete check with
+0 errors, 0 warnings, and 0 notes. The .55 function-documentation candidate
+passed examples and vignette rebuilding with the same clean result; its code
+was unchanged from .54 and its redundant test run was skipped.
+Final .56 source-archive and as-cran checks are pending. Earlier R-hub and
+win-builder runs predate this overhaul and do not validate this candidate.
 
 ## Dependencies
 
-* `landgraph` (>= 0.0.1) is available from CRAN; terradish's genetic-summary
-  helpers re-export it.
-* `multiScaleR` (Imports) is on CRAN.
-* All other Imports are CRAN or base packages; Suggests are used conditionally.
+terradish requires landgraph >= 0.0.3 for the documented covariance metadata
+and grouped-data Gower default. This companion version has passed local checks
+but its CRAN publication is still a release prerequisite. The private validation
+library contains that version. Do not submit terradish before the required
+landgraph release is available on CRAN.
 
-## Additional checks
+## Scope
 
-* `spelling::spell_check_package()` reported no spelling errors.
-* The PDF and HTML manuals built successfully from the exact source archive.
-* `urlchecker::url_check()` found only transient HTTP 504 responses from Zenodo
-  for DOI 10.5281/zenodo.21225712. The DataCite registry reports that DOI as
-  findable and registered to Zenodo.
+The core retains symmetric resistance likelihoods, supported conductance
+factories, direct/auto/AMG solvers, and fixed-domain cross-validation.
+Research prototypes are retained on the experimental branch. Final check
+results and submission metadata will be updated after release approval.

@@ -1,6 +1,6 @@
 # terradish 0.1.0: resume checkpoint
 
-Updated 2026-09-24 at 17:05 America/New_York after the owner resumed work.
+Updated 2026-09-24 at 17:40 America/New_York after the owner resumed work.
 The overhaul is NOT complete. The original 14:45 checkpoint follows below;
 this update supersedes its next-action instructions.
 
@@ -21,13 +21,30 @@ this update supersedes its next-action instructions.
   0 warnings, 0 notes. Tests were deliberately skipped because C5 checked the
   identical code. See phase5_phase6_validation.md for precise evidence.
 - Checked candidates remain frozen as evidence.
-- C7 editable candidate: dev/check/phase7-package, copied from C6. README and
-  all eight vignette revisions are drafted. Six freshly rendered successfully;
-  IBE and simulation rendering is pending a code-example type correction.
-  Metadata, final builds, audits, and release gates are still pending.
-- C5 is committed as 9b75ff4 (.54). C6 source and function documentation are
-  adopted for the .55 commit. Preserve the checked C5/C6 candidates as evidence;
-  continue edits in C7 and propagate only deliberate subsequent fixes.
+- C7 FROZEN candidate: dev/check/phase7-package (.56). All eight revised guides
+  rendered. README fits and spelling passed. Full examples/vignette check
+  passed 0 errors, 0 warnings, 0 notes in 16m44s. All three standalone examples
+  completed. Power-example fit rates are 0.8-1, with no design meeting its
+  recovery target. C7 is adopted for the .56 documentation commit.
+- C8 FROZEN candidate: dev/check/phase8-package (.57), same executable R code
+  plus fast CRAN numerical tests (8 assertions, 1.21 seconds combined).
+  Final nine baselines converge and agree with C2 within plan tolerances.
+  Audits completed: basic, extensions, CV, corrections, rho. See final
+  phase8_audit_interpretation.md and the CV acceptance report: 3/8 Wishart and
+  2/8 MLPE noise selections, excluding a 7.85e-13 numerical tie.
+- Running: coverage session 35746; full source tests session 77854 (single
+  thread replacement); final as-cran/vignette check session 28977. Logs use
+  phase8_coverage, phase8_tests, and phase8_check prefixes. The first source
+  test run was interrupted for thread contention; see environment notes.
+- C5 is committed as 9b75ff4 (.54), C6 as e81acdb (.55). C8 is not adopted.
+  The adoption script now supports phases 7 and 8. Never copy build artifacts.
+- Experimental branch documentation is committed as 38f57d8 (.48), with code
+  unchanged from .47. Its worktree is the sibling
+  ../terradish-experimental-release-notes. No merge, tag, or push occurred.
+- Next: finish running jobs; inspect coverage gaps and address meaningful ones;
+  adopt/commit C7 .56 and C8 .57 with final evidence. Update log.md, metadata,
+  audit hashes, and final report. Owner sign-off and landgraph publication
+  remain release gates. A literal RStudio GUI check is not performed.
 - Resume scripts and receipts are in this directory. Some diagnostic runs were
   interrupted or failed during development; only final named acceptance
   receipts establish validation. Do not overwrite those artifacts.
@@ -36,7 +53,7 @@ The original logoff details remain in logoff_status.md.
 
 ## Current checkout and commits
 
-Branch: release/0.1.0. Current development version: 0.0.55 (C6).
+Branch: release/0.1.0. Current development version: 0.0.56 (C7).
 Use git log -1 for the latest commit hash.
 
 - C0 c80425d, .48: baseline evidence and owner vignette wrapping.

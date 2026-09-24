@@ -4,16 +4,22 @@ import shutil
 import sys
 
 phase = sys.argv[1]
-assert phase in ('5', '6')
+assert phase in ('5', '6', '7', '8')
 root = Path.cwd()
 candidate = root / 'dev/check' / f'phase{phase}-package'
 files = [candidate / name for name in ('DESCRIPTION', 'NEWS.md', 'NAMESPACE', 'README.md')]
 for folder in ('R', 'man', 'tests'):
     files.extend(p for p in (candidate / folder).rglob('*')
                  if p.is_file() and (folder != 'tests' or p.suffix == '.R'))
-if phase == '6':
+if phase in ('6', '7', '8'):
     files.extend([candidate / '.Rbuildignore', candidate / 'inst/WORDLIST'])
     files.extend((candidate / 'man-roxygen').glob('*.R'))
+if phase in ('7', '8'):
+    files.extend(candidate / name for name in ('CITATION.cff', '.zenodo.json', 'cran-comments.md'))
+    files.extend((candidate / 'vignettes').glob('*.Rmd'))
+    files.append(candidate / 'vignettes/precompute.R')
+    files.extend((candidate / 'inst/examples').glob('*.R'))
+    files.append(candidate / 'inst/benchmarks/compare-radish-terradish.R')
 for src in files:
     dst = root / src.relative_to(candidate)
     assert dst.resolve().is_relative_to(root.resolve())

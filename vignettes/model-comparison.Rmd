@@ -168,9 +168,9 @@ absolute permeability.
 ### Testing against the null model of isolation by distance (IBD)
 
 The formula `~ 1` fits a null conductance surface where all cells have
-equal conductance. Resistance distance then equals graph distance
-(weighted only by geography, not landscape features). This is the IBD
-baseline:
+equal conductance. Resistance still combines all routes through the graph;
+it is neither shortest-path distance nor necessarily proportional to Euclidean
+distance. This uniform-surface model is the graph-based IBD baseline:
 
 ```{r ibd-test}
 fit_ibd <- terradish(
@@ -218,7 +218,13 @@ anova(fit_full, fit_interaction)
 > parameters. `anova()` rejects different measurement models and obvious
 > formula non-nesting, but the analyst must still verify substantive
 > nesting and whether boundary parameters invalidate the usual
-> chi-squared reference distribution.
+> chi-squared reference distribution. The response, site order, graph,
+> pairwise design, basis definition, and supplied Wishart `nu` must agree.
+> A linear term is not automatically nested in an arbitrary spline basis, and
+> a fitted Gaussian scale changes the model dimension. For Wishart fits,
+> the LRT magnitude depends on `nu`; interpret it descriptively at the declared
+> value and report sensitivity rather than treating nominal marker counts as
+> calibrated replication.
 
 ------------------------------------------------------------------------
 
@@ -226,7 +232,7 @@ anova(fit_full, fit_interaction)
 
 Likelihood ratio tests require nested models. When comparing non-nested
 models (e.g. altitude-only vs. forest-cover-only), use an information
-criterion instead.
+criterion or held-out prediction instead.
 
 ```{r fit-all-candidates}
 fit_altitude_only <- terradish(
@@ -267,6 +273,26 @@ aic_table(
   are a common heuristic for similar support within the declared
   candidate set, not proof that the models are equivalent.
 
+### Effective information and over-selection
+
+Wishart AIC can select unnecessary conductance terms when nominal `nu`
+overstates effective information. AICc does not repair an incorrectly scaled
+likelihood. Use the same predeclared candidates in cross-validation and
+compare inference over plausible effective degrees of freedom:
+
+```{r nu-sensitivity, eval = FALSE}
+# fit_wishart is a converged Wishart fit at the declared primary nu.
+sensitivity <- lapply(c(10, 30, 100), function(value) {
+  terradish_rescale_nu(fit_wishart, nu = value)
+})
+lapply(sensitivity, confint)
+```
+
+**How to read the output.** Rescaling changes uncertainty and likelihood-based
+comparisons without changing the fitted coefficients. If conclusions depend
+on a high `nu`, report that dependence. Rescale every candidate to the same
+value before comparing their information criteria.
+
 ### When to use AICc
 
 AIC can over-fit when the effective sample size is small relative to the
@@ -293,8 +319,7 @@ parameter.
 ### BIC for stricter parsimony
 
 BIC penalizes complexity more heavily than AIC and tends to favor
-simpler models. The implementation here uses the number of selected pair
-rows for a pair-subset fit and otherwise uses the number of pairwise
+simpler models. The implementation uses the number of pairwise
 observations (`n = n_sites * (n_sites - 1) / 2`) as the BIC sample size.
 AICc instead uses the number of focal sites. Which count is the most
 appropriate `n` for landscape-genetic data is debated; treat BIC values
@@ -449,8 +474,9 @@ predictors already in the model.
 
 When focal sites sparsely cover a covariate tail, unconstrained
 marginals can show unstable extremes that dominate interpretation. Use
-focal-support clamping to keep model comparison focused on supported
-covariate ranges:
+focal-support clamping to inspect predictions within sampled covariate
+ranges. This display choice does not alter the fitted likelihood or model
+comparison:
 
 ```{r support-clamp-marginal, eval = FALSE}
 plot(
@@ -480,8 +506,6 @@ cond_full_focal <- conductance(
 
 ## Cross-validation
 
-<!-- Phase 7: rewrite -->
-
 ### Spatially blocked, fixed-domain cross-validation
 
 Random splits ask whether a model predicts sites withheld throughout the
@@ -503,7 +527,11 @@ unscaled projected coordinates:
 
 ```{r cv-spatial-folds, eval = FALSE}
 # melip.coords is geographic, so project it before measuring planar separation.
-coords_projected <- terra::project(melip.coords, "EPSG:5070")
+# Center a local distance projection on the sampled Brazilian sites.
+lonlat <- terra::crds(terra::project(melip.coords, "EPSG:4326"))
+local_crs <- sprintf("+proj=aeqd +lat_0=%f +lon_0=%f +datum=WGS84 +units=m",
+                     mean(lonlat[, 2]), mean(lonlat[, 1]))
+coords_projected <- terra::project(melip.coords, local_crs)
 folds_spatial <- terradish_folds(
   coords_projected,
   k = 5,
@@ -519,6 +547,7 @@ cv_spatial <- terradish_cv_folds(
   ),
   folds = folds_spatial,
   model = mlpe,
+  nuisance = "fixed",
   keep_fits = "slim",
   checkpoint = file.path(tempdir(), "terradish-spatial-cv.rds")
 )
@@ -527,13 +556,56 @@ cv_spatial$summary
 cv_spatial$results
 ```
 
-For each test fold, the function reprofiles the measurement-model
-nuisance parameters twice: once at the conductance coefficients learned
-from the training sites and once at zero coefficients, which represents
-uniform conductance on the same graph. `loglik_gain` is their
-difference. Positive gain means the trained conductance model predicted
-that fold better than the uniform baseline. Inspect fold-level values
-and failures before interpreting their sum or mean.
+With `nuisance = "fixed"`, all measurement-model coefficients are learned
+from training sites and used unchanged to score held-out sites. This tests
+prediction from the trained model. A separately fitted uniform-conductance
+baseline provides `loglik_gain`; positive gain favors the trained landscape
+surface over that baseline on the same held-out response.
+
+The default `nuisance = "reprofile"` instead optimizes nuisance coefficients
+using each test response, separately for the trained surface and baseline.
+That asks whether the learned surface retains useful structure after local
+recalibration. It is a different prediction target. Declare the mode and do
+not compare scores across modes.
+
+### Different models and repeated folds
+
+Each formula can have its own conductance or measurement-model factory. For
+example, compare a linear forest-cover term with a fixed-degree spline using
+the same response and folds:
+
+```{r cv-repeats, eval = FALSE}
+folds_repeated <- lapply(c(42, 91, 137), function(seed) {
+  terradish_folds(coords_projected, k = 5, seed = seed)
+})
+cv_shape <- terradish_cv_folds(
+  data = surface,
+  formulas = list(linear = melip.Fst ~ forestcover,
+                  spline = melip.Fst ~ s(forestcover, df = 3)),
+  folds = folds_repeated,
+  model = mlpe,
+  conductance_model = list(linear = loglinear_conductance,
+                           spline = smooth_loglinear_conductance),
+  nuisance = "fixed"
+)
+cv_shape$summary
+cv_shape$results
+```
+
+**How to read the output.** Inspect convergence and score failures first.
+Rankings use folds on which every candidate succeeded. `mean_difference`
+and `se_difference` describe paired score differences against the best
+candidate on those common folds; `within_one_se` flags a difference no larger
+than its estimated standard error. Prefer a simpler model when its predictive
+performance is indistinguishable under the declared design. Overlapping
+training sets and repeated partitions make these standard errors descriptive,
+not independent-replicate hypothesis tests. Repeats expose split sensitivity;
+they do not create new independent sites.
+
+Checkpoint files retain completed fits and scores. Resume only the identical
+response, graph, formulas, model settings, and folds; changed inputs are
+rejected. Keep failed baseline scores separate from failed trained-model scores:
+a valid held-out score can exist even when its baseline gain is unavailable.
 
 The comparison boundary remains strict. Raw held-out log-likelihood and
 `loglik_gain` are meaningful only when candidates use the same response
@@ -543,8 +615,6 @@ gain from the generalized-Wishart or covariance-Wishart likelihood.
 Spatial cross-validation strengthens evidence for transfer under the
 declared blocking design. It does not establish a causal landscape
 effect or prediction beyond the observed landscape domain.
-
-<!-- Phase 7: rewrite -->
 
 ## Combining the evidence
 
@@ -557,11 +627,13 @@ A complete analysis typically uses all three approaches together:
 | `terradish_cv_folds()` | Which candidate transfers best across declared spatial blocks? | Fixed-domain prediction under identical folds and one likelihood family |
 | `mlpe_response_change()` | How large is an MLPE pairwise-covariate association on the response scale? | IBE terms fitted with `mlpe_covariates()` |
 
-Concordant LRT, information-criterion, and held-out results strengthen
-evidence for a conditional association and predictive value under the
-fitted model and split design. They still do not establish causality,
-observed movement, absolute permeability, or unique attribution to a
-landscape mechanism.
+Use cross-validation to assess conductance terms and shape, then use `nu`
+sensitivity to describe the uncertainty of Wishart inference. Treat an LRT at
+a fixed `nu` as conditional, descriptive evidence. Information criteria add
+a view of in-sample fit and complexity, but agreement among these summaries
+does not validate the underlying effective sample size. None establishes
+causality, observed movement, absolute permeability, or unique attribution to
+a landscape mechanism.
 
 ------------------------------------------------------------------------
 
@@ -599,16 +671,20 @@ aic_table(
 
 # 5. Fixed-domain transfer across spatial blocks. Prefer design-based blocks;
 #    otherwise cluster projected coordinates without standardizing them.
-coords_projected <- terra::project(coords, "EPSG:5070")
+# Center a local distance projection on the sampled Brazilian sites.
+lonlat <- terra::crds(terra::project(coords, "EPSG:4326"))
+local_crs <- sprintf("+proj=aeqd +lat_0=%f +lon_0=%f +datum=WGS84 +units=m",
+                     mean(lonlat[, 2]), mean(lonlat[, 1]))
+coords_projected <- terra::project(coords, local_crs)
 folds <- terradish_folds(coords_projected, k = 5, seed = 42)
 cv <- terradish_cv_folds(
   data = surface,
   formulas = list(full = melip.Fst ~ forestcover + altitude,
                   altitude = melip.Fst ~ altitude),
   folds = folds,
-  model = mlpe
+  model = mlpe, nuisance = "fixed"
 )
-cv$summary                        # compare within this likelihood and fold set
+cv$summary                        # paired differences on common successful folds
 
 # 6. Map the surface with uncertainty
 plot(fit_full, type = "surface", data = surface)
