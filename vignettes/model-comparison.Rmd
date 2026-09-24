@@ -528,20 +528,22 @@ summary(cv_reps)
 ### Spatially blocked, fixed-domain cross-validation
 
 Random splits ask whether a model predicts sites withheld throughout the
-sampled landscape. They do not directly ask whether the fitted association
-transfers across space. For that question, construct spatial folds and use
-`terradish_cv_folds()`.
+sampled landscape. They do not directly ask whether the fitted
+association transfers across space. For that question, construct spatial
+folds and use `terradish_cv_folds()`.
 
-The fixed-domain method differs from `terradish_cv()` in an important way. It
-builds the graph once, then changes only which focal sites contribute to the
-training and test responses. Unsampled raster cells, graph edges, and raster
-covariates remain available in every fold. This matches the prediction target
-of transferring to held-out sites within the observed landscape.
+The fixed-domain method differs from `terradish_cv()` in an important
+way. It builds the graph once, then changes only which focal sites
+contribute to the training and test responses. Unsampled raster cells,
+graph edges, and raster covariates remain available in every fold. This
+matches the prediction target of transferring to held-out sites within
+the observed landscape.
 
-Use ecological blocks when the study design supplies them. Watersheds, barrier
-units, or sampling campaigns can be more defensible than an automated
-partition. When such blocks are unavailable, `terradish_folds()` provides a
-reproducible k-means partition of unscaled projected coordinates:
+Use ecological blocks when the study design supplies them. Watersheds,
+barrier units, or sampling campaigns can be more defensible than an
+automated partition. When such blocks are unavailable,
+`terradish_folds()` provides a reproducible k-means partition of
+unscaled projected coordinates:
 
 ```{r cv-spatial-folds, eval = FALSE}
 # melip.coords is geographic, so project it before measuring planar separation.
@@ -569,22 +571,22 @@ cv_spatial$summary
 cv_spatial$results
 ```
 
-For each test fold, the function reprofiles the measurement-model nuisance
-parameters twice: once at the conductance coefficients learned from the
-training sites and once at zero coefficients, which represents uniform
-conductance on the same graph. `loglik_gain` is their difference. Positive
-gain means the trained conductance model predicted that fold better than the
-uniform baseline. Inspect fold-level values and failures before interpreting
-their sum or mean.
+For each test fold, the function reprofiles the measurement-model
+nuisance parameters twice: once at the conductance coefficients learned
+from the training sites and once at zero coefficients, which represents
+uniform conductance on the same graph. `loglik_gain` is their
+difference. Positive gain means the trained conductance model predicted
+that fold better than the uniform baseline. Inspect fold-level values
+and failures before interpreting their sum or mean.
 
 The comparison boundary remains strict. Raw held-out log-likelihood and
 `loglik_gain` are meaningful only when candidates use the same response
 representation, measurement likelihood, folds, graph domain, and Wishart
-degrees of freedom. A gain from MLPE is not on a common scale with a gain from
-the generalized-Wishart or covariance-Wishart likelihood. Spatial
-cross-validation strengthens evidence for transfer under the declared
-blocking design. It does not establish a causal landscape effect or prediction
-beyond the observed landscape domain.
+degrees of freedom. A gain from MLPE is not on a common scale with a
+gain from the generalized-Wishart or covariance-Wishart likelihood.
+Spatial cross-validation strengthens evidence for transfer under the
+declared blocking design. It does not establish a causal landscape
+effect or prediction beyond the observed landscape domain.
 
 ### Cross-validation for model selection
 

@@ -1,3 +1,8 @@
+terradish 0.0.48
+----------------
+* Recorded the core-release plan, reproducible numerical baselines, and original
+  package validation. Preserved the existing vignette paragraph formatting.
+
 terradish 0.0.47
 ----------------
 * Added fixed-domain cross-validation with reproducible spatial or balanced
