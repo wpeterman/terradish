@@ -17,6 +17,7 @@ terradish_cv_folds(
   resume = TRUE,
   cores = 1L,
   measurement_control = NULL,
+  nuisance = c("reprofile", "fixed"),
   ...
 )
 }
@@ -25,18 +26,22 @@ terradish_cv_folds(
 \code{\link{conductance_surface}}.}
 
 \item{formulas}{A formula or named list of formulas. All formulas must use
-the same response matrix and measurement model.}
+the same response matrix and likelihood family.}
 
 \item{folds}{Fold membership for each focal site. Use
-\code{\link{terradish_folds}}, or supply study-specific labels.}
+\code{\link{terradish_folds}}, or supply study-specific labels. A list of
+fold vectors requests repeated cross-validation.}
 
 \item{model}{Measurement model function or one of \code{"mlpe"},
-\code{"wishart"}, or \code{"ls"}.}
+\code{"wishart"}, or \code{"ls"}. With fixed nuisance parameters, a named
+list matching the formula names can compare models within one family.}
 
 \item{nu}{Effective Wishart degrees of freedom when required by the selected
 measurement model.}
 
-\item{conductance_model}{Conductance-model factory.}
+\item{conductance_model}{One conductance-model factory or a named list
+matching the formula names, allowing log-linear, Gaussian, and spline
+models in the same comparison.}
 
 \item{baseline}{Should each test fold also be scored at zero conductance
 coefficients, the uniform-conductance baseline on the same graph?}
@@ -56,18 +61,26 @@ serial to avoid nested parallel clusters.}
 \item{measurement_control}{Optional \code{\link{NewtonRaphsonControl}} object
 for profiling nuisance parameters.}
 
+\item{nuisance}{\code{"reprofile"} (default) estimates measurement parameters
+separately on each held-out block. \code{"fixed"} holds every measurement
+parameter, including environmental coefficients, at its training estimate.}
+
 \item{...}{Additional arguments passed to \code{\link{terradish}}.}
 }
 \value{
 An object of class \code{"terradish_cv_folds"}. Its \code{folds}
   element records the site assignments, \code{results} contains one row per
   formula and fold, and \code{summary} reports summed and mean held-out scores
-  by formula. Optional retained fits are stored in \code{fits}.
+  by formula, common-fold totals, paired differences from the best model,
+  the standard error of their mean, and a one-standard-error flag.
+  Repeated runs also report the SD of repeat totals over common folds.
+  Optional retained fits are stored in \code{fits}.
 }
 \description{
 Fits one or more conductance formulas to each training fold while retaining
 the complete landscape graph, then evaluates the trained coefficients on the
-held-out focal sites. Nuisance parameters are reprofiled on every test fold.
+held-out focal sites. Measurement parameters can be reprofiled on each test
+fold or held at their training estimates for predictive scoring.
 }
 \details{
 The graph domain and raster covariates remain fixed. Only the focal-site
@@ -75,6 +88,26 @@ columns in \code{demes} and \code{rhs}, the response matrix, and any
 measurement-model site attributes are subset. This evaluates transfer to
 held-out sites within the observed landscape rather than rebuilding a new
 landscape for every fold.
+
+Reprofiled scores compare conductance formulas under one measurement model;
+they must not be compared across calls with different measurement models or
+effective degrees of freedom. Fixed-parameter scores are predictive marginal
+densities and can compare measurement models within one likelihood family.
+Neither mode scores pairs spanning training and test sites. Spatial folds
+score only within-cluster pairs. Wishart score gains scale with \code{nu},
+although ideal fitted rankings are invariant to its scale.
+
+Checkpoints include a signature of the response, graph, focal cells,
+covariates, model definitions, formulas, \code{nu}, and fold assignments.
+A mismatched signature stops resumption. Nonconverged fits and failed scores
+count as failed folds. With fixed nuisance parameters, no-structure boundary
+fits remain scoreable because predictions do not depend on conductance.
+A failed uniform-baseline score is recorded separately: model scores remain
+usable, but baseline gains are unavailable for that fold.
+Models with failed folds receive
+NA totals and an explicit success count. Rankings use only folds successful
+for every model. Paired differences and their standard errors are descriptive;
+repeated folds share observations and are not independent replicates.
 
 \code{loglik_gain} is the trained model's held-out log-likelihood minus the
 uniform-conductance baseline log-likelihood. Larger values indicate improved

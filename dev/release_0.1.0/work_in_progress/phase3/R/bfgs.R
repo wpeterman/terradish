@@ -1,0 +1,242 @@
+#for now focus on stable BFGS
+#setRefClass("LBFGSstorage", fields = list(ss = "matrix", yy = "matrix", m = "integer", k = "integer"))
+
+BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = rep(Inf, length(par)), control = NewtonRaphsonControl())
+{
+  BFGSNaN <- function()
+  {
+    list(objective = NaN,
+         gradient  = matrix(NaN, length(par), 1),
+         hessian   = matrix(NaN, length(par), length(par)))
+  }
+  
+  prettify <- function(x)
+    formatC(x, digits=3, width=5, format="e")
+
+  zero_bounded_variables <- function(gradient, par, lower, upper, eps = 1e-8)
+  {
+    # set gradient to 0 for active constraints
+    tol <- eps * abs(par)
+    gradient <- ifelse(upper - tol <= par & gradient < 0, 0, gradient)
+    gradient <- ifelse(lower + tol >= par & gradient > 0, 0, gradient)
+    gradient
+  }
+
+  gap_step_bounded_variables <- function(desc, par, gradient, lower, upper, eps = 1e-8)
+  {
+    # modify search direction so that at alpha == 1, actively constrained variables are set to the boundary
+    tol <- eps * abs(par)
+    desc <- ifelse(upper - tol <= par & gradient < 0, upper - par, desc)
+    desc <- ifelse(lower + tol >= par & gradient > 0, lower - par, desc)
+    desc
+  }
+
+  project <- function(x, lower, upper)
+    pmin(pmax(x, lower), upper)
+
+  stopifnot(lower <= upper)
+
+  maxit <- control$maxit
+  ctol <- control$ctol
+  etol <- control$etol
+  ftol <- control$ftol
+  verbose <- control$verbose
+  eps <- control$eps
+  del <- control$del
+  ls.control <- control$ls.control
+  etol <- etol * length(par)
+  use_armijo <- .terradish_is_armijo_control(ls.control)
+
+  if (verbose)
+    message("BFGS with ",
+            if (use_armijo) "objective-only Armijo" else "Hager-Zhang",
+            " line search")
+
+  # `maxit` must be at least one step: the loop below defines `fit` and `i`,
+  # and the convergence check after it reads both.
+  maxit <- .terradish_validate_maxit(maxit)
+
+  convergence <- 0
+  criterion <- "iteration_limit"
+  line_search_failed <- FALSE
+  initialized <- 0
+  par <- as.matrix(par)
+  fit_from_line_search <- NULL
+
+  for (i in seq_len(maxit))
+  {
+    if (is.null(fit_from_line_search))
+      fit <- fn(par, gradient = TRUE, hessian = FALSE)
+    else
+    {
+      fit <- fit_from_line_search
+      fit_from_line_search <- NULL
+    }
+    delta <- if (i > 1) abs(oldfit$objective - fit$objective) else 0
+
+    if (verbose)
+      message(paste0("[", i, "]"),
+              " f(x) = ", prettify(-fit$objective),
+              "  |f(x) - fold(x)| = ", prettify(delta),
+              "  max|f'(x)| = ", prettify(max(abs(fit$gradient))))
+
+    gradient     <- fit$gradient
+    gradient_box <- zero_bounded_variables(gradient, par, lower, upper, eps)
+    projected_norm <- max(abs(gradient_box))
+    if (projected_norm < ctol) {
+      criterion <- "projected_gradient"
+      break
+    }
+    if (i > 1 && delta < ftol) {
+      if (projected_norm < sqrt(ctol)) {
+        criterion <- "objective_and_projected_gradient"
+      } else {
+        convergence <- 2L
+        criterion <- "stalled"
+        warning("Optimizer stalled: objective change is small but the projected gradient remains large.",
+                call. = FALSE)
+      }
+      break
+    }
+
+    if(initialized > 0) 
+    { #BFGS update from Nodecal and Wright Ch 6
+      #with damping from Nodecal and Wright Ch 18 to ensure matrix is sufficiently positive definite
+      yy    <- gradient - oldfit$gradient
+      ss    <- alpha*desc
+      irho  <- c(t(yy) %*% ss) 
+      if(initialized == 1)
+      { #rescale initial Hessian as per Nodecal and Wright 6.20
+        initialized <- 2
+        ihess       <- diag(nrow(ihess)) * irho/c(t(yy) %*% yy)
+        hess        <- diag(nrow(hess)) * c(t(yy) %*% yy)/irho
+      } 
+      sBs   <- c(t(ss) %*% hess %*% ss)
+      theta <- if (irho >= 0.2 * sBs) 1.0 else (0.8 * sBs)/(sBs - irho)
+      if (verbose && theta < 1.0)
+        message("... damped BFGS update")
+      rr    <- theta * yy + (1 - theta) * hess %*% ss
+      rho   <- 1./c(t(rr) %*% ss) 
+      upd   <- diag(nrow(ihess)) - rho * ss %*% t(rr)
+      ihess <- upd %*% ihess %*% t(upd) + rho * ss %*% t(ss)
+      hess  <- hess - hess %*% ss %*% t(ss) %*% hess / sBs + rho * rr %*% t(rr)
+    } 
+    else
+    { #initial (diagonal) Hessian approximation
+      initialized <- 1 
+      ihess       <- del/sqrt(sum(gradient * gradient)) * diag(length(par))
+      hess        <- sqrt(sum(gradient * gradient))/del * diag(length(par))
+    }
+
+    desc  <- gap_step_bounded_variables(-ihess %*% gradient_box, par, gradient, lower, upper, eps)
+    phi0  <- fit$objective
+    dphi0 <- c(t(desc) %*% gradient_box)
+
+    if (use_armijo)
+    {
+      objective_cache <- new.env(parent = emptyenv())
+      phi_fn <- function(alpha)
+      {
+        cache_key <- .terradish_line_search_cache_key(alpha)
+        cached <- objective_cache[[cache_key]]
+        if (!is.null(cached))
+          return(cached)
+
+        .terradish_record_line_search_trial(control, objective_only = TRUE)
+        value <- tryCatch({
+          phi <- fn(project(par + alpha*desc, lower, upper),
+                    gradient = FALSE,
+                    hessian = FALSE)
+          list(objective = phi$objective)
+        }, error = function(e) {
+          list(objective = NaN)
+        })
+        objective_cache[[cache_key]] <- value
+        value
+      }
+
+      alpha <- Armijo(phi_fn, phi0, dphi0, control = ls.control)
+      next_par <- project(par + alpha*desc, lower, upper)
+      fit_from_line_search <- if (alpha == 0)
+      {
+        fit
+      }
+      else
+      {
+        fn(next_par, gradient = TRUE, hessian = FALSE)
+      }
+      par <- next_par
+    }
+    else
+    {
+      line_cache <- new.env(parent = emptyenv())
+      dphi_fn <- function(alpha)
+      {
+        cache_key <- .terradish_line_search_cache_key(alpha)
+        cached <- line_cache[[cache_key]]
+        if (!is.null(cached))
+          return(cached$value)
+
+        .terradish_record_line_search_trial(control, gradient = TRUE)
+        tryCatch({
+          phi <- fn(project(par + alpha*desc, lower, upper), gradient = TRUE, hessian = FALSE)
+          grb <- zero_bounded_variables(phi$gradient, par + alpha*desc, lower, upper, eps)
+          value <- list(objective = phi$objective, gradient = c(t(desc) %*% grb))
+          line_cache[[cache_key]] <- list(value = value, fit = phi)
+          value
+        }, error = function(e) {
+          # Return a non-finite sentinel so the line search backtracks.
+          BFGSNaN()
+        })
+      }
+
+      alpha <- tryCatch({
+        HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
+      }, error = function(err) {
+        if (verbose)
+          message("Hager-Zhang line search failed; switching to bounded backtracking.")
+        Backtracking(dphi_fn, phi0, dphi0, control = ls.control)
+      })
+      if (!is.finite(alpha) || alpha <= 0 ||
+          identical(attr(alpha, "line_search_status"), "failed"))
+      {
+        convergence <- 2
+        line_search_failed <- TRUE
+        criterion <- "line_search_failed"
+        warning("Failed to find a usable line-search step; returning the current parameter values.",
+                call. = FALSE, immediate. = TRUE)
+        break
+      }
+      accepted <- line_cache[[.terradish_line_search_cache_key(alpha)]]
+      fit_from_line_search <- if (is.null(accepted)) NULL else accepted$fit
+      par <- project(par + alpha*desc, lower, upper)
+    }
+
+    oldfit <- fit
+  }
+
+  boundary_fit <- any(par == lower | par == upper)
+  if (verbose)
+    message("Solution on ", if (boundary_fit) "boundary" else "interior",
+            " with `max(abs(gradient))` == ", max(abs(fit$gradient)),
+            " and `diff(f)` == ", delta)
+
+  if (identical(criterion, "iteration_limit"))
+  {
+    fit <- fn(par, gradient = TRUE, hessian = FALSE)
+    gradient_box <- zero_bounded_variables(fit$gradient, par, lower, upper, eps)
+    warning("`maxit` reached for quasi-Newton steps", immediate. = TRUE)
+    convergence = 1
+  } 
+
+  list(par = par,
+       gradient = fit$gradient,
+       hessian = fit$hessian,
+       value = fit$objective,
+       fit = fit,
+       iters = i,
+       boundary = boundary_fit,
+       criterion = criterion,
+       max_abs_projected_gradient = max(abs(gradient_box)),
+       convergence = convergence)
+}

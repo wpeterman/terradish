@@ -1,0 +1,25 @@
+ℹ Loading terradish
+optimizer-stopping: 123.......
+
+══ Failed ══════════════════════════════════════════════════════════════════════
+── 1. Failure ('test-optimizer-stopping.R:5:5'): small objective changes cannot 
+Expected `... <- NULL` to throw a warning.
+
+── 2. Failure ('test-optimizer-stopping.R:7:5'): small objective changes cannot 
+Expected `fit$convergence` to equal 2.
+Differences:
+  `actual`: 0.0
+`expected`: 2.0
+
+
+── 3. Failure ('test-optimizer-stopping.R:8:5'): small objective changes cannot 
+Expected `fit$criterion` to equal "stalled".
+Differences:
+`actual`:   "projected_gradient"
+`expected`: "stalled"           
+
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+Error:
+! Test failures.
+Execution halted

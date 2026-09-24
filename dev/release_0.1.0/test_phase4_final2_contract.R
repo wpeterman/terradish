@@ -1,0 +1,12 @@
+.libPaths(c(file.path(getwd(), "dev/check/phase2-library"), .libPaths()))
+pkgload::load_all("dev/check/phase3-accepted-package")
+scratch <- new.env(parent = asNamespace("terradish"))
+sys.source("dev/check/phase4/R/spatial_cv.R", scratch)
+sys.source("tests/testthat/helper-melip.R", scratch)
+results <- lapply(c("test-cv-contracts.R", "test-spatial-cv.R"), function(file) {
+  as.data.frame(testthat::test_file(file.path("dev/check/phase4/tests", file), env = scratch, reporter = "summary", stop_on_failure = FALSE))
+})
+result <- do.call(rbind, results)
+saveRDS(result, "dev/release_0.1.0/phase4_final2_contract_test.rds")
+print(colSums(result[, c("passed", "failed", "error", "warning", "skipped")]))
+stopifnot(sum(result$failed) == 0, sum(result$error) == 0)

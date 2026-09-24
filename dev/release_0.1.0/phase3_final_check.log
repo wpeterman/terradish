@@ -1,0 +1,69 @@
+══ Building ════════════════════════════════════════════════════════════════════
+Setting env vars:
+• CFLAGS    : -Wall -pedantic
+• CXXFLAGS  : -Wall -pedantic
+• CXX11FLAGS: -Wall -pedantic
+• CXX14FLAGS: -Wall -pedantic
+• CXX17FLAGS: -Wall -pedantic
+• CXX20FLAGS: -Wall -pedantic
+── R CMD build ─────────────────────────────────────────────────────────────────
+* checking for file 'C:\Users\peterman.73\OneDrive - The Ohio State University\R\Packages\terradish\dev\check\phase3-final-package/DESCRIPTION' ... OK
+
+* preparing 'terradish':
+
+* checking DESCRIPTION meta-information ... OK
+
+* cleaning src
+
+* installing the package (it is needed to build vignettes)
+
+* creating vignettes ... OK
+
+* cleaning src
+
+* checking for LF line-endings in source and make files and shell scripts
+
+* checking for empty or unneeded directories
+
+Removed empty directory 'terradish/tests/testthat/_snaps'
+
+* looking to see if a 'data/datalist' file should be added
+
+* building 'terradish_0.0.50.tar.gz'
+
+Warning: file 'terradish/cleanup' did not have execute permissions: corrected
+
+Warning: file 'terradish/configure' did not have execute permissions: corrected
+
+
+
+══ Checking ════════════════════════════════════════════════════════════════════
+Setting env vars:
+• _R_CHECK_CRAN_INCOMING_REMOTE_               : FALSE
+• _R_CHECK_CRAN_INCOMING_                      : FALSE
+• _R_CHECK_FORCE_SUGGESTS_                     : FALSE
+• _R_CHECK_PACKAGES_USED_IGNORE_UNUSED_IMPORTS_: FALSE
+• NOT_CRAN                                     : true
+── R CMD check ─────────────────────────────────────────────────────────────────
+* using log directory 'C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/dev/check/phase3-final/terradish.Rcheck'
+* using R version 4.6.1 (2026-06-24 ucrt)
+* using platform: x86_64-w64-mingw32
+* R was compiled by
+    gcc.exe (GCC) 14.3.0
+    GNU Fortran (GCC) 14.3.0
+* running under: Windows 11 x64 (build 26200)
+* using session charset: UTF-8
+* current time: 2026-09-24 17:55:01 UTC
+* using options '--no-manual --as-cran'
+* checking for file 'terradish/DESCRIPTION' ... OK
+* checking extension type ... Package
+* this is package 'terradish' version '0.0.50'
+* package encoding: UTF-8
+* checking package namespace information ... OK
+* checking package dependencies ... OK
+* checking if this is a source package ... OK
+* checking if there is a namespace ... OK
+* checking for executable files ... OK
+* checking for hidden files and directories ... OK
+* checking for portable file names ... OK
+* checking whether package 'terradish' can be installed ...

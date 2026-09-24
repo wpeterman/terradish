@@ -1,0 +1,387 @@
+#' Maximum likelihood population effects (MLPE) measurement model
+#'
+#' A function of class \code{"terradish_measurement_model"} that evaluates the
+#' maximum likelihood population effects (MLPE) likelihood.  MLPE accounts for
+#' the non-independence of pairwise genetic distances that share a sampling
+#' site. It is the preferred distance-response likelihood when a defensible
+#' effective Wishart degrees-of-freedom value is unavailable or the response is
+#' not admissible for \code{\link{generalized_wishart}}.
+#'
+#' @param E Conductance-implied covariance matrix: the generalized inverse of
+#'   the graph Laplacian, evaluated at the current conductance parameters.
+#'   Passed automatically by the optimizer; users normally do not call this
+#'   function directly.
+#' @param S Square, symmetric matrix of observed pairwise genetic distances
+#'   (e.g. F\eqn{_{ST}}). Must have the same dimensions as \code{E}.
+#' @param phi Named numeric vector of nuisance parameters \code{(alpha, beta,
+#'   tau, rho)}. The stored \code{tau} is log precision and the stored
+#'   \code{rho} is an unconstrained, logit-scale parameter. Omit to obtain
+#'   starting values from a least-squares fit and a weak positive MLPE
+#'   correlation.
+#' @param nu Unused; present for a common interface with Wishart measurement
+#'   models.
+#' @param gradient Logical. Compute gradient of the negative log-likelihood
+#'   with respect to \code{phi}?
+#' @param hessian Logical. Compute Hessian of the negative log-likelihood with
+#'   respect to \code{phi}?
+#' @param partial Logical. Compute second partial derivatives with respect to
+#'   \code{phi}, \code{E}, and \code{S}? Required by the optimizer.
+#' @param nonnegative Logical. Constrain the IBR slope \code{beta} to be
+#'   nonnegative? Default \code{TRUE}.
+#' @param validate Logical. Numerically validate gradients and Hessians via
+#'   \pkg{numDeriv}? Very slow; for debugging small examples only.
+#'
+#' @details
+#' The nuisance parameters are:
+#' \describe{
+#'   \item{\code{alpha}}{Intercept of the mean structure.}
+#'   \item{\code{beta}}{Resistance-distance (IBR) slope; constrained
+#'     \eqn{\geq 0} when \code{nonnegative = TRUE}.}
+#'   \item{\code{tau}}{Log-precision parameter: residual variance is
+#'     \eqn{\exp(-\tau)}.}
+#'   \item{\code{rho}}{Unconstrained optimization-scale parameter. The actual
+#'     shared-site correlation is
+#'     \eqn{\rho_{MLPE} = \text{plogis}(\rho)/2 \in (0, 0.5)}.}
+#' }
+#'
+#' The mean structure is \eqn{S_{ij} = \alpha + \beta R_{ij} + e_{ij}}, where
+#' \eqn{R_{ij}} is the resistance distance derived from \code{E}.  The
+#' residual vector \eqn{e} follows the MLPE correlation structure of Clarke
+#' et al. (2002): two pairs \eqn{(i,j)} and \eqn{(i,k)} sharing site \eqn{i}
+#' have correlation \eqn{\rho_{MLPE}}, while pairs sharing no site are
+#' uncorrelated.
+#'
+#' Use \code{\link{mlpe_covariates}} to extend the mean structure with
+#' additional fixed pairwise covariates (isolation by environment).
+#' Coefficients describe conditional associations under the specified mean and
+#' correlation structure; they do not isolate causal environmental effects.
+#'
+#' @references
+#' Clarke RT, Rothery P, Raybould AF. 2002. Confidence limits for regression
+#' relationships between distance matrices: estimating gene flow with distance.
+#' Journal of Agricultural, Biological, and Environmental Statistics
+#' 7(3):361-372.
+#'
+#' @seealso \code{\link{leastsquares}}, \code{\link{mlpe_covariates}},
+#'   \code{\link{generalized_wishart}}, \code{\link{terradish}}
+#'
+#' @return When \code{phi} is missing, a list with elements \code{phi}
+#'   (starting values), \code{lower}, and \code{upper} (parameter bounds).
+#'   Otherwise a list containing:
+#'  \item{objective}{Negative log-likelihood.}
+#'  \item{fitted}{Matrix of expected genetic distances (same dimensions as \code{S}).}
+#'  \item{boundary}{Logical; \code{TRUE} if \code{beta = 0}, indicating no detectable IBR signal.}
+#'  \item{gradient}{Gradient with respect to \code{phi} (if \code{gradient = TRUE}).}
+#'  \item{hessian}{Hessian matrix with respect to \code{phi} (if \code{hessian = TRUE}).}
+#'  \item{gradient_E}{Gradient with respect to \code{E} (if \code{partial = TRUE}).}
+#'  \item{partial_E}{Jacobian of \code{gradient_E} with respect to \code{phi} (if \code{partial = TRUE}).}
+#'  \item{partial_S}{Jacobian of \code{gradient} with respect to the lower triangle of \code{S} (if \code{partial = TRUE}).}
+#'  \item{jacobian_E}{Function for reverse-mode AD through \code{E} (if \code{partial = TRUE}).}
+#'  \item{jacobian_S}{Function for reverse-mode AD through \code{S} (if \code{partial = TRUE}).}
+#'
+#' @examples
+#' library(terra)
+#' 
+#' data(melip)
+#' melip.altitude <- terra::unwrap(melip.altitude)
+#' melip.forestcover <- terra::unwrap(melip.forestcover)
+#' melip.coords <- terra::unwrap(melip.coords)
+#' 
+#' covariates <- c(melip.altitude, melip.forestcover)
+#' names(covariates) <- c("altitude", "forestcover")
+#' surface <- conductance_surface(covariates, melip.coords, directions = 8)
+#'
+#' # inverse of graph Laplacian at null model (IBD) 
+#' laplacian_inv <- terradish_distance(theta = matrix(0, 1, 2), 
+#'                                  formula = ~forestcover + altitude,
+#'                                  data = surface,
+#'                                  terradish::loglinear_conductance, 
+#'                                  covariance = TRUE)$covariance[,,1]
+#' 
+#' mlpe(laplacian_inv, melip.Fst) #without 'phi': return MLE of phi
+#' # Set the actual shared-site correlation to 0.2 with qlogis(2 * 0.2)
+#' mlpe(laplacian_inv, melip.Fst,
+#'      phi = c(0, 0.5, -0.1, qlogis(2 * 0.2)))
+#'
+#' @details When the fitted internal correlation logit is below -8,
+#'   \code{summary()} reports the shared-site correlation at zero and omits its
+#'   Wald uncertainty. The parameter remains in the degrees of freedom because
+#'   it was estimated; fixing it in advance would define a different model.
+#' @export
+
+mlpe <- function(E, S, phi, nu = NULL, gradient = TRUE, hessian = TRUE, partial = TRUE, nonnegative = TRUE, validate = FALSE)
+{
+  symm <- function(X) (X + t(X))/2
+
+  if (missing(phi)) #return starting values and boundaries for optimization of phi
+  {
+    ls_start <- leastsquares(E = E, S = S, nonnegative = nonnegative)$phi
+    phi <- c(ls_start, "rho" = qlogis(0.2))
+
+    return(list(phi   = phi, 
+                lower = if (nonnegative) c(-Inf, 0, -Inf, -Inf) 
+                        else c(-Inf, -Inf, -Inf, -Inf), 
+                upper = c(Inf, Inf, Inf, Inf)))
+  }
+  else if (!(is.matrix(E)    & 
+             is.matrix(S)    & 
+             all(dim(E)  == dim(S)) &
+             is.numeric(phi) & 
+             length(phi) == 4 ))
+    stop ("invalid inputs")
+
+  names(phi) <- c("alpha", "beta", "tau", "rho")
+
+  alpha <- phi["alpha"]
+  beta  <- phi["beta"]
+  tau   <- exp(phi["tau"])
+  rho   <- 0.5 * plogis(phi["rho"])
+
+  ones <- matrix(1, nrow(E), 1)
+  Ed   <- diag(E)
+  R    <- Ed %*% t(ones) + ones %*% t(Ed) - 2 * symm(E)
+
+  Rl  <- R[lower.tri(R)]
+  Sl  <- S[lower.tri(S)]
+  Ind <- which(lower.tri(R), arr.ind = TRUE)
+
+  unos   <- matrix(1, length(Sl), 1)
+  U      <- sparseMatrix(i = rep(seq_along(Sl), 2), j = c(Ind), x = c(unos))
+
+  correlation <- .mlpe_correlation_operator(U, phi["rho"])
+  SigmaInv <- correlation$inverse
+  SigmaLogDet <- correlation$logdet
+
+  # products against inverse correlation matrix
+  e       <- Sl - alpha * unos - beta * Rl
+  Si_e    <- SigmaInv(e)
+  quadratic <- correlation$quadratic(e)
+  loglik  <- -0.5 * tau * quadratic + 0.5 * nrow(e) * log(tau) - 0.5 * SigmaLogDet
+  #check here that matches corMLPE
+
+  distance <- matrix(0, nrow(S), ncol(S))
+  distance[lower.tri(distance)] <- Rl
+  distance <- distance + t(distance)
+  fitted <- alpha + beta * distance
+
+  # gradients, hessians, mixed partial derivatives
+  if (gradient || hessian || partial)
+  {
+    dPhi    <- matrix(0, length(phi), 1)
+    ddPhi   <- matrix(0, length(phi), length(phi))
+    ddEdPhi <- matrix(0, length(Rl),  length(phi))
+    ddPhidS <- matrix(0, length(phi), length(Sl))
+    rownames(dPhi) <- colnames(ddPhi) <- 
+      rownames(ddPhi) <- colnames(ddEdPhi) <- 
+        rownames(ddPhidS) <- names(phi)
+
+    drho_Si_e  <- t(U) %*% Si_e
+    drho_Si_e  <- as.matrix(2*Si_e - U %*% drho_Si_e)
+    drho_trans <- correlation$derivative
+
+    # gradient, phi
+    dPhi["alpha",] <- t(unos) %*% Si_e * tau
+    dPhi["beta",]  <- t(Rl) %*% Si_e * tau
+    dPhi["tau",]   <- -0.5 * tau * quadratic + 0.5 * length(e)
+    dPhi["rho",]   <- 
+      (-0.5 * tau * t(Si_e) %*% drho_Si_e - 
+       0.5 * correlation$dlogdet) * drho_trans
+
+    if (hessian || partial)
+    {
+      Si_unos      <- SigmaInv(unos)
+      Si_Rl        <- SigmaInv(Rl)
+      Si_Sl        <- SigmaInv(Sl)
+      Si_drho_Si_e <- SigmaInv(drho_Si_e)
+
+      # hessian, phi x phi
+      ddPhi["alpha", "alpha"] <- -tau * t(unos) %*% Si_unos
+      ddPhi["alpha",  "beta"] <- -tau * t(unos) %*% Si_Rl
+      ddPhi["alpha",   "tau"] <- tau * t(unos) %*% Si_e
+      ddPhi["alpha",   "rho"] <- tau * t(Si_unos) %*% drho_Si_e * drho_trans
+      ddPhi[ "beta",  "beta"] <- -tau * t(Rl) %*% Si_Rl
+      ddPhi[ "beta",   "tau"] <- tau * t(Rl) %*% Si_e
+      ddPhi[ "beta",   "rho"] <- tau * t(Si_Rl) %*% drho_Si_e * drho_trans
+      ddPhi[  "tau",   "tau"] <- -0.5 * tau * quadratic
+      ddPhi[  "tau",   "rho"] <- -0.5 * tau * t(Si_e) %*% drho_Si_e * drho_trans
+      ddPhi[  "rho",   "rho"] <- 
+        (-tau * t(drho_Si_e) %*% Si_drho_Si_e +
+         -0.5 * correlation$d2logdet) * drho_trans^2 + dPhi["rho",] * (1 - 4*rho)
+      ddPhi                   <- ddPhi + t(ddPhi)
+      diag(ddPhi)             <- diag(ddPhi)/2
+
+      if (partial)
+      {
+        # gradient wrt E
+        dR <- matrix(0, nrow(R), ncol(R))
+        dR[lower.tri(dR)] <- 2 * beta * tau * as.vector(Si_e)
+        dR <- symm(dR)
+        dE <- diag(nrow(R)) * (dR %*% ones %*% t(ones)) - dR
+
+        # hessian offdiagonal, E x phi
+        ddEdPhi[, "alpha"] <- -2 * beta * tau * Si_unos
+        ddEdPhi[,  "beta"] <- 2 * tau * (Si_e - beta * Si_Rl)
+        ddEdPhi[,   "tau"] <- 2 * beta * tau * Si_e
+        ddEdPhi[,   "rho"] <- 2 * beta * tau * Si_drho_Si_e * drho_trans
+        ddEdPhi            <- apply(ddEdPhi, 2, function(x) { X <- matrix(0,nrow(E),ncol(E)); X[lower.tri(X)] <- x; X <- symm(X); diag(nrow(E)) * (X %*% ones %*% t(ones)) - X })
+
+        # hessian offdiagonal, S x phi
+        ddPhidS["alpha",] <- tau * Si_unos
+        ddPhidS["beta",]  <- tau * Si_Rl
+        ddPhidS["tau",]   <- -tau * Si_e
+        ddPhidS["rho",]   <- -tau * Si_drho_Si_e * drho_trans
+
+        # jacobian products (label these properly)
+        jacobian_E <- function(dE)
+        {
+          ddEdE <- diag(dE) %*% t(ones) + ones %*% t(diag(dE)) - 2 * symm(dE)
+          ddEdE[lower.tri(ddEdE)] <- SigmaInv(ddEdE[lower.tri(ddEdE)])
+          ddEdE[upper.tri(ddEdE)] <- 0
+          ddEdE <- ddEdE + t(ddEdE)
+          ddEdE <- -beta^2 * tau * ddEdE
+          ddEdE <- diag(nrow(dE)) * (ddEdE %*% ones %*% t(ones)) - ddEdE
+          -ddEdE
+        }
+
+        jacobian_S <- function(dE)
+        {
+          ddEdE <- diag(dE) %*% t(ones) + ones %*% t(diag(dE)) - 2 * symm(dE)
+          ddEdE[lower.tri(ddEdE)] <- SigmaInv(ddEdE[lower.tri(ddEdE)])
+          ddEdE[upper.tri(ddEdE)] <- 0
+          ddEdE <- ddEdE + t(ddEdE)
+          ddEdE <- -beta * tau * ddEdE
+          ddEdE <- diag(nrow(dE)) * (ddEdE %*% ones %*% t(ones)) - ddEdE
+          diag(ddEdE) <- 0
+          -ddEdE
+        }
+      }
+    }
+  }
+
+  # numerical validation
+  if (validate)
+  {
+    num_gradient <- .numderiv_grad(function(x) 
+                                   mlpe(E = E, 
+                                        phi = x, 
+                                        S = S)$objective, 
+                                    phi)
+
+    num_hessian <- .numderiv_hessian(function(x) 
+                                     mlpe(E = E, 
+                                          phi = x, 
+                                          S = S)$objective, 
+                                     phi)
+
+    num_gradient_E <- symm(matrix(.numderiv_grad(function(x) 
+                                                 mlpe(E = x, 
+                                                      phi = phi, 
+                                                      S = S)$objective, 
+                                                 E), 
+                                  nrow(E), ncol(E)))
+
+    num_partial_E <- .numderiv_jacobian(function(x) 
+                                        mlpe(E = E, 
+                                             phi = x, 
+                                             S = S)$gradient_E, 
+                                        phi)
+
+    num_partial_S <- .numderiv_jacobian(function(x) 
+                                        mlpe(E = E, 
+                                             phi = phi, 
+                                             S = x)$gradient, 
+                                        S)[,lower.tri(S)]
+
+    num_jacobian_E <- function(X) 
+      matrix(c(X) %*% .numderiv_jacobian(function(x) 
+                                         mlpe(E = x, 
+                                              phi = phi, 
+                                              S = S)$gradient_E, 
+                                         E), 
+             nrow(X), ncol(X))
+
+    num_jacobian_S <- function(X) 
+      matrix(c(X) %*% .numderiv_jacobian(function(x) 
+                                         mlpe(E = E, 
+                                              phi = phi, 
+                                              S = x)$gradient_E, 
+                                         S), 
+             nrow(X), ncol(X))
+  }
+
+  list(objective        = -c(loglik), 
+       fitted           = fitted,
+       boundary         = nonnegative && beta == 0,
+       rho_boundary     = unname(phi["rho"] < -8),
+       gradient         = if(!gradient) NULL else -dPhi,
+       hessian          = if(!hessian)  NULL else -ddPhi,
+       gradient_E       = if(!partial)  NULL else -dE, 
+       partial_E        = if(!partial)  NULL else -ddEdPhi,   # partial_E[i,k] is d(dl/dE_i)/dPhi_k where i is linearized matrix index
+       partial_S        = if(!partial)  NULL else -ddPhidS,   # partial_S[i,k] is d(dl/dPhi_i)/dS_k where k is linearized matrix index
+       jacobian_E       = if(!partial)  NULL else jacobian_E, # function mapping vectorized dg/dE to d(dg/dE)/dE
+       jacobian_S       = if(!partial)  NULL else jacobian_S, # function mapping vectorized dg/dE to d(dg/dE)/dS
+       num_gradient     = if(!validate) NULL else num_gradient,
+       num_hessian      = if(!validate) NULL else num_hessian,
+       num_gradient_E   = if(!validate) NULL else num_gradient_E,
+       num_partial_E    = if(!validate) NULL else num_partial_E,
+       num_partial_S    = if(!validate) NULL else num_partial_S,
+       num_jacobian_E   = if(!validate) NULL else num_jacobian_E,
+       num_jacobian_S   = if(!validate) NULL else num_jacobian_S)
+}
+class(mlpe) <- c("terradish_measurement_model",
+                 "radish_measurement_model")
+
+.mlpe_eigen_cache <- new.env(parent = emptyenv())
+
+# Resolve the shared-site subspace before division by the residual variance.
+# This avoids cancellation between two huge Woodbury terms near rho = 1/2.
+# The positive quadratic form cannot spuriously reward a poor predictive fit.
+.mlpe_correlation_operator <- function(U, logit) {
+  eig <- .get_mlpe_eigen(ncol(U))
+  keep <- eig$values > max(eig$values) * .Machine$double.eps * ncol(U)
+  D <- eig$values[keep]
+  basis <- sweep(as.matrix(U %*% eig$vectors[, keep, drop = FALSE]), 2, sqrt(D), "/")
+  rho <- .5 * plogis(logit)
+  log_b <- plogis(-logit, log.p = TRUE)
+  b <- exp(log_b)
+  if (b == 0) stop("MLPE residual correlation variance is outside floating-point range.", call. = FALSE)
+  eigenvalues <- b + rho * D
+  residual_rank <- nrow(U) - length(D)
+  components <- function(x) {
+    x <- as.matrix(x)
+    projected <- crossprod(basis, x)
+    list(projected = projected, residual = x - basis %*% projected)
+  }
+  list(inverse = function(x) {
+    parts <- components(x)
+    parts$residual / b + basis %*% (parts$projected / eigenvalues)
+  }, quadratic = function(x) {
+    parts <- components(x)
+    sum(parts$residual^2) / b + sum(parts$projected^2 / eigenvalues)
+  }, logdet = sum(log(eigenvalues)) + residual_rank * log_b,
+  dlogdet = sum((D - 2) / eigenvalues) - 2 * residual_rank / b,
+  d2logdet = -sum((D - 2)^2 / eigenvalues^2) - 4 * residual_rank / b^2,
+  derivative = rho * b)
+}
+
+.get_mlpe_eigen <- function(n)
+{
+  key <- as.character(as.integer(n))
+  cached <- get0(key, envir = .mlpe_eigen_cache, inherits = FALSE)
+  if (!is.null(cached))
+    return(cached)
+
+  eig <- if (n <= 1L)
+    NA
+  else
+  {
+    Ind <- which(lower.tri(diag(n)), arr.ind = TRUE)
+    U <- sparseMatrix(i = rep(seq_len(nrow(Ind)), 2),
+                      j = c(Ind),
+                      x = rep(1, nrow(Ind) * 2))
+    eigen(as.matrix(t(U) %*% U))
+  }
+
+  assign(key, eig, envir = .mlpe_eigen_cache)
+  eig
+}

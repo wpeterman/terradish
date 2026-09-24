@@ -1,0 +1,12 @@
+ℹ Updating terradish documentation
+Writing 'NAMESPACE'
+ℹ Loading terradish
+Writing 'NAMESPACE'
+Writing 'aic_table.Rd'
+Writing 'gaussian_scale_profile.Rd'
+Writing 'terradish_inference.Rd'
+Writing 'terradish_rescale_nu.Rd'
+Writing 'terradish_ibe_ratio.Rd'
+Writing 'mlpe.Rd'
+Writing 'NewtonRaphsonControl.Rd'
+Writing 'wishart_covariates.Rd'

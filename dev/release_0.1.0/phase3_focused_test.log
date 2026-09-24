@@ -1,0 +1,64 @@
+ℹ Testing terradish
+core-inference: ............................WWWWWWWWWWWWWWWWWWWWW..........WWW....
+optimizer-stopping: ..........
+scale-inference: W.....W......
+Projected Newton-Raphson with Hager-Zhang line search
+Projected Newton-Raphson with Hager-Zhang line search
+[1] f(x) = -1.311e+02  |f(x)-fold(x)| = 0.000e+00  max|f'(x)| = 1.270e-15  |f''(x)| = -2.792e+02
+Solution on interior with `max(abs(gradient))` == 1.27015710448691e-15 and `diff(f)` == 0
+warm-starts: ......
+
+══ Warnings ════════════════════════════════════════════════════════════════════
+1. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+2. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+3. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+4. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+5. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+6. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+7. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+8. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+9. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+10. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+11. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+12. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+13. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+14. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+15. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+16. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+17. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+18. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+19. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+20. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+21. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+22. MLPE near-zero correlation has no Wald output ('test-core-inference.R:110:3') - NaNs produced
+
+23. MLPE near-zero correlation has no Wald output ('test-core-inference.R:110:3') - Hessian matrix has negative eigenvalues: possibly a saddle point
+
+24. MLPE near-zero correlation has no Wald output ('test-core-inference.R:110:3') - diag(V) had non-positive or NA entries; the non-finite result may be dubious
+
+25. Gaussian reporting and fixed-scale profiles respect fitted bounds ('test-scale-inference.R:14:3') - The retained raster is in longitude/latitude, so sigma is reported in degrees. Use a projected raster or provide `distance_per_map_unit` for a descriptive conversion.
+
+26. Gaussian reporting and fixed-scale profiles respect fitted bounds ('test-scale-inference.R:20:3') - The retained raster is in longitude/latitude, so sigma is reported in degrees. Use a projected raster or provide `distance_per_map_unit` for a descriptive conversion.
+
+══ DONE ════════════════════════════════════════════════════════════════════════

@@ -34,3 +34,8 @@ dev/fulltest_fails.csv
 Rplots.pdf
 *.trees
 *.npz
+
+# Large local diagnostic fit objects; scripts, logs, and acceptance receipts are tracked.
+/dev/release_0.1.0/warm_start_diagnosis.rds
+/dev/release_0.1.0/warm_start_repaired.rds
+/dev/release_0.1.0/phase4_prediction_diagnosis.rds

@@ -1,0 +1,519 @@
+#' Wishart measurement models with site-level environmental covariance kernels
+#'
+#' Creates a Wishart measurement model whose fitted covariance includes the
+#' resistance-implied covariance plus one or more positive semidefinite kernels
+#' built from site-level environmental covariates.  Use this as the Wishart
+#' analogue of \code{\link{mlpe_covariates}} when your measurement model is
+#' \code{\link{generalized_wishart}} (squared-distance responses) or
+#' \code{\link{wishart_covariance}} (covariance-matrix responses).
+#'
+#' @param x Site-level covariates.  Supported inputs are the same as
+#'   \code{\link{pairwise_endpoint_covariates}}: a numeric vector, matrix, data
+#'   frame, or \code{terra::SpatRaster}. A previously constructed
+#'   \code{terradish_pairwise_covariates} object is accepted unchanged.
+#' @param coords Required when \code{x} is a raster.  Focal-point coordinates
+#'   in the same projection as \code{x}; accepts the same inputs as
+#'   \code{\link{conductance_surface}}.
+#' @param model Which Wishart likelihood to use.
+#'   \code{"generalized_wishart"} is appropriate only when \code{S} is an
+#'   admissible squared-distance matrix coherently related to a centered
+#'   positive-semidefinite covariance matrix. An arbitrary distance matrix,
+#'   including an unchecked F\eqn{_{ST}} matrix, is not sufficient.
+#'   \code{"wishart_covariance"} is appropriate when \code{S} is a
+#'   \strong{covariance} matrix (e.g. from \code{\link{cov_from_genetic_data}}).
+#'   In both cases the same \eqn{\Sigma} parameterization is used; they differ
+#'   in how \eqn{\Sigma} is compared to the observed data.
+#' @param scale Logical.  Standardize site-level covariates to zero mean and
+#'   unit variance before constructing kernels?  Recommended when covariates
+#'   use different units or scales.
+#' @param transform Pairwise environmental difference: \code{"absdiff"}
+#'   (default), \code{"sqdiff"}, \code{"euclidean"}, or \code{"manhattan"}.
+#'   See \code{\link{pairwise_endpoint_covariates}}. Ignored for an existing
+#'   pairwise-covariate object.
+#'
+#' @details
+#' A zero kernel coefficient sets the boundary flag while retaining conductance
+#' inference when the resistance coefficient is positive. Summaries mark zero
+#' kernel coefficients and give one-sided upper limits instead of symmetric
+#' intervals. Tests adding only kernel coefficients use a chi-bar-square
+#' reference with binomial weights. This reference is exact for
+#' information-orthogonal kernels and approximate otherwise. MLPE environmental
+#' coefficients are unconstrained and retain ordinary chi-square tests.
+#'
+#' \code{wishart_covariates()} is the Wishart analogue of
+#' \code{\link{mlpe_covariates}}, but environmental covariates enter the model
+#' through positive semidefinite kernels. For each pairwise difference matrix
+#' \eqn{D_k}, the kernel is \eqn{K_k=-\frac12 H D_k H}, where \eqn{H} centers
+#' sites. A kernel with a negative eigenvalue beyond numerical tolerance is
+#' rejected. The \code{"sqdiff"} transform gives the centered outer product
+#' of the original covariate. The fitted covariance is:
+#'
+#' \deqn{\Sigma = \tau E(\theta) + \sum_k \lambda_k K_k + \exp(\sigma) I}
+#'
+#' where \eqn{E(\theta)} is the resistance-implied covariance (generalized
+#' inverse of the graph Laplacian at conductance parameters \eqn{\theta}),
+#' \eqn{\tau} is the weight on conductance-implied covariance,
+#' \eqn{\lambda_k \geq 0} are nonnegative kernel weights, and
+#' \eqn{\exp(\sigma)} is diagonal residual variance not represented by the
+#' graph or environmental kernels.
+#'
+#' The nuisance parameters estimated alongside \eqn{\theta} are:
+#' \describe{
+#'   \item{\code{tau}}{Nonnegative scale on the resistance-implied covariance
+#'     \eqn{E}. A value near zero indicates no detectable contribution from
+#'     conductance-implied covariance under this model.}
+#'   \item{\code{lambda_<covariate>}}{Nonnegative weight per unit of the
+#'     corresponding pairwise environmental difference. A negative association
+#'     is represented at the zero bound; MLPE environmental slopes are
+#'     unconstrained. The weight is not a causal IBE effect.}
+#'   \item{\code{sigma}}{Log-scale nugget: identity component added as
+#'     \eqn{\exp(\sigma) I}, representing diagonal variance not captured by the
+#'     other covariance components. It is not a smoothing scale or direct drift
+#'     or population-size estimate.}
+#' }
+#'
+#' This design naturally preserves positive definiteness of \eqn{\Sigma} when
+#' the nugget is positive and all kernel weights are nonnegative.  It is
+#' evaluated on site contrasts, as in \code{\link{wishart_covariance}}. The
+#' implied squared-distance mean is \eqn{\tau R_{ij}+\sum_k\lambda_k D_{k,ij}
+#' +2\exp(\sigma)}, using the same additive environmental terms as MLPE.
+#' The likelihoods and coefficient constraints still differ. Use
+#' \code{wishart_covariates()} when the response satisfies the selected Wishart
+#' model's requirements and you can justify an effective degrees-of-freedom
+#' value \code{nu}; use \code{\link{mlpe_covariates}} when \code{nu} is unknown
+#' or when the distance-regression framework better matches the response.
+#' Neither formulation cleanly separates causal IBE from IBR when predictors
+#' and kernels are spatially correlated.
+#' Scaling is applied to site values before the pairwise transform; kernels
+#' are not normalized afterward. Site subsets retain these original pairwise
+#' values and rebuild centered kernels without restandardizing the subset.
+#'
+#' @return A function of class \code{"terradish_measurement_model"} suitable
+#'   for the \code{measurement_model} argument of \code{\link{terradish}} and
+#'   \code{\link{terradish_grid}}.  The nuisance parameter vector \eqn{\phi}
+#'   estimated by \code{\link{terradish}} contains \code{tau}, one
+#'   \code{lambda_<covariate>} per environmental kernel, and \code{sigma} (in
+#'   that order).  The function stores the kernel array in attribute
+#'   \code{"kernel_covariates"} and supports site-subsetting for
+#'   model fitting through \code{\link{terradish}}.
+#'
+#' @seealso \code{\link{check_distance_response}},
+#'   \code{\link{generalized_wishart}}, \code{\link{wishart_covariance}},
+#'   \code{\link{mlpe_covariates}},
+#'   \code{\link{pairwise_endpoint_covariates}}, \code{\link{terradish}}
+#'
+#' @references
+#' McCullagh P. 2009. Marginal likelihood for distance matrices. Statistica
+#' Sinica 19:631-649.
+#'
+#' @examples
+#' library(terra)
+#'
+#' data(melip)
+#' melip.altitude    <- terra::unwrap(melip.altitude)
+#' melip.forestcover <- terra::unwrap(melip.forestcover)
+#' melip.coords      <- terra::unwrap(melip.coords)
+#'
+#' covariates <- c(melip.altitude, melip.forestcover)
+#' names(covariates) <- c("altitude", "forestcover")
+#' covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+#'                                                 na.rm = TRUE))
+#' surface <- conductance_surface(covariates, melip.coords, directions = 8)
+#'
+#' # Build an altitude kernel for a covariance-Wishart model.
+#' g_wc <- wishart_covariates(melip.altitude, coords = melip.coords,
+#'                            model = "wishart_covariance", scale = TRUE)
+#' inherits(g_wc, "terradish_measurement_model")  # TRUE
+#'
+#' # Simulate an admissible covariance response, then fit the extended model.
+#' \donttest{
+#' simulated <- simulate_covariance_response(
+#'   theta = c(altitude = 0.2, forestcover = -0.1),
+#'   formula = ~ altitude + forestcover,
+#'   data = surface, tau = 0.8, sigma = 0.2, nu = 40, seed = 1
+#' )
+#' fit_joint_w <- terradish(
+#'   simulated$covariance ~ altitude + forestcover,
+#'   data              = surface,
+#'   conductance_model = loglinear_conductance,
+#'   measurement_model = g_wc,
+#'   nu                = 40
+#' )
+#' # phi table shows tau, lambda_altitude, and sigma.
+#' summary(fit_joint_w)
+#' }
+#'
+#' @export
+wishart_covariates <- function(x,
+                               coords = NULL,
+                               transform = c("absdiff", "sqdiff", "euclidean", "manhattan"),
+                               scale = FALSE,
+                               model = c("wishart_covariance",
+                                         "generalized_wishart"))
+{
+  model <- match.arg(model)
+  pairs <- pairwise_endpoint_covariates(x, coords = coords,
+                                         transform = match.arg(transform), scale = scale)
+  kernels <- .make_wishart_kernel_covariates(pairs)
+
+  g <- switch(
+    model,
+    wishart_covariance = .wishart_covariate_model(kernels, covariance = TRUE),
+    generalized_wishart = .wishart_covariate_model(kernels, covariance = FALSE)
+  )
+
+  attr(g, "base_model") <- model
+  attr(g, "kernel_covariates") <- kernels
+  attr(g, "subsetter") <- function(index) {
+    distances <- attr(kernels, "distances")
+    block <- distances[index, index, , drop = FALSE]
+    values <- vapply(seq_len(dim(block)[3]), function(k)
+      block[, , k][lower.tri(block[, , k])], numeric(length(index) * (length(index) - 1) / 2))
+    values <- matrix(values, ncol = dim(block)[3])
+    colnames(values) <- dimnames(block)[[3]]
+    class(values) <- c("terradish_pairwise_covariates", "matrix", "array")
+    wishart_covariates(values, model = model)
+  }
+  class(g) <- unique(c("terradish_wishart_covariate_model",
+                       "terradish_measurement_model",
+                       "radish_measurement_model",
+                       class(g)))
+  g
+}
+
+.make_wishart_kernel_covariates <- function(pairwise)
+{
+  pairwise <- as.matrix(pairwise)
+  if (!is.numeric(pairwise) || any(!is.finite(pairwise)))
+    stop("missing values are not supported in Wishart kernel covariates")
+  n <- (1 + sqrt(1 + 8 * nrow(pairwise))) / 2
+  if (n < 2 || n != as.integer(n) || !ncol(pairwise))
+    stop("Pairwise covariates must contain one row per unordered site pair.", call. = FALSE)
+  if (is.null(colnames(pairwise))) colnames(pairwise) <- paste0("var", seq_len(ncol(pairwise)))
+  H <- diag(n) - matrix(1 / n, n, n)
+  kernels <- array(0, c(n, n, ncol(pairwise)),
+                    dimnames = list(NULL, NULL, paste0("kernel_", colnames(pairwise))))
+  distances <- kernels
+  dimnames(distances)[[3]] <- colnames(pairwise)
+  for (j in seq_len(ncol(pairwise))) {
+    D <- matrix(0, n, n)
+    D[lower.tri(D)] <- pairwise[, j]
+    D <- D + t(D)
+    K <- .symmetrize_matrix(-0.5 * H %*% D %*% H)
+    ev <- eigen(K, symmetric = TRUE, only.values = TRUE)$values
+    if (min(ev) < -1e-10 * max(abs(ev)))
+      stop("Pairwise covariate `", colnames(pairwise)[j],
+           "` is not conditionally negative definite; its Wishart kernel is not positive semidefinite.",
+           call. = FALSE)
+    kernels[, , j] <- K
+    distances[, , j] <- D
+  }
+  structure(kernels,
+            distances = distances,
+            kernel = "pairwise_distance",
+            class = unique(c("terradish_wishart_kernel_covariates",
+                             class(kernels))))
+}
+
+.wishart_covariate_model <- function(kernels, covariance)
+{
+  force(kernels)
+  force(covariance)
+
+  function(E, S, phi, nu,
+           gradient = TRUE,
+           hessian = TRUE,
+           partial = TRUE,
+           nonnegative = TRUE,
+           validate = FALSE)
+  {
+    .wishart_covariate_fit(E = E, S = S,
+                           phi = if (missing(phi)) NULL else phi,
+                           nu = nu, kernels = kernels,
+                           covariance = covariance,
+                           gradient = gradient,
+                           hessian = hessian,
+                           partial = partial,
+                           nonnegative = nonnegative,
+                           validate = validate)
+  }
+}
+
+.wishart_covariate_fit <- function(E, S, phi, nu, kernels, covariance,
+                                   gradient = TRUE, hessian = TRUE,
+                                   partial = TRUE, nonnegative = TRUE,
+                                   validate = FALSE)
+{
+  if (!(is.matrix(E) && is.matrix(S) && all(dim(E) == dim(S))))
+    stop("invalid inputs", call. = FALSE)
+  if (anyNA(E) || anyNA(S))
+    stop("missing values are not supported", call. = FALSE)
+  if (!is.array(kernels) || length(dim(kernels)) != 3L ||
+      !all(dim(kernels)[1:2] == dim(E)))
+    stop("Wishart kernel covariates do not match the response matrix.",
+         call. = FALSE)
+
+  E <- .symmetrize_matrix(E)
+  if (!isTRUE(covariance))
+    S <- .prepare_gw_response(S)
+  else
+    S <- .symmetrize_matrix(S)
+
+  kernel_names <- dimnames(kernels)[[3]]
+  if (is.null(kernel_names))
+    kernel_names <- paste0("kernel_", seq_len(dim(kernels)[3]))
+  lambda_names <- paste0("lambda_", sub("^kernel_", "", kernel_names))
+  phi_names <- c("tau", lambda_names, "sigma")
+
+  if (is.null(phi))
+  {
+    if (isTRUE(covariance))
+    {
+      L <- qr.Q(qr(stats::contr.helmert(nrow(E))))
+      project <- function(M) c(crossprod(L, M %*% L))
+      X <- cbind(project(E),
+                 do.call(cbind, lapply(seq_len(dim(kernels)[3]),
+                                       function(k) project(kernels[, , k]))),
+                 c(diag(ncol(L))))
+      coef0 <- tryCatch(qr.solve(X, project(S)),
+                        error = function(e) rep(1e-6, length(phi_names)))
+      coef0 <- pmax(as.numeric(coef0), 1e-6)
+      phi <- c(coef0[-length(coef0)], log(coef0[length(coef0)]))
+    }
+    else
+    {
+      phi <- c(1, rep(1e-6, length(lambda_names)), 0)
+    }
+    names(phi) <- phi_names
+    return(list(phi = phi,
+                lower = c(0, rep(0, length(lambda_names)), -Inf),
+                upper = rep(Inf, length(phi_names))))
+  }
+
+  if (!(is.numeric(phi) && length(phi) == length(phi_names)))
+    stop("invalid inputs", call. = FALSE)
+  if (anyNA(phi))
+    stop("missing values are not supported", call. = FALSE)
+  stopifnot(nu > 0)
+
+  names(phi) <- phi_names
+  tau <- phi["tau"]
+  lambdas <- phi[lambda_names]
+  sigma <- exp(phi["sigma"])
+  stopifnot(tau >= 0, all(lambdas >= 0))
+  nonnegative <- TRUE
+
+  I <- diag(nrow(E))
+  kernel_sum <- matrix(0, nrow(E), ncol(E))
+  for (k in seq_along(lambdas))
+    kernel_sum <- kernel_sum + lambdas[k] * kernels[, , k]
+  Sigma <- tau * E + kernel_sum + sigma * I
+
+  B <- c(list(tau = E),
+         lapply(seq_along(lambdas), function(k) kernels[, , k]),
+         list(sigma = sigma * I))
+  names(B) <- phi_names
+
+  if (isTRUE(covariance))
+    .wishart_covariate_covariance(E = E, S = S, phi = phi, nu = nu,
+                                  Sigma = Sigma, B = B, tau = tau,
+                                  gradient = gradient, hessian = hessian,
+                                  partial = partial,
+                                  nonnegative = nonnegative,
+                                  validate = validate)
+  else
+    .wishart_covariate_generalized(E = E, S = S, phi = phi, nu = nu,
+                                   Sigma = Sigma, B = B, tau = tau,
+                                   sigma = sigma,
+                                   gradient = gradient, hessian = hessian,
+                                   partial = partial,
+                                   nonnegative = nonnegative,
+                                   validate = validate)
+}
+
+.wishart_covariate_covariance <- function(E, S, phi, nu, Sigma, B, tau,
+                                          gradient, hessian, partial,
+                                          nonnegative, validate,
+                                          curvature = NULL)
+{
+  symm <- function(X) (X + t(X)) / 2
+  L <- qr.Q(qr(stats::contr.helmert(nrow(Sigma))))
+  SigmaContrast <- crossprod(L, Sigma %*% L)
+  A <- L %*% solve(SigmaContrast, t(L))
+  ASA <- A %*% S %*% A
+  objective <- nu / 2 * (as.numeric(determinant(SigmaContrast, logarithm = TRUE)$modulus) +
+                           sum(diag(A %*% S)))
+  grad_Sigma <- nu / 2 * (A - ASA)
+
+  dgrad_from_dSigma <- function(U)
+  {
+    U <- symm(U)
+    out <- nu / 2 * (-A %*% U %*% A +
+                       A %*% U %*% ASA +
+                       ASA %*% U %*% A)
+    symm(out)
+  }
+
+  .wishart_covariate_finish(objective = c(objective),
+                            fitted = Sigma,
+                            grad_Sigma = grad_Sigma,
+                            dgrad_from_dSigma = dgrad_from_dSigma,
+                            E = E, S = S, phi = phi, B = B, tau = tau,
+                            nu = nu, sigma_sign = 1,
+                            gradient = gradient, hessian = hessian,
+                            partial = partial, nonnegative = nonnegative,
+                            validate = validate,
+                            jacobian_S_factor = -nu / 2,
+                            A_left = A, A_right = A,
+                            jacobian_S_left = A,
+                            jacobian_S_right = A,
+                            curvature = curvature)
+}
+
+.wishart_covariate_generalized <- function(E, S, phi, nu, Sigma, B, tau,
+                                           sigma, gradient, hessian, partial,
+                                           nonnegative, validate,
+                                           curvature = NULL)
+{
+  symm <- function(X) (X + t(X)) / 2
+  ones <- matrix(1, nrow(S), 1)
+  I <- diag(nrow(S))
+  SigmaInv <- solve(Sigma)
+  SigInvOne <- SigmaInv %*% ones
+  W <- I - ones %*% solve(t(ones) %*% SigInvOne) %*% t(SigInvOne)
+  SigInvW <- symm(SigmaInv %*% W)
+  eigSigW <- eigen(SigInvW, symmetric = TRUE)
+  P <- eigSigW$vectors[, -nrow(Sigma)]
+  D <- diag(eigSigW$values[-nrow(Sigma)])
+
+  loglik <- nu / 4 * sum(diag(SigInvW %*% S)) + nu / 2 * sum(log(diag(D)))
+  fitted <- diag(Sigma) %*% t(ones) + ones %*% t(diag(Sigma)) - 2 * Sigma
+  grad_Sigma <- -nu / 2 * SigInvW - nu / 4 * SigInvW %*% S %*% t(SigInvW)
+
+  dgrad_from_dSigma <- function(U)
+  {
+    U <- symm(U)
+    dSigInvW <- -SigmaInv %*% U %*% SigInvW
+    denom <- solve(t(ones) %*% SigmaInv %*% ones)
+    dW_part <- ones %*% denom %*% t(ones) %*% SigmaInv %*% U %*% SigmaInv -
+      c(t(ones) %*% SigmaInv %*% U %*% SigmaInv %*% ones) *
+      c(denom^2) * ones %*% t(ones) %*% SigmaInv
+
+    out <- -0.5 * nu * dSigInvW %*% W -
+      0.25 * nu * dSigInvW %*% S %*% t(SigInvW) -
+      0.5 * nu * W %*% dSigInvW -
+      0.25 * nu * SigInvW %*% S %*% t(dSigInvW) +
+      0.5 * nu * W %*% dSigInvW %*% W
+    out <- -0.5 * nu * SigmaInv %*% dW_part -
+      nu / 4 * SigmaInv %*% dW_part %*% S %*% t(W) %*% SigmaInv -
+      nu / 4 * SigmaInv %*% W %*% S %*% t(dW_part) %*% SigmaInv + out
+    out
+  }
+
+  .wishart_covariate_finish(objective = -c(loglik),
+                            fitted = fitted,
+                            grad_Sigma = grad_Sigma,
+                            dgrad_from_dSigma = dgrad_from_dSigma,
+                            E = E, S = S, phi = phi, B = B, tau = tau,
+                            nu = nu, sigma_sign = -1,
+                            gradient = gradient, hessian = hessian,
+                            partial = partial, nonnegative = nonnegative,
+                            validate = validate,
+                            jacobian_S_factor = -nu / 4,
+                            A_left = SigInvW, A_right = t(SigInvW),
+                            jacobian_S_left = t(SigInvW),
+                            jacobian_S_right = SigInvW,
+                            curvature = curvature)
+}
+
+.wishart_covariate_finish <- function(objective, fitted, grad_Sigma,
+                                      dgrad_from_dSigma, E, S, phi, B, tau, nu,
+                                      sigma_sign, gradient, hessian, partial,
+                                      nonnegative, validate, jacobian_S_factor,
+                                      A_left, A_right,
+                                      jacobian_S_left, jacobian_S_right,
+                                      curvature = NULL)
+{
+  p <- length(phi)
+  dPhi <- matrix(0, p, 1, dimnames = list(names(phi), NULL))
+  ddPhi <- matrix(0, p, p, dimnames = list(names(phi), names(phi)))
+  ddEdPhi <- matrix(0, length(E), p,
+                    dimnames = list(NULL, names(phi)))
+  ddPhidS <- matrix(0, p, sum(lower.tri(S, diag = sigma_sign > 0)),
+                    dimnames = list(names(phi), NULL))
+
+  if (gradient || hessian || partial)
+  {
+    for (nm in names(phi))
+      dPhi[nm, ] <- sum(B[[nm]] * grad_Sigma)
+
+    dgrad <- NULL
+    if (hessian || partial)
+    {
+      dgrad <- lapply(B, dgrad_from_dSigma)
+      for (i in names(phi))
+        for (j in names(phi))
+          ddPhi[i, j] <- sum(B[[i]] * dgrad[[j]])
+      # Second-order ("curvature") term: the contribution of the second
+      # derivative of Sigma with respect to phi, sum(grad_Sigma * d2Sigma/dphi_i dphi_j).
+      # For the additive-kernel model only the log-scale nugget is curved
+      # (d2Sigma/dsigma^2 = exp(sigma) I), giving the historical special case.
+      # A caller (e.g. the drift surface) may supply a full p x p curvature
+      # matrix via `curvature(grad_Sigma)`.
+      if (is.null(curvature))
+        ddPhi["sigma", "sigma"] <- ddPhi["sigma", "sigma"] + dPhi["sigma", ]
+      else
+        ddPhi <- ddPhi + curvature(grad_Sigma)
+      ddPhi <- (ddPhi + t(ddPhi)) / 2
+
+      if (partial)
+      {
+        dE <- tau * grad_Sigma
+        for (nm in names(phi))
+          ddEdPhi[, nm] <- c(tau * dgrad[[nm]])
+        ddEdPhi[, "tau"] <- c(grad_Sigma + tau * dgrad[["tau"]])
+
+        for (nm in names(phi))
+        {
+          dparam_dS <- jacobian_S_factor * A_left %*% B[[nm]] %*% A_right
+          if (sigma_sign > 0)
+            ddPhidS[nm, ] <- dparam_dS[lower.tri(dparam_dS, diag = TRUE)]
+          else
+            ddPhidS[nm, ] <- dparam_dS[lower.tri(dparam_dS)]
+        }
+
+        jacobian_E <- function(dotdotE)
+        {
+          U <- .symmetrize_matrix(dotdotE)
+          sigma_sign * tau^2 * dgrad_from_dSigma(U)
+        }
+
+        jacobian_S <- function(dotdotE)
+        {
+          U <- .symmetrize_matrix(dotdotE)
+          sigma_sign * jacobian_S_factor * tau *
+            jacobian_S_left %*% U %*% jacobian_S_right
+        }
+      }
+    }
+  }
+
+  list(objective = objective,
+       fitted = fitted,
+       boundary = (nonnegative && tau == 0) || any(phi[grepl("^lambda_", names(phi))] == 0),
+       no_structure_boundary = nonnegative && tau == 0,
+       gradient = if (!gradient) NULL else sigma_sign * dPhi,
+       hessian = if (!hessian) NULL else sigma_sign * ddPhi,
+       gradient_E = if (!partial) NULL else sigma_sign * dE,
+       partial_E = if (!partial) NULL else sigma_sign * ddEdPhi,
+       partial_S = if (!partial) NULL else sigma_sign * ddPhidS,
+       jacobian_E = if (!partial) NULL else jacobian_E,
+       jacobian_S = if (!partial) NULL else jacobian_S,
+       num_gradient = NULL,
+       num_hessian = NULL,
+       num_gradient_E = NULL,
+       num_partial_E = NULL,
+       num_partial_S = NULL,
+       num_jacobian_E = NULL,
+       num_jacobian_S = NULL)
+}

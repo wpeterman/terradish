@@ -1,0 +1,169 @@
+ℹ Testing terradish
+amg-solver: ..........................................................................
+analytic-derivatives: ..WW......................
+core-inference: ............................WWWWWWWWWWWWWWWWWWWWW..........WWW....
+core-scope: .........
+covariance-response-power: .......WWWWWW.......
+curvature: ..................
+distance-response: .......................
+environmental-kernels: ................................
+fit-storage: ...............
+gaussian-alignment: ...............
+gaussian-scale-conductance: W..W...................................W.W.....
+genetic-covariance: ............................................
+ibe-workflow: .........................
+kernel-recovery: ......
+landmark-approximation: ..........12............3............................
+layer-scaling: .
+legacy-wrappers: W...................
+model-selection: W..W..W...W...W.....W.
+optimizer-stopping: ..........
+optimizer: .....................
+parallel: ..S
+s3-methods: .........................................................................................
+scale-agreement: ....
+Smoothing spatRaster 1 of 1: x at sigma = 100
+
+Smoothing spatRaster 1 of 1: x at sigma = 100
+.
+scale-inference: ...........
+scale-optim: ...........
+settings-assessment: ...........................
+smooth-loglinear-conductance: ............................
+spatial-cv: .................
+spline-fit-support: ....
+spline-reuse: ........
+terra-workflow: ................................
+[1] f(x) = 1.041e+02  |f(x)-fold(x)| = 0.000e+00  max|f'(x)| = 4.985e+01  |f''(x)| = -7.559e+02
+[2] f(x) = 1.057e+02  |f(x)-fold(x)| = 1.608e+00  max|f'(x)| = 2.684e+01  |f''(x)| = 1.441e+03
+[3] f(x) = 1.103e+02  |f(x)-fold(x)| = 4.581e+00  max|f'(x)| = 1.804e+01  |f''(x)| = -7.606e+03
+Solution on interior with `max(abs(gradient))` == 18.0362224201251 and `diff(f)` == 4.58091455980374
+[1] f(x) = 1.041e+02  |f(x)-fold(x)| = 0.000e+00  max|f'(x)| = 4.985e+01  |f''(x)| = -7.559e+02
+[2] f(x) = 1.057e+02  |f(x)-fold(x)| = 1.608e+00  max|f'(x)| = 2.684e+01  |f''(x)| = 1.441e+03
+[3] f(x) = 1.103e+02  |f(x)-fold(x)| = 4.581e+00  max|f'(x)| = 1.804e+01  |f''(x)| = -7.606e+03
+Solution on interior with `max(abs(gradient))` == 18.0362224201251 and `diff(f)` == 4.58091455980374
+verbose-and-tau2: ...........
+Projected Newton-Raphson with Hager-Zhang line search
+Projected Newton-Raphson with Hager-Zhang line search
+[1] f(x) = -1.311e+02  |f(x)-fold(x)| = 0.000e+00  max|f'(x)| = 1.270e-15  |f''(x)| = -2.792e+02
+Solution on interior with `max(abs(gradient))` == 1.27015710448691e-15 and `diff(f)` == 0
+warm-starts: ......
+wishart-clustered: ...............
+wishart-contrasts: ..............
+wishart-covariance: ........................................................
+wishart-covariates: .................................
+
+══ Skipped ═════════════════════════════════════════════════════════════════════
+1. terradish_grid and terradish_distance match across cores ('test-parallel.R:31:5') - Reason: parallel worker consistency is validated against the installed package
+
+══ Warnings ════════════════════════════════════════════════════════════════════
+1. generalized_wishart gradient and Hessian match finite differences ('test-analytic-derivatives.R:57:3') - Optimizer stalled: objective change is small but the projected gradient remains large.
+
+2. generalized_wishart gradient and Hessian match finite differences ('test-analytic-derivatives.R:57:3') - Optimizer stalled: objective change is small but the projected gradient remains large.
+
+3. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+4. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+5. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+6. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+7. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+8. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+9. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+10. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+11. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+12. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+13. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+14. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+15. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+16. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+17. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+18. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+19. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+20. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+21. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+22. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+23. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+24. MLPE near-zero correlation has no Wald output ('test-core-inference.R:110:3') - NaNs produced
+
+25. MLPE near-zero correlation has no Wald output ('test-core-inference.R:110:3') - Hessian matrix has negative eigenvalues: possibly a saddle point
+
+26. MLPE near-zero correlation has no Wald output ('test-core-inference.R:110:3') - diag(V) had non-positive or NA entries; the non-finite result may be dubious
+
+27. covariance_response_power accepts Gaussian theta on external scale ('test-covariance-response-power.R:51:3') - `sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (1.17 map units). Large scales are truncated by the raster-sized window.
+
+28. covariance_response_power accepts Gaussian theta on external scale ('test-covariance-response-power.R:56:3') - `sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (1.17 map units). Large scales are truncated by the raster-sized window.
+
+29. covariance_response_power accepts Gaussian theta on external scale ('test-covariance-response-power.R:56:3') - `sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (1.17 map units). Large scales are truncated by the raster-sized window.
+
+30. covariance_response_power accepts Gaussian theta on external scale ('test-covariance-response-power.R:56:3') - `sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (1.17 map units). Large scales are truncated by the raster-sized window.
+
+31. covariance_response_power accepts Gaussian theta on external scale ('test-covariance-response-power.R:56:3') - `sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (1.17 map units). Large scales are truncated by the raster-sized window.
+
+32. covariance_response_power accepts Gaussian theta on external scale ('test-covariance-response-power.R:56:3') - `sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (1.17 map units). Large scales are truncated by the raster-sized window.
+
+33. gaussian scale-aware conductance matches numerical derivatives for interactions and polynomials ('test-gaussian-scale-conductance.R:14:3') - `sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (1.17 map units). Large scales are truncated by the raster-sized window.
+
+34. gaussian scale-aware conductance fits jointly with bounded sigma ('test-gaussian-scale-conductance.R:80:3') - `sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (1.17 map units). Large scales are truncated by the raster-sized window.
+
+35. gaussian scale-aware conductance rejects non-finite conductance values ('test-gaussian-scale-conductance.R:281:3') - `sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (1.17 map units). Large scales are truncated by the raster-sized window.
+
+36. gaussian scale-aware conductance validates sigma starts and supports coarse raster starts ('test-gaussian-scale-conductance.R:305:3') - `sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (1.17 map units). Large scales are truncated by the raster-sized window.
+
+37. radish() warns and forwards to terradish() ('test-legacy-wrappers.R:13:3') - `maxit` reached for Newton steps
+
+38. aic_table ranks fitted terradish models across supported criteria ('test-model-selection.R:21:3') - Some models have not converged or have parameters on a boundary; inspect fit diagnostics before ranking.
+
+39. aic_table ranks fitted terradish models across supported criteria ('test-model-selection.R:25:3') - Some models have not converged or have parameters on a boundary; inspect fit diagnostics before ranking.
+
+40. aic_table ranks fitted terradish models across supported criteria ('test-model-selection.R:29:3') - Some models have not converged or have parameters on a boundary; inspect fit diagnostics before ranking.
+
+41. default model labels append [mlpe:n] when pairwise covariates are present ('test-model-selection.R:60:3') - Some models have not converged or have parameters on a boundary; inspect fit diagnostics before ranking.
+
+42. default model labels append [mlpe:n] when pairwise covariates are present ('test-model-selection.R:65:3') - Some models have not converged or have parameters on a boundary; inspect fit diagnostics before ranking.
+
+43. aic_table keeps log-likelihoods aligned when model labels repeat ('test-model-selection.R:125:3') - Some models have not converged or have parameters on a boundary; inspect fit diagnostics before ranking.
+
+══ Failed ══════════════════════════════════════════════════════════════════════
+── 1. Failure ('test-landmark-approximation.R:64:3'): terradish landmark approxi
+Expected `fit_landmark$loglik` to equal `fit_exact$loglik`.
+Differences:
+  `actual`: 115.5
+`expected`: 113.0
+
+
+── 2. Failure ('test-landmark-approximation.R:65:3'): terradish landmark approxi
+Expected `max(abs(fit_landmark$mle$theta - fit_exact$mle$theta))` < 0.02.
+Actual comparison: 0.0239 >= 0.0200
+Difference: 0.0039 >= 0
+
+── 3. Failure ('test-landmark-approximation.R:140:3'): coarse-raster approximati
+Expected `fit_coarse$loglik` to equal `fit_exact$loglik`.
+Differences:
+  `actual`: 179.8
+`expected`: 184.5
+
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+Frustration is a natural part of programming :)
+ passed  failed   error warning skipped 
+    870       3       0      43       1 

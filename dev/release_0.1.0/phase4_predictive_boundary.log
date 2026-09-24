@@ -1,0 +1,52 @@
+ℹ Loading terradish
+  replicate  wishart      mlpe common_wishart common_mlpe failed_wishart
+1         1 1502.515 -30.84249              4           4              0
+  failed_mlpe
+1           0
+  replicate  wishart     mlpe common_wishart common_mlpe failed_wishart
+1         2 1158.073 60.30033              4           4              0
+  failed_mlpe
+1           0
+  replicate wishart     mlpe common_wishart common_mlpe failed_wishart
+1         3 324.762 13.42113              4           4              0
+  failed_mlpe
+1           0
+  replicate wishart     mlpe common_wishart common_mlpe failed_wishart
+1         4 1165.56 9.301534              4           4              0
+  failed_mlpe
+1           0
+  replicate  wishart     mlpe common_wishart common_mlpe failed_wishart
+1         5 1276.426 28.33138              4           4              0
+  failed_mlpe
+1           0
+  replicate  wishart      mlpe common_wishart common_mlpe failed_wishart
+1         6 934.1942 -1444.881              4           4              0
+  failed_mlpe
+1           0
+  replicate wishart      mlpe common_wishart common_mlpe failed_wishart
+1         7 1484.09 -125.3792              4           3              0
+  failed_mlpe
+1           1
+There were 16 warnings (use warnings() to see them)
+  replicate  wishart    mlpe common_wishart common_mlpe failed_wishart
+1         8 1252.194 10.6439              4           4              0
+  failed_mlpe
+1           0
+  replicate   wishart         mlpe common_wishart common_mlpe failed_wishart
+1         1 1502.5146   -30.842485              4           4              0
+2         2 1158.0728    60.300330              4           4              0
+3         3  324.7620    13.421127              4           4              0
+4         4 1165.5601     9.301534              4           4              0
+5         5 1276.4259    28.331376              4           4              0
+6         6  934.1942 -1444.880868              4           4              0
+7         7 1484.0902  -125.379193              4           3              0
+8         8 1252.1943    10.643896              4           4              0
+  failed_mlpe
+1           0
+2           0
+3           0
+4           0
+5           0
+6           0
+7           1
+8           0

@@ -1,3 +1,14 @@
+terradish 0.0.53
+----------------
+* Added per-formula conductance factories, repeated folds, paired comparisons,
+  and input signatures that prevent incompatible checkpoint resumption.
+* Added fixed-nuisance predictive scoring for measurement-model comparisons
+  within a likelihood family, including valid no-structure boundary fits.
+* Reported failed folds explicitly, kept incomplete totals unavailable, and
+  ranked models on common successful folds. Recorded baseline failures
+  separately from valid model scores.
+* Corrected the uniform baseline for Gaussian and spline comparisons.
+
 terradish 0.0.52
 ----------------
 * Added covariance, confidence interval, observation-count, Wishart nu

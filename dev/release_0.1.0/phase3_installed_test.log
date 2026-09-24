@@ -1,0 +1,713 @@
+
+R version 4.6.1 (2026-06-24 ucrt) -- "Happy Hop"
+Copyright (C) 2026 The R Foundation for Statistical Computing
+Platform: x86_64-w64-mingw32/x64
+
+R is free software and comes with ABSOLUTELY NO WARRANTY.
+You are welcome to redistribute it under certain conditions.
+Type 'license()' or 'licence()' for distribution details.
+
+R is a collaborative project with many contributors.
+Type 'contributors()' for more information and
+'citation()' on how to cite R or R packages in publications.
+
+Type 'demo()' for some demos, 'help()' for on-line help, or
+'help.start()' for an HTML browser interface to help.
+Type 'q()' to quit R.
+
+> library(testthat)
+> library(terradish)
+> 
+> test_check("terradish")
+
+Smoothing spatRaster 1 of 1: x at sigma = 100
+
+Smoothing spatRaster 1 of 1: x at sigma = 100
+[1] f(x) = 1.041e+02  |f(x)-fold(x)| = 0.000e+00  max|f'(x)| = 4.985e+01  |f''(x)| = -7.559e+02
+[2] f(x) = 1.057e+02  |f(x)-fold(x)| = 1.608e+00  max|f'(x)| = 2.684e+01  |f''(x)| = 1.441e+03
+[3] f(x) = 1.103e+02  |f(x)-fold(x)| = 4.581e+00  max|f'(x)| = 1.804e+01  |f''(x)| = -7.606e+03
+Solution on interior with `max(abs(gradient))` == 18.0362224201251 and `diff(f)` == 4.58091455980374
+[1] f(x) = 1.041e+02  |f(x)-fold(x)| = 0.000e+00  max|f'(x)| = 4.985e+01  |f''(x)| = -7.559e+02
+[2] f(x) = 1.057e+02  |f(x)-fold(x)| = 1.608e+00  max|f'(x)| = 2.684e+01  |f''(x)| = 1.441e+03
+[3] f(x) = 1.103e+02  |f(x)-fold(x)| = 4.581e+00  max|f'(x)| = 1.804e+01  |f''(x)| = -7.606e+03
+Solution on interior with `max(abs(gradient))` == 18.0362224201251 and `diff(f)` == 4.58091455980374
+Projected Newton-Raphson with Hager-Zhang line search
+Projected Newton-Raphson with Hager-Zhang line search
+[1] f(x) = -1.311e+02  |f(x)-fold(x)| = 0.000e+00  max|f'(x)| = 1.270e-15  |f''(x)| = -2.792e+02
+Solution on interior with `max(abs(gradient))` == 1.27015710448691e-15 and `diff(f)` == 0
+[ FAIL 0 | WARN 40 | SKIP 0 | PASS 897 ]
+
+══ Warnings ════════════════════════════════════════════════════════════════════
+── Warning ('test-analytic-derivatives.R:57:3'): generalized_wishart gradient and Hessian match finite differences ──
+Optimizer stalled: objective change is small but the projected gradient remains large.
+Backtrace:
+     ▆
+  1. └─terradish (local) expect_derivatives_match(...) at test-analytic-derivatives.R:57:3
+  2.   ├─numDeriv::hessian(objective, theta, method = "Richardson") at test-analytic-derivatives.R:38:3
+  3.   └─numDeriv:::hessian.default(objective, theta, method = "Richardson")
+  4.     ├─numDeriv::genD(...)
+  5.     └─numDeriv:::genD.default(...)
+  6.       └─terradish (local) func(x - (i == (1:n)) * h, ...)
+  7.         └─terradish::terradish_algorithm(...) at test-analytic-derivatives.R:29:3
+  8.           └─terradish:::radish_subproblem(...)
+  9.             ├─base::tryCatch(...)
+ 10.             │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 11.             │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 12.             │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 13.             └─terradish (local) fit_subproblem(phi_start)
+ 14.               └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-analytic-derivatives.R:57:3'): generalized_wishart gradient and Hessian match finite differences ──
+Optimizer stalled: objective change is small but the projected gradient remains large.
+Backtrace:
+     ▆
+  1. └─terradish (local) expect_derivatives_match(...) at test-analytic-derivatives.R:57:3
+  2.   ├─numDeriv::hessian(objective, theta, method = "Richardson") at test-analytic-derivatives.R:38:3
+  3.   └─numDeriv:::hessian.default(objective, theta, method = "Richardson")
+  4.     ├─numDeriv::genD(...)
+  5.     └─numDeriv:::genD.default(...)
+  6.       └─terradish (local) func(x + (i == (1:n)) * h, ...)
+  7.         └─terradish::terradish_algorithm(...) at test-analytic-derivatives.R:29:3
+  8.           └─terradish:::radish_subproblem(...)
+  9.             ├─base::tryCatch(...)
+ 10.             │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 11.             │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 12.             │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 13.             └─terradish (local) fit_subproblem(phi_start)
+ 14.               └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       ├─base::tryCatch(...)
+  5.       │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  6.       │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+  7.       │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+  8.       └─terradish:::HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
+  9.         └─terradish (local) dphifn(c)
+ 10.           ├─base::tryCatch(...)
+ 11.           │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 12.           │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 13.           │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 14.           └─terradish (local) fn(...)
+ 15.             └─terradish::terradish_algorithm(...)
+ 16.               └─terradish:::radish_subproblem(...)
+ 17.                 ├─base::tryCatch(...)
+ 18.                 │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 19.                 │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 20.                 │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 21.                 └─terradish (local) fit_subproblem(phi_start)
+ 22.                   └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       ├─base::tryCatch(...)
+  5.       │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  6.       │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+  7.       │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+  8.       └─terradish:::HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
+  9.         └─terradish (local) dphifn(c)
+ 10.           ├─base::tryCatch(...)
+ 11.           │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 12.           │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 13.           │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 14.           └─terradish (local) fn(...)
+ 15.             └─terradish::terradish_algorithm(...)
+ 16.               └─terradish:::radish_subproblem(...)
+ 17.                 ├─base::tryCatch(...)
+ 18.                 │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 19.                 │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 20.                 │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 21.                 └─terradish (local) fit_subproblem(phi_start)
+ 22.                   └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       ├─base::tryCatch(...)
+  5.       │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  6.       │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+  7.       │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+  8.       └─terradish:::HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
+  9.         └─terradish:::secant2(...)
+ 10.           └─terradish (local) dphifn(c)
+ 11.             ├─base::tryCatch(...)
+ 12.             │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 13.             │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 14.             │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 15.             └─terradish (local) fn(...)
+ 16.               └─terradish::terradish_algorithm(...)
+ 17.                 └─terradish:::radish_subproblem(...)
+ 18.                   ├─base::tryCatch(...)
+ 19.                   │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 20.                   │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 21.                   │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 22.                   └─terradish (local) fit_subproblem(phi_start)
+ 23.                     └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       └─terradish (local) fn(par, gradient = TRUE, hessian = TRUE)
+  5.         └─terradish::terradish_algorithm(...)
+  6.           └─terradish:::radish_subproblem(...)
+  7.             ├─base::tryCatch(...)
+  8.             │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  9.             │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 10.             │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 11.             └─terradish (local) fit_subproblem(phi_start)
+ 12.               └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       ├─base::tryCatch(...)
+  5.       │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  6.       │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+  7.       │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+  8.       └─terradish:::HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
+  9.         └─terradish (local) dphifn(c)
+ 10.           ├─base::tryCatch(...)
+ 11.           │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 12.           │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 13.           │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 14.           └─terradish (local) fn(...)
+ 15.             └─terradish::terradish_algorithm(...)
+ 16.               └─terradish:::radish_subproblem(...)
+ 17.                 ├─base::tryCatch(...)
+ 18.                 │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 19.                 │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 20.                 │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 21.                 └─terradish (local) fit_subproblem(phi_start)
+ 22.                   └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       ├─base::tryCatch(...)
+  5.       │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  6.       │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+  7.       │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+  8.       └─terradish:::HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
+  9.         └─terradish:::secant2(...)
+ 10.           └─terradish (local) dphifn(c)
+ 11.             ├─base::tryCatch(...)
+ 12.             │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 13.             │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 14.             │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 15.             └─terradish (local) fn(...)
+ 16.               └─terradish::terradish_algorithm(...)
+ 17.                 └─terradish:::radish_subproblem(...)
+ 18.                   ├─base::tryCatch(...)
+ 19.                   │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 20.                   │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 21.                   │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 22.                   └─terradish (local) fit_subproblem(phi_start)
+ 23.                     └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       ├─base::tryCatch(...)
+  5.       │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  6.       │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+  7.       │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+  8.       └─terradish:::HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
+  9.         └─terradish:::secant2(...)
+ 10.           └─terradish (local) dphifn(c)
+ 11.             ├─base::tryCatch(...)
+ 12.             │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 13.             │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 14.             │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 15.             └─terradish (local) fn(...)
+ 16.               └─terradish::terradish_algorithm(...)
+ 17.                 └─terradish:::radish_subproblem(...)
+ 18.                   ├─base::tryCatch(...)
+ 19.                   │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 20.                   │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 21.                   │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 22.                   └─terradish (local) fit_subproblem(phi_start)
+ 23.                     └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       ├─base::tryCatch(...)
+  5.       │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  6.       │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+  7.       │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+  8.       └─terradish:::HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
+  9.         └─terradish:::secant2(...)
+ 10.           └─terradish (local) dphifn(c)
+ 11.             ├─base::tryCatch(...)
+ 12.             │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 13.             │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 14.             │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 15.             └─terradish (local) fn(...)
+ 16.               └─terradish::terradish_algorithm(...)
+ 17.                 └─terradish:::radish_subproblem(...)
+ 18.                   ├─base::tryCatch(...)
+ 19.                   │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 20.                   │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 21.                   │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 22.                   └─terradish (local) fit_subproblem(phi_start)
+ 23.                     └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       ├─base::tryCatch(...)
+  5.       │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  6.       │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+  7.       │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+  8.       └─terradish:::HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
+  9.         └─terradish (local) dphifn(c)
+ 10.           ├─base::tryCatch(...)
+ 11.           │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 12.           │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 13.           │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 14.           └─terradish (local) fn(...)
+ 15.             └─terradish::terradish_algorithm(...)
+ 16.               └─terradish:::radish_subproblem(...)
+ 17.                 ├─base::tryCatch(...)
+ 18.                 │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 19.                 │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 20.                 │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 21.                 └─terradish (local) fit_subproblem(phi_start)
+ 22.                   └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       ├─base::tryCatch(...)
+  5.       │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  6.       │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+  7.       │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+  8.       └─terradish:::HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
+  9.         └─terradish:::secant2(...)
+ 10.           └─terradish (local) dphifn(c)
+ 11.             ├─base::tryCatch(...)
+ 12.             │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 13.             │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 14.             │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 15.             └─terradish (local) fn(...)
+ 16.               └─terradish::terradish_algorithm(...)
+ 17.                 └─terradish:::radish_subproblem(...)
+ 18.                   ├─base::tryCatch(...)
+ 19.                   │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 20.                   │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 21.                   │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 22.                   └─terradish (local) fit_subproblem(phi_start)
+ 23.                     └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       └─terradish (local) fn(par, gradient = TRUE, hessian = TRUE)
+  5.         └─terradish::terradish_algorithm(...)
+  6.           └─terradish:::radish_subproblem(...)
+  7.             ├─base::tryCatch(...)
+  8.             │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  9.             │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 10.             │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 11.             └─terradish (local) fit_subproblem(phi_start)
+ 12.               └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       ├─base::tryCatch(...)
+  5.       │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  6.       │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+  7.       │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+  8.       └─terradish:::HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
+  9.         └─terradish (local) dphifn(c)
+ 10.           ├─base::tryCatch(...)
+ 11.           │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 12.           │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 13.           │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 14.           └─terradish (local) fn(...)
+ 15.             └─terradish::terradish_algorithm(...)
+ 16.               └─terradish:::radish_subproblem(...)
+ 17.                 ├─base::tryCatch(...)
+ 18.                 │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 19.                 │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 20.                 │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 21.                 └─terradish (local) fit_subproblem(phi_start)
+ 22.                   └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       ├─base::tryCatch(...)
+  5.       │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  6.       │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+  7.       │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+  8.       └─terradish:::HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
+  9.         └─terradish:::secant2(...)
+ 10.           └─terradish (local) dphifn(c)
+ 11.             ├─base::tryCatch(...)
+ 12.             │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 13.             │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 14.             │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 15.             └─terradish (local) fn(...)
+ 16.               └─terradish::terradish_algorithm(...)
+ 17.                 └─terradish:::radish_subproblem(...)
+ 18.                   ├─base::tryCatch(...)
+ 19.                   │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 20.                   │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 21.                   │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 22.                   └─terradish (local) fit_subproblem(phi_start)
+ 23.                     └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       └─terradish (local) fn(par, gradient = TRUE, hessian = TRUE)
+  5.         └─terradish::terradish_algorithm(...)
+  6.           └─terradish:::radish_subproblem(...)
+  7.             ├─base::tryCatch(...)
+  8.             │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  9.             │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 10.             │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 11.             └─terradish (local) fit_subproblem(phi_start)
+ 12.               └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       ├─base::tryCatch(...)
+  5.       │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  6.       │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+  7.       │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+  8.       └─terradish:::HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
+  9.         └─terradish (local) dphifn(c)
+ 10.           ├─base::tryCatch(...)
+ 11.           │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 12.           │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 13.           │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 14.           └─terradish (local) fn(...)
+ 15.             └─terradish::terradish_algorithm(...)
+ 16.               └─terradish:::radish_subproblem(...)
+ 17.                 ├─base::tryCatch(...)
+ 18.                 │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 19.                 │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 20.                 │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 21.                 └─terradish (local) fit_subproblem(phi_start)
+ 22.                   └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       ├─base::tryCatch(...)
+  5.       │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  6.       │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+  7.       │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+  8.       └─terradish:::HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
+  9.         └─terradish (local) dphifn(c)
+ 10.           ├─base::tryCatch(...)
+ 11.           │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 12.           │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 13.           │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 14.           └─terradish (local) fn(...)
+ 15.             └─terradish::terradish_algorithm(...)
+ 16.               └─terradish:::radish_subproblem(...)
+ 17.                 ├─base::tryCatch(...)
+ 18.                 │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 19.                 │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 20.                 │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 21.                 └─terradish (local) fit_subproblem(phi_start)
+ 22.                   └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       ├─base::tryCatch(...)
+  5.       │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  6.       │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+  7.       │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+  8.       └─terradish:::HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
+  9.         └─terradish:::secant2(...)
+ 10.           └─terradish (local) dphifn(c)
+ 11.             ├─base::tryCatch(...)
+ 12.             │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 13.             │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 14.             │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 15.             └─terradish (local) fn(...)
+ 16.               └─terradish::terradish_algorithm(...)
+ 17.                 └─terradish:::radish_subproblem(...)
+ 18.                   ├─base::tryCatch(...)
+ 19.                   │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 20.                   │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 21.                   │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 22.                   └─terradish (local) fit_subproblem(phi_start)
+ 23.                     └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       └─terradish (local) fn(par, gradient = TRUE, hessian = TRUE)
+  5.         └─terradish::terradish_algorithm(...)
+  6.           └─terradish:::radish_subproblem(...)
+  7.             ├─base::tryCatch(...)
+  8.             │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  9.             │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 10.             │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 11.             └─terradish (local) fit_subproblem(phi_start)
+ 12.               └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       ├─base::tryCatch(...)
+  5.       │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  6.       │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+  7.       │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+  8.       └─terradish:::HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
+  9.         └─terradish (local) dphifn(c)
+ 10.           ├─base::tryCatch(...)
+ 11.           │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 12.           │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 13.           │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 14.           └─terradish (local) fn(...)
+ 15.             └─terradish::terradish_algorithm(...)
+ 16.               └─terradish:::radish_subproblem(...)
+ 17.                 ├─base::tryCatch(...)
+ 18.                 │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 19.                 │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 20.                 │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 21.                 └─terradish (local) fit_subproblem(phi_start)
+ 22.                   └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       ├─base::tryCatch(...)
+  5.       │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  6.       │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+  7.       │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+  8.       └─terradish:::HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
+  9.         └─terradish (local) dphifn(c)
+ 10.           ├─base::tryCatch(...)
+ 11.           │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 12.           │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 13.           │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 14.           └─terradish (local) fn(...)
+ 15.             └─terradish::terradish_algorithm(...)
+ 16.               └─terradish:::radish_subproblem(...)
+ 17.                 ├─base::tryCatch(...)
+ 18.                 │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 19.                 │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 20.                 │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 21.                 └─terradish (local) fit_subproblem(phi_start)
+ 22.                   └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-core-inference.R:85:3'): kernel boundary flags preserve conductance derivatives and use chi-bar tests ──
+`maxit` reached for Newton steps
+Backtrace:
+     ▆
+  1. └─terradish::terradish(...) at test-core-inference.R:85:3
+  2.   └─terradish:::.run_terradish_optimizer(...)
+  3.     └─terradish:::BoxConstrainedNewton(...)
+  4.       ├─base::tryCatch(...)
+  5.       │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+  6.       │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+  7.       │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+  8.       └─terradish:::HagerZhang(dphi_fn, phi0, dphi0, control = ls.control)
+  9.         └─terradish (local) dphifn(c)
+ 10.           ├─base::tryCatch(...)
+ 11.           │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 12.           │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 13.           │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 14.           └─terradish (local) fn(...)
+ 15.             └─terradish::terradish_algorithm(...)
+ 16.               └─terradish:::radish_subproblem(...)
+ 17.                 ├─base::tryCatch(...)
+ 18.                 │ └─base (local) tryCatchList(expr, classes, parentenv, handlers)
+ 19.                 │   └─base (local) tryCatchOne(expr, names, parentenv, handlers[[1L]])
+ 20.                 │     └─base (local) doTryCatch(return(expr), name, parentenv, handler)
+ 21.                 └─terradish (local) fit_subproblem(phi_start)
+ 22.                   └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-covariance-response-power.R:51:3'): covariance_response_power accepts Gaussian theta on external scale ──
+`sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (1.17 map units). Large scales are truncated by the raster-sized window.
+Backtrace:
+    ▆
+ 1. └─terradish (local) gaussian_factory(~altitude, surface$x) at test-covariance-response-power.R:51:3
+ 2.   └─terradish:::.gaussian_scale_sigma_bounds(...)
+── Warning ('test-covariance-response-power.R:56:3'): covariance_response_power accepts Gaussian theta on external scale ──
+`sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (1.17 map units). Large scales are truncated by the raster-sized window.
+Backtrace:
+    ▆
+ 1. └─terradish::covariance_response_power(...) at test-covariance-response-power.R:56:3
+ 2.   └─terradish (local) conductance_model(.covariance_power_rhs_formula(formula), data$x)
+ 3.     └─terradish:::.gaussian_scale_sigma_bounds(...)
+── Warning ('test-covariance-response-power.R:56:3'): covariance_response_power accepts Gaussian theta on external scale ──
+`sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (1.17 map units). Large scales are truncated by the raster-sized window.
+Backtrace:
+    ▆
+ 1. └─terradish::covariance_response_power(...) at test-covariance-response-power.R:56:3
+ 2.   └─terradish:::.covariance_power_model_specs(...)
+ 3.     └─base::lapply(...)
+ 4.       └─terradish (local) FUN(X[[i]], ...)
+ 5.         └─spec$conductance_model(...)
+ 6.           └─terradish:::.gaussian_scale_sigma_bounds(...)
+── Warning ('test-covariance-response-power.R:56:3'): covariance_response_power accepts Gaussian theta on external scale ──
+`sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (1.17 map units). Large scales are truncated by the raster-sized window.
+Backtrace:
+    ▆
+ 1. └─terradish::covariance_response_power(...) at test-covariance-response-power.R:56:3
+ 2.   └─terradish::simulate_covariance_response(...)
+ 3.     └─terradish (local) conductance_model(model_formula, data$x)
+ 4.       └─terradish:::.gaussian_scale_sigma_bounds(...)
+── Warning ('test-covariance-response-power.R:56:3'): covariance_response_power accepts Gaussian theta on external scale ──
+`sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (1.17 map units). Large scales are truncated by the raster-sized window.
+Backtrace:
+    ▆
+ 1. └─terradish::covariance_response_power(...) at test-covariance-response-power.R:56:3
+ 2.   └─terradish::simulate_covariance_response(...)
+ 3.     └─terradish::terradish_distance(...)
+ 4.       └─terradish (local) conductance_model_factory(formula, data$x)
+ 5.         └─terradish:::.gaussian_scale_sigma_bounds(...)
+── Warning ('test-covariance-response-power.R:56:3'): covariance_response_power accepts Gaussian theta on external scale ──
+`sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (1.17 map units). Large scales are truncated by the raster-sized window.
+Backtrace:
+    ▆
+ 1. └─terradish::covariance_response_power(...) at test-covariance-response-power.R:56:3
+ 2.   └─terradish::simulate_covariance_response(...)
+ 3.     └─terradish::terradish_distance(...)
+ 4.       └─terradish:::.terradish_distance_worker(idx, worker_state)
+ 5.         └─terradish (local) conductance_model_factory(worker_formula, state$data$x)
+ 6.           └─terradish:::.gaussian_scale_sigma_bounds(...)
+── Warning ('test-gaussian-scale-conductance.R:14:3'): gaussian scale-aware conductance matches numerical derivatives for interactions and polynomials ──
+`sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (1.17 map units). Large scales are truncated by the raster-sized window.
+Backtrace:
+    ▆
+ 1. └─terradish (local) factory(~altitude * forestcover + I(altitude^2), surface$x) at test-gaussian-scale-conductance.R:14:3
+ 2.   └─terradish:::.gaussian_scale_sigma_bounds(...)
+── Warning ('test-gaussian-scale-conductance.R:80:3'): gaussian scale-aware conductance fits jointly with bounded sigma ──
+`sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (1.17 map units). Large scales are truncated by the raster-sized window.
+Backtrace:
+    ▆
+ 1. └─terradish (local) factory(~altitude + I(altitude^2), surface$x) at test-gaussian-scale-conductance.R:80:3
+ 2.   └─terradish:::.gaussian_scale_sigma_bounds(...)
+── Warning ('test-gaussian-scale-conductance.R:281:3'): gaussian scale-aware conductance rejects non-finite conductance values ──
+`sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (1.17 map units). Large scales are truncated by the raster-sized window.
+Backtrace:
+    ▆
+ 1. └─terradish (local) factory(~forestcover, surface$x) at test-gaussian-scale-conductance.R:281:3
+ 2.   └─terradish:::.gaussian_scale_sigma_bounds(...)
+── Warning ('test-gaussian-scale-conductance.R:305:3'): gaussian scale-aware conductance validates sigma starts and supports coarse raster starts ──
+`sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (1.17 map units). Large scales are truncated by the raster-sized window.
+Backtrace:
+    ▆
+ 1. ├─testthat::expect_error(...) at test-gaussian-scale-conductance.R:305:3
+ 2. │ └─testthat:::expect_condition_matching_(...)
+ 3. │   └─testthat:::quasi_capture(...)
+ 4. │     ├─testthat (local) .capture(...)
+ 5. │     │ └─base::withCallingHandlers(...)
+ 6. │     └─rlang::eval_bare(quo_get_expr(.quo), quo_get_env(.quo))
+ 7. └─terradish::terradish(...)
+ 8.   └─terradish (local) conductance_model_factory(formula, data$x)
+ 9.     └─terradish:::.gaussian_scale_sigma_bounds(...)
+── Warning ('test-legacy-wrappers.R:13:3'): radish() warns and forwards to terradish() ──
+`maxit` reached for Newton steps
+Backtrace:
+    ▆
+ 1. └─terradish::terradish(...)
+ 2.   └─terradish:::.run_terradish_optimizer(...)
+ 3.     └─terradish:::BoxConstrainedNewton(...)
+── Warning ('test-model-selection.R:21:3'): aic_table ranks fitted terradish models across supported criteria ──
+Some models have not converged or have parameters on a boundary; inspect fit diagnostics before ranking.
+Backtrace:
+    ▆
+ 1. └─terradish::aic_table(list(fit1, fit2)) at test-model-selection.R:21:3
+── Warning ('test-model-selection.R:25:3'): aic_table ranks fitted terradish models across supported criteria ──
+Some models have not converged or have parameters on a boundary; inspect fit diagnostics before ranking.
+Backtrace:
+    ▆
+ 1. └─terradish::aic_table(list(fit1, fit2), AICc = TRUE) at test-model-selection.R:25:3
+── Warning ('test-model-selection.R:29:3'): aic_table ranks fitted terradish models across supported criteria ──
+Some models have not converged or have parameters on a boundary; inspect fit diagnostics before ranking.
+Backtrace:
+    ▆
+ 1. └─terradish::aic_table(list(fit1, fit2), BIC = TRUE) at test-model-selection.R:29:3
+── Warning ('test-model-selection.R:60:3'): default model labels append [mlpe:n] when pairwise covariates are present ──
+Some models have not converged or have parameters on a boundary; inspect fit diagnostics before ranking.
+Backtrace:
+    ▆
+ 1. └─terradish::aic_table(list(fit_base, fit_joint)) at test-model-selection.R:60:3
+── Warning ('test-model-selection.R:65:3'): default model labels append [mlpe:n] when pairwise covariates are present ──
+Some models have not converged or have parameters on a boundary; inspect fit diagnostics before ranking.
+Backtrace:
+    ▆
+ 1. └─terradish::aic_table(...) at test-model-selection.R:65:3
+── Warning ('test-model-selection.R:125:3'): aic_table keeps log-likelihoods aligned when model labels repeat ──
+Some models have not converged or have parameters on a boundary; inspect fit diagnostics before ranking.
+Backtrace:
+    ▆
+ 1. └─terradish::aic_table(...) at test-model-selection.R:125:3
+
+[ FAIL 0 | WARN 40 | SKIP 0 | PASS 897 ]
+> 
+> proc.time()
+   user  system elapsed 
+ 618.78   87.35  717.64 

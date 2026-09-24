@@ -1,0 +1,153 @@
+ℹ Loading terradish
+$n
+[1] 8
+
+$approximation
+[1] "none"
+
+$theta
+   altitude forestcover 
+ -0.3216841  -0.1797163 
+
+$loglik
+[1] 112.9553
+
+$phi
+              [,1]
+alpha  -0.03054317
+beta    0.28404644
+tau     9.06823836
+rho   -27.05260623
+
+$subproblem
+$subproblem$convergence
+[1] 0
+
+$subproblem$iters
+[1] 2
+
+
+$reset_loglik
+[1] 115.498
+
+$reset_phi
+             [,1]
+alpha -0.02888681
+beta   0.27915954
+tau    9.00610343
+rho   -0.10543476
+
+$n
+[1] 8
+
+$approximation
+[1] "landmark"
+
+$theta
+   altitude forestcover 
+ -0.3293827  -0.2036565 
+
+$loglik
+[1] 115.5209
+
+$phi
+             [,1]
+alpha -0.02949503
+beta   0.28059374
+tau    9.00101485
+rho   -0.07986392
+
+$subproblem
+$subproblem$convergence
+[1] 0
+
+$subproblem$iters
+[1] 1
+
+
+$reset_loglik
+[1] 115.5209
+
+$reset_phi
+             [,1]
+alpha -0.02949503
+beta   0.28059374
+tau    9.00101485
+rho   -0.07986392
+
+$n
+[1] 10
+
+$approximation
+[1] "none"
+
+$theta
+   altitude forestcover 
+ -0.2914497  -0.1874156 
+
+$loglik
+[1] 184.4638
+
+$phi
+             [,1]
+alpha -0.03138992
+beta   0.28114340
+tau    8.94345696
+rho   -0.21976839
+
+$subproblem
+$subproblem$convergence
+[1] 0
+
+$subproblem$iters
+[1] 1
+
+
+$reset_loglik
+[1] 184.4638
+
+$reset_phi
+             [,1]
+alpha -0.03138992
+beta   0.28114340
+tau    8.94345696
+rho   -0.21976839
+
+$n
+[1] 10
+
+$approximation
+[1] "coarse_raster"
+
+$theta
+   altitude forestcover 
+ -0.3005867  -0.1984964 
+
+$loglik
+[1] 179.7716
+
+$phi
+              [,1]
+alpha  -0.03251368
+beta    0.28530432
+tau     8.98985048
+rho   -29.03328222
+
+$subproblem
+$subproblem$convergence
+[1] 0
+
+$subproblem$iters
+[1] 1
+
+
+$reset_loglik
+[1] 184.4525
+
+$reset_phi
+             [,1]
+alpha -0.03147462
+beta   0.28235600
+tau    8.94505932
+rho   -0.22748702
+

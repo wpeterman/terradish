@@ -1,0 +1,12 @@
+ℹ Loading terradish
+Warning messages:
+1: In assemble_model_matrix(formula, x) :
+  Removed unused spatial covariates: x2
+2: In assemble_model_matrix(formula, x) :
+  Removed unused spatial covariates: x2
+3: In assemble_model_matrix(formula, x) :
+  Removed unused spatial covariates: x2
+  replicate  wishart         mlpe failed_wishart failed_mlpe
+1         6 10.56329 4.396334e+14              0           0
+  replicate  wishart         mlpe failed_wishart failed_mlpe
+1         6 10.56329 4.396334e+14              0           0

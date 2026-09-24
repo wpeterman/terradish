@@ -1,0 +1,7 @@
+.libPaths(c(file.path(getwd(), "dev/check/phase2-library"), .libPaths()))
+pkgload::load_all("dev/check/phase3-accepted-package")
+result <- testthat::test_file("dev/check/phase3-accepted-package/tests/testthat/test-core-inference.R", env = new.env(parent = asNamespace("terradish")), reporter = "summary", stop_on_failure = FALSE)
+result <- as.data.frame(result)
+saveRDS(result, "dev/release_0.1.0/phase3_final_guard_test.rds")
+print(colSums(result[, c("passed", "failed", "error", "warning", "skipped")]))
+stopifnot(sum(result$failed) == 0, sum(result$error) == 0)

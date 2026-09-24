@@ -1,0 +1,24 @@
+ℹ Testing terradish
+landmark-approximation: ............12..............3............................
+
+══ Failed ══════════════════════════════════════════════════════════════════════
+── 1. Failure ('test-landmark-approximation.R:66:3'): terradish landmark approxi
+Expected `fit_landmark$loglik` to equal `fit_exact$loglik`.
+Differences:
+  `actual`: 115.5
+`expected`: 113.0
+
+
+── 2. Failure ('test-landmark-approximation.R:67:3'): terradish landmark approxi
+Expected `max(abs(fit_landmark$mle$theta - fit_exact$mle$theta))` < 0.02.
+Actual comparison: 0.0239 >= 0.0200
+Difference: 0.0039 >= 0
+
+── 3. Failure ('test-landmark-approximation.R:144:3'): coarse-raster approximati
+Expected `fit_coarse$loglik` to equal `fit_exact$loglik`.
+Differences:
+  `actual`: 179.8
+`expected`: 184.5
+
+
+══ DONE ════════════════════════════════════════════════════════════════════════
