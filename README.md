@@ -4,20 +4,18 @@
 
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21225712.svg)](https://doi.org/10.5281/zenodo.21225712)
 
-`terradish` is an R package for maximum likelihood estimation of isolation-by-resistance (IBR) models. The core optimization infrastructure (sparse Laplacian factorization, reverse-mode gradient backpropagation through the graph Laplacian, and the MLPE and generalized Wishart likelihood layers) was developed by **Nate Pope** as the [`radish`](https://github.com/nspope/radish) R package. `terradish` is a `terra`-native extension of that framework, adding new measurement models, Gaussian raster-smoothing optimization, IBE + IBR joint fitting, cross-validation tools, improved visualization, and a suite of helper utilities, while preserving full backward compatibility with `radish` function names.
+`terradish` is an R package for maximum likelihood estimation of isolation-by-resistance (IBR) models. The core optimization infrastructure (sparse Laplacian factorization, reverse-mode gradient backpropagation through the graph Laplacian, and the MLPE and generalized Wishart likelihood layers) was developed by **Nate Pope** as the [`radish`](https://github.com/nspope/radish) R package. `terradish` is a `terra`-native extension of that framework, adding new measurement models, Gaussian raster-smoothing optimization, IBE + IBR joint fitting, cross-validation tools, improved visualization, and a suite of helper utilities, while retaining selected `radish` function-name wrappers.
 
 The central idea is **isolation by resistance (IBR)**: instead of assuming that genetic distance simply tracks straight-line geographic distance (isolation by distance, IBD), the model maps landscape covariates to relative conductance on a graph. `terradish` estimates conditional associations between those covariates and genetic distance or covariance using efficient sparse linear algebra and analytic gradients. Conductance is a model-implied graph quantity, not a direct measurement of habitat permeability, movement, migration, or causation.
 
 ## Key features
 
 -   Four **measurement models**: `leastsquares`, `mlpe`, `generalized_wishart`, `wishart_covariance`
--   Four core **conductance models**: `loglinear_conductance`, `linear_conductance`, `smooth_loglinear_conductance`, and `gaussian_smoothed_loglinear_conductance`
+-   Three core **conductance models**: `loglinear_conductance`, `smooth_loglinear_conductance`, and `gaussian_smoothed_loglinear_conductance`
 -   Support for **quadratic** (`I(x^2)`) and **interaction** (`x * z`) terms in conductance formulas
 -   Five **plot types**: observed vs. fitted (`"fit"`), conductance surface with CI (`"surface"`), marginal associations on the response scale (`"marginal_response"`, default), marginal associations on the conductance scale (`"marginal"`), and Gaussian-kernel summaries (`"sigma"`)
 -   **IBE + IBR** joint modeling via `pairwise_endpoint_covariates()` and `mlpe_covariates()`
 -   **Model comparison**: `aic_table()`, `anova()`, `terradish_grid()`
--   **Cross-validation**: `terradish_cv()`, `terradish_cv_replicates()`, `cv_model_selection()`
--   **Selected-pair analyses**: `pair_subset_measurement_model()` retains all sites in the graph while fitting only chosen pairwise observations
 -   **Large-raster helpers**: focal-site cropping with `crop_buffer`, coarse-raster warm starts, `terradish_solver_benchmark()`, and `terradish_assess_settings()`
 -   `terra`-native throughout; `radish*` legacy names work with deprecation warnings during transition
 
@@ -113,33 +111,7 @@ cond_focal <- conductance(surface, fit,
                           clamp_covariates = c("forestcover", "altitude"))
 ```
 
-## Selected pair analyses
-
-You can retain all focal sites in the conductance graph while fitting the
-measurement model to only a chosen subset of pairwise observations. This
-is useful when the sampling design, biological hypothesis, or validation
-scheme focuses on selected comparisons rather than the full pairwise
-distance matrix.
-
-``` r
-selected_pairs <- rbind(
-  c(1, 2),
-  c(1, 4),
-  c(3, 5)
-)
-
-pair_mlpe <- pair_subset_measurement_model(mlpe, selected_pairs)
-
-fit_subset <- terradish(
-  melip.Fst ~ forestcover + altitude,
-  data              = surface,
-  conductance_model = loglinear_conductance,
-  measurement_model = pair_mlpe
-)
-```
-
-The graph solve still retains all sites, but the likelihood and MLPE
-correlation structure are evaluated only for the selected pair rows.
+<!-- Phase 7: rewrite -->
 
 ## Measurement models
 
@@ -284,7 +256,7 @@ fit_coarse <- terradish(
 )
 ```
 
-With `exact_refine = TRUE`, the final coefficients, likelihood, and standard errors come from the full-resolution graph. The coarse stages are only used to find a better starting point. With `exact_refine = FALSE`, the fit is faster but approximate and is best treated as a screening result.
+With `exact_refine = TRUE`, the final coefficients, likelihood, and standard errors come from the full-resolution graph. The coarse stages are only used to find a better starting point.
 
 ### Benchmark direct solver settings
 
@@ -398,41 +370,7 @@ grid_result <- terradish_grid(
 )
 ```
 
-## Cross-validation
-
-Information criteria summarize in-sample fit under a specified likelihood. Cross-validation evaluates held-out predictive likelihood. Random site splits can leak information across spatial clusters, so use spatially structured folds when the scientific target is transfer to new regions or clusters. In every held-out evaluation, nuisance parameters are reprofiled for the test response under the fixed conductance coefficients.
-
-``` r
-# Single train/test split
-cv_result <- terradish_cv(
-  pts        = melip.coords,
-  covariates = covariates,
-  fmla       = melip.Fst ~ forestcover + altitude,
-  model      = mlpe,
-  prop_train = 2/3,
-  seed       = 42
-)
-cat("Held-out log-likelihood:", round(cv_result$cv_loglik, 2))
-
-# Repeated cross-validation across many random splits
-cv_reps <- terradish_cv_replicates(
-  pts        = melip.coords,
-  covariates = covariates,
-  fmla       = melip.Fst ~ forestcover + altitude,
-  model      = mlpe,
-  seeds      = 1:10
-)
-summary(cv_reps)
-
-# Compare two models using held-out log-likelihood
-cv_comparison <- cv_model_selection(
-  list(cv_simple, cv_full),
-  cv_names = c("Simple", "Full"),
-  aic      = TRUE
-)
-```
-
-See `vignette("model-comparison", package = "terradish")` for a detailed walkthrough of all three comparison approaches (LRT, AIC, CV).
+<!-- Phase 7: rewrite -->
 
 ## Vignettes
 

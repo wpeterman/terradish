@@ -480,50 +480,7 @@ cond_full_focal <- conductance(
 
 ## Cross-validation
 
-Information criteria measure in-sample fit. Cross-validation evaluates
-**out-of-sample** prediction under a specified splitting design.
-
-`terradish_cv()` randomly partitions the focal sampling sites into a
-training set and a test set, fits the conductance coefficients on the
-training set, and evaluates the held-out likelihood at those
-coefficients. Measurement-model nuisance parameters are reprofiled on
-the test subset. Random site splits can retain strong spatial similarity
-between training and test sites, so they may overstate transfer to new
-regions. Use spatially structured folds when that is the intended
-prediction target.
-
-```{r cv-single}
-cv_result <- terradish_cv(
-  pts       = melip.coords,
-  covariates = covariates,
-  fmla      = melip.Fst ~ forestcover + altitude,
-  model     = mlpe,
-  prop_train = 2 / 3,   # use 2/3 of sites for training
-  seed      = 42,
-  fit_full  = FALSE     # skip re-fitting on the full data (saves time)
-)
-
-cat("Held-out log-likelihood:", round(cv_result$cv_loglik, 2), "\n")
-```
-
-A single split can be noisy; it may depend heavily on which sites
-happened to land in the training set. `terradish_cv_replicates()`
-repeats the process across many random splits:
-
-```{r cv-replicates}
-cv_reps <- terradish_cv_replicates(
-  pts        = melip.coords,
-  covariates = covariates,
-  fmla       = melip.Fst ~ forestcover + altitude,
-  model      = mlpe,
-  seeds      = 1:5,    # five random splits
-  fit_full   = FALSE,
-  keep_fits  = FALSE
-)
-
-print(cv_reps)
-summary(cv_reps)
-```
+<!-- Phase 7: rewrite -->
 
 ### Spatially blocked, fixed-domain cross-validation
 
@@ -532,8 +489,7 @@ sampled landscape. They do not directly ask whether the fitted
 association transfers across space. For that question, construct spatial
 folds and use `terradish_cv_folds()`.
 
-The fixed-domain method differs from `terradish_cv()` in an important
-way. It builds the graph once, then changes only which focal sites
+The fixed-domain method builds the graph once, then changes only which focal sites
 contribute to the training and test responses. Unsampled raster cells,
 graph edges, and raster covariates remain available in every fold. This
 matches the prediction target of transferring to held-out sites within
@@ -588,47 +544,7 @@ Spatial cross-validation strengthens evidence for transfer under the
 declared blocking design. It does not establish a causal landscape
 effect or prediction beyond the observed landscape domain.
 
-### Cross-validation for model selection
-
-To compare models using held-out log-likelihood, fit each candidate with
-`terradish_cv()` or `terradish_cv_replicates()` and then pass the
-results to `cv_model_selection()`. In this example, we compare a
-one-covariate model to the two-covariate model. A pure intercept-only
-MLPE model (`~ 1`) can fit on the full data but still collapse to a
-no-coefficient boundary on some training splits, which makes it a
-fragile teaching example for cross-validation.
-
-```{r cv-selection}
-# For speed, use a reduced control with fewer Newton iterations
-ctrl <- NewtonRaphsonControl(maxit = 10, verbose = FALSE)
-
-# Subset the raster stack for the simpler model so the example stays quiet
-# and only uses the covariate that appears in the formula.
-forestcover_only <- covariates[["forestcover"]]
-
-cv_forestcover <- terradish_cv(
-  pts = melip.coords, covariates = forestcover_only,
-  fmla = melip.Fst ~ forestcover, model = mlpe,
-  prop_train = 2 / 3, seed = 42, fit_full = TRUE, control = ctrl
-)
-
-cv_full <- terradish_cv(
-  pts = melip.coords, covariates = covariates,
-  fmla = melip.Fst ~ forestcover + altitude, model = mlpe,
-  prop_train = 2 / 3, seed = 42, fit_full = TRUE, control = ctrl
-)
-
-cv_comparison <- cv_model_selection(
-  list(cv_forestcover, cv_full),
-  cv_names = c("Forest cover only", "Full (altitude + forestcover)"),
-  aic = TRUE
-)
-
-cv_comparison$loglik_tab
-cv_comparison$AIC_tab
-```
-
-------------------------------------------------------------------------
+<!-- Phase 7: rewrite -->
 
 ## Combining the evidence
 
@@ -638,7 +554,6 @@ A complete analysis typically uses all three approaches together:
 |----|----|----|
 | `anova()` | Does a larger model have incremental likelihood support? | Nested models within one measurement family |
 | `aic_table()` | Which declared candidate has the strongest relative support? | Models satisfying the full comparison contract |
-| `terradish_cv()` / `cv_model_selection()` | Which candidate predicts a random held-out subset best? | Prediction under an identical random split |
 | `terradish_cv_folds()` | Which candidate transfers best across declared spatial blocks? | Fixed-domain prediction under identical folds and one likelihood family |
 | `mlpe_response_change()` | How large is an MLPE pairwise-covariate association on the response scale? | IBE terms fitted with `mlpe_covariates()` |
 
@@ -708,11 +623,8 @@ plot(fit_full, type = "surface", data = surface)
 | `terradish_grid()` | Evaluate log-likelihood on a parameter grid |
 | `conductance()` | Fitted conductance with confidence intervals |
 | `mlpe_response_change()` | Response-scale change and confidence interval for MLPE pairwise covariates |
-| `terradish_cv()` | Single train/test split cross-validation |
-| `terradish_cv_replicates()` | Repeated cross-validation across random splits |
 | `terradish_folds()` | Reproducible spatial or balanced random fold assignment |
 | `terradish_cv_folds()` | Fixed-domain fold fitting with a uniform-conductance baseline |
-| `cv_model_selection()` | Combine CV log-likelihoods with an AIC table |
 
 ## See also
 

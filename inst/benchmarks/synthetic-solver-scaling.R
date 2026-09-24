@@ -39,7 +39,7 @@ CONFIG <- list(
   max_sim_attempts = 5L,
   timeout_sec = 600,
   terradish_cores = 1L,
-  solvers = c("direct", "auto", "amg"),
+  solvers = c("direct", "amg"),
   auto_control = list(
     auto_direct_max_vertices = 750000L,
     auto_amg_min_vertices = 1500000L,
@@ -79,7 +79,6 @@ CONFIG <- list(
     power_iters = 4L,
     reuse_preconditioner = TRUE
   ),
-  pcg_control = list(tol = 1e-8, maxit = 5000L),
   seed = 1L
 )
 
@@ -242,8 +241,6 @@ fit_once <- function(surface_case, solver, config)
     solver,
     auto = config$auto_control,
     amg = config$amg_control,
-    pcg = config$pcg_control,
-    pcg_jacobi = config$pcg_control,
     NULL
   )
   elapsed <- tryCatch(

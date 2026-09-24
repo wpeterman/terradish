@@ -36,7 +36,7 @@ the optimizer fails to improve from the starting value.}
 \value{
 A function of class \code{"terradish_measurement_model"} suitable
   for use as the \code{measurement_model} argument of \code{\link{terradish}},
-  \code{\link{terradish_grid}}, and \code{\link{terradish_cv}}.
+  \code{\link{terradish_grid}}, and \code{\link{terradish_cv_folds}}.
 }
 \description{
 Creates an MLPE measurement model whose mean structure includes both an IBR
@@ -69,7 +69,7 @@ by the outer loop. The actual MLPE shared-site correlation is
 When \code{x} is site-level data or the output of
 \code{pairwise_endpoint_covariates()}, the pairwise covariate matrix is
 stored as an attribute of the returned function.  This allows
-\code{\link{terradish_cv}} to rebuild the correct pairwise covariates for
+\code{\link{terradish_cv_folds}} to rebuild the correct pairwise covariates for
 each train/test split automatically.
 }
 \examples{
@@ -101,5 +101,5 @@ Journal of Agricultural, Biological, and Environmental Statistics
 }
 \seealso{
 \code{\link{mlpe}}, \code{\link{pairwise_endpoint_covariates}},
-  \code{\link{terradish_cv}}
+  \code{\link{terradish_cv_folds}}
 }

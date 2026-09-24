@@ -980,4 +980,3 @@ plot(cond_raster)
 - **`vignette("getting-started", package = "terradish")`**, the log-linear baseline these models extend.
 - **`vignette("model-comparison", package = "terradish")`**, AICc, likelihood ratio tests, and cross-validation for choosing among candidates.
 - **`vignette("gaussian-scale-optimization", package = "terradish")`**, Gaussian raster smoothing rather than flexibility in the covariate-response shape.
-- **`vignette("hierarchical-conductance", package = "terradish")`**, a diagnostic residual-conductance field for spatial structure not represented by the fixed covariates.

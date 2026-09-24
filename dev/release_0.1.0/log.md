@@ -75,3 +75,21 @@ errors, one expected legacy warning and one intentional parallel skip.
 The full vignette-enabled check completed with Status: OK, zero errors,
 warnings, or notes, in 53m48s. See phase1a_00check.log and phase1a_check.rds.
 The check used the frozen source before the metadata-only version bump.
+
+## C1b: core split, version 0.0.50
+
+Removed experimental features and their exclusive documentation/tests while
+preserving shared numerical helpers and internal compiled code permitted by S9.
+All nine frozen baseline results are identical. Scope and globals checks pass.
+Source tests: 703 passed, zero failures/errors, one expected legacy warning
+and one intentional parallel skip. Full vignette-enabled package check:
+Status OK, zero errors, warnings, or notes. See phase1b_00check.log.
+Metadata-only version bump followed validation.
+
+## Phase 3 acceptance investigation
+
+The initial outer-optimizer prototype reports code 2 for the corrected even-grid
+Gaussian baseline, projected gradient 0.0007226463. The other eight fits report
+code 0. The owner authorized investigating and fixing the cause while retaining
+the specified stopping thresholds. This prototype does not yet exercise the
+new inner warm-start path; full-package validation remains required.

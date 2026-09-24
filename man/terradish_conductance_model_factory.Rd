@@ -11,6 +11,6 @@ Functions that generate objects of class \code{"terradish_conductance_model"}
 that represent mappings from spatial data (e.g. rasters) to conductance.
 }
 \seealso{
-\code{\link{linear_conductance}}, \code{\link{loglinear_conductance}},
+\code{\link{loglinear_conductance}},
   \code{\link{smooth_loglinear_conductance}}
 }

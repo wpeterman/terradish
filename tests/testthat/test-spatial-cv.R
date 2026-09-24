@@ -49,14 +49,6 @@ test_that("fixed-domain cross-validation scores trained and baseline models", {
   expect_equal(names(resumed$fits), names(cv$fits))
 })
 
-test_that("cv_model_selection rejects different held-out sites", {
-  fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 1, verbose = FALSE))
-  item_1 <- list(train_mod = fx$fit, cv_loglik = fx$fit$loglik,
-                 train_index = 1:5, test_index = 6:8)
-  item_2 <- list(train_mod = fx$fit, cv_loglik = fx$fit$loglik,
-                 train_index = 2:6, test_index = c(1, 7, 8))
-  expect_error(cv_model_selection(list(item_1, item_2)), "identical")
-})
 
 test_that("measurement profiling reports convergence metadata", {
   fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 1, verbose = FALSE))

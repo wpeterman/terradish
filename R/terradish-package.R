@@ -25,7 +25,7 @@
 #' \strong{Main components.}
 #' \describe{
 #'   \item{Conductance models}{\code{\link{loglinear_conductance}} (the
-#'     default), \code{\link{linear_conductance}},
+#'     default),
 #'     \code{\link{smooth_loglinear_conductance}} for spline responses, and
 #'     \code{\link{gaussian_smoothed_loglinear_conductance}} for estimating a
 #'     covariate's Gaussian raster-smoothing scale inside the model.}
@@ -36,12 +36,8 @@
 #'     \code{nu}; \code{\link{check_distance_response}} to verify a
 #'     generalized-Wishart squared-distance response; \code{\link{mlpe_covariates}} and
 #'     \code{\link{wishart_covariates}} to add isolation-by-environment terms.}
-#'   \item{Model extensions}{\code{\link{terradish_hierarchical}} adds a smooth
-#'     diagnostic residual field for spatial conductance structure not captured
-#'     by supplied covariates. \code{\link{terradish_directed}} fits
-#'     antisymmetric edge-rate bias through a symmetric commute-time response.}
 #'   \item{Comparison and diagnostics}{\code{\link{aic_table}},
-#'     \code{\link{terradish_cv}}, \code{\link{terradish_grid}}, and
+#'     \code{\link{terradish_cv_folds}}, \code{\link{terradish_grid}}, and
 #'     \code{\link{terradish_assess_settings}}, which profiles the graph and
 #'     recommends solver and optimizer settings.}
 #' }
@@ -50,7 +46,7 @@
 #' \code{vignette("getting-started", package = "terradish")}.  The others cover
 #' model comparison, joint isolation by environment and resistance, the
 #' covariance-based Wishart workflow, spline conductance, scale optimization,
-#' hierarchical and directional models, large landscapes, and simulation-based
+#' large landscapes, and simulation-based
 #' study design.  List them all with
 #' \code{browseVignettes("terradish")}.
 #'

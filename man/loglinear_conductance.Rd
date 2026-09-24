@@ -56,8 +56,7 @@ These are model-based associations, not direct estimates of movement rate,
 habitat suitability, or a causal landscape effect.
 
 The exponential link guarantees strictly positive conductances for any real
-\eqn{\theta}, making \code{loglinear_conductance} more numerically stable
-than \code{\link{linear_conductance}} when parameters stray far from zero.
+\eqn{\theta}.
 
 Categorical covariates must be stored as \code{factor} columns in \code{x}
 (see \code{\link{conductance_surface}} for how to encode them). They are
@@ -81,7 +80,6 @@ model2 <- loglinear_conductance(~ altitude + I(altitude^2) + fc, x2)
 
 }
 \seealso{
-\code{\link{linear_conductance}},
-  \code{\link{gaussian_smoothed_loglinear_conductance}},
+\code{\link{gaussian_smoothed_loglinear_conductance}},
   \code{\link{conductance_surface}}, \code{\link{terradish}}
 }

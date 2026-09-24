@@ -55,7 +55,7 @@ surface    <- conductance_surface(covariates, melip.coords, directions = 8)
 
 `terradish` builds a weighted graph over the raster grid and solves a linear
 system on that graph to get resistance distances among focal sites. The cost of
-that solve grows with the number of grid cells, `N`. Three things change as `N`
+that solve grows with the number of grid cells, `N`. Two things change as `N`
 grows into the hundreds of thousands and beyond:
 
 1. The linear **solver** that computes resistance distances can run out of
@@ -64,8 +64,6 @@ grows into the hundreds of thousands and beyond:
    unchanged in form, but larger analyses can include more focal sites. Wishart
    precision also depends on the supplied effective degrees of freedom, `nu`
    (Section 4).
-3. An exact, **memory-bounded reduction** onto the focal sites becomes useful as
-   a diagnostic and as an out-of-core building block (Section 5).
 
 "Large" here means the regime where the default solver's memory use becomes the
 binding constraint. On a 64 GB workstation that boundary falls between roughly
@@ -104,9 +102,6 @@ The choices:
   Each solve costs roughly linear time in `N`, and its iteration count stays
   nearly constant as `N` grows (this is called mesh-independent convergence), so
   total cost scales near-linearly. This is the intended path past the wall.
-- **`block_cg`**, **`pcg`**, **`pcg_jacobi`**: conjugate-gradient variants for
-  small or well-conditioned graphs. `block_cg` shares one Krylov subspace across
-  all focal sites. These are fallbacks, not the large-N path.
 - **`auto`**: lets `terradish` pick.
 
 Measured behavior on a heterogeneous grid (one likelihood and gradient
@@ -133,11 +128,9 @@ once the raster is large enough that `direct` fails or thrashes.
 
 This applies to every symmetric resistance model: any `conductance_model`
 (`loglinear_conductance`, `smooth_loglinear_conductance`, the Gaussian
-scale-aware and hierarchical models) paired with any measurement model (`mlpe`,
+scale-aware model) paired with any measurement model (`mlpe`,
 `leastsquares`, `generalized_wishart`, and `wishart_covariance`). The solver sits underneath
-all of them. The one exception is the directional model
-(`terradish_directed()`), which runs a different algorithm on an asymmetric
-generator; see `vignette("directional-conductance", package = "terradish")`.
+all of them.
 
 ---
 
@@ -341,72 +334,7 @@ also removes the strongest stored check for later model comparison.
 
 ---
 
-## An exact, memory-bounded reduction
-
-`terradish_kron_reduce_tiled()` reduces the full graph Laplacian onto the focal
-sites exactly, returning the focal effective-resistance structure while keeping
-peak memory in check. It is the same result as `terradish_kron_reduce()` (the
-single-shot reduction), computed so that it does not have to factorize the whole
-interior at once.
-
-```{r reduce}
-# a conductance vector to reduce (evaluate the model at some theta)
-model <- loglinear_conductance(~ forestcover + altitude, surface$x)
-cond  <- model(c(0.3, -0.2))$conductance
-
-red <- terradish_kron_reduce_tiled(surface, cond)
-red$method                 # which strategy "auto" chose
-red$peak$interior          # largest single factorization (vertices)
-red$n_interior             # interior vertices in total
-
-# forcing nested dissection bounds the largest factorization far below the
-# whole interior (this is the path that keeps memory in check at scale)
-nested <- terradish_kron_reduce_tiled(surface, cond, method = "nested")
-nested$peak$interior
-
-# both are identical to the single-shot reduction
-single <- terradish_kron_reduce(surface, cond)
-P <- match(single$boundary, red$boundary)
-max(abs(as.matrix(red$laplacian[P, P]) -
-        as.matrix(single$laplacian))) / max(abs(as.matrix(single$laplacian)))
-```
-
-**How to read the output.** `method` reports the strategy actually used; on a
-graph this small `"auto"` chooses `"direct"`, so `peak$interior` equals
-`n_interior` (the single-shot path factorizes the whole interior at once). When
-you force `"nested"`, `peak$interior` drops far below `n_interior`: that gap is
-the memory the bounded path saves, and it is what lets the reduction run on
-rasters where the single-shot factor would not fit. The final number is the
-relative difference from the single-shot reduction; it is at the level of
-floating-point round-off, confirming every path is exact.
-
-The strategy is controlled by `method` and `mem_budget`:
-
-| Argument     | Default  | What it does |
-|--------------|----------|--------------|
-| `method`     | `"auto"` | `"auto"` uses the fast single-shot factorization while it is estimated to fit `mem_budget`, and switches to nested dissection only when it would not. `"direct"` forces single-shot; `"nested"` forces nested dissection. |
-| `mem_budget` | `4e9`    | The memory budget in bytes for the `"auto"` decision. The estimate (returned as `est_factor_bytes`) tracks the single-shot factor size. |
-| `cores`      | `1`      | Worker processes for nested dissection. With `cores > 1` its independent recursive halves run in parallel by forking on Unix. The result is identical to the sequential run. |
-| `n_tiles`    | `2000`   | The nested-dissection leaf size (vertices per subdomain). |
-
-The two strategies trade speed against memory:
-
-- **single-shot** (`"direct"`) factorizes the whole interior in one pass. It is
-  fast (this is the CHOLMOD path), but the factor can exhaust memory at large
-  scale, the same wall the `direct` solver hits.
-- **nested dissection** (`"nested"`) recursively bisects the interior with thin
-  separators, so no single factorization exceeds a separator width. Its memory
-  stays bounded at scales where the single-shot factor would not fit. It is
-  markedly slower per element, which is exactly why `"auto"` reserves it for the
-  regime where the single-shot factor would run out of memory.
-
-**Scope.** This reduction is a standalone, exact primitive: a diagnostic and an
-out-of-core building block that returns the focal effective-resistance
-structure. It is **not** wired into model fitting; to fit a model on a large
-raster, use `solver = "amg"` (Section 3), not this function. It also applies to
-the symmetric resistance models only, not the directional model.
-
----
+<!-- Phase 7: rewrite -->
 
 ## Quick reference
 
@@ -429,12 +357,6 @@ summary(fit)                                   # conditional estimates and SEs
 fit_archive <- slim_terradish(fit)
 saveRDS(fit_archive, "fit-archive.rds")
 
-# 3. (Advanced) exact memory-bounded reduction onto the focal sites
-cond_map <- conductance(surface, fit)[["est"]]
-cond <- terra::values(cond_map, mat = FALSE)
-cond <- cond[is.finite(cond)]                   # active-cell conductance vector
-red  <- terradish_kron_reduce_tiled(surface, cond)  # auto: fast unless it would not fit
-red$method                                     # "direct" or "nested"
 ```
 
 ## Summary of key functions
@@ -445,8 +367,6 @@ red$method                                     # "direct" or "nested"
 | `terradish()` | Fit the model; takes `solver` and `curvature` |
 | `terradish_algorithm()` | One likelihood and gradient evaluation; same `solver` and `curvature` |
 | `slim_terradish()` | Remove prediction closures and other optional large components before storage |
-| `terradish_kron_reduce()` | Single-shot exact reduction onto the focal sites |
-| `terradish_kron_reduce_tiled()` | Memory-aware exact reduction (`auto`/`direct`/`nested`) |
 
 ## See also
 
@@ -456,5 +376,4 @@ red$method                                     # "direct" or "nested"
   covariance Wishart measurement models and the role of `nu`.
 - **`vignette("model-comparison", package = "terradish")`** ranking competing
   models with AIC and likelihood ratio tests.
-- **`vignette("directional-conductance", package = "terradish")`** the
   directional model, which uses a separate algorithm.

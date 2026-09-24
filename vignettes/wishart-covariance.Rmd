@@ -520,120 +520,7 @@ cond_wc_focal <- conductance(
 
 ------------------------------------------------------------------------
 
-## Modeling site-specific diagonal variance
-
-The `sigma` nugget above is a **single scalar**: every site receives the
-same diagonal variance. If the response and study design support a
-hypothesis about site-specific diagonal heterogeneity, a covariate model
-can replace that common nugget. This extension does not, by itself,
-separate movement, drift, sampling variation, density, or effective
-size.
-
-`wishart_drift_covariates()` replaces the scalar nugget with a
-**per-site diagonal parameterized by site-level covariates**, producing
-a site-specific diagonal-variance surface:
-
-> **Sigma = tau · E(theta) + diag(exp(Z gamma))**
-
-where `Z` is a site design matrix with an intercept and one column per
-supplied covariate. The graph kernel and diagonal terms are estimated
-jointly. The off-diagonal term is not a direct movement estimate, and
-the diagonal term is not a direct estimate of local drift, effective
-size, abundance, or density. Because the nugget is `exp(Z gamma)`, it is
-always positive and `Sigma` stays positive definite. With no drift
-covariates (intercept only) the model reduces **exactly** to
-`wishart_covariance`.
-
-To demonstrate the parameterization, we simulate a covariance matrix
-whose diagonal variance declines along a site covariate. The generating
-log-diagonal slope is negative.
-
-```{r drift-simulate}
-# An illustrative site-level covariate for diagonal variance.
-n_site <- length(surface$demes)
-site_variance <- scale(seq_len(n_site))[, 1]
-
-# True conductance-implied covariance E at the conductance truth used above.
-E_true <- as.matrix(terradish_algorithm(
-  loglinear_conductance(~ forestcover + altitude, surface$x),
-  leastsquares, surface, S = diag(n_site),
-  theta = c(forestcover = 1.0, altitude = -0.5),
-  objective = FALSE, gradient = FALSE, hessian = FALSE, partial = FALSE
-)$covariance)
-
-# Per-site nugget: baseline exp(log(0.2)), slope -0.6 on the (centered) covariate.
-Z <- cbind(1, scale(site_variance, scale = FALSE))
-gamma_true <- c(log(0.2), -0.6)
-nugget     <- as.vector(exp(Z %*% gamma_true))
-Sigma_true <- 1.0 * E_true + diag(nugget)
-
-set.seed(123)
-nu_demo <- 500
-S_drift <- rWishart(1, df = nu_demo, Sigma = Sigma_true / nu_demo)[, , 1]
-```
-
-Fit the diagonal-variance extension and, for comparison, the
-scalar-nugget model:
-
-```{r drift-fit}
-g_drift <- wishart_drift_covariates(site_variance, model = "wishart_covariance")
-
-fit_drift <- terradish(
-  S_drift ~ forestcover + altitude,
-  data              = surface,
-  conductance_model = loglinear_conductance,
-  measurement_model = g_drift,
-  nu                = nu_demo
-)
-
-fit_scalar <- terradish(
-  S_drift ~ forestcover + altitude,
-  data              = surface,
-  conductance_model = loglinear_conductance,
-  measurement_model = wishart_covariance,
-  nu                = nu_demo
-)
-
-summary(fit_drift)
-```
-
-The `phi` table now contains `tau`, `sigma` (the baseline log-nugget,
-identical in meaning to the scalar model's `sigma`), and `gamma_var1`,
-the slope of the log-nugget on the site covariate.
-
-```{r drift-interpret}
-# Recovered log-diagonal slope (true value -0.6)
-fit_drift$fit$phi["gamma_var1", 1]
-
-# Compare only because the response, sites, graph, likelihood, and nu match.
-aic_table(
-  list(fit_drift, fit_scalar),
-  mod_names = c("diagonal covariate", "scalar nugget")
-)
-```
-
-A negative `gamma_var1` means that larger covariate values are
-associated with a smaller fitted diagonal variance, conditional on the
-graph kernel and other terms. A drift or effective-size interpretation
-would require an external model that identifies how this genetic summary
-maps to those demographic quantities.
-
-A few practical notes:
-
-- The diagonal covariate is **site-level** (one value per focal site),
-  supplied as a vector, data frame, or `terra::SpatRaster` plus
-  `coords`, just like `wishart_covariates()`.
-- `gamma` is on the **log-nugget** scale and is unconstrained in sign;
-  only `tau` is constrained to be nonnegative.
-- Adding diagonal covariates can change `theta` because the terms are
-  estimated jointly. It does not guarantee protection from spatial or
-  demographic confounding.
-- This is the diagonal (within-site) companion to
-  `wishart_covariates()`, which adds off-diagonal
-  isolation-by-environment kernels. The two address different parts of
-  `Sigma` and can be motivated by the same data.
-
-------------------------------------------------------------------------
+<!-- Phase 7: rewrite -->
 
 ## Preparing a generalized-Wishart squared-distance response
 
@@ -828,7 +715,6 @@ plot(fit, type = "marginal", data = surface)   # conductance-scale associations
 | `wishart_covariance()` | Measurement model for a covariance response; needs `nu` |
 | `check_distance_response()` | Diagnose squared-Euclidean admissibility of a proposed generalized-Wishart response |
 | `generalized_wishart()` | Generalized Wishart likelihood for an admissible squared-distance response |
-| `wishart_drift_covariates()` | Add site-specific diagonal variance covariates |
 | `simulate_covariance_response()` | Simulate a covariance matrix from known parameters |
 | `terradish()` | Fit the model and return coefficients, standard errors, and AIC |
 
@@ -842,6 +728,5 @@ plot(fit, type = "marginal", data = surface)   # conductance-scale associations
 - **`vignette("ibe-ibr-workflow", package = "terradish")`**, adding
   environmental kernels to the Wishart likelihood with
   `wishart_covariates()`.
-- **`vignette("hierarchical-conductance", package = "terradish")`**,
   adding a diagnostic residual field and evaluating sensitivity to
   spatial confounding.

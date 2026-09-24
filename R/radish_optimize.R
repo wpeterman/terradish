@@ -202,6 +202,9 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
   control <- if (is.null(control)) list() else as.list(control)
   defaults <- .terradish_landmark_control_defaults()
   control <- modifyList(defaults, control)
+  if (!isTRUE(control$exact_refine))
+    stop("Unrefined approximations are not supported in terradish 0.1.0; available on the experimental branch.",
+         call. = FALSE)
 
   requested <- control$n_landmarks
   if (is.null(requested))
@@ -558,7 +561,7 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   Standard errors from \code{summary()} are then the asymptotic
 #'   information-based errors. With \code{leverage = TRUE} the leverage
 #'   diagnostics inherit the same approximation.
-#' @param solver Linear-system solver used for the reduced Laplacian. \code{"direct"} uses sparse Cholesky updates; \code{"auto"} conservatively chooses between the direct and AMG backends based on graph size and right-hand-side count; \code{"amg"} uses smoothed-aggregation AMG-preconditioned conjugate gradients; \code{"pcg"} uses incomplete-Cholesky preconditioned conjugate gradients; \code{"pcg_jacobi"} keeps the older Jacobi-preconditioned prototype.
+#' @param solver Linear-system solver. \code{"direct"} uses sparse Cholesky, \code{"amg"} uses algebraic multigrid, and \code{"auto"} chooses between them.
 #' @param solver_control Optional named list of solver settings passed to
 #'   \code{\link{terradish_algorithm}}. For \code{solver = "direct"}, supported
 #'   entries include \code{factorization}, \code{supernodal_min_vertices},
@@ -589,11 +592,11 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   optimizes first on a space-filling subset of focal populations and then
 #'   refines on the full likelihood when supported by the measurement model.
 #'   \code{"coarse_raster"} optimizes first on an aggregated raster and then
-#'   optionally refines on the full-resolution graph. If multiple coarse
+#'   refines on the full-resolution graph. If multiple coarse
 #'   factors are supplied, they are evaluated from coarsest to finest before the
 #'   final full-resolution stage. This is an opt-in warm-start strategy, not a
-#'   replacement for the exact full-resolution likelihood unless
-#'   \code{exact_refine = FALSE}.
+#'   replacement for the exact full-resolution likelihood. Exact refinement
+#'   is required.
 #' @param approximation_control Optional named list controlling the landmark or
 #'   coarse-raster approximation. Landmark entries include
 #'   \code{n_landmarks}, \code{fraction}, \code{min_landmarks},
@@ -678,8 +681,7 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' likelihood are from the full-resolution graph; the coarse fits are only
 #' starting values. To keep the full-resolution cleanup deliberately short, pass
 #' \code{refine_control = NewtonRaphsonControl(maxit = 2, ...)} inside
-#' \code{approximation_control}. With \code{exact_refine = FALSE}, the result is
-#' faster but approximate and should be interpreted as a screening fit.
+#' \code{approximation_control}. Exact refinement is required.
 #'
 #' \strong{Gaussian scale-aware conductance.}
 #' \code{\link{gaussian_smoothed_loglinear_conductance}} can also use
@@ -785,7 +787,7 @@ terradish <- function(formula,
                    validate = FALSE,
                    cores = 1L,
                    curvature = c("exact", "gauss_newton"),
-                   solver = c("direct", "auto", "amg", "pcg", "pcg_jacobi", "block_cg"),
+                   solver = c("direct", "auto", "amg"),
                    solver_control = NULL,
                    approximation = c("none", "landmark", "coarse_raster"),
                    approximation_control = NULL,

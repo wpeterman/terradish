@@ -1,0 +1,348 @@
+ℹ Loading terradish
+START a_mlpe 2026-09-24 12:38:06 
+$theta
+   altitude forestcover 
+-0.53775283  0.06571419 
+
+$logLik
+[1] 2160.184
+
+$se
+   altitude forestcover 
+ 0.06643077  0.09594235 
+
+$phi
+             [,1]
+alpha -0.03309757
+beta   0.12020529
+tau    6.23513970
+rho    1.22278644
+
+$iterations
+  newton_steps function_calls 
+             5             17 
+
+$gradient
+     altitude   forestcover 
+-5.151991e-09  2.264385e-09 
+
+$max_abs_gradient
+[1] 5.151991e-09
+
+$boundary
+[1] FALSE
+
+$seconds
+[1] 17.89096
+
+$warnings
+character(0)
+
+START b_leastsquares 2026-09-24 12:38:24 
+$theta
+   altitude forestcover 
+ -0.1923526   0.2188760 
+
+$logLik
+[1] 1960.571
+
+$se
+   altitude forestcover 
+ 0.01669266  0.03396559 
+
+$phi
+             [,1]
+alpha -0.04530027
+beta   0.12388085
+tau    6.88760135
+
+$iterations
+  newton_steps function_calls 
+             6             18 
+
+$gradient
+    altitude  forestcover 
+7.476093e-11 1.941539e-11 
+
+$max_abs_gradient
+[1] 7.476093e-11
+
+$boundary
+[1] FALSE
+
+$seconds
+[1] 7.503312
+
+$warnings
+character(0)
+
+START c_generalized_wishart 2026-09-24 12:38:31 
+$theta
+   altitude forestcover 
+  0.3106727  -0.1994653 
+
+$logLik
+[1] -609.885
+
+$se
+   altitude forestcover 
+ 0.03639162  0.04998658 
+
+$phi
+           [,1]
+tau    1.011344
+sigma -2.387405
+
+$iterations
+  newton_steps function_calls 
+             4             13 
+
+$gradient
+     altitude   forestcover 
+-1.147420e-10 -1.398943e-10 
+
+$max_abs_gradient
+[1] 1.398943e-10
+
+$boundary
+[1] FALSE
+
+$seconds
+[1] 9.144996
+
+$warnings
+character(0)
+
+START d_wishart_covariance 2026-09-24 12:38:41 
+$theta
+   altitude forestcover 
+  0.3157759  -0.2087044 
+
+$logLik
+[1] -664.8265
+
+$se
+   altitude forestcover 
+ 0.03541924  0.04946570 
+
+$phi
+           [,1]
+tau    1.002838
+sigma -2.377724
+
+$iterations
+  newton_steps function_calls 
+             4             13 
+
+$gradient
+     altitude   forestcover 
+-2.127863e-09 -3.013119e-09 
+
+$max_abs_gradient
+[1] 3.013119e-09
+
+$boundary
+[1] FALSE
+
+$seconds
+[1] 5.956632
+
+$warnings
+character(0)
+
+START e_spline 2026-09-24 12:38:47 
+$theta
+s(altitude).1 s(altitude).2 s(altitude).3 s(altitude).4 
+   -0.7708774    -1.4482661     0.7724565    -0.7056948 
+
+$logLik
+[1] 2182.35
+
+$se
+s(altitude).1 s(altitude).2 s(altitude).3 s(altitude).4 
+    0.2672715     0.6266932     0.6786899     1.3771354 
+
+$phi
+             [,1]
+alpha -0.02916761
+beta   0.09842538
+tau    6.61934117
+rho    0.75097911
+
+$iterations
+  newton_steps function_calls 
+             7             32 
+
+$gradient
+s(altitude).1 s(altitude).2 s(altitude).3 s(altitude).4 
+ 5.443953e-12 -2.775782e-12  9.737459e-12 -5.129616e-12 
+
+$max_abs_gradient
+[1] 9.737459e-12
+
+$boundary
+[1] FALSE
+
+$seconds
+[1] 23.15242
+
+$warnings
+character(0)
+
+START f_gaussian_odd 2026-09-24 12:39:10 
+$theta
+      altitude    forestcover sigma.altitude 
+    -0.7039246     -0.1037210      0.1350000 
+
+$logLik
+[1] 1517.628
+
+$se
+      altitude    forestcover sigma.altitude 
+    0.09572056     0.13560847     0.11461283 
+
+$phi
+             [,1]
+alpha -0.00962782
+beta   0.13210389
+tau    6.65992828
+rho    0.68843584
+
+$iterations
+  newton_steps function_calls 
+            10             38 
+
+$gradient
+      altitude    forestcover sigma.altitude 
+  1.014345e-05  -3.121859e-06  -1.308031e+01 
+
+$max_abs_gradient
+[1] 13.08031
+
+$boundary
+[1] FALSE
+
+$seconds
+[1] 14.36813
+
+$warnings
+character(0)
+
+START g_gaussian_even 2026-09-24 12:39:25 
+$theta
+      altitude    forestcover sigma.altitude 
+    -1.0560783     -0.6577200      0.2430622 
+
+$logLik
+[1] 1549.991
+
+$se
+      altitude    forestcover sigma.altitude 
+    0.06424275     0.11823611     0.03822633 
+
+$phi
+             [,1]
+alpha -0.01576731
+beta   0.17295099
+tau    6.30936188
+rho    1.41508448
+
+$iterations
+  newton_steps function_calls 
+             7             27 
+
+$gradient
+      altitude    forestcover sigma.altitude 
+ -6.080468e-09   3.585809e-09   1.721048e-08 
+
+$max_abs_gradient
+[1] 1.721048e-08
+
+$boundary
+[1] FALSE
+
+$seconds
+[1] 9.530536
+
+$warnings
+character(0)
+
+START h_mlpe_covariates 2026-09-24 12:39:35 
+$theta
+   altitude forestcover 
+ -0.5687205   0.1250613 
+
+$logLik
+[1] 2222.044
+
+$se
+   altitude forestcover 
+ 0.07008515  0.11043114 
+
+$phi
+                            [,1]
+alpha               -0.038974539
+beta                 0.107420020
+absdiff_altitude     0.012286205
+absdiff_forestcover  0.004815915
+tau                  6.035427789
+rho                  1.731163618
+
+$iterations
+  newton_steps function_calls 
+             6             19 
+
+$gradient
+     altitude   forestcover 
+ 2.108866e-11 -1.569850e-11 
+
+$max_abs_gradient
+[1] 2.108866e-11
+
+$boundary
+[1] FALSE
+
+$seconds
+[1] 15.86563
+
+$warnings
+character(0)
+
+START i_wishart_covariates 2026-09-24 12:39:51 
+$theta
+   altitude forestcover 
+  0.3112533  -0.1991568 
+
+$logLik
+[1] -609.8802
+
+$se
+   altitude forestcover 
+ 0.03687785  0.05010764 
+
+$phi
+                         [,1]
+tau              1.0105122449
+lambda_altitude  0.0003082854
+sigma           -2.3873188843
+
+$iterations
+  newton_steps function_calls 
+             4             12 
+
+$gradient
+     altitude   forestcover 
+-7.117226e-11 -8.338548e-11 
+
+$max_abs_gradient
+[1] 8.338548e-11
+
+$boundary
+[1] FALSE
+
+$seconds
+[1] 5.865774
+
+$warnings
+character(0)
+

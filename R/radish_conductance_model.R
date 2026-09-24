@@ -269,7 +269,7 @@ assemble_model_matrix <- function(formula, spdat)
 #' that represent mappings from spatial data (e.g. rasters) to conductance.
 #'
 #' @name terradish_conductance_model_factory
-#' @seealso \code{\link{linear_conductance}}, \code{\link{loglinear_conductance}},
+#' @seealso \code{\link{loglinear_conductance}},
 #'   \code{\link{smooth_loglinear_conductance}}
 terradish_conductance_model_factory <- NULL
 
@@ -324,8 +324,7 @@ NULL
 #' habitat suitability, or a causal landscape effect.
 #'
 #' The exponential link guarantees strictly positive conductances for any real
-#' \eqn{\theta}, making \code{loglinear_conductance} more numerically stable
-#' than \code{\link{linear_conductance}} when parameters stray far from zero.
+#' \eqn{\theta}.
 #'
 #' Categorical covariates must be stored as \code{factor} columns in \code{x}
 #' (see \code{\link{conductance_surface}} for how to encode them). They are
@@ -340,8 +339,7 @@ NULL
 #'   conductance values), \code{confint} (a function for confidence intervals),
 #'   and derivative functions used internally by the optimizer.
 #'
-#' @seealso \code{\link{linear_conductance}},
-#'   \code{\link{gaussian_smoothed_loglinear_conductance}},
+#' @seealso \code{\link{gaussian_smoothed_loglinear_conductance}},
 #'   \code{\link{conductance_surface}}, \code{\link{terradish}}
 #'
 #' @examples
@@ -537,117 +535,3 @@ attr(smooth_loglinear_conductance, "link") <- "log"
   )
   factory
 }
-
-#' Identity-link conductance model
-#'
-#' Returns a function of class \code{"terradish_conductance_model"} that
-#' represents a linear mapping from spatial covariates to conductance.
-#'
-#' @param formula Model formula describing which spatial covariates drive
-#'   conductance. The left-hand side is ignored; only the right-hand side terms
-#'   are used.
-#' @param x Data frame of spatial covariates extracted from a
-#'   \code{\link{conductance_surface}} object (typically \code{surface$x}).
-#'
-#' @details
-#' The conductance at grid cell \code{i} is:
-#'
-#' \deqn{C_i = \theta_1 x_{i1} + \theta_2 x_{i2} + \ldots}
-#'
-#' The intercept is omitted because it is non-identifiable (multiplying all
-#' conductances by a constant leaves resistance distances unchanged).
-#'
-#' \strong{When to prefer \code{linear_conductance} over
-#' \code{loglinear_conductance}:}
-#' \itemize{
-#'   \item When the chosen covariate transformations support a direct additive
-#'     parameterization of fitted conductance.
-#'   \item When theory predicts a linear relationship.
-#' }
-#'
-#' \strong{Caution:} conductance must be strictly positive. The optimizer does
-#' not automatically enforce this; choose starting values and parameter bounds
-#' so that \eqn{C_i > 0} throughout the optimization. Fitting is safer when
-#' covariates are non-negative and parameters are constrained to be positive.
-#' For unrestricted parameters, \code{\link{loglinear_conductance}} is more
-#' numerically robust.
-#'
-#' Default starting values are all 1 (rather than 0 as in
-#' \code{loglinear_conductance}) to ensure positive conductances at the start.
-#'
-#' Categorical covariates and in-formula transformations are supported via
-#' \code{\link[stats]{model.matrix}}, the same as in
-#' \code{\link{loglinear_conductance}}.
-#'
-#' @return A function of class \code{"terradish_conductance_model"} that
-#'   accepts a numeric vector of conductance parameters \code{theta} and
-#'   returns a list with elements \code{conductance}, \code{confint}, and
-#'   internal derivative functions.
-#'
-#' @seealso \code{\link{loglinear_conductance}}, \code{\link{terradish}}
-#'
-#' @examples
-#' x <- data.frame(altitude = c(1, 2, 3), forestcover = c(2, 5, 4))
-#' model <- linear_conductance(~ altitude + forestcover, x)
-#' fit <- model(c(altitude = 0.5, forestcover = 1))
-#' fit$conductance
-#'
-#' @export
-
-linear_conductance <- function(formula, x)
-{
-  x <- assemble_model_matrix(formula, x)
-
-  # default starting values
-  default <- rep(1, ncol(x))
-  names(default) <- colnames(x)
-
-  conductance_model <- function(theta)
-  {
-    stopifnot(length(theta) == ncol(x))
-
-    conductance        <- as.vector(x %*% theta)
-    conductance        <- .validate_conductance_values(
-      conductance,
-      context = "linear_conductance()"
-    )
-
-    ones <- matrix(1, nrow(x), 1)
-    df__dtheta_matrix <- x
-
-    # asymptotic confidence intervals
-    confint <- function(theta, vcov, quantile = 0.95, scale = c("conductance", "linpred"))
-    {
-      scale <- match.arg(scale)
-      cond_sd <- sqrt(rowSums((x %*% vcov) * x))
-      ci <- conductance + qnorm((1 - quantile)/2) * cond_sd %*% t(c(1, -1))
-      colnames(ci) <- c("lower", "upper")
-      attr(ci, "quantile") <- quantile 
-      if (scale == "linpred") 
-        return (ci)
-      else if (scale == "conductance")
-        return (ci)
-    }
-
-    # first- and second-order derivatives
-    df__dx             <- function(k)    ones * theta[k]
-    df__dtheta         <- function(k)    df__dtheta_matrix[, k]
-    d2f__dtheta_dtheta <- function(k, l) 0. * ones
-    d2f__dtheta_dx     <- function(k, l) (k==l) * ones
-
-    list(conductance        = conductance,
-         confint            = confint,
-         df__dx             = df__dx,
-         df__dtheta         = df__dtheta,
-         df__dtheta_matrix  = df__dtheta_matrix,
-         d2f__dtheta_dtheta = d2f__dtheta_dtheta, 
-         d2f__dtheta_dx     = d2f__dtheta_dx)
-  }
-
-  class(conductance_model) <- c("terradish_conductance_model",
-                                "radish_conductance_model")
-  attr(conductance_model, "default") <- default
-  conductance_model
-}
-class(linear_conductance) <- c("terradish_conductance_model_factory",
-                               "radish_conductance_model_factory")

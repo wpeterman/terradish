@@ -15,7 +15,7 @@ terradish_grid(
   conductance = TRUE,
   covariance = FALSE,
   cores = 1L,
-  approximation = c("none", "landmark", "coarse_raster"),
+  approximation = "none",
   approximation_control = NULL
 )
 }
@@ -52,21 +52,10 @@ values.}
 
 \item{cores}{Number of worker processes to use. \code{1} evaluates the grid serially.}
 
-\item{approximation}{Exploratory approximation used during grid evaluation.
-\code{"none"} evaluates the full focal set at each grid point.
-\code{"landmark"} evaluates a landmark subset selected once and reused
-across the whole grid.
-\code{"coarse_raster"} keeps the full focal set but rebuilds the graph on
-one or more aggregated rasters for safer coarse screening.}
+\item{approximation}{Only \code{"none"} is supported; every grid point
+uses the full graph and focal set.}
 
-\item{approximation_control}{Optional named list controlling the landmark
-or coarse-raster approximation. For \code{"landmark"}, see
-\code{\link{terradish}} for the supported entries. For
-\code{"coarse_raster"}, supported entries include \code{factor},
-\code{aggregate_fun}, and \code{directions}. \code{factor} may be a single
-positive integer or a vector such as \code{c(4, 2)}; grid likelihoods are
-evaluated on the coarsest requested approximation. Coarse-raster screening
-requires that \code{data} retain its original raster stack.}
+\item{approximation_control}{Reserved for compatibility; unused.}
 }
 \value{
 An object of class \code{terradish_grid} with components
@@ -103,12 +92,6 @@ theta <- as.matrix(expand.grid(forestcover = seq(-0.5, 0.5, length.out = 3),
 
 grid <- terradish_grid(theta, melip.Fst ~ forestcover + altitude, surface,
                     terradish::loglinear_conductance, terradish::mlpe, cores = 1)
-
-grid_coarse <- terradish_grid(theta, melip.Fst ~ forestcover + altitude, surface,
-                           terradish::loglinear_conductance, terradish::mlpe,
-                           cores = 1,
-                           approximation = "coarse_raster",
-                           approximation_control = list(factor = 2L))
 
 cbind(grid$theta, loglik = grid$loglik)
 coef(fit_mlpe)

@@ -69,7 +69,7 @@ pairwise distance matrix, scanned column by column.
 
 The returned object has class \code{"terradish_pairwise_covariates"}.  This
 class carries the original site-level covariate matrix and the chosen
-transform as attributes, so that \code{\link{terradish_cv}} can
+transform as attributes, so that \code{\link{terradish_cv_folds}} can
 automatically rebuild the correct pairwise covariates for each train/test
 split.
 
@@ -96,6 +96,6 @@ head(z_env)
 
 }
 \seealso{
-\code{\link{mlpe_covariates}}, \code{\link{terradish_cv}},
+\code{\link{mlpe_covariates}}, \code{\link{terradish_cv_folds}},
   \code{\link{terradish}}
 }

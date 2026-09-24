@@ -1,4 +1,4 @@
-.pair_subset_symm <- function(x)
+.symmetrize_matrix <- function(x)
 {
   (x + t(x)) / 2
 }

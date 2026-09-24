@@ -1,6 +1,6 @@
 # Re-exported from landgraph (the shared base package).
 #
-# The genetic-covariance, distance, and directional-edge-covariate helpers now live
+# The genetic-covariance and distance helpers now live
 # in landgraph and are re-exported here so existing terradish workflows and
 # documentation links are unchanged. terradish's own functions (resistance, Tier-1/2/3,
 # wishart measurement models, simulation) continue to call them as before.
@@ -24,11 +24,3 @@ landgraph::dist_from_cov
 #' @importFrom landgraph dist_from_biallelic
 #' @export
 landgraph::dist_from_biallelic
-
-#' @importFrom landgraph edge_gradient
-#' @export
-landgraph::edge_gradient
-
-#' @importFrom landgraph edge_flow
-#' @export
-landgraph::edge_flow

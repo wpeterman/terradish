@@ -48,7 +48,7 @@ A function of class \code{"terradish_measurement_model"} suitable
   \code{lambda_<covariate>} per environmental kernel, and \code{sigma} (in
   that order).  The function stores the kernel array in attribute
   \code{"kernel_covariates"} and supports site-subsetting for
-  cross-validation through \code{\link{terradish_cv}}.
+  model fitting through \code{\link{terradish}}.
 }
 \description{
 Creates a Wishart measurement model whose fitted covariance includes the
@@ -148,6 +148,6 @@ Sinica 19:631-649.
 \seealso{
 \code{\link{check_distance_response}},
   \code{\link{generalized_wishart}}, \code{\link{wishart_covariance}},
-  \code{\link{wishart_drift_covariates}}, \code{\link{mlpe_covariates}},
+  \code{\link{mlpe_covariates}},
   \code{\link{pairwise_endpoint_covariates}}, \code{\link{terradish}}
 }

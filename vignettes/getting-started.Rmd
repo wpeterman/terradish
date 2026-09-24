@@ -807,8 +807,7 @@ rec <- assessment$recommended             # reuse for all fits below
 #                        requires nu
 #   wishart_covariance : Wishart model, requires nu (covariance matrix)
 #   For Wishart IBE or site-level environmental covariance kernels, use
-#   wishart_covariates(); pair_subset_measurement_model() is for pairwise
-#   regression rows and does not apply to the full-matrix Wishart likelihood.
+#   wishart_covariates().
 fit <- terradish(melip.Fst ~ forestcover + altitude,
                  data              = surface,
                  conductance_model = loglinear_conductance,
@@ -852,7 +851,7 @@ cond <- conductance(surface, fit,
 | Function | Purpose |
 |--------------------------------------|----------------------------------|
 | `scale_covariates()` | Center and scale raster layers to mean 0, sd 1 before fitting |
-| `scale_to_0_1()` | Rescale layers to the unit interval (needed by `linear_conductance()`) |
+| `scale_to_0_1()` | Rescale layers to the unit interval |
 | `crop_to_focal_buffer()` | Trim the raster extent to a buffer around the focal sites |
 | `conductance_surface()` | Build the weighted graph linking raster cells and focal sites |
 | `terradish_assess_settings()` | Profile the graph and recommend solver and optimizer settings |
@@ -884,10 +883,8 @@ Each companion vignette assumes the workflow above and takes it further.
 - **`vignette("gaussian-scale-optimization", package = "terradish")`**,
   estimating a Gaussian raster-smoothing scale inside the model rather
   than by pre-smoothing.
-- **`vignette("hierarchical-conductance", package = "terradish")`**,
   adding a diagnostic residual log-conductance field and evaluating
   spatial confounding.
-- **`vignette("directional-conductance", package = "terradish")`**,
   fitting antisymmetric edge-rate bias through symmetric commute time.
 - **`vignette("large-landscapes", package = "terradish")`**, solvers,
   curvature, and exact graph reduction for rasters with hundreds of

@@ -8,8 +8,6 @@
 \alias{fst_from_biallelic}
 \alias{dist_from_cov}
 \alias{dist_from_biallelic}
-\alias{edge_gradient}
-\alias{edge_flow}
 \title{Objects exported from other packages}
 \keyword{internal}
 \description{
@@ -17,6 +15,6 @@ These objects are imported from other packages. Follow the links
 below to see their documentation.
 
 \describe{
-  \item{landgraph}{\code{\link[landgraph:cov_from_biallelic]{cov_from_biallelic()}}, \code{\link[landgraph:cov_from_genetic_data]{cov_from_genetic_data()}}, \code{\link[landgraph:dist_from_biallelic]{dist_from_biallelic()}}, \code{\link[landgraph:dist_from_cov]{dist_from_cov()}}, \code{\link[landgraph:edge_flow]{edge_flow()}}, \code{\link[landgraph:edge_gradient]{edge_gradient()}}, \code{\link[landgraph:fst_from_biallelic]{fst_from_biallelic()}}}
+  \item{landgraph}{\code{\link[landgraph:cov_from_biallelic]{cov_from_biallelic()}}, \code{\link[landgraph:cov_from_genetic_data]{cov_from_genetic_data()}}, \code{\link[landgraph:dist_from_biallelic]{dist_from_biallelic()}}, \code{\link[landgraph:dist_from_cov]{dist_from_cov()}}, \code{\link[landgraph:fst_from_biallelic]{fst_from_biallelic()}}}
 }}
 

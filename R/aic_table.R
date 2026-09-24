@@ -9,8 +9,7 @@
 #'   correction uses \eqn{n} = number of focal sampling sites (not the number
 #'   of pairwise observations).  A common guideline is to prefer AICc over AIC
 #'   when \eqn{n / K < 40}, where \eqn{K} is the number of estimated parameters.
-#' @param BIC Should BIC be used instead of AIC? BIC uses the number of selected
-#'   pair rows for pair-subset fits and otherwise uses
+#' @param BIC Should BIC be used instead of AIC? BIC uses
 #'   \eqn{n = n_{sites}(n_{sites}-1)/2} as an implementation convention. Those
 #'   pairs are not independent in MLPE and related designs, so report the
 #'   convention and do not treat it as a uniquely determined effective sample
@@ -23,7 +22,7 @@
 #'
 #' @details
 #' Information-criterion comparison requires the same observed response,
-#' focal sites, graph domain, likelihood family, and pair subset. Wishart fits
+#' focal sites, graph domain, and likelihood family. Wishart fits
 #' must also use the same effective degrees of freedom, \code{nu}.
 #' \code{leastsquares} and \code{mlpe} are Gaussian likelihoods for the same
 #' pairwise-distance response and can be ranked when those conditions hold.
@@ -32,7 +31,7 @@
 #' rankings, such as \code{mlpe} versus \code{generalized_wishart}, are invalid.
 #'
 #' The function checks response values, model family, fitted dimensions,
-#' selected pairs, and recorded \code{nu}. It cannot establish that two
+#' and recorded \code{nu}. It cannot establish that two
 #' separately constructed graphs with the same dimensions have identical
 #' domains, so users must verify that condition.
 #'
@@ -127,13 +126,7 @@ aic_table <- function(mod_list, AICc = FALSE, BIC = FALSE, mod_names = NULL, ver
   else
   {
     mod_n <- vapply(mod_list, function(x) x$dim[["focal"]], numeric(1))
-    mod_pairs <- vapply(seq_along(mod_list), function(i) {
-      contract <- .terradish_fit_comparison_contract(mod_list[[i]])
-      if (is.null(contract$pairs))
-        mod_n[[i]] * (mod_n[[i]] - 1) / 2
-      else
-        nrow(contract$pairs)
-    }, numeric(1))
+    mod_pairs <- mod_n * (mod_n - 1) / 2
     mod_BIC <- -2 * mod_loglik + mod_df * log(mod_pairs)
     delta <- mod_BIC - min(mod_BIC)
     wt <- exp(-0.5 * delta)
@@ -262,14 +255,12 @@ aic_table <- function(mod_list, AICc = FALSE, BIC = FALSE, mod_names = NULL, ver
 {
   model_name <- .terradish_measurement_model_name(measurement_model)
   family <- .terradish_measurement_family(model_name)
-  pairs <- attr(measurement_model, "pairs", exact = TRUE)
 
   list(
     measurement_model = model_name,
     likelihood_family = family,
     nu = if (isTRUE(grepl("wishart", family, fixed = TRUE))) nu else NULL,
-    response = response,
-    pairs = if (is.null(pairs)) NULL else as.matrix(pairs)
+    response = response
   )
 }
 
@@ -286,12 +277,6 @@ aic_table <- function(mod_list, AICc = FALSE, BIC = FALSE, mod_names = NULL, ver
     contract$likelihood_family <- .terradish_measurement_family(contract$measurement_model)
   if (is.null(contract$response) && !is.null(fit$fit$response))
     contract$response <- fit$fit$response
-  if (is.null(contract$pairs) && is.function(measurement_model))
-  {
-    pairs <- attr(measurement_model, "pairs", exact = TRUE)
-    if (!is.null(pairs))
-      contract$pairs <- as.matrix(pairs)
-  }
 
   contract
 }
@@ -329,13 +314,6 @@ aic_table <- function(mod_list, AICc = FALSE, BIC = FALSE, mod_names = NULL, ver
   if (all(have_responses) &&
       !all(vapply(responses[-1L], identical, logical(1), responses[[1L]])))
     stop("Models must use the same response matrix for a valid ", purpose, ".",
-         call. = FALSE)
-
-  pairs <- lapply(contracts, `[[`, "pairs")
-  have_pairs <- !vapply(pairs, is.null, logical(1))
-  if (any(have_pairs) &&
-      (!all(have_pairs) || !all(vapply(pairs[-1L], identical, logical(1), pairs[[1L]]))))
-    stop("Models must use the same selected pairs for a valid ", purpose, ".",
          call. = FALSE)
 
   is_wishart <- grepl("wishart", families, fixed = TRUE)

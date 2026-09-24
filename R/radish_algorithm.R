@@ -300,9 +300,6 @@
                                 power_iters = 4L,
                                 reuse_preconditioner = TRUE,
                                 reuse_preconditioner_max_age = Inf),
-                     pcg_jacobi = list(tol = 1e-8, maxit = 1000L),
-                     pcg = list(tol = 1e-8, maxit = 1000L),
-                     block_cg = list(tol = 1e-8, maxit = 1000L),
                      stop("Unknown solver: ", solver))
 
   if (identical(solver, "amg") && !is.null(solver_control))
@@ -330,7 +327,7 @@
 
 .terradish_solver_setup <- function(s, conductance, solver, solver_control = NULL, solver_reuse_state = NULL)
 {
-  requested_solver <- match.arg(solver, c("direct", "auto", "amg", "pcg", "pcg_jacobi", "block_cg"))
+  requested_solver <- match.arg(solver, c("direct", "auto", "amg"))
   resolution <- .terradish_resolve_solver(s, requested_solver, length(conductance), solver_control = solver_control)
   solver <- resolution$type
   control <- .normalize_solver_control(solver, resolution$solver_control)
@@ -561,31 +558,7 @@
                 warm_start = out$solution))
   }
 
-  rhs <- as.matrix(rhs)
-  if (!is.null(warm_start))
-    warm_start <- as.matrix(warm_start)
-  solver_fun <- switch(solver_state$type,
-                       pcg = pcg_reduced_laplacian_ic,
-                       pcg_jacobi = pcg_reduced_laplacian,
-                       block_cg = block_cg_reduced_laplacian,
-                       stop("Unknown solver type: ", solver_state$type))
-  out <- solver_fun(rhs,
-                    solver_state$conductance,
-                    solver_state$edge_pairs,
-                    x0 = warm_start,
-                    tol = solver_state$control$tol,
-                    maxit = as.integer(solver_state$control$maxit))
-  if (!all(out$converged))
-    stop(toupper(solver_state$type), " solver failed to converge for ", sum(!out$converged), " RHS column(s)")
-  list(solution = out$solution,
-       info = c(list(type = solver_state$type,
-                     converged = out$converged,
-                     iterations = out$iterations,
-                     residual_norm = out$residual_norm,
-                     target_tol = solver_state$control$tol,
-                     target_maxit = solver_state$control$maxit),
-                common_info),
-       warm_start = out$solution)
+  stop("Unknown solver type: ", solver_state$type)
 }
 
 .terradish_new_worker_pool <- function(cores, worker_libpaths = .libPaths())
@@ -704,8 +677,8 @@
 #'   scale-aware and spline conductance models whose second derivatives are
 #'   expensive or unstable. The number of linear solves is the same as for the
 #'   exact Hessian.
-#' @param solver Linear-system solver used for the reduced Laplacian. \code{"direct"} uses the cached sparse Cholesky factorization, \code{"auto"} conservatively chooses between the direct and AMG backends based on graph size and right-hand-side count, \code{"amg"} uses smoothed-aggregation algebraic multigrid preconditioned conjugate gradients, \code{"pcg"} uses incomplete-Cholesky preconditioned conjugate gradients, and \code{"pcg_jacobi"} keeps the older Jacobi-preconditioned prototype.
-#' @param solver_control Optional named list of solver settings. For \code{solver = "direct"}, supported entries include \code{factorization} (\code{"auto"}, \code{"simplicial_ldl"}, \code{"simplicial_ll"}, or \code{"supernodal_ll"}), \code{solve_backend} (\code{"matrix"} or the experimental \code{"cholmod_cpp"} and \code{"cholmod_cpp_cached"} backends), \code{supernodal_min_vertices}, \code{supernodal_max_rhs}, and \code{perm}. For \code{solver = "auto"}, supported selection entries include \code{auto_direct_max_vertices}, \code{auto_amg_min_vertices}, and \code{auto_direct_max_rhs}. For \code{solver = "amg"}, supported entries include \code{tol}, \code{maxit}, \code{coarse_enough}, \code{npre}, \code{npost}, \code{sa_relax}, \code{aggr_eps_strong}, \code{estimate_spectral_radius}, \code{power_iters}, and \code{reuse_preconditioner}. For \code{solver = "pcg"} or \code{"pcg_jacobi"}, supported entries are \code{tol} and \code{maxit}.
+#' @param solver Linear-system solver. \code{"direct"} uses sparse Cholesky, \code{"amg"} uses algebraic multigrid, and \code{"auto"} chooses between them.
+#' @param solver_control Optional named list of solver settings. For \code{solver = "direct"}, supported entries include \code{factorization} (\code{"auto"}, \code{"simplicial_ldl"}, \code{"simplicial_ll"}, or \code{"supernodal_ll"}), \code{solve_backend} (\code{"matrix"} or the experimental \code{"cholmod_cpp"} and \code{"cholmod_cpp_cached"} backends), \code{supernodal_min_vertices}, \code{supernodal_max_rhs}, and \code{perm}. For \code{solver = "auto"}, supported selection entries include \code{auto_direct_max_vertices}, \code{auto_amg_min_vertices}, and \code{auto_direct_max_rhs}. For \code{solver = "amg"}, supported entries include \code{tol}, \code{maxit}, \code{coarse_enough}, \code{npre}, \code{npost}, \code{sa_relax}, \code{aggr_eps_strong}, \code{estimate_spectral_radius}, \code{power_iters}, and \code{reuse_preconditioner}.
 #'   \code{reuse_preconditioner_max_age} can be set to a finite nonnegative
 #'   value to periodically rebuild the AMG hierarchy instead of reusing it
 #'   indefinitely.
@@ -762,7 +735,7 @@
 #'
 #' }
 #' @export
-terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, objective = TRUE, gradient = TRUE, hessian = TRUE, partial = TRUE, nonnegative = TRUE, validate = FALSE, cores = 1L, curvature = c("exact", "gauss_newton"), solver = c("direct", "auto", "amg", "pcg", "pcg_jacobi", "block_cg"), solver_control = NULL, solver_warm_start = NULL, solver_reuse_state = NULL, measurement_control = NULL, worker_pool = NULL)
+terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, objective = TRUE, gradient = TRUE, hessian = TRUE, partial = TRUE, nonnegative = TRUE, validate = FALSE, cores = 1L, curvature = c("exact", "gauss_newton"), solver = c("direct", "auto", "amg"), solver_control = NULL, solver_warm_start = NULL, solver_reuse_state = NULL, measurement_control = NULL, worker_pool = NULL)
 {
   stopifnot(inherits(f, c("terradish_conductance_model",
                           "radish_conductance_model")))

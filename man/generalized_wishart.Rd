@@ -174,6 +174,6 @@ Sinica 19:631-649.
 \seealso{
 \code{\link{check_distance_response}},
   \code{\link{wishart_covariance}}, \code{\link{wishart_covariates}},
-  \code{\link{wishart_drift_covariates}}, \code{\link{mlpe}},
+  \code{\link{mlpe}},
   \code{\link{terradish}}
 }

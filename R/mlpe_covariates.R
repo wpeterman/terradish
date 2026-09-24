@@ -47,7 +47,7 @@
 #'
 #' The returned object has class \code{"terradish_pairwise_covariates"}.  This
 #' class carries the original site-level covariate matrix and the chosen
-#' transform as attributes, so that \code{\link{terradish_cv}} can
+#' transform as attributes, so that \code{\link{terradish_cv_folds}} can
 #' automatically rebuild the correct pairwise covariates for each train/test
 #' split.
 #'
@@ -59,7 +59,7 @@
 #'   chosen transform (e.g. \code{"absdiff_altitude"},
 #'   \code{"euclidean"}).
 #'
-#' @seealso \code{\link{mlpe_covariates}}, \code{\link{terradish_cv}},
+#' @seealso \code{\link{mlpe_covariates}}, \code{\link{terradish_cv_folds}},
 #'   \code{\link{terradish}}
 #'
 #' @examples
@@ -144,15 +144,15 @@ pairwise_endpoint_covariates <- function(x,
 #' When \code{x} is site-level data or the output of
 #' \code{pairwise_endpoint_covariates()}, the pairwise covariate matrix is
 #' stored as an attribute of the returned function.  This allows
-#' \code{\link{terradish_cv}} to rebuild the correct pairwise covariates for
+#' \code{\link{terradish_cv_folds}} to rebuild the correct pairwise covariates for
 #' each train/test split automatically.
 #'
 #' @return A function of class \code{"terradish_measurement_model"} suitable
 #'   for use as the \code{measurement_model} argument of \code{\link{terradish}},
-#'   \code{\link{terradish_grid}}, and \code{\link{terradish_cv}}.
+#'   \code{\link{terradish_grid}}, and \code{\link{terradish_cv_folds}}.
 #'
 #' @seealso \code{\link{mlpe}}, \code{\link{pairwise_endpoint_covariates}},
-#'   \code{\link{terradish_cv}}
+#'   \code{\link{terradish_cv_folds}}
 #'
 #' @references
 #' Clarke RT, Rothery P, Raybould AF. 2002. Confidence limits for regression

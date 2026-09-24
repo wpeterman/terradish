@@ -82,11 +82,11 @@
 #'   \code{lambda_<covariate>} per environmental kernel, and \code{sigma} (in
 #'   that order).  The function stores the kernel array in attribute
 #'   \code{"kernel_covariates"} and supports site-subsetting for
-#'   cross-validation through \code{\link{terradish_cv}}.
+#'   model fitting through \code{\link{terradish}}.
 #'
 #' @seealso \code{\link{check_distance_response}},
 #'   \code{\link{generalized_wishart}}, \code{\link{wishart_covariance}},
-#'   \code{\link{wishart_drift_covariates}}, \code{\link{mlpe_covariates}},
+#'   \code{\link{mlpe_covariates}},
 #'   \code{\link{pairwise_endpoint_covariates}}, \code{\link{terradish}}
 #'
 #' @references
@@ -245,11 +245,11 @@ wishart_covariates <- function(x,
     stop("Wishart kernel covariates do not match the response matrix.",
          call. = FALSE)
 
-  E <- .pair_subset_symm(E)
+  E <- .symmetrize_matrix(E)
   if (!isTRUE(covariance))
     S <- .prepare_gw_response(S)
   else
-    S <- .pair_subset_symm(S)
+    S <- .symmetrize_matrix(S)
 
   kernel_names <- dimnames(kernels)[[3]]
   if (is.null(kernel_names))
@@ -472,13 +472,13 @@ wishart_covariates <- function(x,
 
         jacobian_E <- function(dotdotE)
         {
-          U <- .pair_subset_symm(dotdotE)
+          U <- .symmetrize_matrix(dotdotE)
           sigma_sign * tau^2 * dgrad_from_dSigma(U)
         }
 
         jacobian_S <- function(dotdotE)
         {
-          U <- .pair_subset_symm(dotdotE)
+          U <- .symmetrize_matrix(dotdotE)
           sigma_sign * jacobian_S_factor * tau *
             jacobian_S_left %*% U %*% jacobian_S_right
         }

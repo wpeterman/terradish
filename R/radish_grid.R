@@ -1,4 +1,4 @@
-.validate_multiscale_covariates <- function(covariates, caller = "`terradish_multiscale()`")
+.validate_multiscale_covariates <- function(covariates, caller = "Coarse-raster screening")
 {
   covariates <- .as_spatraster(covariates)
   is_factor_layer <- vapply(seq_len(nlyr(covariates)),
@@ -30,6 +30,9 @@
     refine_control = NULL
   )
   control <- modifyList(defaults, control)
+  if (!isTRUE(control$exact_refine))
+    stop("Unrefined approximations are not supported in terradish 0.1.0; available on the experimental branch.",
+         call. = FALSE)
   control$factor <- sort(unique(as.integer(control$factor)), decreasing = TRUE)
   if (!length(control$factor) || anyNA(control$factor) || any(control$factor < 1L))
     stop("`approximation_control$factor` must contain positive integers")
@@ -258,58 +261,11 @@
   theta[, parameter_names, drop = FALSE]
 }
 
-.terradish_grid_approximation <- function(data, S, approximation = c("none", "landmark", "coarse_raster"),
+.terradish_grid_approximation <- function(data, S, approximation = "none",
                                           approximation_control = NULL, covariance = FALSE)
 {
-  approximation <- match.arg(approximation)
-  if (identical(approximation, "none"))
-    return(list(data = data,
-                S = S,
-                info = list(type = "none", used = FALSE)))
-
-  if (identical(approximation, "landmark"))
-  {
-    subset <- .terradish_landmark_subset(data, S, approximation_control = approximation_control)
-    info <- list(
-      type = "landmark",
-      used = isTRUE(subset$used),
-      n_landmarks = subset$control$n_landmarks,
-      full_focal = nrow(S),
-      focal_fraction = subset$control$n_landmarks / nrow(S),
-      method = subset$control$method,
-      landmark_index = subset$index
-    )
-
-    if (isTRUE(covariance) && isTRUE(subset$used))
-      warning("`covariance = TRUE` with `approximation = \"landmark\"` returns landmark covariance only.",
-              call. = FALSE)
-
-    return(list(data = subset$data,
-                S = subset$S,
-                info = info))
-  }
-
-  coarse <- .coarse_raster_surface(data, approximation_control = approximation_control)
-  info <- list(
-    type = "coarse_raster",
-    used = isTRUE(coarse$used),
-    factor = coarse$control$factor,
-    directions = coarse$control$directions,
-    full_vertices = coarse$full_vertices,
-    coarse_vertices = coarse$coarse_vertices,
-    vertex_fraction = coarse$coarse_vertices / coarse$full_vertices,
-    full_focal = nrow(S),
-    unique_demes = coarse$unique_demes,
-    duplicate_demes = coarse$duplicate_demes
-  )
-
-  if (isTRUE(covariance) && isTRUE(coarse$used))
-    warning("`covariance = TRUE` with `approximation = \"coarse_raster\"` returns covariance on the aggregated graph.",
-            call. = FALSE)
-
-  list(data = coarse$surface,
-       S = S,
-       info = info)
+  match.arg(approximation, "none")
+  list(data = data, S = S, info = list(type = "none", used = FALSE))
 }
 
 .terradish_grid_parallel_chunk <- function(idx, theta, term_labels, data,
@@ -383,7 +339,7 @@
 
   conductance_model_factory_name <- .parallel_fun_name(
     conductance_model_factory,
-    c("loglinear_conductance", "linear_conductance")
+    "loglinear_conductance"
   )
   measurement_model_name <- .parallel_fun_name(
     measurement_model,
@@ -470,7 +426,7 @@
 .terradish_grid_impl <- function(theta, term_labels, data, S,
                                  conductance_model_factory, measurement_model,
                                  nu, nonnegative, covariance, cores,
-                                 approximation = c("none", "landmark", "coarse_raster"),
+                                 approximation = "none",
                                  approximation_control = NULL)
 {
   model_formula <- reformulate(term_labels)
@@ -585,20 +541,9 @@
 #'   \code{conductance = TRUE} is currently implemented.
 #' @param covariance If \code{TRUE}, additionally return (a submatrix of) the generalized inverse of graph Laplacian across the grid
 #' @param cores Number of worker processes to use. \code{1} evaluates the grid serially.
-#' @param approximation Exploratory approximation used during grid evaluation.
-#'   \code{"none"} evaluates the full focal set at each grid point.
-#'   \code{"landmark"} evaluates a landmark subset selected once and reused
-#'   across the whole grid.
-#'   \code{"coarse_raster"} keeps the full focal set but rebuilds the graph on
-#'   one or more aggregated rasters for safer coarse screening.
-#' @param approximation_control Optional named list controlling the landmark
-#'   or coarse-raster approximation. For \code{"landmark"}, see
-#'   \code{\link{terradish}} for the supported entries. For
-#'   \code{"coarse_raster"}, supported entries include \code{factor},
-#'   \code{aggregate_fun}, and \code{directions}. \code{factor} may be a single
-#'   positive integer or a vector such as \code{c(4, 2)}; grid likelihoods are
-#'   evaluated on the coarsest requested approximation. Coarse-raster screening
-#'   requires that \code{data} retain its original raster stack.
+#' @param approximation Only \code{"none"} is supported; every grid point
+#'   uses the full graph and focal set.
+#' @param approximation_control Reserved for compatibility; unused.
 #'
 #' @return An object of class \code{terradish_grid} with components
 #'   \code{theta}, \code{loglik}, \code{phi}, and, when requested,
@@ -630,12 +575,6 @@
 #' grid <- terradish_grid(theta, melip.Fst ~ forestcover + altitude, surface,
 #'                     terradish::loglinear_conductance, terradish::mlpe, cores = 1)
 #'
-#' grid_coarse <- terradish_grid(theta, melip.Fst ~ forestcover + altitude, surface,
-#'                            terradish::loglinear_conductance, terradish::mlpe,
-#'                            cores = 1,
-#'                            approximation = "coarse_raster",
-#'                            approximation_control = list(factor = 2L))
-#'
 #' cbind(grid$theta, loglik = grid$loglik)
 #' coef(fit_mlpe)
 #'
@@ -652,14 +591,14 @@ terradish_grid <- function(theta,
                         conductance = TRUE,
                         covariance  = FALSE,
                         cores = 1L,
-                        approximation = c("none", "landmark", "coarse_raster"),
+                        approximation = "none",
                         approximation_control = NULL)
 {
   stopifnot(is.matrix(theta))
   stopifnot(length(cores) == 1, is.numeric(cores), cores >= 1)
   if (!isTRUE(conductance))
     stop("`conductance = FALSE` is not currently supported.", call. = FALSE)
-  approximation <- match.arg(approximation)
+  approximation <- match.arg(approximation, "none")
   conductance_model_factory <- conductance_model
   trm <- terms(formula)
   vars <- as.character(attr(trm, "variables"))[-1]
@@ -800,7 +739,7 @@ terradish_distance <- function(theta,
                        conductance_model_factory = conductance_model_factory,
                        conductance_model_factory_name = .parallel_fun_name(
                          conductance_model_factory,
-                         c("loglinear_conductance", "linear_conductance")
+                         "loglinear_conductance"
                        ),
                        data = data,
                        covariance = covariance,

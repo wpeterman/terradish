@@ -1,3 +1,11 @@
+terradish 0.0.50
+----------------
+* Restricted the core package to supported undirected models, direct/auto/AMG
+  solvers, and approximations followed by exact refinement. Experimental
+  models, solvers, legacy cross-validation, and result helpers remain preserved
+  on the experimental branch.
+* Updated exports, examples, and tests to enforce the core scope.
+
 terradish 0.0.49
 ----------------
 * Relocated shared comparison, cross-validation, and matrix helpers without

@@ -1,0 +1,278 @@
+Registered S3 methods overwritten by 'RcppEigen':
+  method               from         
+  predict.fastLm       RcppArmadillo
+  print.fastLm         RcppArmadillo
+  summary.fastLm       RcppArmadillo
+  print.summary.fastLm RcppArmadillo
+ℹ Updating terradish documentation
+Writing 'NAMESPACE'
+ℹ Loading terradish
+Exports from C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/src/amg_solver.cpp:
+   SEXP amg_reduced_laplacian_create(const arma::vec& conductance, const arma::umat& edge_pairs, const double tol = 1e-8, const int maxit = 1000, const int coarse_enough = 500, const int npre = 1, const int npost = 1, const double sa_relax = 1.0, const double aggr_eps_strong = 0.08, const bool estimate_spectral_radius = true, const int power_iters = 4)
+   Rcpp::List amg_reduced_laplacian_solve(SEXP solver_ptr, const arma::mat& rhs, Rcpp::Nullable<arma::mat> x0 = R_NilValue, Rcpp::Nullable<double> tol = R_NilValue, Rcpp::Nullable<int> maxit = R_NilValue)
+   Rcpp::List amg_reduced_laplacian_rebuild(SEXP solver_ptr, const arma::vec& conductance, const arma::umat& edge_pairs)
+
+Exports from C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/src/cholmod_direct.cpp:
+   Rcpp::List cholmod_factor_solve(SEXP factor, const arma::mat& rhs)
+   SEXP cholmod_direct_create(SEXP matrix, const std::string& factorization = "simplicial_ldl", const bool perm = true)
+   Rcpp::List cholmod_direct_update(SEXP solver_ptr, SEXP matrix)
+   Rcpp::List cholmod_direct_solve(SEXP solver_ptr, const arma::mat& rhs)
+
+Exports from C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/src/radish.cpp:
+   arma::sp_mat assemble_reduced_laplacian(const arma::vec& conductance, const arma::umat& edge_pairs)
+   Rcpp::List pcg_reduced_laplacian_ic(const arma::mat& rhs, const arma::vec& conductance, const arma::umat& edge_pairs, Rcpp::Nullable<arma::mat> x0 = R_NilValue, const double tol = 1e-8, const int maxit = 1000)
+   Rcpp::List pcg_reduced_laplacian(const arma::mat& rhs, const arma::vec& conductance, const arma::umat& edge_pairs, Rcpp::Nullable<arma::mat> x0 = R_NilValue, const double tol = 1e-8, const int maxit = 1000)
+   arma::vec backpropagate_laplacian_to_conductance(const arma::mat& tGl, const arma::mat& tGr, const arma::umat& tadj)
+   arma::sp_mat backpropagate_conductance_to_laplacian(const arma::vec& dgrad__ddl_dC, const arma::umat& tadj)
+   arma::mat laplacian_derivative_matrix_product(const arma::vec& dgrad__ddl_dC, const arma::umat& tadj, const arma::mat& G)
+   arma::mat graph_rhs_matrix_product(const arma::uvec& demes, const int n_vertices, const arma::mat& X)
+   arma::mat graph_rhs_crossprod(const arma::uvec& demes, const int n_vertices, const arma::mat& X)
+   Rcpp::List block_cg_reduced_laplacian(const arma::mat& rhs, const arma::vec& conductance, const arma::umat& edge_pairs, Rcpp::Nullable<arma::mat> x0 = R_NilValue, const double tol = 1e-8, const int maxit = 1000)
+
+C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/src/RcppExports.cpp updated.
+C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/R/RcppExports.R updated.
+ℹ Re-compiling terradish (debug build)
+── R CMD INSTALL ───────────────────────────────────────────────────────────────
+* installing *source* package 'terradish' ...
+** this is package 'terradish' version '0.0.47'
+** using staged installation
+
+   **********************************************
+   WARNING: this package has a configure script
+         It probably needs manual configuration
+   **********************************************
+
+
+** libs
+using C++ compiler: 'G__~1.EXE (GCC) 14.2.0'
+g++ -std=gnu++20  -I"C:/PROGRA~1/R/R-46~1.1/include" -DNDEBUG -I../inst/include -DAMGCL_NO_BOOST -I'C:/Program Files/R/R-4.6.1/library/Matrix/include' -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/Rcpp/include' -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppArmadillo/include' -I'C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include'   -I"C:/rtools45/x86_64-w64-mingw32.static.posix/include"   -fopenmp -DARMA_64BIT_WORD   -O2 -Wall -gdwarf-2 -mfpmath=sse -msse2 -mstackrealign   -UNDEBUG -Wall -pedantic -g -O0  -c RcppExports.cpp -o RcppExports.o
+In file included from C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/Core:205,
+                 from C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/Dense:1,
+                 from C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/RcppEigenForward.h:28,
+                 from C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/RcppEigen.h:25,
+                 from RcppExports.cpp:5:
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/arch/SSE/PacketMath.h:46:40: warning: ignoring attributes on template argument '__m128i' [-Wignored-attributes]
+   46 | typedef eigen_packet_wrapper<__m128i, 0> Packet4i;
+      |                                        ^
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/arch/SSE/PacketMath.h:47:40: warning: ignoring attributes on template argument '__m128i' [-Wignored-attributes]
+   47 | typedef eigen_packet_wrapper<__m128i, 1> Packet16b;
+      |                                        ^
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/arch/SSE/PacketMath.h:49:39: warning: ignoring attributes on template argument '__m128' [-Wignored-attributes]
+   49 | template<> struct is_arithmetic<__m128>  { enum { value = true }; };
+      |                                       ^
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/arch/SSE/PacketMath.h:50:40: warning: ignoring attributes on template argument '__m128i' [-Wignored-attributes]
+   50 | template<> struct is_arithmetic<__m128i> { enum { value = true }; };
+      |                                        ^
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/arch/SSE/PacketMath.h:51:40: warning: ignoring attributes on template argument '__m128d' [-Wignored-attributes]
+   51 | template<> struct is_arithmetic<__m128d> { enum { value = true }; };
+      |                                        ^
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/arch/SSE/PacketMath.h:222:43: warning: ignoring attributes on template argument 'Eigen::internal::Packet4f' {aka '__m128'} [-Wignored-attributes]
+  222 | template<> struct unpacket_traits<Packet4f> {
+      |                                           ^
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/arch/SSE/PacketMath.h:228:43: warning: ignoring attributes on template argument 'Eigen::internal::Packet2d' {aka '__m128d'} [-Wignored-attributes]
+  228 | template<> struct unpacket_traits<Packet2d> {
+      |                                           ^
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/arch/SSE/PacketMath.h:1124:34: warning: ignoring attributes on template argument 'Eigen::internal::Packet4f' {aka '__m128'} [-Wignored-attributes]
+ 1124 | ptranspose(PacketBlock<Packet4f,4>& kernel) {
+      |                                  ^
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/arch/SSE/PacketMath.h:1129:34: warning: ignoring attributes on template argument 'Eigen::internal::Packet2d' {aka '__m128d'} [-Wignored-attributes]
+ 1129 | ptranspose(PacketBlock<Packet2d,2>& kernel) {
+      |                                  ^
+In file included from C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/Core:174:
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/arch/Default/ConjHelper.h:16:60: warning: ignoring attributes on template argument 'Eigen::internal::Packet4f' {aka '__m128'} [-Wignored-attributes]
+   16 |   struct conj_helper<PACKET_REAL, PACKET_CPLX, false, false> {          \
+      |                                                            ^
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/arch/SSE/Complex.h:173:1: note: in expansion of macro 'EIGEN_MAKE_CONJ_HELPER_CPLX_REAL'
+  173 | EIGEN_MAKE_CONJ_HELPER_CPLX_REAL(Packet2cf,Packet4f)
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/arch/Default/ConjHelper.h:29:60: warning: ignoring attributes on template argument 'Eigen::internal::Packet4f' {aka '__m128'} [-Wignored-attributes]
+   29 |   struct conj_helper<PACKET_CPLX, PACKET_REAL, false, false> {          \
+      |                                                            ^
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/arch/SSE/Complex.h:173:1: note: in expansion of macro 'EIGEN_MAKE_CONJ_HELPER_CPLX_REAL'
+  173 | EIGEN_MAKE_CONJ_HELPER_CPLX_REAL(Packet2cf,Packet4f)
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/arch/Default/ConjHelper.h:16:60: warning: ignoring attributes on template argument 'Eigen::internal::Packet2d' {aka '__m128d'} [-Wignored-attributes]
+   16 |   struct conj_helper<PACKET_REAL, PACKET_CPLX, false, false> {          \
+      |                                                            ^
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/arch/SSE/Complex.h:298:1: note: in expansion of macro 'EIGEN_MAKE_CONJ_HELPER_CPLX_REAL'
+  298 | EIGEN_MAKE_CONJ_HELPER_CPLX_REAL(Packet1cd,Packet2d)
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/arch/Default/ConjHelper.h:29:60: warning: ignoring attributes on template argument 'Eigen::internal::Packet2d' {aka '__m128d'} [-Wignored-attributes]
+   29 |   struct conj_helper<PACKET_CPLX, PACKET_REAL, false, false> {          \
+      |                                                            ^
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/arch/SSE/Complex.h:298:1: note: in expansion of macro 'EIGEN_MAKE_CONJ_HELPER_CPLX_REAL'
+  298 | EIGEN_MAKE_CONJ_HELPER_CPLX_REAL(Packet1cd,Packet2d)
+      | ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+In file included from C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/Core:165:
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/util/XprHelper.h: In instantiation of 'struct Eigen::internal::find_best_packet<float, 4>':
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/Matrix.h:22:57:   required from 'struct Eigen::internal::traits<Eigen::Matrix<float, 4, 1> >'
+   22 |   typedef typename find_best_packet<_Scalar,size>::type PacketScalar;
+      |                                                         ^~~~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Geometry/Quaternion.h:266:49:   required from 'struct Eigen::internal::traits<Eigen::Quaternion<float> >'
+  266 |     Alignment = internal::traits<Coefficients>::Alignment,
+      |                                                 ^~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Geometry/arch/Geometry_SIMD.h:24:46:   required from here
+   24 |     ResAlignment = traits<Quaternion<float> >::Alignment
+      |                                              ^~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/util/XprHelper.h:190:44: warning: ignoring attributes on template argument 'Eigen::internal::packet_traits<float>::type' {aka '__m128'} [-Wignored-attributes]
+  190 |          bool Stop = Size==Dynamic || (Size%unpacket_traits<PacketType>::size)==0 || is_same<PacketType,typename unpacket_traits<PacketType>::half>::value>
+      |                                       ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/util/XprHelper.h:190:83: warning: ignoring attributes on template argument 'Eigen::internal::packet_traits<float>::type' {aka '__m128'} [-Wignored-attributes]
+  190 |          bool Stop = Size==Dynamic || (Size%unpacket_traits<PacketType>::size)==0 || is_same<PacketType,typename unpacket_traits<PacketType>::half>::value>
+      |                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/util/XprHelper.h:190:83: warning: ignoring attributes on template argument 'Eigen::internal::packet_traits<float>::type' {aka '__m128'} [-Wignored-attributes]
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/util/XprHelper.h:190:83: warning: ignoring attributes on template argument 'Eigen::internal::unpacket_traits<__vector(4) float>::half' {aka '__m128'} [-Wignored-attributes]
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/util/XprHelper.h:208:88: warning: ignoring attributes on template argument 'Eigen::internal::packet_traits<float>::type' {aka '__m128'} [-Wignored-attributes]
+  208 |   typedef typename find_best_packet_helper<Size,typename packet_traits<T>::type>::type type;
+      |                                                                                        ^~~~
+In file included from C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/Core:271:
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/DenseCoeffsBase.h: In instantiation of 'class Eigen::DenseCoeffsBase<Eigen::Matrix<float, 4, 1>, 0>':
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/DenseCoeffsBase.h:302:7:   required from 'class Eigen::DenseCoeffsBase<Eigen::Matrix<float, 4, 1>, 1>'
+  302 | class DenseCoeffsBase<Derived, WriteAccessors> : public DenseCoeffsBase<Derived, ReadOnlyAccessors>
+      |       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/DenseCoeffsBase.h:555:7:   required from 'class Eigen::DenseCoeffsBase<Eigen::Matrix<float, 4, 1>, 3>'
+  555 | class DenseCoeffsBase<Derived, DirectWriteAccessors>
+      |       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/DenseBase.h:41:34:   required from 'class Eigen::DenseBase<Eigen::Matrix<float, 4, 1> >'
+   41 | template<typename Derived> class DenseBase
+      |                                  ^~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/MatrixBase.h:48:34:   required from 'class Eigen::MatrixBase<Eigen::Matrix<float, 4, 1> >'
+   48 | template<typename Derived> class MatrixBase
+      |                                  ^~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/PlainObjectBase.h:98:7:   required from 'class Eigen::PlainObjectBase<Eigen::Matrix<float, 4, 1> >'
+   98 | class PlainObjectBase : public internal::dense_xpr_base<Derived>::type
+      |       ^~~~~~~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/Matrix.h:178:7:   required from 'class Eigen::Matrix<float, 4, 1>'
+  178 | class Matrix
+      |       ^~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Geometry/Quaternion.h:46:50:   required from 'class Eigen::QuaternionBase<Eigen::Quaternion<float> >'
+   46 |   typedef typename Coefficients::CoeffReturnType CoeffReturnType;
+      |                                                  ^~~~~~~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Geometry/Quaternion.h:273:7:   required from 'class Eigen::Quaternion<float>'
+  273 | class Quaternion : public QuaternionBase<Quaternion<_Scalar,_Options> >
+      |       ^~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Geometry/arch/Geometry_SIMD.h:27:3:   required from here
+   27 |   {
+      |   ^
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/DenseCoeffsBase.h:56:30: warning: ignoring attributes on template argument 'Eigen::internal::packet_traits<float>::type' {aka '__m128'} [-Wignored-attributes]
+   56 |                      >::type PacketReturnType;
+      |                              ^~~~~~~~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/util/XprHelper.h: In instantiation of 'struct Eigen::internal::find_best_packet<double, 4>':
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/Matrix.h:22:57:   required from 'struct Eigen::internal::traits<Eigen::Matrix<double, 4, 1> >'
+   22 |   typedef typename find_best_packet<_Scalar,size>::type PacketScalar;
+      |                                                         ^~~~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Geometry/Quaternion.h:266:49:   required from 'struct Eigen::internal::traits<Eigen::Quaternion<double> >'
+  266 |     Alignment = internal::traits<Coefficients>::Alignment,
+      |                                                 ^~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Geometry/arch/Geometry_SIMD.h:98:47:   required from here
+   98 |     ResAlignment = traits<Quaternion<double> >::Alignment
+      |                                               ^~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/util/XprHelper.h:190:44: warning: ignoring attributes on template argument 'Eigen::internal::packet_traits<double>::type' {aka '__m128d'} [-Wignored-attributes]
+  190 |          bool Stop = Size==Dynamic || (Size%unpacket_traits<PacketType>::size)==0 || is_same<PacketType,typename unpacket_traits<PacketType>::half>::value>
+      |                                       ~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/util/XprHelper.h:190:83: warning: ignoring attributes on template argument 'Eigen::internal::packet_traits<double>::type' {aka '__m128d'} [-Wignored-attributes]
+  190 |          bool Stop = Size==Dynamic || (Size%unpacket_traits<PacketType>::size)==0 || is_same<PacketType,typename unpacket_traits<PacketType>::half>::value>
+      |                      ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/util/XprHelper.h:190:83: warning: ignoring attributes on template argument 'Eigen::internal::packet_traits<double>::type' {aka '__m128d'} [-Wignored-attributes]
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/util/XprHelper.h:190:83: warning: ignoring attributes on template argument 'Eigen::internal::unpacket_traits<__vector(2) double>::half' {aka '__m128d'} [-Wignored-attributes]
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/util/XprHelper.h:208:88: warning: ignoring attributes on template argument 'Eigen::internal::packet_traits<double>::type' {aka '__m128d'} [-Wignored-attributes]
+  208 |   typedef typename find_best_packet_helper<Size,typename packet_traits<T>::type>::type type;
+      |                                                                                        ^~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/DenseCoeffsBase.h: In instantiation of 'class Eigen::DenseCoeffsBase<Eigen::Matrix<double, 4, 1>, 0>':
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/DenseCoeffsBase.h:302:7:   required from 'class Eigen::DenseCoeffsBase<Eigen::Matrix<double, 4, 1>, 1>'
+  302 | class DenseCoeffsBase<Derived, WriteAccessors> : public DenseCoeffsBase<Derived, ReadOnlyAccessors>
+      |       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/DenseCoeffsBase.h:555:7:   required from 'class Eigen::DenseCoeffsBase<Eigen::Matrix<double, 4, 1>, 3>'
+  555 | class DenseCoeffsBase<Derived, DirectWriteAccessors>
+      |       ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/DenseBase.h:41:34:   required from 'class Eigen::DenseBase<Eigen::Matrix<double, 4, 1> >'
+   41 | template<typename Derived> class DenseBase
+      |                                  ^~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/MatrixBase.h:48:34:   required from 'class Eigen::MatrixBase<Eigen::Matrix<double, 4, 1> >'
+   48 | template<typename Derived> class MatrixBase
+      |                                  ^~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/PlainObjectBase.h:98:7:   required from 'class Eigen::PlainObjectBase<Eigen::Matrix<double, 4, 1> >'
+   98 | class PlainObjectBase : public internal::dense_xpr_base<Derived>::type
+      |       ^~~~~~~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/Matrix.h:178:7:   required from 'class Eigen::Matrix<double, 4, 1>'
+  178 | class Matrix
+      |       ^~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Geometry/Quaternion.h:46:50:   required from 'class Eigen::QuaternionBase<Eigen::Quaternion<double> >'
+   46 |   typedef typename Coefficients::CoeffReturnType CoeffReturnType;
+      |                                                  ^~~~~~~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Geometry/Quaternion.h:273:7:   required from 'class Eigen::Quaternion<double>'
+  273 | class Quaternion : public QuaternionBase<Quaternion<_Scalar,_Options> >
+      |       ^~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Geometry/arch/Geometry_SIMD.h:102:3:   required from here
+  102 |   {
+      |   ^
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/Core/DenseCoeffsBase.h:56:30: warning: ignoring attributes on template argument 'Eigen::internal::packet_traits<double>::type' {aka '__m128d'} [-Wignored-attributes]
+   56 |                      >::type PacketReturnType;
+      |                              ^~~~~~~~~~~~~~~~
+In file included from C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/SparseCore:37,
+                 from C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/Sparse:26,
+                 from C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/RcppEigenForward.h:29:
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/SparseCore/SparseMatrixBase.h: In instantiation of 'class Eigen::SparseMatrixBase<Eigen::SparseMatrix<double, 0, int> >':
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/SparseCore/SparseCompressedBase.h:36:7:   required from 'class Eigen::SparseCompressedBase<Eigen::SparseMatrix<double, 0, int> >'
+   36 | class SparseCompressedBase
+      |       ^~~~~~~~~~~~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/SparseCore/SparseMatrix.h:96:7:   required from 'class Eigen::SparseMatrix<double, 0, int>'
+   96 | class SparseMatrix
+      |       ^~~~~~~~~~~~
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/unsupported/Eigen/src/IterativeSolvers/ConstrainedConjGrad.h:61:25:   required from here
+   61 |   typedef Triplet<double> T;
+      |                         ^
+C:/Users/peterman.73/AppData/Local/R/win-library/4.6/RcppEigen/include/Eigen/src/SparseCore/SparseMatrixBase.h:47:30: warning: ignoring attributes on template argument 'Eigen::internal::packet_traits<double>::type' {aka '__m128d'} [-Wignored-attributes]
+   47 |                      >::type PacketReturnType;
+      |                              ^~~~~~~~~~~~~~~~
+g++ -std=gnu++20 -shared -static-libgcc -o terradish.dll tmp.def RcppExports.o amg_solver.o cholmod_direct.o radish.o -fopenmp -LC:/PROGRA~1/R/R-46~1.1/bin/x64 -lRlapack -LC:/PROGRA~1/R/R-46~1.1/bin/x64 -lRblas -lgfortran -lquadmath -LC:/rtools45/x86_64-w64-mingw32.static.posix/lib/x64 -LC:/rtools45/x86_64-w64-mingw32.static.posix/lib -LC:/PROGRA~1/R/R-46~1.1/bin/x64 -lR
+installing to C:/Users/peterman.73/AppData/Local/Temp/RtmpOw0qKQ/devtools_install_112cc2f1a3345/00LOCK-terradish/00new/terradish/libs/x64
+* DONE (terradish)
+Warning: S3 methods 'AIC.terradish_directed', 'AIC.terradish_hierarchical', 'coef.terradish_directed', 'coef.terradish_hierarchical', 'confint.terradish_directed', 'confint.terradish_hierarchical', 'logLik.terradish_directed', 'logLik.terradish_hierarchical', 'plot.terradish_directed', 'plot.terradish_hierarchical', 'print.summary.terradish_cv_replicates', 'print.summary.terradish_directed', 'print.terradish_cv_replicates', 'print.terradish_directed', 'print.terradish_hierarchical', 'summary.terradish_cv_replicates', 'summary.terradish_directed', 'summary.terradish_hierarchical', 'vcov.terradish_directed', 'vcov.terradish_hierarchical' were declared in NAMESPACE but not found
+Warning: Objects listed as exports, but not present in namespace:
+• conductance_field
+• cv_model_selection
+• directed_rates
+• edge_flow
+• edge_gradient
+• linear_conductance
+• pair_subset_measurement_model
+• radish_cv
+• radish_multiscale
+• radish_parameters
+• terradish_cv
+• terradish_cv_replicates
+• terradish_directed
+• terradish_directed_algorithm
+• terradish_hierarchical
+• terradish_kron_reduce
+• terradish_kron_reduce_tiled
+• terradish_multiscale
+• terradish_parameters
+• terradish_results
+• wishart_drift_covariates
+Writing 'NAMESPACE'
+Writing 'aic_table.Rd'
+Writing 'covariance_response_power.Rd'
+Writing 'generalized_wishart.Rd'
+Writing 'pairwise_endpoint_covariates.Rd'
+Writing 'mlpe_covariates.Rd'
+Writing 'terradish_algorithm.Rd'
+Writing 'terradish_conductance_model_factory.Rd'
+Writing 'loglinear_conductance.Rd'
+Writing 'terradish_grid.Rd'
+Writing 'terradish.Rd'
+Writing 'reexports.Rd'
+Writing 'terradish-package.Rd'
+Writing 'wishart_covariance.Rd'
+Writing 'wishart_covariates.Rd'
+Deleting 'conductance_field.Rd', 'cv_model_selection.Rd', 'directed_rates.Rd',
+'legacy_radish_cv_wrapper.Rd', 'legacy_radish_multiscale_wrapper.Rd',
+'legacy_radish_parameters_wrapper.Rd', 'linear_conductance.Rd',
+'pair_subset_measurement_model.Rd', 'terradish_cv.Rd',
+'terradish_cv_replicates.Rd', 'terradish_cv_replicates_methods.Rd',
+'terradish_directed.Rd', 'terradish_directed_algorithm.Rd',
+'terradish_directed_methods.Rd', 'terradish_hierarchical.Rd',
+'terradish_hierarchical_methods.Rd', 'terradish_kron_reduce.Rd',
+'terradish_kron_reduce_tiled.Rd', …, 'terradish_results.Rd', and
+'wishart_drift_covariates.Rd'

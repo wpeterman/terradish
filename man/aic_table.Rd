@@ -21,8 +21,7 @@ correction uses \eqn{n} = number of focal sampling sites (not the number
 of pairwise observations).  A common guideline is to prefer AICc over AIC
 when \eqn{n / K < 40}, where \eqn{K} is the number of estimated parameters.}
 
-\item{BIC}{Should BIC be used instead of AIC? BIC uses the number of selected
-pair rows for pair-subset fits and otherwise uses
+\item{BIC}{Should BIC be used instead of AIC? BIC uses
 \eqn{n = n_{sites}(n_{sites}-1)/2} as an implementation convention. Those
 pairs are not independent in MLPE and related designs, so report the
 convention and do not treat it as a uniquely determined effective sample
@@ -46,7 +45,7 @@ AIC, AICc, or BIC.
 }
 \details{
 Information-criterion comparison requires the same observed response,
-focal sites, graph domain, likelihood family, and pair subset. Wishart fits
+focal sites, graph domain, and likelihood family. Wishart fits
 must also use the same effective degrees of freedom, \code{nu}.
 \code{leastsquares} and \code{mlpe} are Gaussian likelihoods for the same
 pairwise-distance response and can be ranked when those conditions hold.
@@ -55,7 +54,7 @@ response representations and must not be ranked together. Cross-family
 rankings, such as \code{mlpe} versus \code{generalized_wishart}, are invalid.
 
 The function checks response values, model family, fitted dimensions,
-selected pairs, and recorded \code{nu}. It cannot establish that two
+and recorded \code{nu}. It cannot establish that two
 separately constructed graphs with the same dimensions have identical
 domains, so users must verify that condition.
 }

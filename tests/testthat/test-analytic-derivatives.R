@@ -113,32 +113,6 @@ test_that("the profile Hessian is correct when a nuisance parameter is pinned at
                tolerance = 1e-6, ignore_attr = TRUE)
 })
 
-test_that("free nuisance parameters still contribute to the profile Hessian", {
-  # Complement to the test above: `wishart_drift_covariates` estimates an
-  # interior drift slope, so the correction must NOT be dropped there.
-  skip_if_not_installed("numDeriv")
-  fx <- deriv_fixture()
-  S_cov <- simulate_covariance_response(
-    theta = c(0.15, -0.2), formula = ~ altitude + forestcover,
-    data = fx$surface, conductance_model = loglinear_conductance,
-    tau = 0.7, sigma = 0.05, nu = 40, seed = 1)$covariance
-
-  set.seed(11)
-  site_env <- data.frame(env = rnorm(fx$n_sites))
-  g <- wishart_drift_covariates(site_env, model = "wishart_covariance")
-  theta <- c(0.15, -0.2)
-
-  fit <- terradish_algorithm(fx$f, g, fx$surface, S_cov, theta, nu = 40,
-                             partial = FALSE)
-  expect_true(all(is.finite(fit$phi)))
-  expect_derivatives_match(fx$f, g, fx$surface, S_cov, theta, nu = 40)
-
-  # the drift term genuinely changes the curvature relative to the base model
-  base <- terradish_algorithm(fx$f, wishart_covariance, fx$surface, S_cov,
-                              theta, nu = 40, partial = FALSE)
-  expect_false(isTRUE(all.equal(as.matrix(fit$hessian),
-                                as.matrix(base$hessian))))
-})
 
 test_that(".free_parameter_index flags only parameters on an active bound", {
   free <- terradish:::.free_parameter_index(
@@ -165,7 +139,7 @@ test_that(".constrained_inverse_hessian zeroes pinned rows and columns", {
                solve(H))
 })
 
-test_that("linear and spline conductance derivatives match finite differences", {
+test_that("spline conductance derivatives match finite differences", {
   skip_on_cran()
   skip_if_not_installed("numDeriv")
 
@@ -174,14 +148,6 @@ test_that("linear and spline conductance derivatives match finite differences", 
   names(covariates) <- c("altitude", "forestcover")
   coords <- terra::unwrap(melip.coords)[1:8]
   S_dist <- ifelse(melip.Fst[1:8, 1:8] < 0, 0, melip.Fst[1:8, 1:8])
-
-  # identity-link conductance requires strictly positive values, so use the
-  # 0-1 rescaling rather than the mean-zero standardization
-  surface_01 <- conductance_surface(scale_to_0_1(covariates), coords,
-                                    directions = 8)
-  f_linear <- linear_conductance(~ altitude + forestcover, surface_01$x)
-  expect_derivatives_match(f_linear, leastsquares, surface_01, S_dist,
-                           c(0.8, 1.2))
 
   surface_z <- conductance_surface(scale_covariates(covariates), coords,
                                    directions = 8)
@@ -202,10 +168,4 @@ test_that("pairwise-covariate measurement models match finite differences", {
   expect_derivatives_match(fx$f, mlpe_covariates(site_env), fx$surface,
                            fx$S_dist, c(-0.3, 0.3))
 
-  pairs <- t(utils::combn(fx$n_sites, 2))
-  subset_pairs <- pairs[seq(1, nrow(pairs), by = 2), , drop = FALSE]
-  expect_derivatives_match(fx$f,
-                           pair_subset_measurement_model(leastsquares,
-                                                         subset_pairs),
-                           fx$surface, fx$S_dist, c(-0.3, 0.3))
 })

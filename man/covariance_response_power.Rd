@@ -24,7 +24,7 @@ covariance_response_power(
   conductance_cor_threshold = 0.9,
   optimizer = c("auto", "newton", "bfgs"),
   control = NewtonRaphsonControl(maxit = 8, verbose = FALSE),
-  solver = c("auto", "direct", "amg", "pcg", "pcg_jacobi"),
+  solver = c("auto", "direct", "amg"),
   solver_control = NULL,
   approximation = c("none", "landmark", "coarse_raster"),
   approximation_control = NULL,

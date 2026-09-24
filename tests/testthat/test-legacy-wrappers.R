@@ -92,8 +92,7 @@ test_that(".terradish_forward_call rewrites the function but keeps the arguments
 })
 
 test_that("every legacy wrapper is exported and deprecated", {
-  legacy <- c("radish", "radish_algorithm", "radish_cv", "radish_distance",
-              "radish_grid", "radish_multiscale", "radish_parameters")
+  legacy <- c("radish", "radish_algorithm", "radish_distance", "radish_grid")
   exported <- getNamespaceExports(asNamespace("terradish"))
   expect_true(all(legacy %in% exported))
   # each body must route through the shared deprecation helper, so none can
