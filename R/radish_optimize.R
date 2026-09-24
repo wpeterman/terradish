@@ -847,6 +847,8 @@ terradish <- function(formula,
       is.null(rebuild_conductance_model_for_surface))
     stop("`approximation = \"coarse_raster\"` is not currently supported for this conductance model")
   conductance_model <- conductance_model_factory(formula, data$x)
+  if (isTRUE(attr(conductance_model, "smooth_loglinear", exact = TRUE)))
+    conductance_model_factory <- attr(conductance_model, "plot_factory", exact = TRUE)
   conductance_model_user <- .externalize_conductance_model(conductance_model)
   conductance_supports_partial <- !identical(
     attr(conductance_model, "supports_partial", exact = TRUE),
@@ -1297,6 +1299,9 @@ radish <- function(...)
 #' \code{tau} is log precision and its stored \code{rho} is unconstrained; the
 #' actual shared-site correlation is \eqn{\text{plogis}(\rho)/2}. Consult the
 #' selected measurement-model help page before interpreting \code{phi}.
+#' Covariance-response residuals are centered on both site dimensions:
+#' \eqn{H(S-\Sigma)H}, where \eqn{H} is the site-centering matrix. Fitted
+#' covariance matrices retain their full \eqn{n\times n} form.
 #'
 #' \code{anova()} is a likelihood-ratio test for nested conductance formulas
 #' fitted to the same response, sites, graph domain, conductance-model factory,
@@ -1692,7 +1697,12 @@ AIC.radish <- function(object, ..., k = 2)
 residuals.radish <- function(object, ...)
 {
   fit <- fitted(object)
-  object$fit$response - fit
+  residual <- object$fit$response - fit
+  if (.fit_uses_covariance_response(object)) {
+    H <- diag(nrow(residual)) - matrix(1 / nrow(residual), nrow(residual), nrow(residual))
+    residual <- H %*% residual %*% H
+  }
+  residual
 }
 
 #' @rdname terradish_methods

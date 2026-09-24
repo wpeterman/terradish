@@ -217,6 +217,11 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
 
 .resolve_plot_conductance_model <- function(fit, conductance_model)
 {
+  if (!is.null(fit$submodels$f_internal) &&
+      isTRUE(attr(fit$submodels$f_internal, "smooth_loglinear", exact = TRUE)) &&
+      (is.null(conductance_model) || identical(conductance_model, smooth_loglinear_conductance) ||
+       isTRUE(attr(conductance_model, "smooth_loglinear", exact = TRUE))))
+    return(attr(fit$submodels$f_internal, "plot_factory", exact = TRUE))
   if (!is.null(conductance_model))
     return(conductance_model)
 

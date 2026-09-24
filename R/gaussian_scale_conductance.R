@@ -144,15 +144,19 @@
 
   stack <- .as_spatraster(surface$stack)
   mean_res <- mean(abs(res(stack[[1]])))
-  extent_diag <- .gaussian_scale_extent_diagonal(stack)
 
   lower_default <- mean_res / 2
-  upper_default <- max(extent_diag, lower_default * 4)
+  upper_default <- min(nrow(stack), ncol(stack)) * mean_res / 6
 
   lower <- .coerce_gaussian_scale_bound(sigma_lower, scale_vars,
                                         lower_default, "sigma_lower")
   upper <- .coerce_gaussian_scale_bound(sigma_upper, scale_vars,
                                         upper_default, "sigma_upper")
+
+  if (any(upper > upper_default))
+    warning("`sigma_upper` exceeds the three-sigma support of the truncated Gaussian kernel (",
+            signif(upper_default, 4), " map units). Large scales are truncated by the raster-sized window.",
+            call. = FALSE)
 
   if (any(lower >= upper))
     stop("Each `sigma_lower` bound must be strictly less than `sigma_upper`",
@@ -221,10 +225,10 @@
     ncol = nc,
     nrow_pad = nrow_pad,
     ncol_pad = ncol_pad,
-    i1 = floor(nr / 2) + 1L,
-    i2 = floor(nr / 2) + nr,
-    j1 = floor(nc / 2) + 1L,
-    j2 = floor(nc / 2) + nc,
+    i1 = ceiling(nr / 2),
+    i2 = ceiling(nr / 2) + nr - 1L,
+    j1 = ceiling(nc / 2),
+    j2 = ceiling(nc / 2) + nc - 1L,
     dist2 = dist2,
     rowcol = rowcol,
     na_mask = !mask,
@@ -717,7 +721,9 @@
 #'   are recycled across all scaled rasters; named vectors may be used to set
 #'   different bounds by raster name. When omitted, \code{sigma_lower} defaults
 #'   to half of the mean raster cell width and \code{sigma_upper} defaults to
-#'   the diagonal length of the retained raster extent.
+#'   one sixth of the smaller raster dimension in cells times the mean cell
+#'   width. The Gaussian kernel uses a raster-sized window; larger explicit
+#'   upper bounds issue a warning because more of the kernel is truncated.
 #' @param sigma_conversion Internal scaling applied during optimization.
 #'   \code{"cell"} (default) rescales each sigma parameter by the mean cell
 #'   width of its raster layer so optimization happens in approximate cell

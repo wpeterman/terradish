@@ -18,7 +18,7 @@ terra_radish_scale_optim(
   grid_points = 5L,
   maxit = 10L,
   tol = 0.1,
-  scale_fun = NULL,
+  scale_fun = "terradish",
   scale_args = NULL,
   postprocess = scale_covariates,
   directions = 8L,

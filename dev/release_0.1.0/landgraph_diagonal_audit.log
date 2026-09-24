@@ -1,0 +1,27 @@
+ℹ Loading terradish
+terra 1.9.34
+
+Attaching package: 'terra'
+
+The following objects are masked from 'package:testthat':
+
+    compare, describe
+
+  seed diagonal term truth   estimate        se boundary   bias_se wrong_sign
+1    1   within   x1   0.6 -0.3650445 0.6181632    FALSE 1.5611484       TRUE
+2    1   within   x2  -0.4 -0.2699295 0.5330507    FALSE 0.2440115      FALSE
+  seed diagonal term truth   estimate         se boundary   bias_se wrong_sign
+1    1    gower   x1   0.6  0.5568695 0.05746781    FALSE 0.7505158      FALSE
+2    1    gower   x2  -0.4 -0.3758914 0.10094864    FALSE 0.2388206      FALSE
+  seed diagonal term truth   estimate        se boundary  bias_se wrong_sign
+1    2   within   x1   0.6 -0.6915720 0.4731544    FALSE 2.729705       TRUE
+2    2   within   x2  -0.4  0.1752833 0.3750279    FALSE 1.533975       TRUE
+  seed diagonal term truth   estimate         se boundary   bias_se wrong_sign
+1    2    gower   x1   0.6  0.4990493 0.06221338    FALSE 1.6226530      FALSE
+2    2    gower   x2  -0.4 -0.3753910 0.10081164    FALSE 0.2441088      FALSE
+  seed diagonal term truth    estimate        se boundary  bias_se wrong_sign
+1    3   within   x1   0.6 -0.58249827 0.5671428    FALSE 2.085010       TRUE
+2    3   within   x2  -0.4 -0.06090281 0.5244076    FALSE 0.646629      FALSE
+  seed diagonal term truth   estimate         se boundary   bias_se wrong_sign
+1    3    gower   x1   0.6  0.6057512 0.05538621    FALSE 0.1038375      FALSE
+2    3    gower   x2  -0.4 -0.3575256 0.10390130    FALSE 0.4087952      FALSE

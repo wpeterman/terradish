@@ -8,7 +8,7 @@ test_that("wishart_covariates builds PSD kernels from site covariates", {
   expect_s3_class(g, "terradish_measurement_model")
   expect_equal(dim(kernels), c(4, 4, 2))
   expect_equal(dimnames(kernels)[[3]],
-               c("kernel_altitude", "kernel_moisture"))
+               c("kernel_absdiff_altitude", "kernel_absdiff_moisture"))
   for (k in seq_len(dim(kernels)[3]))
     expect_gte(min(eigen(kernels[, , k], symmetric = TRUE,
                          only.values = TRUE)$values), -1e-8)
@@ -27,7 +27,7 @@ test_that("wishart_covariates returns the covariance Wishart interface", {
   start <- g(E, S, nu = 25)
   fit <- g(E, S, phi = start$phi, nu = 25)
 
-  expect_equal(names(start$phi), c("tau", "lambda_altitude", "sigma"))
+  expect_equal(names(start$phi), c("tau", "lambda_absdiff_altitude", "sigma"))
   expect_equal(start$lower, c(0, 0, -Inf))
   expect_true(is.finite(fit$objective))
   expect_equal(dim(fit$fitted), dim(S))
@@ -49,7 +49,7 @@ test_that("wishart_covariates matches base covariance Wishart with zero kernel w
   g <- wishart_covariates(data.frame(altitude = c(-1, 0, 1)),
                           model = "wishart_covariance")
 
-  wrapped <- g(E, S, phi = c(tau = 0.8, lambda_altitude = 0,
+  wrapped <- g(E, S, phi = c(tau = 0.8, lambda_absdiff_altitude = 0,
                              sigma = log(0.2)), nu = 25)
   base <- wishart_covariance(E, S, phi = c(tau = 0.8, sigma = log(0.2)),
                              nu = 25)
@@ -69,7 +69,7 @@ test_that("wishart_covariates supports generalized Wishart likelihoods", {
   g <- wishart_covariates(data.frame(altitude = c(-1, 0, 1)),
                           model = "generalized_wishart")
 
-  wrapped <- g(E, S, phi = c(tau = 0.8, lambda_altitude = 0,
+  wrapped <- g(E, S, phi = c(tau = 0.8, lambda_absdiff_altitude = 0,
                              sigma = log(0.2)), nu = 25)
   base <- generalized_wishart(E, S, phi = c(tau = 0.8, sigma = log(0.2)),
                               nu = 25)
@@ -123,7 +123,7 @@ test_that("terradish can optimize covariance responses with Wishart covariates",
 
   expect_s3_class(fit, "terradish")
   expect_true(is.finite(fit$loglik))
-  expect_true("lambda_altitude" %in% rownames(fit$fit$phi))
+  expect_true("lambda_absdiff_altitude" %in% rownames(fit$fit$phi))
 })
 
 test_that("terradish can optimize distance responses with generalized Wishart covariates", {
@@ -146,5 +146,5 @@ test_that("terradish can optimize distance responses with generalized Wishart co
   expect_s3_class(fit, "terradish")
   expect_true(is.finite(fit$loglik))
   expect_false(is.complex(fit$loglik))
-  expect_true("lambda_altitude" %in% rownames(fit$fit$phi))
+  expect_true("lambda_absdiff_altitude" %in% rownames(fit$fit$phi))
 })

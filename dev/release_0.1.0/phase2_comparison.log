@@ -1,0 +1,12 @@
+a_mlpe logLik: 2160.184 -> 2160.184 
+b_leastsquares logLik: 1960.571 -> 1960.571 
+c_generalized_wishart logLik: -609.885 -> -609.885 
+d_wishart_covariance logLik: -664.8265 -> -609.885 
+e_spline logLik: 2182.35 -> 2182.35 
+f_gaussian_odd logLik: 1517.628 -> 1517.628 
+g_gaussian_even logLik: 1549.991 -> 1517.538 
+h_mlpe_covariates logLik: 2222.044 -> 2222.044 
+i_wishart_covariates logLik: -609.8802 -> -609.8802 
+ℹ Loading terradish
+F8 kernel variance: 1.140215 ; old/new lambda: 0.0003082854 0.0002703747 
+All Phase 2 baseline contracts passed.

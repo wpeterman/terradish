@@ -9,7 +9,8 @@
 #'
 #' @param x Site-level covariates.  Supported inputs are the same as
 #'   \code{\link{pairwise_endpoint_covariates}}: a numeric vector, matrix, data
-#'   frame, or \code{terra::SpatRaster}.
+#'   frame, or \code{terra::SpatRaster}. A previously constructed
+#'   \code{terradish_pairwise_covariates} object is accepted unchanged.
 #' @param coords Required when \code{x} is a raster.  Focal-point coordinates
 #'   in the same projection as \code{x}; accepts the same inputs as
 #'   \code{\link{conductance_surface}}.
@@ -25,18 +26,19 @@
 #' @param scale Logical.  Standardize site-level covariates to zero mean and
 #'   unit variance before constructing kernels?  Recommended when covariates
 #'   use different units or scales.
-#' @param normalize Logical.  If \code{TRUE}, rescale each kernel matrix by
-#'   its mean diagonal so that estimated kernel weights \eqn{\lambda_k} are on
-#'   similar numerical scales across covariates. This normalization does not
-#'   make fitted weights scientifically or causally comparable.
+#' @param transform Pairwise environmental difference: \code{"absdiff"}
+#'   (default), \code{"sqdiff"}, \code{"euclidean"}, or \code{"manhattan"}.
+#'   See \code{\link{pairwise_endpoint_covariates}}. Ignored for an existing
+#'   pairwise-covariate object.
 #'
 #' @details
 #' \code{wishart_covariates()} is the Wishart analogue of
 #' \code{\link{mlpe_covariates}}, but environmental covariates enter the model
-#' differently because the Wishart likelihood is a full-matrix rather than a
-#' pairwise regression.  For each site covariate \eqn{z_k}, this helper centers
-#' the vector and constructs the positive semidefinite outer-product kernel
-#' \eqn{K_k = z_k z_k^\top}.  The fitted covariance is:
+#' through positive semidefinite kernels. For each pairwise difference matrix
+#' \eqn{D_k}, the kernel is \eqn{K_k=-\frac12 H D_k H}, where \eqn{H} centers
+#' sites. A kernel with a negative eigenvalue beyond numerical tolerance is
+#' rejected. The \code{"sqdiff"} transform gives the centered outer product
+#' of the original covariate. The fitted covariance is:
 #'
 #' \deqn{\Sigma = \tau E(\theta) + \sum_k \lambda_k K_k + \exp(\sigma) I}
 #'
@@ -52,11 +54,10 @@
 #'   \item{\code{tau}}{Nonnegative scale on the resistance-implied covariance
 #'     \eqn{E}. A value near zero indicates no detectable contribution from
 #'     conductance-implied covariance under this model.}
-#'   \item{\code{lambda_<covariate>}}{Nonnegative weight on the outer-product
-#'     kernel for each environmental covariate.  A positive value indicates
-#'     support for that particular centered outer-product covariance pattern,
-#'     conditional on the graph kernel and other terms. It is not a causal IBE
-#'     effect and is not numerically comparable to an MLPE slope.}
+#'   \item{\code{lambda_<covariate>}}{Nonnegative weight per unit of the
+#'     corresponding pairwise environmental difference. A negative association
+#'     is represented at the zero bound; MLPE environmental slopes are
+#'     unconstrained. The weight is not a causal IBE effect.}
 #'   \item{\code{sigma}}{Log-scale nugget: identity component added as
 #'     \eqn{\exp(\sigma) I}, representing diagonal variance not captured by the
 #'     other covariance components. It is not a smoothing scale or direct drift
@@ -65,15 +66,19 @@
 #'
 #' This design naturally preserves positive definiteness of \eqn{\Sigma} when
 #' the nugget is positive and all kernel weights are nonnegative.  It is
-#' intentionally different from \code{\link{mlpe_covariates}}, which adds
-#' pairwise environmental dissimilarities as regression covariates in the MLPE
-#' mean structure.  Neither approach is universally preferable: use
+#' evaluated on site contrasts, as in \code{\link{wishart_covariance}}. The
+#' implied squared-distance mean is \eqn{\tau R_{ij}+\sum_k\lambda_k D_{k,ij}
+#' +2\exp(\sigma)}, using the same additive environmental terms as MLPE.
+#' The likelihoods and coefficient constraints still differ. Use
 #' \code{wishart_covariates()} when the response satisfies the selected Wishart
 #' model's requirements and you can justify an effective degrees-of-freedom
 #' value \code{nu}; use \code{\link{mlpe_covariates}} when \code{nu} is unknown
 #' or when the distance-regression framework better matches the response.
 #' Neither formulation cleanly separates causal IBE from IBR when predictors
 #' and kernels are spatially correlated.
+#' Scaling is applied to site values before the pairwise transform; kernels
+#' are not normalized afterward. Site subsets retain these original pairwise
+#' values and rebuild centered kernels without restandardizing the subset.
 #'
 #' @return A function of class \code{"terradish_measurement_model"} suitable
 #'   for the \code{measurement_model} argument of \code{\link{terradish}} and
@@ -133,15 +138,15 @@
 #' @export
 wishart_covariates <- function(x,
                                coords = NULL,
-                               model = c("wishart_covariance",
-                                         "generalized_wishart"),
+                               transform = c("absdiff", "sqdiff", "euclidean", "manhattan"),
                                scale = FALSE,
-                               normalize = TRUE)
+                               model = c("wishart_covariance",
+                                         "generalized_wishart"))
 {
   model <- match.arg(model)
-  site_covariates <- .pairwise_site_covariates(x, coords = coords, scale = scale)
-  kernels <- .make_wishart_kernel_covariates(site_covariates,
-                                             normalize = normalize)
+  pairs <- pairwise_endpoint_covariates(x, coords = coords,
+                                         transform = match.arg(transform), scale = scale)
+  kernels <- .make_wishart_kernel_covariates(pairs)
 
   g <- switch(
     model,
@@ -151,11 +156,16 @@ wishart_covariates <- function(x,
 
   attr(g, "base_model") <- model
   attr(g, "kernel_covariates") <- kernels
-  attr(g, "subsetter") <- function(index)
-    wishart_covariates(attr(kernels, "site_covariates")[index, , drop = FALSE],
-                       model = model,
-                       scale = FALSE,
-                       normalize = normalize)
+  attr(g, "subsetter") <- function(index) {
+    distances <- attr(kernels, "distances")
+    block <- distances[index, index, , drop = FALSE]
+    values <- vapply(seq_len(dim(block)[3]), function(k)
+      block[, , k][lower.tri(block[, , k])], numeric(length(index) * (length(index) - 1) / 2))
+    values <- matrix(values, ncol = dim(block)[3])
+    colnames(values) <- dimnames(block)[[3]]
+    class(values) <- c("terradish_pairwise_covariates", "matrix", "array")
+    wishart_covariates(values, model = model)
+  }
   class(g) <- unique(c("terradish_wishart_covariate_model",
                        "terradish_measurement_model",
                        "radish_measurement_model",
@@ -163,46 +173,36 @@ wishart_covariates <- function(x,
   g
 }
 
-.make_wishart_kernel_covariates <- function(site_covariates, normalize = TRUE)
+.make_wishart_kernel_covariates <- function(pairwise)
 {
-  site_covariates <- as.matrix(site_covariates)
-  if (!is.numeric(site_covariates))
-    stop("site-level covariates must be numeric")
-  if (anyNA(site_covariates))
+  pairwise <- as.matrix(pairwise)
+  if (!is.numeric(pairwise) || any(!is.finite(pairwise)))
     stop("missing values are not supported in Wishart kernel covariates")
-  if (nrow(site_covariates) < 2L)
-    stop("need at least two focal points to construct Wishart kernel covariates")
-  if (is.null(colnames(site_covariates)))
-    colnames(site_covariates) <- paste0("var", seq_len(ncol(site_covariates)))
-
-  centered <- scale(site_covariates, center = TRUE, scale = FALSE)
-  kernels <- array(0, dim = c(nrow(centered), nrow(centered), ncol(centered)),
-                   dimnames = list(rownames(centered), rownames(centered),
-                                   paste0("kernel_", colnames(centered))))
-  scales <- rep(NA_real_, ncol(centered))
-  names(scales) <- dimnames(kernels)[[3]]
-
-  for (j in seq_len(ncol(centered)))
-  {
-    z <- centered[, j]
-    K <- tcrossprod(z)
-    if (isTRUE(normalize))
-    {
-      scale_j <- mean(diag(K))
-      if (!is.finite(scale_j) || scale_j <= .Machine$double.eps)
-        stop("Wishart kernel covariate `", colnames(centered)[j],
-             "` has no variation.", call. = FALSE)
-      K <- K / scale_j
-      scales[j] <- scale_j
-    }
+  n <- (1 + sqrt(1 + 8 * nrow(pairwise))) / 2
+  if (n < 2 || n != as.integer(n) || !ncol(pairwise))
+    stop("Pairwise covariates must contain one row per unordered site pair.", call. = FALSE)
+  if (is.null(colnames(pairwise))) colnames(pairwise) <- paste0("var", seq_len(ncol(pairwise)))
+  H <- diag(n) - matrix(1 / n, n, n)
+  kernels <- array(0, c(n, n, ncol(pairwise)),
+                    dimnames = list(NULL, NULL, paste0("kernel_", colnames(pairwise))))
+  distances <- kernels
+  dimnames(distances)[[3]] <- colnames(pairwise)
+  for (j in seq_len(ncol(pairwise))) {
+    D <- matrix(0, n, n)
+    D[lower.tri(D)] <- pairwise[, j]
+    D <- D + t(D)
+    K <- .symmetrize_matrix(-0.5 * H %*% D %*% H)
+    ev <- eigen(K, symmetric = TRUE, only.values = TRUE)$values
+    if (min(ev) < -1e-10 * max(abs(ev)))
+      stop("Pairwise covariate `", colnames(pairwise)[j],
+           "` is not conditionally negative definite; its Wishart kernel is not positive semidefinite.",
+           call. = FALSE)
     kernels[, , j] <- K
+    distances[, , j] <- D
   }
-
   structure(kernels,
-            site_covariates = site_covariates,
-            kernel = "linear",
-            normalized = isTRUE(normalize),
-            kernel_scale = scales,
+            distances = distances,
+            kernel = "pairwise_distance",
             class = unique(c("terradish_wishart_kernel_covariates",
                              class(kernels))))
 }
@@ -261,11 +261,13 @@ wishart_covariates <- function(x,
   {
     if (isTRUE(covariance))
     {
-      X <- cbind(c(E),
+      L <- qr.Q(qr(stats::contr.helmert(nrow(E))))
+      project <- function(M) c(crossprod(L, M %*% L))
+      X <- cbind(project(E),
                  do.call(cbind, lapply(seq_len(dim(kernels)[3]),
-                                       function(k) c(kernels[, , k]))),
-                 c(diag(nrow(E))))
-      coef0 <- tryCatch(qr.solve(X, c(S)),
+                                       function(k) project(kernels[, , k]))),
+                 c(diag(ncol(L))))
+      coef0 <- tryCatch(qr.solve(X, project(S)),
                         error = function(e) rep(1e-6, length(phi_names)))
       coef0 <- pmax(as.numeric(coef0), 1e-6)
       phi <- c(coef0[-length(coef0)], log(coef0[length(coef0)]))
@@ -327,9 +329,11 @@ wishart_covariates <- function(x,
                                           curvature = NULL)
 {
   symm <- function(X) (X + t(X)) / 2
-  A <- solve(Sigma)
+  L <- qr.Q(qr(stats::contr.helmert(nrow(Sigma))))
+  SigmaContrast <- crossprod(L, Sigma %*% L)
+  A <- L %*% solve(SigmaContrast, t(L))
   ASA <- A %*% S %*% A
-  objective <- nu / 2 * (as.numeric(determinant(Sigma, logarithm = TRUE)$modulus) +
+  objective <- nu / 2 * (as.numeric(determinant(SigmaContrast, logarithm = TRUE)$modulus) +
                            sum(diag(A %*% S)))
   grad_Sigma <- nu / 2 * (A - ASA)
 

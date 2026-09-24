@@ -11,7 +11,8 @@
 #'
 #' @param theta Conductance parameters. May be supplied as a numeric vector or
 #'   a one-row matrix. If unnamed, values are matched in the order implied by
-#'   \code{formula}.
+#'   \code{formula}. Gaussian \code{sigma.<layer>} parameters use the map
+#'   units reported by \code{coef()}; conversion to optimizer units is internal.
 #' @param formula Model formula specifying the conductance covariates. The left
 #'   hand side, if supplied, is ignored.
 #' @param data A \code{\link{conductance_surface}} object.
@@ -123,7 +124,8 @@ simulate_covariance_response <- function(theta,
     set.seed(seed)
 
   E <- terradish_distance(
-    theta = theta,
+    theta = matrix(.conductance_model_to_internal(c(theta), conductance_model_obj),
+                   nrow = 1L, dimnames = dimnames(theta)),
     formula = model_formula,
     data = data,
     conductance_model = conductance_model,

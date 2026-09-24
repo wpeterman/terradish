@@ -90,13 +90,18 @@ The nuisance parameters are:
 }
 
 The fitted covariance is \eqn{\Sigma = \tau E + \exp(\sigma) I}.  The
+likelihood is evaluated on orthonormal site contrasts. Let \eqn{L} have
+\eqn{n-1} orthonormal columns perpendicular to the constant vector, and let
+\eqn{\tilde\Sigma = L^T\Sigma L} and \eqn{\tilde S = L^T S L}. The
 negative log-likelihood is:
 
-\deqn{-\ell = \frac{\nu}{2} \left[ \log|\Sigma| + \mathrm{tr}(\Sigma^{-1} S) \right]}
+\deqn{-\ell = \frac{\nu}{2} \left[ \log|\tilde\Sigma| + \mathrm{tr}(\tilde\Sigma^{-1} \tilde S) \right]}
 
-treating \code{S} as a sample covariance with \eqn{\nu} degrees of freedom
-(i.e. \eqn{\nu S} follows a Wishart distribution with \eqn{\nu} degrees of
-freedom and scale matrix \eqn{\Sigma}).
+The response is a sample covariance on site contrasts with effective
+degrees of freedom \eqn{\nu}. Adding a constant to every entry of \code{S}
+or centering it across sites does not change this objective. This is the
+same objective as \code{generalized_wishart(dist_from_cov(S))}; the nugget
+contributes \eqn{2\exp(\sigma)} to the expected squared distances.
 
 \strong{The role of \code{nu} (read this before choosing a value).}
 \code{nu} is the single most consequential setting in a covariance-based

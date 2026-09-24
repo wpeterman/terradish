@@ -54,6 +54,13 @@ applies the same positive log-link used by \code{\link{loglinear_conductance}}:
 
 \deqn{C_i = \exp(B_i \theta)}
 
+Each spline column is centered over the active graph cells. The fitted
+knots, boundary knots, degree, and column centers are retained and reused
+for plotting, focal-support prediction, and coarse warm starts. Centering
+changes the arbitrary conductance reference level but preserves the
+likelihood and fitted conductance coefficients. Uncertainty bands are
+relative to the landscape-mean spline contribution to log conductance.
+
 where \eqn{B_i} is the row of the expanded spline/parametric design matrix
 for grid cell \eqn{i}. This is GAM-like in the conductance surface, not a
 replacement for the MLPE response model. The \code{\link{mlpe}} measurement

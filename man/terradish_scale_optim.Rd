@@ -17,7 +17,7 @@ terradish_scale_optim(
   grid_points = 5L,
   maxit = 10L,
   tol = 0.1,
-  scale_fun = NULL,
+  scale_fun = "terradish",
   scale_args = NULL,
   postprocess = scale_covariates,
   directions = 8L,
@@ -38,12 +38,10 @@ whose smoothing scales will be optimized.}
 \code{search = "coordinate"} unless \code{scale_grid} is supplied.}
 
 \item{lower, upper}{Lower and upper bounds for each scale parameter, in
-whatever units \code{scale_fun} expects.  The default \code{scale_fun} is
-\code{multiScaleR::kernel_scale.raster()}, whose \code{sigma} is measured
-in \strong{raster cells}, not map units, so a bound below 1 barely smooths
-at all and a bound approaching the raster dimensions flattens the layer.
-A useful starting range is roughly 1 cell up to a tenth of the smaller
-raster dimension.  Used to construct \code{scale_grid} when that is not
+map units for both built-in smoothing methods. The default uses the same
+normalized, truncated Gaussian as the joint scale model. A useful upper
+bound is one sixth of the smaller raster dimension times its cell width.
+Used to construct \code{scale_grid} when that is not
 supplied, and required for \code{search = "coordinate"}.}
 
 \item{scale_grid}{Optional named list of candidate scale values for
@@ -62,10 +60,11 @@ supplied, and required for \code{search = "coordinate"}.}
 \item{tol}{Convergence tolerance for coordinate search, measured as the
 maximum absolute change in the scale vector between iterations.}
 
-\item{scale_fun}{Optional function used to rescale one raster layer at a
-time. It must accept a single-layer raster as its first argument and a
-numeric \code{scale=} argument. If \code{NULL}, the function tries to use
-\code{multiScaleR::kernel_scale.raster()}.}
+\item{scale_fun}{Smoothing method: \code{"terradish"} (default) or
+\code{"multiScaleR"}. Both use map units, but their kernel constructions
+differ, so their fitted scales are not interchangeable. A custom function
+may instead accept a single-layer raster and a numeric \code{scale=}
+argument. \code{NULL} selects the default.}
 
 \item{scale_args}{Optional named list passed to \code{scale_fun}.}
 
@@ -88,7 +87,7 @@ each outer evaluation.}
 \value{
 An object of class \code{"terradish_scale_optim"}, a list with:
 \item{par}{The selected scale for each raster layer, in the units
-  \code{scale_fun} uses (cells for the default \code{kernel_scale.raster}).}
+  \code{scale_fun} uses (map units for both built-in methods).}
 \item{value}{The outer objective at \code{par}.  Lower is better, whichever
   objective was used.}
 \item{fit}{The fitted \code{terradish} model at \code{par}.  Read its
@@ -147,21 +146,22 @@ names(covariates) <- c("altitude", "forestcover")
 # grid for the example. Use the full resolution in a real analysis.
 covariates <- terra::aggregate(covariates, fact = 3, na.rm = TRUE)
 
-# The default scale_fun smooths in RASTER CELLS, so these bounds span
-# 1 to 6 cells of the coarsened grid. A 2-point grid over two layers is 4
+# Express the bounds in map units, using the coarsened cell width.
+cell_width <- mean(terra::res(covariates))
+# A 2-point grid over two layers is 4
 # candidate fits; use a wider grid in practice.
 fit_scale <- terradish_scale_optim(
   melip.Fst ~ altitude + forestcover,
   covariates = covariates,
   coords = melip.coords,
-  lower = c(altitude = 1, forestcover = 1),
-  upper = c(altitude = 6, forestcover = 6),
+  lower = cell_width,
+  upper = 6 * cell_width,
   search = "grid",
   grid_points = 2,
   measurement_model = leastsquares,
   optimizer = "bfgs"
 )
-fit_scale$par          # selected smoothing scale per layer, in cells
+fit_scale$par          # selected smoothing scale per layer, in map units
 fit_scale$value        # objective value there (lower is better)
 fit_scale$objective    # which objective was minimized ("aic" by default)
 fit_scale$evaluations  # every candidate tried, with its AIC and loglik

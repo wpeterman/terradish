@@ -93,3 +93,25 @@ Gaussian baseline, projected gradient 0.0007226463. The other eight fits report
 code 0. The owner authorized investigating and fixing the cause while retaining
 the specified stopping thresholds. This prototype does not yet exercise the
 new inner warm-start path; full-package validation remains required.
+
+## C2: correctness fixes, version 0.0.51
+
+Implemented F1-F8 and dependency L4. The complete candidate passed 803 assertions
+with zero failures/errors, 10 intentional Gaussian-support warnings, one legacy
+maxit warning, and one intentional parallel skip. Full vignette-enabled check
+completed Status OK: zero errors, warnings, or notes. See phase2_00check.log.
+Actual-candidate baseline comparison passed. MLPE, least squares, generalized
+Wishart, odd-grid Gaussian, and MLPE covariate results are unchanged. Spline
+coefficients/SE/likelihood are unchanged; nuisance scaling absorbs centering.
+Covariance Wishart now matches generalized Wishart. Even-grid Gaussian changes
+are intentional. Kernel lambda rescales by the removed kernel variance.
+
+Landgraph L3 audit and the owner-approved gower default are complete. Companion
+commit 36a4e17 (0.0.3) passed 74 assertions and full check. Installed only in
+an isolated validation library. Ordinary library remains unchanged. No push
+or merge occurred. The dependency must be released before CRAN submission.
+
+The Phase 2 runner saved its test/check RDS receipts before a trailing top-level
+else parse error in reporting. Both complete R CMD check and structured test
+results independently establish the results above. Runner corrected after both
+processes finished; no running script was edited.

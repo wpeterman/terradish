@@ -34,7 +34,9 @@ Gaussian scale parameters on their natural distance scale. Scalar values
 are recycled across all scaled rasters; named vectors may be used to set
 different bounds by raster name. When omitted, \code{sigma_lower} defaults
 to half of the mean raster cell width and \code{sigma_upper} defaults to
-the diagonal length of the retained raster extent.}
+one sixth of the smaller raster dimension in cells times the mean cell
+width. The Gaussian kernel uses a raster-sized window; larger explicit
+upper bounds issue a warning because more of the kernel is truncated.}
 
 \item{sigma_conversion}{Internal scaling applied during optimization.
 \code{"cell"} (default) rescales each sigma parameter by the mean cell

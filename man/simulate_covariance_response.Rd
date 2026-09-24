@@ -20,7 +20,8 @@ simulate_covariance_response(
 \arguments{
 \item{theta}{Conductance parameters. May be supplied as a numeric vector or
 a one-row matrix. If unnamed, values are matched in the order implied by
-\code{formula}.}
+\code{formula}. Gaussian \code{sigma.<layer>} parameters use the map
+units reported by \code{coef()}; conversion to optimizer units is internal.}
 
 \item{formula}{Model formula specifying the conductance covariates. The left
 hand side, if supplied, is ignored.}

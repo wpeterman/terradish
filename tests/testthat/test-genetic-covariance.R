@@ -22,7 +22,8 @@ test_that("cov_from_genetic_data constructs Dyer-style covariance from features"
               ncol = 2, byrow = TRUE)
   groups <- rep(c("pop_b", "pop_a", "pop_c"), each = 2)
 
-  cov <- cov_from_genetic_data(x, groups, center = FALSE, scale = FALSE)
+  cov <- cov_from_genetic_data(x, groups, center = FALSE, scale = FALSE,
+                               diagonal = "within")
 
   centroids <- matrix(c(0, 0,
                         1, 0,
@@ -340,6 +341,6 @@ test_that("cov_from_biallelic aligns each locus with its own pooled frequency", 
   freq <- Y[, keep, drop = FALSE] / N
   pb <- colMeans(freq)
   Gs <- sweep(sweep(freq, 2, pb, "-"), 2, sqrt(pb * (1 - pb)), "/")
-  expect_equal(unname(cov_from_biallelic(Y, N)),
+  expect_equal(unname(cov_from_biallelic(Y, N)[, ]),
                unname(N * (Gs %*% t(Gs)) / sum(keep)))
 })

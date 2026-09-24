@@ -1,0 +1,23 @@
+ℹ Updating landgraph documentation
+ℹ Loading landgraph
+Writing 'fst_from_biallelic.Rd'
+Writing 'cov_from_biallelic.Rd'
+Writing 'cov_from_genetic_data.Rd'
+ℹ Testing landgraph
+covariance-metadata: ............
+deme-graph: ..........
+edge-covariates: .......
+genetic-covariance: ...........................................1
+
+══ Failed ══════════════════════════════════════════════════════════════════════
+── 1. Failure ('test-genetic-covariance.R:343:3'): cov_from_biallelic aligns eac
+Expected `unname(cov_from_biallelic(Y, N))` to equal `unname(N * (Gs %*% t(Gs))/sum(keep))`.
+Differences:
+`attr(actual, 'centered')` is a character vector ('sites')
+`attr(expected, 'centered')` is absent
+
+`attr(actual, 'diagonal')` is a character vector ('normalized_dosage')
+`attr(expected, 'diagonal')` is absent
+
+
+══ DONE ════════════════════════════════════════════════════════════════════════

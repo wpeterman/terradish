@@ -1,0 +1,4 @@
+ℹ Loading terradish
+n = 4 objective difference = 4.973799e-14 distance difference = 4.440892e-16 
+n = 9 objective difference = 2.842171e-14 distance difference = 8.881784e-16 
+Same tau and log(sigma) in both parameterizations; off-diagonal nugget is 2*sigma.

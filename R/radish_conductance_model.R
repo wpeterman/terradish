@@ -124,6 +124,12 @@ assemble_model_matrix <- function(formula, spdat)
     )
   }
   out <- as.matrix(out)
+  # Preserve the fitted basis and its graph-wide origin when rebuilding on
+  # focal support, plotting grids, or a coarser raster.
+  knots <- attr(out, "knots", exact = TRUE)
+  boundary_knots <- attr(out, "Boundary.knots", exact = TRUE)
+  centers <- if (is.null(spec$centers)) colMeans(out) else spec$centers
+  out <- sweep(out, 2L, centers, "-")
   if (!is.null(spec$columns) && length(spec$columns) == ncol(out))
     colnames(out) <- spec$columns
   else
@@ -135,8 +141,9 @@ assemble_model_matrix <- function(formula, spdat)
     basis = basis,
     degree = degree,
     intercept = intercept,
-    knots = attr(out, "knots", exact = TRUE),
-    Boundary.knots = attr(out, "Boundary.knots", exact = TRUE),
+    knots = knots,
+    Boundary.knots = boundary_knots,
+    centers = centers,
     columns = colnames(out)
   )
   out
@@ -145,6 +152,7 @@ assemble_model_matrix <- function(formula, spdat)
 .smooth_loglinear_model_matrix <- function(formula, x, df, basis, degree,
                                            intercept, smooth_specs = NULL)
 {
+  fitting_basis <- is.null(smooth_specs)
   stopifnot(inherits(formula, "formula"))
   stopifnot(is.data.frame(x))
 
@@ -189,7 +197,7 @@ assemble_model_matrix <- function(formula, spdat)
   out <- cbind(param_x, smooth_x)
   if (!ncol(out))
     stop("No conductance covariates were produced from formula.", call. = FALSE)
-  if (qr(out)$rank < ncol(out))
+  if (fitting_basis && qr(out)$rank < ncol(out))
     stop("Smooth conductance model matrix is rank deficient.", call. = FALSE)
   rownames(out) <- NULL
   attr(out, "smooth_specs") <- smooth_specs
@@ -450,6 +458,13 @@ class(loglinear_conductance) <- c("terradish_conductance_model_factory",
 #' applies the same positive log-link used by \code{\link{loglinear_conductance}}:
 #'
 #' \deqn{C_i = \exp(B_i \theta)}
+#'
+#' Each spline column is centered over the active graph cells. The fitted
+#' knots, boundary knots, degree, and column centers are retained and reused
+#' for plotting, focal-support prediction, and coarse warm starts. Centering
+#' changes the arbitrary conductance reference level but preserves the
+#' likelihood and fitted conductance coefficients. Uncertainty bands are
+#' relative to the landscape-mean spline contribution to log conductance.
 #'
 #' where \eqn{B_i} is the row of the expanded spline/parametric design matrix
 #' for grid cell \eqn{i}. This is GAM-like in the conductance surface, not a

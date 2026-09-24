@@ -7,19 +7,29 @@
 wishart_covariates(
   x,
   coords = NULL,
-  model = c("wishart_covariance", "generalized_wishart"),
+  transform = c("absdiff", "sqdiff", "euclidean", "manhattan"),
   scale = FALSE,
-  normalize = TRUE
+  model = c("wishart_covariance", "generalized_wishart")
 )
 }
 \arguments{
 \item{x}{Site-level covariates.  Supported inputs are the same as
 \code{\link{pairwise_endpoint_covariates}}: a numeric vector, matrix, data
-frame, or \code{terra::SpatRaster}.}
+frame, or \code{terra::SpatRaster}. A previously constructed
+\code{terradish_pairwise_covariates} object is accepted unchanged.}
 
 \item{coords}{Required when \code{x} is a raster.  Focal-point coordinates
 in the same projection as \code{x}; accepts the same inputs as
 \code{\link{conductance_surface}}.}
+
+\item{transform}{Pairwise environmental difference: \code{"absdiff"}
+(default), \code{"sqdiff"}, \code{"euclidean"}, or \code{"manhattan"}.
+See \code{\link{pairwise_endpoint_covariates}}. Ignored for an existing
+pairwise-covariate object.}
+
+\item{scale}{Logical.  Standardize site-level covariates to zero mean and
+unit variance before constructing kernels?  Recommended when covariates
+use different units or scales.}
 
 \item{model}{Which Wishart likelihood to use.
 \code{"generalized_wishart"} is appropriate only when \code{S} is an
@@ -30,15 +40,6 @@ including an unchecked F\eqn{_{ST}} matrix, is not sufficient.
 \strong{covariance} matrix (e.g. from \code{\link{cov_from_genetic_data}}).
 In both cases the same \eqn{\Sigma} parameterization is used; they differ
 in how \eqn{\Sigma} is compared to the observed data.}
-
-\item{scale}{Logical.  Standardize site-level covariates to zero mean and
-unit variance before constructing kernels?  Recommended when covariates
-use different units or scales.}
-
-\item{normalize}{Logical.  If \code{TRUE}, rescale each kernel matrix by
-its mean diagonal so that estimated kernel weights \eqn{\lambda_k} are on
-similar numerical scales across covariates. This normalization does not
-make fitted weights scientifically or causally comparable.}
 }
 \value{
 A function of class \code{"terradish_measurement_model"} suitable
@@ -61,10 +62,11 @@ analogue of \code{\link{mlpe_covariates}} when your measurement model is
 \details{
 \code{wishart_covariates()} is the Wishart analogue of
 \code{\link{mlpe_covariates}}, but environmental covariates enter the model
-differently because the Wishart likelihood is a full-matrix rather than a
-pairwise regression.  For each site covariate \eqn{z_k}, this helper centers
-the vector and constructs the positive semidefinite outer-product kernel
-\eqn{K_k = z_k z_k^\top}.  The fitted covariance is:
+through positive semidefinite kernels. For each pairwise difference matrix
+\eqn{D_k}, the kernel is \eqn{K_k=-\frac12 H D_k H}, where \eqn{H} centers
+sites. A kernel with a negative eigenvalue beyond numerical tolerance is
+rejected. The \code{"sqdiff"} transform gives the centered outer product
+of the original covariate. The fitted covariance is:
 
 \deqn{\Sigma = \tau E(\theta) + \sum_k \lambda_k K_k + \exp(\sigma) I}
 
@@ -80,11 +82,10 @@ The nuisance parameters estimated alongside \eqn{\theta} are:
   \item{\code{tau}}{Nonnegative scale on the resistance-implied covariance
     \eqn{E}. A value near zero indicates no detectable contribution from
     conductance-implied covariance under this model.}
-  \item{\code{lambda_<covariate>}}{Nonnegative weight on the outer-product
-    kernel for each environmental covariate.  A positive value indicates
-    support for that particular centered outer-product covariance pattern,
-    conditional on the graph kernel and other terms. It is not a causal IBE
-    effect and is not numerically comparable to an MLPE slope.}
+  \item{\code{lambda_<covariate>}}{Nonnegative weight per unit of the
+    corresponding pairwise environmental difference. A negative association
+    is represented at the zero bound; MLPE environmental slopes are
+    unconstrained. The weight is not a causal IBE effect.}
   \item{\code{sigma}}{Log-scale nugget: identity component added as
     \eqn{\exp(\sigma) I}, representing diagonal variance not captured by the
     other covariance components. It is not a smoothing scale or direct drift
@@ -93,15 +94,19 @@ The nuisance parameters estimated alongside \eqn{\theta} are:
 
 This design naturally preserves positive definiteness of \eqn{\Sigma} when
 the nugget is positive and all kernel weights are nonnegative.  It is
-intentionally different from \code{\link{mlpe_covariates}}, which adds
-pairwise environmental dissimilarities as regression covariates in the MLPE
-mean structure.  Neither approach is universally preferable: use
+evaluated on site contrasts, as in \code{\link{wishart_covariance}}. The
+implied squared-distance mean is \eqn{\tau R_{ij}+\sum_k\lambda_k D_{k,ij}
++2\exp(\sigma)}, using the same additive environmental terms as MLPE.
+The likelihoods and coefficient constraints still differ. Use
 \code{wishart_covariates()} when the response satisfies the selected Wishart
 model's requirements and you can justify an effective degrees-of-freedom
 value \code{nu}; use \code{\link{mlpe_covariates}} when \code{nu} is unknown
 or when the distance-regression framework better matches the response.
 Neither formulation cleanly separates causal IBE from IBR when predictors
 and kernels are spatially correlated.
+Scaling is applied to site values before the pairwise transform; kernels
+are not normalized afterward. Site subsets retain these original pairwise
+values and rebuild centered kernels without restandardizing the subset.
 }
 \examples{
 library(terra)

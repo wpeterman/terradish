@@ -1,3 +1,22 @@
+terradish 0.0.51
+----------------
+* Corrected even-grid Gaussian alignment, limited default scale bounds to
+  three-sigma kernel support, and warned about larger truncated kernels.
+* Fitted covariance Wishart models on site contrasts and centered their
+  covariance residuals, matching the covariance-derived distance likelihood.
+* Reused fitted spline knots and centering in prediction, plotting, and exact
+  refinement. Centered each spline basis over its active fitting graph.
+* Unified joint, outer-search, and simulation Gaussian scales in map units.
+  Outer search now defaults to the terradish kernel and counts estimated
+  scales in degrees of freedom and AIC.
+* Scaled raster layers independently in scale_to_0_1(), preserving missing
+  values and mapping constant layers to zero.
+* Rebuilt Wishart environmental kernels from the same pairwise differences
+  used by MLPE, without implicit variance normalization. Added transform
+  choices, PSD checks, and consistent site-subset reconstruction.
+* Required landgraph 0.0.3, with truthful covariance metadata and the
+  owner-approved gower default for grouped genetic covariance.
+
 terradish 0.0.50
 ----------------
 * Restricted the core package to supported undirected models, direct/auto/AMG

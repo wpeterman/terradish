@@ -43,14 +43,13 @@ scale_to_0_1 <- function(x)
   if (inherits(x, "SpatRaster"))
   {
     vals <- values(x, dataframe = FALSE)
-    rng <- range(vals, na.rm = TRUE)
-    if (!all(is.finite(rng)) || diff(rng) == 0)
+    for (layer in seq_len(ncol(vals)))
     {
-      vals[!is.na(vals)] <- 0
-    }
-    else
-    {
-      vals <- (vals - rng[1]) / diff(rng)
+      keep <- is.finite(vals[, layer])
+      if (!any(keep)) next
+      rng <- range(vals[keep, layer])
+      vals[keep, layer] <- if (diff(rng) == 0) 0 else
+        (vals[keep, layer] - rng[1]) / diff(rng)
     }
     values(x) <- vals
     return(x)
