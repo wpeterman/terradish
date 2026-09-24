@@ -103,6 +103,10 @@
 #' mlpe(laplacian_inv, melip.Fst,
 #'      phi = c(0, 0.5, -0.1, qlogis(2 * 0.2)))
 #'
+#' @details When the fitted internal correlation logit is below -8,
+#'   \code{summary()} reports the shared-site correlation at zero and omits its
+#'   Wald uncertainty. The parameter remains in the degrees of freedom because
+#'   it was estimated; fixing it in advance would define a different model.
 #' @export
 
 mlpe <- function(E, S, phi, nu = NULL, gradient = TRUE, hessian = TRUE, partial = TRUE, nonnegative = TRUE, validate = FALSE)
@@ -144,28 +148,15 @@ mlpe <- function(E, S, phi, nu = NULL, gradient = TRUE, hessian = TRUE, partial 
   unos   <- matrix(1, length(Sl), 1)
   U      <- sparseMatrix(i = rep(seq_along(Sl), 2), j = c(Ind), x = c(unos))
 
-  eigUtU <- .get_mlpe_eigen(nrow(E))
-  D      <- eigUtU$values
-  P      <- eigUtU$vectors
-  Dr     <- D/(1-2*rho) + 1/rho
-
-  SigmaInv <- function(x)
-  {
-    Ax <- 1/(1-2*rho) * x
-    x <- t(U) %*% Ax
-    x <- t(P) %*% x
-    x <- x / Dr
-    x <- P %*% x
-    x <- Ax - 1/(1-2*rho) * U %*% x
-    as.matrix(x)
-  }
-
-  SigmaLogDet <- sum(log(Dr)) + length(D) * log(rho) + length(Sl) * log(1 - 2*rho)
+  correlation <- .mlpe_correlation_operator(U, phi["rho"])
+  SigmaInv <- correlation$inverse
+  SigmaLogDet <- correlation$logdet
 
   # products against inverse correlation matrix
   e       <- Sl - alpha * unos - beta * Rl
   Si_e    <- SigmaInv(e)
-  loglik  <- -0.5 * tau * t(e) %*% Si_e + 0.5 * nrow(e) * log(tau) - 0.5 * SigmaLogDet 
+  quadratic <- correlation$quadratic(e)
+  loglik  <- -0.5 * tau * quadratic + 0.5 * nrow(e) * log(tau) - 0.5 * SigmaLogDet
   #check here that matches corMLPE
 
   distance <- matrix(0, nrow(S), ncol(S))
@@ -186,16 +177,15 @@ mlpe <- function(E, S, phi, nu = NULL, gradient = TRUE, hessian = TRUE, partial 
 
     drho_Si_e  <- t(U) %*% Si_e
     drho_Si_e  <- as.matrix(2*Si_e - U %*% drho_Si_e)
-    drho_trans <- rho * (1 - 2*rho)
+    drho_trans <- correlation$derivative
 
     # gradient, phi
     dPhi["alpha",] <- t(unos) %*% Si_e * tau
     dPhi["beta",]  <- t(Rl) %*% Si_e * tau
-    dPhi["tau",]   <- -0.5 * tau * t(e) %*% Si_e + 0.5 * length(e)
+    dPhi["tau",]   <- -0.5 * tau * quadratic + 0.5 * length(e)
     dPhi["rho",]   <- 
       (-0.5 * tau * t(Si_e) %*% drho_Si_e - 
-       0.5 * sum((2*D/(1-2*rho)^2 - 1/rho^2)/Dr) - 
-       0.5 * length(D)/rho + length(Sl)/(1-2*rho)) * drho_trans
+       0.5 * correlation$dlogdet) * drho_trans
 
     if (hessian || partial)
     {
@@ -212,12 +202,11 @@ mlpe <- function(E, S, phi, nu = NULL, gradient = TRUE, hessian = TRUE, partial 
       ddPhi[ "beta",  "beta"] <- -tau * t(Rl) %*% Si_Rl
       ddPhi[ "beta",   "tau"] <- tau * t(Rl) %*% Si_e
       ddPhi[ "beta",   "rho"] <- tau * t(Si_Rl) %*% drho_Si_e * drho_trans
-      ddPhi[  "tau",   "tau"] <- -0.5 * tau * t(e) %*% Si_e
+      ddPhi[  "tau",   "tau"] <- -0.5 * tau * quadratic
       ddPhi[  "tau",   "rho"] <- -0.5 * tau * t(Si_e) %*% drho_Si_e * drho_trans
       ddPhi[  "rho",   "rho"] <- 
         (-tau * t(drho_Si_e) %*% Si_drho_Si_e +
-         -0.5 * sum((8*D/(1-2*rho)^3 + 2/rho^3)/Dr) + 0.5 * sum((2*D/(1-2*rho)^2 - 1/rho^2)^2/Dr^2) + 
-         0.5 * length(D)/rho^2 + 2 * length(Sl)/(1-2*rho)^2) * drho_trans^2 + dPhi["rho",] * (1 - 4*rho)
+         -0.5 * correlation$d2logdet) * drho_trans^2 + dPhi["rho",] * (1 - 4*rho)
       ddPhi                   <- ddPhi + t(ddPhi)
       diag(ddPhi)             <- diag(ddPhi)/2
 
@@ -323,6 +312,7 @@ mlpe <- function(E, S, phi, nu = NULL, gradient = TRUE, hessian = TRUE, partial 
   list(objective        = -c(loglik), 
        fitted           = fitted,
        boundary         = nonnegative && beta == 0,
+       rho_boundary     = unname(phi["rho"] < -8),
        gradient         = if(!gradient) NULL else -dPhi,
        hessian          = if(!hessian)  NULL else -ddPhi,
        gradient_E       = if(!partial)  NULL else -dE, 
@@ -342,6 +332,37 @@ class(mlpe) <- c("terradish_measurement_model",
                  "radish_measurement_model")
 
 .mlpe_eigen_cache <- new.env(parent = emptyenv())
+
+# Resolve the shared-site subspace before division by the residual variance.
+# This avoids cancellation between two huge Woodbury terms near rho = 1/2.
+# The positive quadratic form cannot spuriously reward a poor predictive fit.
+.mlpe_correlation_operator <- function(U, logit) {
+  eig <- .get_mlpe_eigen(ncol(U))
+  keep <- eig$values > max(eig$values) * .Machine$double.eps * ncol(U)
+  D <- eig$values[keep]
+  basis <- sweep(as.matrix(U %*% eig$vectors[, keep, drop = FALSE]), 2, sqrt(D), "/")
+  rho <- .5 * plogis(logit)
+  log_b <- plogis(-logit, log.p = TRUE)
+  b <- exp(log_b)
+  if (b == 0) stop("MLPE residual correlation variance is outside floating-point range.", call. = FALSE)
+  eigenvalues <- b + rho * D
+  residual_rank <- nrow(U) - length(D)
+  components <- function(x) {
+    x <- as.matrix(x)
+    projected <- crossprod(basis, x)
+    list(projected = projected, residual = x - basis %*% projected)
+  }
+  list(inverse = function(x) {
+    parts <- components(x)
+    parts$residual / b + basis %*% (parts$projected / eigenvalues)
+  }, quadratic = function(x) {
+    parts <- components(x)
+    sum(parts$residual^2) / b + sum(parts$projected^2 / eigenvalues)
+  }, logdet = sum(log(eigenvalues)) + residual_rank * log_b,
+  dlogdet = sum((D - 2) / eigenvalues) - 2 * residual_rank / b,
+  d2logdet = -sum((D - 2)^2 / eigenvalues^2) - 4 * residual_rank / b^2,
+  derivative = rho * b)
+}
 
 .get_mlpe_eigen <- function(n)
 {

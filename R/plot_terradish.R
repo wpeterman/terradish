@@ -440,8 +440,8 @@ print.terradish_plot_list <- function(x, ...)
 
   sigma_se <- sqrt(pmax(diag(vcov_theta)[sigma_names], 0))
   z_ci <- qnorm((1 + quantile) / 2)
-  sigma_lower <- pmax(sigma_table$sigma - z_ci * sigma_se, 0)
-  sigma_upper <- sigma_table$sigma + z_ci * sigma_se
+  sigma_lower <- pmax(sigma_table$sigma - z_ci * sigma_se, sigma_table$sigma_lower)
+  sigma_upper <- pmin(sigma_table$sigma + z_ci * sigma_se, sigma_table$sigma_upper)
 
   kernel_mass <- 0.9
   z_mass <- qnorm((1 + kernel_mass) / 2)
@@ -582,7 +582,7 @@ print.terradish_plot_list <- function(x, ...)
          'supply the terradish_graph used for fitting.',
          call. = FALSE)
 
-  if (fit$fit$boundary || is.null(fit$mle$theta))
+  if (.no_structure_boundary(fit$fit) || is.null(fit$mle$theta))
     stop("Cannot plot conductance surface: no conductance parameters ",
          "estimated (IBD or boundary model).",
          call. = FALSE)
@@ -1009,7 +1009,7 @@ print.terradish_plot_list <- function(x, ...)
          'supply the terradish_graph used for fitting.',
          call. = FALSE)
 
-  if (fit$fit$boundary || is.null(fit$mle$theta))
+  if (.no_structure_boundary(fit$fit) || is.null(fit$mle$theta))
     stop("Cannot plot marginal associations: no conductance parameters estimated ",
          "(IBD or boundary model).",
          call. = FALSE)

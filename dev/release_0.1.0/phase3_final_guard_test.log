@@ -1,0 +1,49 @@
+ℹ Loading terradish
+core-inference: ............................WWWWWWWWWWWWWWWWWWWWW................
+
+══ Warnings ════════════════════════════════════════════════════════════════════
+1. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+2. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+3. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+4. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+5. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+6. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+7. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+8. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+9. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+10. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+11. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+12. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+13. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+14. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+15. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+16. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+17. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+18. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+19. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+20. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+21. kernel boundary flags preserve conductance derivatives and use chi-bar tests ('test-core-inference.R:85:3') - `maxit` reached for Newton steps
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+ passed  failed   error warning skipped 
+     44       0       0      21       0 

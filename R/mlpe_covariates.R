@@ -252,28 +252,14 @@ mlpe_covariates <- function(x,
     Ind <- which(lower.tri(R), arr.ind = TRUE)
     U   <- sparseMatrix(i = rep(seq_len(length(Sl)), 2), j = c(Ind), x = 1)
 
-    eigUtU <- .get_mlpe_eigen(nrow(E))
-    D      <- eigUtU$values
-    P      <- eigUtU$vectors
-    Dr     <- D/(1 - 2 * rho) + 1/rho
-
-    SigmaInv <- function(x)
-    {
-      Ax <- 1/(1 - 2 * rho) * x
-      x  <- t(U) %*% Ax
-      x  <- t(P) %*% x
-      x  <- x / Dr
-      x  <- P %*% x
-      x  <- Ax - 1/(1 - 2 * rho) * U %*% x
-      as.matrix(x)
-    }
-
-    SigmaLogDet <- sum(log(Dr)) + length(D) * log(rho) +
-      length(Sl) * log(1 - 2 * rho)
+    correlation <- .mlpe_correlation_operator(U, phi["rho"])
+    SigmaInv <- correlation$inverse
+    SigmaLogDet <- correlation$logdet
 
     e      <- Sl - X %*% coef_vec
     Si_e   <- SigmaInv(e)
-    loglik <- -0.5 * tau * t(e) %*% Si_e + 0.5 * nrow(e) * log(tau) -
+    quadratic <- correlation$quadratic(e)
+    loglik <- -0.5 * tau * quadratic + 0.5 * nrow(e) * log(tau) -
       0.5 * SigmaLogDet
 
     fitted <- matrix(0, nrow(S), ncol(S))
@@ -295,18 +281,17 @@ mlpe_covariates <- function(x,
 
       drho_Si_e  <- t(U) %*% Si_e
       drho_Si_e  <- as.matrix(2 * Si_e - U %*% drho_Si_e)
-      drho_trans <- rho * (1 - 2 * rho)
+      drho_trans <- correlation$derivative
 
       Si_X <- lapply(seq_len(p), function(j)
         SigmaInv(matrix(X[, j], ncol = 1)))
       names(Si_X) <- coef_names
 
       dPhi[coef_names, 1] <- tau * crossprod(X, Si_e)[, 1]
-      dPhi["tau", 1]      <- -0.5 * tau * t(e) %*% Si_e + 0.5 * length(e)
+      dPhi["tau", 1]      <- -0.5 * tau * quadratic + 0.5 * length(e)
       dPhi["rho", 1]      <-
         (-0.5 * tau * t(Si_e) %*% drho_Si_e -
-         0.5 * sum((2 * D/(1 - 2 * rho)^2 - 1/rho^2)/Dr) -
-         0.5 * length(D)/rho + length(Sl)/(1 - 2 * rho)) * drho_trans
+         0.5 * correlation$dlogdet) * drho_trans
 
       if (hessian || partial)
       {
@@ -328,14 +313,12 @@ mlpe_covariates <- function(x,
           ddPhi["rho", coef_names[j]] <- ddPhi[coef_names[j], "rho"]
         }
 
-        ddPhi["tau", "tau"] <- -0.5 * tau * t(e) %*% Si_e
+        ddPhi["tau", "tau"] <- -0.5 * tau * quadratic
         ddPhi["tau", "rho"] <- -0.5 * tau * t(Si_e) %*% drho_Si_e * drho_trans
         ddPhi["rho", "tau"] <- ddPhi["tau", "rho"]
         ddPhi["rho", "rho"] <-
           (-tau * t(drho_Si_e) %*% Si_drho_Si_e -
-           0.5 * sum((8 * D/(1 - 2 * rho)^3 + 2/rho^3)/Dr) +
-           0.5 * sum((2 * D/(1 - 2 * rho)^2 - 1/rho^2)^2/Dr^2) +
-           0.5 * length(D)/rho^2 + 2 * length(Sl)/(1 - 2 * rho)^2) *
+           0.5 * correlation$d2logdet) *
           drho_trans^2 + dPhi["rho", 1] * (1 - 4 * rho)
 
         if (partial)
@@ -397,6 +380,7 @@ mlpe_covariates <- function(x,
     list(objective  = -c(loglik),
          fitted     = fitted,
          boundary   = nonnegative && beta == 0,
+         rho_boundary = unname(phi["rho"] < -8),
          gradient   = if (!gradient) NULL else -dPhi,
          hessian    = if (!hessian)  NULL else -ddPhi,
          gradient_E = if (!partial)  NULL else -dE,

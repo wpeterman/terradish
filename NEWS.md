@@ -1,3 +1,14 @@
+terradish 0.0.52
+----------------
+* Added covariance, confidence interval, observation-count, Wishart nu
+  sensitivity, Gaussian scale profile, and IBE ratio methods.
+* Recorded convergence and boundary diagnostics, tightened optimizer stopping,
+  checked likelihood-ratio nesting, and reported environmental boundary tests.
+* Corrected active-bound Newton steps and MLPE nuisance warm starts. Stabilized
+  MLPE correlation calculations near their bounds without relaxing tolerances.
+* Preserved identified conductance parameters at zero environmental effects,
+  and included conductance uncertainty in joint nuisance-ratio uncertainty.
+
 terradish 0.0.51
 ----------------
 * Corrected even-grid Gaussian alignment, limited default scale bounds to

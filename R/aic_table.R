@@ -37,7 +37,9 @@
 #'
 #' @return A data frame containing model ranks, parameter counts, information
 #'   criterion values, delta values, weights, cumulative weights, and
-#'   log-likelihoods.
+#'   log-likelihoods. The \code{converged} column records convergence code 0;
+#'   \code{boundary} marks active parameter bounds or no resistance structure.
+#'   A warning identifies tables containing nonconverged or boundary fits.
 #'
 #' @examples
 #' \donttest{
@@ -94,7 +96,7 @@ aic_table <- function(mod_list, AICc = FALSE, BIC = FALSE, mod_names = NULL, ver
     tab <- tab[order(tab$AIC), , drop = FALSE]
     tab$Cum.wt <- cumsum(tab$AIC_wt)
     tab$loglik <- mod_loglik[tab$.fit_index]
-    tab$.fit_index <- NULL
+
     tab[, 3:7] <- round(tab[, 3:7], digits = 4)
   }
   else if (isTRUE(AICc))
@@ -120,7 +122,7 @@ aic_table <- function(mod_list, AICc = FALSE, BIC = FALSE, mod_names = NULL, ver
     tab <- tab[order(tab$AICc), , drop = FALSE]
     tab$Cum.wt <- cumsum(tab$AICc_wt)
     tab$loglik <- mod_loglik[tab$.fit_index]
-    tab$.fit_index <- NULL
+
     tab[, 3:8] <- round(tab[, 3:8], digits = 4)
   }
   else
@@ -141,10 +143,18 @@ aic_table <- function(mod_list, AICc = FALSE, BIC = FALSE, mod_names = NULL, ver
     tab <- tab[order(tab$BIC), , drop = FALSE]
     tab$Cum.wt <- cumsum(tab$BIC_wt)
     tab$loglik <- mod_loglik[tab$.fit_index]
-    tab$.fit_index <- NULL
+
     tab[, 3:8] <- round(tab[, 3:8], digits = 4)
   }
 
+  tab$converged <- vapply(mod_list, function(fit)
+    isTRUE(fit$convergence$code == 0L), logical(1))[tab$.fit_index]
+  tab$boundary <- vapply(mod_list, function(fit)
+    isTRUE(fit$convergence$boundary) || isTRUE(fit$fit$boundary), logical(1))[tab$.fit_index]
+  tab$.fit_index <- NULL
+  if (any(!tab$converged | tab$boundary))
+    warning("Some models have not converged or have parameters on a boundary; inspect fit diagnostics before ranking.",
+            call. = FALSE)
   if (isTRUE(verbose))
     print(tab, row.names = FALSE)
   else

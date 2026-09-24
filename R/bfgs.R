@@ -34,7 +34,7 @@ BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = 
   project <- function(x, lower, upper)
     pmin(pmax(x, lower), upper)
 
-  stopifnot(lower < upper)
+  stopifnot(lower <= upper)
 
   maxit <- control$maxit
   ctol <- control$ctol
@@ -57,6 +57,7 @@ BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = 
   maxit <- .terradish_validate_maxit(maxit)
 
   convergence <- 0
+  criterion <- "iteration_limit"
   line_search_failed <- FALSE
   initialized <- 0
   par <- as.matrix(par)
@@ -79,11 +80,24 @@ BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = 
               "  |f(x) - fold(x)| = ", prettify(delta),
               "  max|f'(x)| = ", prettify(max(abs(fit$gradient))))
 
-    if (max(abs(fit$gradient)) < ctol || (i > 1 && delta < ftol))
-      break
-
     gradient     <- fit$gradient
     gradient_box <- zero_bounded_variables(gradient, par, lower, upper, eps)
+    projected_norm <- max(abs(gradient_box))
+    if (projected_norm < ctol) {
+      criterion <- "projected_gradient"
+      break
+    }
+    if (i > 1 && delta < ftol) {
+      if (projected_norm < sqrt(ctol)) {
+        criterion <- "objective_and_projected_gradient"
+      } else {
+        convergence <- 2L
+        criterion <- "stalled"
+        warning("Optimizer stalled: objective change is small but the projected gradient remains large.",
+                call. = FALSE)
+      }
+      break
+    }
 
     if(initialized > 0) 
     { #BFGS update from Nodecal and Wright Ch 6
@@ -188,6 +202,7 @@ BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = 
       {
         convergence <- 2
         line_search_failed <- TRUE
+        criterion <- "line_search_failed"
         warning("Failed to find a usable line-search step; returning the current parameter values.",
                 call. = FALSE, immediate. = TRUE)
         break
@@ -206,8 +221,10 @@ BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = 
             " with `max(abs(gradient))` == ", max(abs(fit$gradient)),
             " and `diff(f)` == ", delta)
 
-  if (!line_search_failed && i == maxit)
+  if (identical(criterion, "iteration_limit"))
   {
+    fit <- fn(par, gradient = TRUE, hessian = FALSE)
+    gradient_box <- zero_bounded_variables(fit$gradient, par, lower, upper, eps)
     warning("`maxit` reached for quasi-Newton steps", immediate. = TRUE)
     convergence = 1
   } 
@@ -219,5 +236,7 @@ BoxConstrainedBFGS <- function(par, fn, lower = rep(-Inf, length(par)), upper = 
        fit = fit,
        iters = i,
        boundary = boundary_fit,
+       criterion = criterion,
+       max_abs_projected_gradient = max(abs(gradient_box)),
        convergence = convergence)
 }

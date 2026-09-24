@@ -60,6 +60,14 @@ analogue of \code{\link{mlpe_covariates}} when your measurement model is
 \code{\link{wishart_covariance}} (covariance-matrix responses).
 }
 \details{
+A zero kernel coefficient sets the boundary flag while retaining conductance
+inference when the resistance coefficient is positive. Summaries mark zero
+kernel coefficients and give one-sided upper limits instead of symmetric
+intervals. Tests adding only kernel coefficients use a chi-bar-square
+reference with binomial weights. This reference is exact for
+information-orthogonal kernels and approximate otherwise. MLPE environmental
+coefficients are unconstrained and retain ordinary chi-square tests.
+
 \code{wishart_covariates()} is the Wishart analogue of
 \code{\link{mlpe_covariates}}, but environmental covariates enter the model
 through positive semidefinite kernels. For each pairwise difference matrix

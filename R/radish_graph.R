@@ -377,7 +377,7 @@ conductance <- function(x, ...)
   support <- match.arg(support)
   stopifnot(inherits(fit, c("terradish", "radish")))
   .terradish_require_submodels(fit, "Conductance prediction")
-  stopifnot(!fit$fit$boundary && !is.null(fit$mle$theta))
+  stopifnot(!.no_structure_boundary(fit$fit) && !is.null(fit$mle$theta))
 
   graph_eval <- .clamp_graph_covariates(
     data = x,

@@ -32,6 +32,14 @@
 #'   pairwise-covariate object.
 #'
 #' @details
+#' A zero kernel coefficient sets the boundary flag while retaining conductance
+#' inference when the resistance coefficient is positive. Summaries mark zero
+#' kernel coefficients and give one-sided upper limits instead of symmetric
+#' intervals. Tests adding only kernel coefficients use a chi-bar-square
+#' reference with binomial weights. This reference is exact for
+#' information-orthogonal kernels and approximate otherwise. MLPE environmental
+#' coefficients are unconstrained and retain ordinary chi-square tests.
+#'
 #' \code{wishart_covariates()} is the Wishart analogue of
 #' \code{\link{mlpe_covariates}}, but environmental covariates enter the model
 #' through positive semidefinite kernels. For each pairwise difference matrix
@@ -492,7 +500,8 @@ wishart_covariates <- function(x,
 
   list(objective = objective,
        fitted = fitted,
-       boundary = nonnegative && tau == 0,
+       boundary = (nonnegative && tau == 0) || any(phi[grepl("^lambda_", names(phi))] == 0),
+       no_structure_boundary = nonnegative && tau == 0,
        gradient = if (!gradient) NULL else sigma_sign * dPhi,
        hessian = if (!hessian) NULL else sigma_sign * ddPhi,
        gradient_E = if (!partial) NULL else sigma_sign * dE,

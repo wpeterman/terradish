@@ -1228,7 +1228,8 @@ gaussian_scale_summary <- function(object,
 {
   stopifnot(inherits(object, c("terradish", "radish")))
 
-  info <- attr(object$submodels$f, "gaussian_scale_info", exact = TRUE)
+  info <- object$gaussian_scale_info
+  if (is.null(info)) info <- attr(object$submodels$f, "gaussian_scale_info", exact = TRUE)
   if (is.null(info))
     stop("`object` was not fitted with `gaussian_smoothed_loglinear_conductance()`",
          call. = FALSE)
@@ -1265,8 +1266,8 @@ gaussian_scale_summary <- function(object,
   out <- data.frame(
     covariate = info$scale_vars,
     sigma = unname(sigma),
-    sigma_lower = unname(info$lower[sigma_names]),
-    sigma_upper = unname(info$upper[sigma_names]),
+    sigma_lower = unname(info$lower[info$scale_vars]),
+    sigma_upper = unname(info$upper[info$scale_vars]),
     sigma_internal = unname(sigma / info$conversion[info$scale_vars]),
     sigma_conversion = unname(info$conversion[info$scale_vars]),
     sigma_conversion_mode = rep(info$conversion_mode, length(sigma_names)),

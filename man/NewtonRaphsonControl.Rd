@@ -20,10 +20,11 @@ NewtonRaphsonControl(
 the optimizer reports a convergence warning on large or difficult problems.}
 
 \item{ctol}{Gradient convergence tolerance.  Optimization stops when
-\code{max(abs(gradient)) < ctol}.}
+the largest absolute projected gradient is below \code{ctol}.}
 
 \item{ftol}{Objective convergence tolerance.  Optimization also stops when
-the improvement in the objective over one step falls below \code{ftol}.}
+the absolute change in the objective is below \code{ftol} and the largest
+absolute projected gradient is below \code{sqrt(ctol)}.}
 
 \item{etol}{Eigenvalue threshold used to detect near-singular Hessians.
 Eigenvalues smaller than \code{etol * length(par)} are treated as zero
@@ -62,10 +63,11 @@ Tuning parameters shared by Newton-Raphson and BFGS quasi-Newton
 optimizers inside \code{\link{terradish}}.
 }
 \details{
-Both convergence criteria (\code{ctol} and \code{ftol}) must be satisfied
-simultaneously before the optimizer declares convergence.  If you want
-gradient-only convergence, set \code{ftol} to a very small number; for
-objective-only, set \code{ctol} small.
+The projected gradient sets outward-pointing components at active bounds
+to zero. A sufficiently small projected gradient gives convergence code 0.
+A small objective change also gives code 0 if the projected gradient is
+below \code{sqrt(ctol)}. Otherwise the optimizer warns that it has stalled
+and returns code 2. Reaching the iteration limit gives code 1.
 
 For most resistance-surface models the defaults converge reliably.  Consider
 changing them when:

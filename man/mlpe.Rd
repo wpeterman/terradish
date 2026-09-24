@@ -96,6 +96,11 @@ Use \code{\link{mlpe_covariates}} to extend the mean structure with
 additional fixed pairwise covariates (isolation by environment).
 Coefficients describe conditional associations under the specified mean and
 correlation structure; they do not isolate causal environmental effects.
+
+When the fitted internal correlation logit is below -8,
+  \code{summary()} reports the shared-site correlation at zero and omits its
+  Wald uncertainty. The parameter remains in the degrees of freedom because
+  it was estimated; fixing it in advance would define a different model.
 }
 \examples{
 library(terra)

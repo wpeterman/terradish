@@ -6,9 +6,10 @@
 #' @param maxit Maximum number of Newton or quasi-Newton steps.  Increase if
 #'   the optimizer reports a convergence warning on large or difficult problems.
 #' @param ctol Gradient convergence tolerance.  Optimization stops when
-#'   \code{max(abs(gradient)) < ctol}.
+#'   the largest absolute projected gradient is below \code{ctol}.
 #' @param ftol Objective convergence tolerance.  Optimization also stops when
-#'   the improvement in the objective over one step falls below \code{ftol}.
+#'   the absolute change in the objective is below \code{ftol} and the largest
+#'   absolute projected gradient is below \code{sqrt(ctol)}.
 #' @param etol Eigenvalue threshold used to detect near-singular Hessians.
 #'   Eigenvalues smaller than \code{etol * length(par)} are treated as zero
 #'   when forming the Newton step.  Increasing this value regularizes the step
@@ -27,10 +28,11 @@
 #'   passed to \code{\link{terradish}}.
 #'
 #' @details
-#' Both convergence criteria (\code{ctol} and \code{ftol}) must be satisfied
-#' simultaneously before the optimizer declares convergence.  If you want
-#' gradient-only convergence, set \code{ftol} to a very small number; for
-#' objective-only, set \code{ctol} small.
+#' The projected gradient sets outward-pointing components at active bounds
+#' to zero. A sufficiently small projected gradient gives convergence code 0.
+#' A small objective change also gives code 0 if the projected gradient is
+#' below \code{sqrt(ctol)}. Otherwise the optimizer warns that it has stalled
+#' and returns code 2. Reaching the iteration limit gives code 1.
 #'
 #' For most resistance-surface models the defaults converge reliably.  Consider
 #' changing them when:
@@ -145,7 +147,7 @@ BoxConstrainedNewton <- function(par, fn, lower = rep(-Inf, length(par)), upper 
   project <- function(x, lower, upper)
     pmin(pmax(x, lower), upper)
 
-  stopifnot(lower < upper)
+  stopifnot(lower <= upper)
 
   maxit <- control$maxit
   ctol <- control$ctol
@@ -168,6 +170,7 @@ BoxConstrainedNewton <- function(par, fn, lower = rep(-Inf, length(par)), upper 
   maxit <- .terradish_validate_maxit(maxit)
 
   convergence <- 0
+  criterion <- "iteration_limit"
   line_search_failed <- FALSE
   par <- as.matrix(par)
 
@@ -183,20 +186,43 @@ BoxConstrainedNewton <- function(par, fn, lower = rep(-Inf, length(par)), upper 
               "  max|f'(x)| = ", prettify(max(abs(fit$gradient))),
               "  |f''(x)| = ", prettify(-det(fit$hessian)))
 
-    if (max(abs(fit$gradient)) < ctol || (i > 1 && delta < ftol))
-      break
-
     gradient     <- fit$gradient
     gradient_box <- zero_bounded_variables(gradient, par, lower, upper, eps)
+    projected_norm <- max(abs(gradient_box))
+    if (projected_norm < ctol) {
+      criterion <- "projected_gradient"
+      break
+    }
+    if (i > 1 && delta < ftol) {
+      if (projected_norm < sqrt(ctol)) {
+        criterion <- "objective_and_projected_gradient"
+      } else {
+        convergence <- 2L
+        criterion <- "stalled"
+        warning("Optimizer stalled: objective change is small but the projected gradient remains large.",
+                call. = FALSE)
+      }
+      break
+    }
     # Numerical Hessians can drift slightly away from exact symmetry on larger
     # problems. Symmetrizing keeps the Newton step real-valued and avoids
     # complex eigendecompositions in the line search.
-    hessian_sym  <- (fit$hessian + t(fit$hessian)) / 2
+    # A parameter pinned at a bound cannot move to offset a free-coordinate
+    # step. Invert only the free Hessian block, rather than using the free
+    # rows of the unconstrained inverse (a different quadratic problem).
+    bound_tol <- eps * abs(par)
+    active <- (upper - bound_tol <= par & gradient < 0) |
+      (lower + bound_tol >= par & gradient > 0) | lower == upper
+    free <- which(!active)
+    hessian_sym <- fit$hessian[free, free, drop = FALSE]
+    hessian_sym <- (hessian_sym + t(hessian_sym)) / 2
     ehess        <- eigen(hessian_sym, symmetric = TRUE)
     ehess$values <- abs(ehess$values)
     ehess$values <- ifelse(ehess$values < max(abs(hessian_sym)) * etol, 1, ehess$values)
-    ihess        <- ehess$vectors %*% solve(diag(ehess$values, nrow=length(par))) %*% t(ehess$vectors)
-    desc         <- gap_step_bounded_variables(-ihess %*% gradient_box, par, gradient, lower, upper, eps)
+    ihess <- ehess$vectors %*% solve(diag(ehess$values, nrow=length(free))) %*% t(ehess$vectors)
+    desc <- matrix(0, length(par), 1L)
+    desc[free, ] <- -ihess %*% gradient_box[free, , drop = FALSE]
+    desc <- gap_step_bounded_variables(desc, par, gradient, lower, upper, eps)
     phi0         <- fit$objective
     dphi0        <- c(t(desc) %*% gradient_box)
 
@@ -233,6 +259,7 @@ BoxConstrainedNewton <- function(par, fn, lower = rep(-Inf, length(par)), upper 
     {
       convergence <- 2
       line_search_failed <- TRUE
+      criterion <- "line_search_failed"
       warning("Failed to find a usable line-search step; returning the current parameter values.",
               call. = FALSE, immediate. = TRUE)
       break
@@ -249,8 +276,10 @@ BoxConstrainedNewton <- function(par, fn, lower = rep(-Inf, length(par)), upper 
             " with `max(abs(gradient))` == ", max(abs(fit$gradient)),
             " and `diff(f)` == ", delta)
 
-  if (!line_search_failed && i == maxit)
+  if (identical(criterion, "iteration_limit"))
   {
+    fit <- fn(par, gradient = TRUE, hessian = TRUE)
+    gradient_box <- zero_bounded_variables(fit$gradient, par, lower, upper, eps)
     warning("`maxit` reached for Newton steps", immediate. = TRUE)
     convergence = 1
   } 
@@ -262,5 +291,7 @@ BoxConstrainedNewton <- function(par, fn, lower = rep(-Inf, length(par)), upper 
        fit = fit,
        iters = i,
        boundary = boundary_fit,
+       criterion = criterion,
+       max_abs_projected_gradient = max(abs(gradient_box)),
        convergence = convergence)
 }

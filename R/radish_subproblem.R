@@ -97,6 +97,16 @@ radish_subproblem <- function(g, E, S, nu, phi = NULL, nonnegative = TRUE, valid
   phi_default <- g(E = E, S = S, nonnegative = nonnegative)
   if (is.null(phi))
     phi <- phi_default
+  else if (!is.list(phi))
+    phi <- list(phi = setNames(as.numeric(phi), names(phi_default$phi)), lower = phi_default$lower,
+                 upper = phi_default$upper)
+
+  # At an extreme logit, a negligible derivative can falsely pin rho when the
+  # landscape changes. Reinitialize that coordinate, retaining the other warm
+  # values. Equal bounds denote genuinely fixed predictive parameters.
+  fixed <- !is.null(phi$lower) && !is.null(phi$upper) && all(phi$lower == phi$upper)
+  if (!fixed && "rho" %in% names(phi$phi) && abs(phi$phi["rho"]) > 8)
+    phi$phi["rho"] <- phi_default$phi["rho"]
 
   # use Newton-Raphson to profile out nuisance parameters
   fit_subproblem <- function(phi_start)
@@ -117,12 +127,16 @@ radish_subproblem <- function(g, E, S, nu, phi = NULL, nonnegative = TRUE, valid
                          error = function(e) {
                            if (identical(phi_start, phi_default))
                              stop(e)
+                           if (isTRUE(control$verbose))
+                             message("Nuisance warm start failed; retrying the default start: ",
+                                     conditionMessage(e))
                            phi_start <<- phi_default
                            fit_subproblem(phi_default)
                          })
 
   # refit, computing partial derivatives
   phi         <- subproblem$par
+  rownames(phi) <- names(phi_default$phi)
   fit         <- g(E = E, S = S, nu = nu, phi = c(phi), partial = TRUE, nonnegative = nonnegative)
   gradient_E  <- fit$gradient_E
 
@@ -144,6 +158,8 @@ radish_subproblem <- function(g, E, S, nu, phi = NULL, nonnegative = TRUE, valid
   bounds      <- if (is.list(phi_start)) phi_start else phi_default
   free_phi    <- .free_parameter_index(phi, bounds$lower, bounds$upper)
   invhess     <- .constrained_inverse_hessian(fit$hessian, free_phi)
+  jacobian_phi <- function(dotdotE)
+    -invhess %*% crossprod(partial_E, c(dotdotE))
   jacobian_E  <- function(dotdotE)
   {
     dotdotE_matrix <- .as_base_matrix(dotdotE)
@@ -200,11 +216,14 @@ radish_subproblem <- function(g, E, S, nu, phi = NULL, nonnegative = TRUE, valid
   list(fit            = fit,
        loglikelihood  = fit$objective,
        boundary       = fit$boundary,
+       no_structure_boundary = if (is.null(fit$no_structure_boundary))
+         fit$boundary else fit$no_structure_boundary,
        phi            = phi,
        convergence    = subproblem$convergence,
        iters          = subproblem$iters,
        gradient       = gradient_E,
        jacobian_E     = jacobian_E,
+       jacobian_phi   = jacobian_phi,
        jacobian_S     = jacobian_S,
        num_jacobian_E = if(!validate) NULL else num_jacobian_E,
        num_jacobian_S = if(!validate) NULL else num_jacobian_S)

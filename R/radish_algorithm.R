@@ -59,6 +59,7 @@
 
     list(k = k,
          hess_row = hess_row,
+         phi_sensitivity = state$subproblem$jacobian_phi(chunk_state[[m]]$dgrad__ddl_dE),
          partial_X_k = partial_X_k,
          partial_S_k = partial_S_k)
   })
@@ -790,6 +791,8 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
     # gradient calculation
     grad      <- rep(0, length(theta))
     hess      <- matrix(0, length(theta), length(theta))
+    phi_sensitivity <- matrix(0, length(phi), length(theta),
+                               dimnames = list(rownames(phi), names(theta)))
     partial_X <- NULL
     partial_S <- NULL
     if (gradient || hessian || partial)
@@ -871,6 +874,7 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
         {
           k <- res$k
           hess[k, ] <- res$hess_row
+          phi_sensitivity[, k] <- res$phi_sensitivity
           if (partial)
           {
             partial_X[, k, ] <- res$partial_X_k
@@ -934,12 +938,15 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
            list(convergence = subproblem$convergence,
                 iters = subproblem$iters),
          phi_hessian   = if(!objective) NULL else subproblem$fit$hessian,
-         boundary      = if(!objective) NULL else subproblem$boundary, # the solution is on the boundary (e.g. no genetic structure) so all derivatives wrt theta are 0
+         phi_sensitivity = if(!objective || !hessian) NULL else phi_sensitivity,
+         boundary      = if(!objective) NULL else subproblem$boundary,
+         no_structure_boundary = if(!objective) NULL else subproblem$no_structure_boundary,
+         rho_boundary = if(!objective) NULL else subproblem$fit$rho_boundary,
          fitted        = if(!objective) NULL else subproblem$fit$fitted,
-         gradient      = if(!gradient)  NULL else grad * (1 - subproblem$boundary), # wrt theta
-        hessian       = if(!hessian)   NULL else hess * (1 - subproblem$boundary), # wrt theta
-        partial_X     = if(!partial)   NULL else partial_X * (1 - subproblem$boundary), # partial_X[i,l,k] is \frac{\partial^2 L(theta,x)}{\partial theta_l \partial x_{ik}}
-         partial_S     = if(!partial)   NULL else partial_S * (1 - subproblem$boundary), # partial_S[i,j,k] is \frac{\partial^2 L(theta,x)}{\partial theta_k \partial S_{ij}}
+         gradient      = if(!gradient) NULL else grad * (1 - subproblem$no_structure_boundary),
+         hessian       = if(!hessian) NULL else hess * (1 - subproblem$no_structure_boundary),
+         partial_X     = if(!partial) NULL else partial_X * (1 - subproblem$no_structure_boundary),
+         partial_S     = if(!partial) NULL else partial_S * (1 - subproblem$no_structure_boundary),
          num_gradient  = if(!validate)  NULL else num_gradient,
          num_hessian   = if(!validate)  NULL else num_hessian,
          num_partial_X = if(!validate)  NULL else num_partial_X,

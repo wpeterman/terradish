@@ -26,7 +26,7 @@ test_that("terradish landmark approximation refines back to the full-data fit fo
   dat <- melip_fixture(1:8)
   melip.Fst <- dat$melip.Fst
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
-  control <- NewtonRaphsonControl(maxit = 4, verbose = FALSE)
+  control <- NewtonRaphsonControl(maxit = 100, verbose = FALSE)
 
   fit_exact <- suppressWarnings(
     terradish(
@@ -61,6 +61,8 @@ test_that("terradish landmark approximation refines back to the full-data fit fo
   expect_equal(fit_landmark$approximation$type, "landmark")
   expect_equal(fit_landmark$approximation$n_landmarks, 4L)
   expect_equal(dim(fit_landmark$fit$covariance), dim(fit_exact$fit$covariance))
+  expect_equal(fit_exact$convergence$code, 0)
+  expect_equal(fit_landmark$convergence$code, 0)
   expect_equal(fit_landmark$loglik, fit_exact$loglik, tolerance = 1e-4)
   expect_lt(max(abs(fit_landmark$mle$theta - fit_exact$mle$theta)), 2e-2)
 })
@@ -98,7 +100,7 @@ test_that("coarse-raster approximation refines back to the full-data fit", {
   dat <- melip_fixture(1:10)
   melip.Fst <- dat$melip.Fst
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
-  control <- NewtonRaphsonControl(maxit = 4, verbose = FALSE)
+  control <- NewtonRaphsonControl(maxit = 100, verbose = FALSE)
 
   fit_exact <- suppressWarnings(
     terradish(
@@ -137,6 +139,8 @@ test_that("coarse-raster approximation refines back to the full-data fit", {
   expect_gte(fit_coarse$approximation$refine_steps, 1L)
   expect_equal(length(fit_coarse$approximation$stages), 1L)
   expect_equal(dim(fit_coarse$fit$covariance), dim(fit_exact$fit$covariance))
+  expect_equal(fit_exact$convergence$code, 0)
+  expect_equal(fit_coarse$convergence$code, 0)
   expect_equal(fit_coarse$loglik, fit_exact$loglik, tolerance = 1e-4)
   expect_lt(max(abs(fit_coarse$mle$theta - fit_exact$mle$theta)), 2e-2)
 })

@@ -37,7 +37,9 @@ is the number of added pairwise covariate columns.}
 \value{
 A data frame containing model ranks, parameter counts, information
   criterion values, delta values, weights, cumulative weights, and
-  log-likelihoods.
+  log-likelihoods. The \code{converged} column records convergence code 0;
+  \code{boundary} marks active parameter bounds or no resistance structure.
+  A warning identifies tables containing nonconverged or boundary fits.
 }
 \description{
 Creates a model-selection table from fitted \code{terradish} models using

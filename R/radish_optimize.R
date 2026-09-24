@@ -794,6 +794,7 @@ terradish <- function(formula,
                    measurement_control = NULL,
                    slim = FALSE)
 {
+  requested_leverage <- leverage
   stopifnot(inherits(formula, "formula"))
   stopifnot(inherits(data, c("terradish_graph", "radish_graph")))
   stopifnot(inherits(conductance_model, c("terradish_conductance_model_factory",
@@ -869,6 +870,7 @@ terradish <- function(formula,
   if (any(theta < bounds$lower | theta > bounds$upper))
     stop("Starting values in `theta` must lie within the conductance-model bounds",
          call. = FALSE)
+  started_at_default <- isTRUE(all.equal(as.numeric(theta), as.numeric(default)))
 
   optimizer <- .resolve_terradish_optimizer(match.arg(optimizer), length(theta),
                                            conductance_model_factory = conductance_model_factory)
@@ -1188,9 +1190,13 @@ terradish <- function(formula,
   if (!is.null(names(theta_external)))
     dimnames(fit$hessian) <- list(names(theta_external), names(theta_external))
 
-  if (fit$boundary)
-    warning("Optimum for subproblem is on boundary (e.g. no spatial genetic structure): cannot optimize theta.\nTry different starting values.")
-  no_coef <- fit$boundary || is_ibd 
+  no_coef <- .no_structure_boundary(fit) || is_ibd
+  # Recover the nuisance block of the joint inverse information. The existing
+  # phi_hessian is conditional on theta; this adds uncertainty from theta.
+  fit$phi_vcov_joint <- .safe_hessian_inverse(fit$phi_hessian)
+  if (!no_coef && !is.null(fit$phi_sensitivity))
+    fit$phi_vcov_joint <- fit$phi_vcov_joint + fit$phi_sensitivity %*%
+      .safe_hessian_inverse(fit$hessian_internal) %*% t(fit$phi_sensitivity)
 
   # calculate leverage for genetic distance and spatial covariates
   leverage <- leverage && !no_coef
@@ -1225,6 +1231,16 @@ terradish <- function(formula,
               cost           = c("newton_steps"   = iters,
                                  "function_calls" = fcalls$count + 1),
               diagnostics    = .terradish_diagnostics_snapshot(diagnostics),
+              gaussian_scale_info = attr(conductance_model, "gaussian_scale_info", exact = TRUE),
+              convergence = list(
+                code = if (is_ibd) 0L else exact_problem$convergence,
+                message = if (is_ibd) "no conductance parameters" else
+                  c("converged", "iteration limit reached", "stalled or line search failed")[exact_problem$convergence + 1L],
+                iterations = iters,
+                max_abs_projected_gradient = if (is_ibd) 0 else exact_problem$max_abs_projected_gradient,
+                criterion = if (is_ibd) "no_conductance_parameters" else exact_problem$criterion,
+                boundary = fit$boundary || (!is_ibd && exact_problem$boundary),
+                restarted = FALSE),
               submodels      = list("f" = conductance_model_user,
                                     "f_internal" = conductance_model,
                                     "f_factory" = conductance_model_factory,
@@ -1251,6 +1267,26 @@ terradish <- function(formula,
                                                            "X" = num_leverage_X))
               )
   class(out) <- c("terradish", "radish")
+  out$comparison$graph <- .graph_fingerprint(data)
+  out$comparison$measurement_columns <- .measurement_columns(measurement_model)
+  if (.no_structure_boundary(fit) && !started_at_default && !is_ibd) {
+    restart_formula <- reformulate(attr(terms(formula), "term.labels"), response = "S")
+    retry <- terradish(restart_formula, data = data,
+      conductance_model = conductance_model_factory, measurement_model = measurement_model,
+      theta = NULL, nu = nu, control = control, optimizer = optimizer,
+      leverage = requested_leverage, nonnegative = nonnegative,
+      validate = validate, cores = cores, curvature = curvature,
+      solver = solver, solver_control = solver_control, approximation = approximation,
+      approximation_control = approximation_control, measurement_control = measurement_control,
+      verbose = verbose, slim = FALSE)
+    original_call <- out$call
+    if (retry$loglik > out$loglik) out <- retry
+    out$call <- original_call
+    out$convergence$restarted <- TRUE
+  }
+  if (.no_structure_boundary(out$fit))
+    warning("Optimum has no detectable resistance structure; conductance coefficients are not identified.",
+            call. = FALSE)
   if (isTRUE(slim)) slim_terradish(out) else out
 }
 
@@ -1407,7 +1443,7 @@ print.radish <- function(x, digits = max(3L, getOption("digits") - 3L), ...)
 {
   cat("Conductance surface estimated by maximum likelihood\n")
   cat("Call:   ", paste(deparse(x$call), sep = "\n", collapse = "\n"), "\n\n", sep = "")
-  if (!x$fit$boundary && !is.null(x$mle$theta))
+  if (!.no_structure_boundary(x$fit) && !is.null(x$mle$theta))
   {
     cat("Coefficients:\n")
     print.default(format(x$mle$theta, digits = digits), print.gap = 2L, quote = FALSE)
@@ -1418,6 +1454,9 @@ print.radish <- function(x, digits = max(3L, getOption("digits") - 3L), ...)
   }
   cat("\n")
   cat("Loglikelihood:", x$loglik, paste0("(", x$df), "degrees freedom)   AIC:", x$aic, "\n")
+  if (!is.null(x$convergence))
+    cat("Convergence:", x$convergence$message, "| projected gradient:",
+        format(x$convergence$max_abs_projected_gradient, digits = 3), "\n")
   invisible(x)
 }
 
@@ -1429,7 +1468,7 @@ summary.radish <- function(object, conf.level = 0.95, ...)
   x <- object
   tol <- sqrt(.Machine$double.eps) #for checking singularity
 
-  no_coef <- x$fit$boundary || is.null(x$mle$theta)
+  no_coef <- .no_structure_boundary(x$fit) || is.null(x$mle$theta)
   if (!no_coef)
   {
     ztable <- matrix(0, length(x$mle$theta), 4)
@@ -1455,6 +1494,8 @@ summary.radish <- function(object, conf.level = 0.95, ...)
   }
 
   out <- list(boundary      = x$fit$boundary,
+              no_structure_boundary = .no_structure_boundary(x$fit),
+              convergence   = x$convergence,
               phi           = x$fit$phi[,1],
               phi_table     = NULL,
               phi_vcov      = NULL,
@@ -1478,7 +1519,35 @@ summary.radish <- function(object, conf.level = 0.95, ...)
   {
     out$phi_table <- phi_summary$table
     out$phi_vcov <- phi_summary$vcov
+    at_lambda <- grepl("^lambda_", rownames(out$phi_table)) & out$phi_table[, 1] == 0
+    out$phi_at_bound <- setNames(at_lambda, rownames(out$phi_table))
+    if (any(at_lambda)) {
+      out$phi_table[at_lambda, 3] <- NA_real_
+      out$phi_table[at_lambda, 4] <- qnorm(conf.level) * out$phi_table[at_lambda, 2]
+      out$phi_note <- "Zero kernel coefficients are at their lower bound; their upper limits are one-sided."
+    }
+    if (isTRUE(x$fit$rho_boundary)) {
+      out$phi["rho"] <- 0
+      out$phi_table["rho", ] <- c(0, NA_real_, NA_real_, NA_real_)
+      out$rho_note <- "Shared-site correlation rho is reported at zero (internal logit below -8); no Wald uncertainty is reported. Degrees of freedom retain rho because it was estimated."
+    }
   }
+
+  info <- x$gaussian_scale_info
+  if (!is.null(info) && !no_coef) {
+    sigma_names <- intersect(paste0("sigma.", info$scale_vars), rownames(out$ztable))
+    out$ztable[sigma_names, c("z value", "Pr(>|z|)")] <- NA_real_
+    layers <- sub("^sigma\\.", "", sigma_names)
+    sigma <- out$ztable[sigma_names, "Estimate"]
+    low <- info$lower[layers]
+    high <- info$upper[layers]
+    out$sigma_table <- data.frame(layer = layers, estimate = unname(sigma),
+      SE = unname(out$ztable[sigma_names, "Std. Error"]),
+      lower_bound = unname(low), upper_bound = unname(high),
+      near_bound = unname(abs(sigma - low) <= .01 * abs(low) |
+                           abs(sigma - high) <= .01 * abs(high)))
+  }
+  out$ibe_ratio <- terradish_ibe_ratio(x)
 
   class(out) <- c("summary.terradish", "summary.radish")
   out
@@ -1495,7 +1564,15 @@ print.summary.radish <- function(x, digits = max(3L, getOption("digits") - 3L), 
   cat("Loglikelihood:", x$loglik, paste0("(", x$df), "degrees freedom)\nAIC:", x$aic, "\n\n")
   cat("Number of function calls:", x$fcalls, "\n")
   cat("Number of optimization steps:", x$iters, "\n")
+  if (!is.null(x$convergence))
+    cat("Convergence:", x$convergence$message, "| projected gradient:",
+        format(x$convergence$max_abs_projected_gradient, digits = 3), "\n")
   cat("Norm of gradient at MLE:", x$gradnorm, "\n\n")
+  if (!is.null(x$sigma_table)) {
+    cat("Gaussian scales (map units; no Wald test against zero):\n")
+    print(x$sigma_table, row.names = FALSE)
+    cat("near_bound marks estimates within 1% of a bound.\n\n")
+  }
   if (length(x$phi))
   {
     cat("Nuisance parameters")
@@ -1508,7 +1585,14 @@ print.summary.radish <- function(x, digits = max(3L, getOption("digits") - 3L), 
       print.default(format(x$phi, digits = digits), print.gap = 2L, quote = FALSE)
     cat("\n")
   }
-  if (!x$boundary && !is.null(x$ztable))
+  if (!is.null(x$phi_note)) cat(x$phi_note, "\n")
+  if (!is.null(x$rho_note)) cat(x$rho_note, "\n")
+  if (nrow(x$ibe_ratio)) {
+    cat("Resistance-distance equivalent of one unit of environmental difference:\n")
+    print(x$ibe_ratio, row.names = FALSE)
+    if (!is.null(attr(x$ibe_ratio, "note"))) cat(attr(x$ibe_ratio, "note"), "\n")
+  }
+  if (!x$no_structure_boundary && !is.null(x$ztable))
   {
     cat("Coefficients:\n")
     printCoefmat(x$ztable, digits = digits, signif.stars = signif.stars, na.print = "NA", ...)
@@ -1519,7 +1603,7 @@ print.summary.radish <- function(x, digits = max(3L, getOption("digits") - 3L), 
       print(as.dist(x$vcor))
     }
   }
-  else if (x$boundary)
+  else if (x$no_structure_boundary)
   {
     cat("Model fit is on boundary (e.g. no genetic structure), no meaningful coefficients\n")
   }
@@ -1597,14 +1681,21 @@ anova.radish <- function(object, ..., alternative = NULL)
 {
   dots <- list(...)
   if (is.null(alternative))
-    alternative <- dots[[1]]
+    alternative <- if (length(dots)) dots[[1]] else
+      stop("Supply a second fitted model.", call. = FALSE)
   stopifnot(inherits(object, c("terradish", "radish")) &&
             inherits(alternative, c("terradish", "radish")))
-  stopifnot(!object$fit$boundary && !alternative$fit$boundary)
+  if (.no_structure_boundary(object$fit) || .no_structure_boundary(alternative$fit))
+    stop("A no-structure boundary leaves conductance parameters unidentified; this likelihood-ratio test is unavailable.", call. = FALSE)
 
   contracts <- .terradish_assert_comparable_fits(
     list(object, alternative), purpose = "likelihood-ratio test"
   )
+  if (is.null(contracts[[1]]$response) || is.null(contracts[[2]]$response))
+    stop("Both fits must retain their response matrix for a nesting check.", call. = FALSE)
+  if (is.null(contracts[[1]]$graph) || is.null(contracts[[2]]$graph) ||
+      !identical(contracts[[1]]$graph, contracts[[2]]$graph))
+    stop("Likelihood-ratio tests require the same graph and focal sites.", call. = FALSE)
   model_names <- vapply(contracts,
                         function(x) if (is.null(x$measurement_model)) NA_character_ else x$measurement_model,
                         character(1))
@@ -1612,6 +1703,8 @@ anova.radish <- function(object, ..., alternative = NULL)
     stop("Likelihood-ratio tests require the same measurement model; use information criteria or cross-validation for non-nested alternatives.",
          call. = FALSE)
 
+  if (!is.function(object$submodels$f_factory) || !is.function(alternative$submodels$f_factory))
+    stop("Likelihood-ratio nesting checks require the full fits with retained model factories.", call. = FALSE)
   if (!identical(object$submodels$f_factory,
                  alternative$submodels$f_factory))
     stop("Likelihood-ratio tests require the same conductance-model factory; ",
@@ -1634,6 +1727,13 @@ anova.radish <- function(object, ..., alternative = NULL)
   if (!all(reduced_terms %in% full_terms))
     stop("The reduced model's formula terms are not nested within the full model.",
          call. = FALSE)
+  small <- reduced$comparison$measurement_columns
+  large <- full$comparison$measurement_columns
+  if (!all(colnames(small) %in% colnames(large)))
+    stop("Measurement-model covariate sets are not nested.", call. = FALSE)
+  for (name in colnames(small))
+    if (!isTRUE(all.equal(unname(small[, name]), unname(large[, name]), tolerance = 0)))
+      stop("Measurement-model covariate values differ for `", name, "`.", call. = FALSE)
 
   form_reduced <- paste("Null:", paste(reduced$formula, collapse = " "))
   form_full    <- paste("Alt:", paste(full$formula, collapse = " "))
@@ -1644,6 +1744,19 @@ anova.radish <- function(object, ..., alternative = NULL)
     stop("The full model must add at least one estimated parameter for a likelihood-ratio test.",
          call. = FALSE)
   P     <- pchisq(Chisq, Df, lower.tail = FALSE)
+  reference <- paste0("chi-square (", Df, " df)")
+  added_lambda <- setdiff(grep("^lambda_", rownames(full$fit$phi), value = TRUE),
+                           grep("^lambda_", rownames(reduced$fit$phi), value = TRUE))
+  if (length(added_lambda)) {
+    warning("The null kernel coefficients lie on their zero bounds.", call. = FALSE)
+    if (length(added_lambda) != Df)
+      stop("Test added kernel coefficients separately from other added parameters.", call. = FALSE)
+    P <- .chibar_probability(max(Chisq, 0), length(added_lambda))
+    reference <- paste0("chi-bar-square, binomial weights (", length(added_lambda),
+      " kernels; exact for information-orthogonal kernels, approximate otherwise)")
+  }
+  if (Chisq < -1e-6)
+    stop("The nested full model has lower likelihood; resolve optimization before testing.", call. = FALSE)
   Ll    <- c(reduced$loglik, full$loglik)
   Np    <- c(reduced$df, full$df)
 
@@ -1654,7 +1767,7 @@ anova.radish <- function(object, ..., alternative = NULL)
                "Pr(>Chi)" = c(NA, P))
   rownames(out) <- c("Null", "Alt")
 
-  attr(out, "heading") <- c("Likelihood ratio test",
+  attr(out, "heading") <- c(paste("Likelihood ratio test:", reference),
                            form_reduced, form_full)
   class(out) <- "anova"
   out
@@ -1679,6 +1792,7 @@ logLik.radish <- function(object, ...)
 {
   val <- object$loglik
   attr(val, "df") <- object$df
+  attr(val, "nobs") <- nobs.terradish(object)
   class(val) <- "logLik"
   val
 }
@@ -1698,7 +1812,8 @@ residuals.radish <- function(object, ...)
 {
   fit <- fitted(object)
   residual <- object$fit$response - fit
-  if (.fit_uses_covariance_response(object)) {
+  if (identical(.terradish_fit_comparison_contract(object)$likelihood_family,
+                "wishart_covariance")) {
     H <- diag(nrow(residual)) - matrix(1 / nrow(residual), nrow(residual), nrow(residual))
     residual <- H %*% residual %*% H
   }

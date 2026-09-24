@@ -99,9 +99,9 @@ test_that("the profile Hessian is correct when a nuisance parameter is pinned at
   # `.free_parameter_index()` uses a sqrt(.Machine$double.eps) tolerance, so
   # anything below that counts as pinned
   expect_lt(abs(unname(fit$phi[2])), sqrt(.Machine$double.eps))
-  # tau itself is interior, so this is a partially-active constraint set rather
-  # than the fully degenerate `boundary = TRUE` case
-  expect_false(isTRUE(fit$boundary))
+  # A zero kernel coefficient is flagged without erasing conductance curvature.
+  expect_true(isTRUE(fit$boundary))
+  expect_false(isTRUE(fit$no_structure_boundary))
 
   expect_derivatives_match(fx$f, g, fx$surface, S_cov, theta, nu = 40)
 
