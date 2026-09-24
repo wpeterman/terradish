@@ -71,6 +71,11 @@ When \code{x} is site-level data or the output of
 stored as an attribute of the returned function.  This allows
 \code{\link{terradish_cv_folds}} to rebuild the correct pairwise covariates for
 each train/test split automatically.
+
+Unclassed matrices are interpreted as pairwise columns and must
+  have \eqn{n(n-1)/2} rows. Use a data frame for site-level columns, or
+  \code{\link{pairwise_endpoint_covariates}} to construct their differences.
+  \code{\link{pairwise_covariates}} combines these with other pairwise inputs.
 }
 \examples{
 \donttest{

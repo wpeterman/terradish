@@ -137,6 +137,21 @@
   forceSymmetric((Q + Qd)[reduced_index, reduced_index, drop = FALSE])
 }
 
+.terradish_notice_state <- new.env(parent = emptyenv())
+
+.terradish_parallel_notice <- function(data, cores, solver, solver_control,
+                                      state = .terradish_notice_state) {
+  if (cores <= 1L || isTRUE(state$parallel)) return(invisible(NULL))
+  resolved <- .terradish_resolve_solver(data, solver, nrow(data$x), solver_control)$type
+  ignored <- resolved == "amg" ||
+    identical(solver_control$solve_backend, "cholmod_cpp_cached")
+  if (nrow(data$x) < 50000L || ignored) {
+    message("Parallel derivatives are experimental and use PSOCK workers. Only Hessian and partial solves can run in parallel; AMG and cached CHOLMOD ignore cores. Small graphs can be slower with multiple workers.")
+    state$parallel <- TRUE
+  }
+  invisible(NULL)
+}
+
 .terradish_auto_solver_defaults <- function()
 {
   list(
@@ -174,15 +189,10 @@
     resolved <- "direct"
     reason <- "prefer_direct_until_larger_graphs"
   }
-  else if (n_rhs <= as.integer(auto_control$auto_direct_max_rhs))
+  else
   {
     resolved <- "amg"
     reason <- "graph_large_enough_for_amg"
-  }
-  else
-  {
-    resolved <- "direct"
-    reason <- "large_graph_with_many_rhs_favors_direct"
   }
 
   list(type = resolved,

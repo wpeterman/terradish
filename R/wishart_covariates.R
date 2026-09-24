@@ -294,7 +294,8 @@ wishart_covariates <- function(x,
     stop("invalid inputs", call. = FALSE)
   if (anyNA(phi))
     stop("missing values are not supported", call. = FALSE)
-  stopifnot(nu > 0)
+  if (!is.numeric(nu) || length(nu) != 1L || !is.finite(nu) || nu <= 0)
+    stop("`nu` must be supplied as one finite positive number.", call. = FALSE)
 
   names(phi) <- phi_names
   tau <- phi["tau"]

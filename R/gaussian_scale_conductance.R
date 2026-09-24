@@ -306,7 +306,20 @@
     centered * d2scale / scale^2 +
     2 * centered * dscale^2 / scale^3
 
-  list(value = out, deriv = dout, second = d2out)
+  list(value = out, deriv = dout, second = d2out,
+       center = mu, scale = scale, dcenter = dmu, dscale = dscale,
+       d2center = d2mu, d2scale = d2scale)
+}
+
+.gaussian_reference_standardize <- function(value, reference) {
+  ref <- .gaussian_scale_standardize(reference$value, reference$deriv, reference$second)
+  x <- value$value - ref$center
+  dx <- value$deriv - ref$dcenter
+  d2x <- value$second - ref$d2center
+  list(value = x / ref$scale,
+    deriv = dx / ref$scale - x * ref$dscale / ref$scale^2,
+    second = d2x / ref$scale - 2 * dx * ref$dscale / ref$scale^2 -
+      x * ref$d2scale / ref$scale^2 + 2 * x * ref$dscale^2 / ref$scale^3)
 }
 
 .gaussian_scale_layer_values <- function(prep, sigma, standardize = TRUE)
@@ -847,6 +860,7 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
   stack <- .as_spatraster(surface$stack)
   active_cells <- cellFromXY(stack[[1]], surface$vertex_coordinates)
   rowcol <- rowColFromCell(stack[[1]], active_cells)
+  reference_preps <- NULL
 
   factory <- function(formula, x)
   {
@@ -929,8 +943,13 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
           scaled <- .gaussian_scale_layer_values(
             prep = layer_preps[[nm]],
             sigma = sigma_map[[nm]],
-            standardize = standardize
+            standardize = standardize && is.null(reference_preps)
           )
+          if (isTRUE(standardize) && !is.null(reference_preps)) {
+            reference <- .gaussian_scale_layer_values(reference_preps[[nm]],
+              sigma_map[[nm]], standardize = FALSE)
+            scaled <- .gaussian_reference_standardize(scaled, reference)
+          }
           base_value[[nm]] <- scaled$value
           base_deriv[[nm]] <- scaled$deriv * sigma_conversion_values[[nm]]
           base_second[[nm]] <- scaled$second * sigma_conversion_values[[nm]]^2
@@ -941,7 +960,13 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
           zeros <- rep(0, length(values))
           if (isTRUE(standardize))
           {
-            centered <- .gaussian_scale_standardize(values, zeros, zeros)
+            centered <- if (is.null(reference_preps))
+              .gaussian_scale_standardize(values, zeros, zeros) else {
+                ref <- reference_preps[[nm]]$raw_active
+                .gaussian_reference_standardize(
+                  list(value = values, deriv = zeros, second = zeros),
+                  list(value = ref, deriv = rep(0, length(ref)), second = rep(0, length(ref))))
+              }
             values <- centered$value
           }
           base_value[[nm]] <- values
@@ -1147,6 +1172,18 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
     stage_factory(formula, surface$x)
   }
   attr(factory, "default") <- NULL
+  attr(factory, "predict_for_surface") <- function(formula, surface, reference_model) {
+    info <- attr(reference_model, "gaussian_scale_info", exact = TRUE)
+    context <- attr(reference_model, "gaussian_scale_plot_context", exact = TRUE)
+    stage_factory <- gaussian_smoothed_loglinear_conductance(surface,
+      scale_vars = info$scale_vars, standardize = info$standardize,
+      sigma_lower = info$lower, sigma_upper = info$upper,
+      sigma_conversion = info$conversion_mode, sigma_conversion_factor = info$conversion)
+    # The newly created factory owns this environment; the fitted factory is
+    # unchanged. Reference derivatives keep scale-parameter uncertainty valid.
+    environment(stage_factory)$reference_preps <- context$layer_preps
+    stage_factory(formula, surface$x)
+  }
   attr(factory, "preferred_optimizer") <- "bfgs"
   attr(factory, "supports_partial") <- FALSE
   attr(factory, "requires_fixed_graph") <- TRUE

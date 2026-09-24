@@ -144,6 +144,10 @@
 #' }
 #'
 #' @export
+#' @param nu_fit Effective Wishart degrees of freedom used to fit each
+#'   simulation. Defaults to the generating \code{nu}. Increasing this value
+#'   narrows fitted intervals without adding independent information. Compare
+#'   coverage as well as power when exploring this sensitivity.
 covariance_response_power <- function(theta,
                                       formula,
                                       data,
@@ -172,9 +176,12 @@ covariance_response_power <- function(theta,
                                       nonnegative = TRUE,
                                       leverage = FALSE,
                                       cores = 1L,
-                                      verbose = FALSE)
+                                      verbose = FALSE,
+                                      nu_fit = nu)
 {
   stopifnot(inherits(formula, "formula"))
+  if (length(nu_fit) != 1L || !is.finite(nu_fit) || nu_fit <= 0)
+    stop("`nu_fit` must be finite and positive.", call. = FALSE)
   stopifnot(inherits(data, c("terradish_graph", "radish_graph")))
   stopifnot(inherits(conductance_model,
                      c("terradish_conductance_model_factory",
@@ -311,7 +318,7 @@ covariance_response_power <- function(theta,
               data = subset_data,
               conductance_model = spec$conductance_model,
               measurement_model = wishart_covariance,
-              nu = nu,
+              nu = nu_fit,
               theta = .covariance_power_spec_value(spec, "theta", NULL),
               leverage = .covariance_power_spec_value(spec, "leverage",
                                                        leverage),
@@ -480,6 +487,7 @@ covariance_response_power <- function(theta,
       tau = tau,
       sigma = sigma,
       nu = nu,
+      nu_fit = nu_fit,
       nsim = as.integer(nsim),
       n_designs = as.integer(n_designs),
       theta = theta_external,
@@ -728,7 +736,10 @@ print.terradish_covariance_power <- function(x, ...)
                                          conductance_cor_threshold)
 {
   ok <- identical(status, "OK") && inherits(fit, c("terradish", "radish")) &&
-    !is.null(fit$mle$theta)
+    !is.null(fit$mle$theta) && isTRUE(fit$convergence$code == 0L)
+  if (identical(status, "OK") && !is.null(fit$convergence$code) &&
+      fit$convergence$code != 0L)
+    status <- paste("NONCONVERGED:", fit$convergence$message)
   fitted_conductance <- if (ok)
     tryCatch(fit$submodels$f(fit$mle$theta)$conductance,
              error = function(e) rep(NA_real_, length(true_conductance)))

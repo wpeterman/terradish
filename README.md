@@ -303,7 +303,7 @@ Isolation by environment (IBE) and isolation by resistance (IBR) terms can be in
 
 ``` r
 # Pairwise environmental differences at sampling sites
-Z <- pairwise_endpoint_covariates(melip.coords, covariates)
+Z <- pairwise_endpoint_covariates(covariates, melip.coords)
 
 # Joint IBE + IBR model
 fit_ibe_ibr <- terradish(

@@ -1,0 +1,120 @@
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning: Failed to find a usable line-search step; returning the current parameter values.
+Warning in HagerZhang(dphi_fn, phi0, dphi0, control = ls.control) :
+  Failed to achieve finite new evaluation point, using alpha=0
+Warning: Failed to find a usable line-search step; returning the current parameter values.
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning: Failed to find a usable line-search step; returning the current parameter values.
+Warning: Failed to find a usable line-search step; returning the current parameter values.
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning: Failed to find a usable line-search step; returning the current parameter values.
+$code
+[1] 2
+
+$message
+[1] "stalled or line search failed"
+
+$iterations
+[1] 18
+
+$max_abs_projected_gradient
+[1] 2.889106e+14
+
+$criterion
+[1] "line_search_failed"
+
+$boundary
+[1] FALSE
+
+$restarted
+[1] FALSE
+
+  x 
+0.8 
+                         [,1]
+alpha           -2.303713e-15
+beta             1.000000e+00
+absdiff_climate  1.000000e-01
+geographic       5.000000e-02
+tau              6.868613e+01
+rho              4.115655e+00
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in HagerZhang(dphi_fn, phi0, dphi0, control = ls.control) :
+  Failed to achieve finite new evaluation point, using alpha=0
+Warning: Failed to find a usable line-search step; returning the current parameter values.
+Warning: Backtracking failed to find a finite improving step; returning alpha = 0.
+Warning: Failed to find a usable line-search step; returning the current parameter values.
+Warning: Backtracking failed to find a finite improving step; returning alpha = 0.
+Warning: Failed to find a usable line-search step; returning the current parameter values.
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps
+Warning in BoxConstrainedNewton(phi_start$phi, function(par, gradient, hessian) g(E = E,  :
+  `maxit` reached for Newton steps

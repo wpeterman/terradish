@@ -1,0 +1,71 @@
+ℹ Updating terradish documentation
+ℹ Loading terradish
+ℹ Testing terradish
+core-robustness: ...........12..3................
+gaussian-alignment: ...............
+new-surface-prediction: ...............
+nu-fit-power: .......
+optimizer-stopping: ............
+spline-reuse: ........
+
+══ Failed ══════════════════════════════════════════════════════════════════════
+── 1. Failure ('test-core-robustness.R:46:5'): both families fit combined geogra
+Expected `fit$convergence$code` to equal 0L.
+Differences:
+  `actual`: 2.0
+`expected`: 0.0
+
+
+── 2. Failure ('test-core-robustness.R:47:5'): both families fit combined geogra
+Expected `all(colnames(z) %in% sub("^(gamma_|lambda_)", "", names(fit$fit$phi)))` to be TRUE.
+Differences:
+`actual`:   FALSE
+`expected`: TRUE 
+
+
+── 3. Failure ('test-core-robustness.R:47:5'): both families fit combined geogra
+Expected `all(colnames(z) %in% sub("^(gamma_|lambda_)", "", names(fit$fit$phi)))` to be TRUE.
+Differences:
+`actual`:   FALSE
+`expected`: TRUE 
+
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+                                                                       test
+1        eight-neighbor graphs and graph notices follow the public contract
+2                   within-diagonal covariance gives an explicit diagnostic
+3              both families fit combined geographic and climate covariates
+4                    stored scaling is applied by layer name to new rasters
+5           combined pairwise inputs preserve ordering for both likelihoods
+6           spline monotonicity follows derivative signs over focal support
+7                   Gaussian convolution is aligned on odd and even rasters
+8                  Gaussian upper bounds respect the retained kernel window
+9         new log-linear landscapes retain terms and fitted transformations
+10                new spline landscapes retain training knots and centering
+11           mixed spline models retain transformations of parametric terms
+12 Gaussian prediction uses training post-smoothing scaling and derivatives
+13   overstated fit information reduces coverage without changing the truth
+14        small objective changes cannot conceal a large projected gradient
+15                 Newton steps use the free Hessian block at active bounds
+16             diagonal Newton curvature can span disparate parameter units
+17         spline rebuilds preserve knots, centers, and fitted coefficients
+18                         simulated Gaussian theta uses reported map units
+   passed failed error warning
+1       8      0 FALSE       0
+2       2      0 FALSE       0
+3       3      3 FALSE       0
+4       3      0 FALSE       0
+5       8      0 FALSE       0
+6       5      0 FALSE       0
+7      13      0 FALSE       0
+8       2      0 FALSE       0
+9       8      0 FALSE       0
+10      2      0 FALSE       0
+11      1      0 FALSE       0
+12      4      0 FALSE       0
+13      7      0 FALSE       0
+14      6      0 FALSE       0
+15      4      0 FALSE       0
+16      2      0 FALSE       0
+17      6      0 FALSE       0
+18      2      0 FALSE       0

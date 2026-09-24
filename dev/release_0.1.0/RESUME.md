@@ -1,8 +1,37 @@
 # terradish 0.1.0: resume checkpoint
 
-Saved 2026-09-24 before the owner's 14:45 America/New_York logoff.
-Read logoff_status.md for the exact final check states and stopped jobs.
-The overhaul is NOT complete. Phases 5-9 and final release validation remain.
+Updated 2026-09-24 at 17:05 America/New_York after the owner resumed work.
+The overhaul is NOT complete. The original 14:45 checkpoint follows below;
+this update supersedes its next-action instructions.
+
+## Resumed work: current state
+
+- Exact committed C4 passed a complete metadata-free archive check: 0 errors,
+  0 warnings, 0 notes, including installed tests, examples, and vignettes.
+  Evidence: phase4_exact_archive_check.rds and its log. The earlier checkout
+  check was interrupted because copying deep .git paths caused Windows warnings.
+- C5 candidate, version .54: dev/check/phase5-package. Robustness changes are
+  implemented, documented, and tested. All nine baseline fits converge and meet
+  plan tolerances (core_phase5.rds). Final affected tests: 167 passing, no
+  failures/errors, 154 diagnostic warnings. Full check PASSED with 0 errors,
+  0 warnings, 0 notes, including installed tests and rebuilt vignettes.
+- C6 candidate, version .55: dev/check/phase6-package. Function documentation is
+  rewritten; 45 R files have identical executable syntax to C5. Roxygen and
+  package spelling passed. Its examples/vignette check PASSED with 0 errors,
+  0 warnings, 0 notes. Tests were deliberately skipped because C5 checked the
+  identical code. See phase5_phase6_validation.md for precise evidence.
+- Checked candidates remain frozen as evidence.
+- C7 editable candidate: dev/check/phase7-package, copied from C6. README and
+  all eight vignette revisions are drafted. Six freshly rendered successfully;
+  IBE and simulation rendering is pending a code-example type correction.
+  Metadata, final builds, audits, and release gates are still pending.
+- C5 source has been adopted for its .54 commit. Adopt C6 next as a separate
+  .55 commit. Preserve each version and NEWS entry. Propagate fixes into C7.
+- Resume scripts and receipts are in this directory. Some diagnostic runs were
+  interrupted or failed during development; only final named acceptance
+  receipts establish validation. Do not overwrite those artifacts.
+
+The original logoff details remain in logoff_status.md.
 
 ## Current checkout and commits
 

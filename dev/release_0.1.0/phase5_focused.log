@@ -1,0 +1,385 @@
+ℹ Updating terradish documentation
+ℹ Loading terradish
+ℹ Testing terradish
+core-robustness: ................................
+cv-contracts: WWWWWWWWWWWWWWWWWWW..WWW.WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW.....WW.WWW.WWWWWWWWWWWWWWWWWWWWWWWWWW.WW.....WWWW..WW..WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW......WWWWWWWWWWWWWWWWW.....
+gaussian-alignment: ...............
+new-surface-prediction: ...............
+nu-fit-power: .......
+optimizer-stopping: ..........
+spatial-cv: .............W....
+spline-reuse: ........
+terra-workflow: ................................
+
+══ Warnings ════════════════════════════════════════════════════════════════════
+1. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:16:3') - Removed unused spatial covariates: z
+
+2. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:16:3') - Removed unused spatial covariates: z
+
+3. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:16:3') - Removed unused spatial covariates: z
+
+4. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:19:3') - Removed unused spatial covariates: z
+
+5. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:19:3') - Removed unused spatial covariates: z
+
+6. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:19:3') - Removed unused spatial covariates: z
+
+7. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:19:3') - Removed unused spatial covariates: z
+
+8. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:19:3') - Removed unused spatial covariates: z
+
+9. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:19:3') - Removed unused spatial covariates: z
+
+10. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:19:3') - Removed unused spatial covariates: z
+
+11. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:19:3') - Removed unused spatial covariates: z
+
+12. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:19:3') - Removed unused spatial covariates: z
+
+13. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:19:3') - Removed unused spatial covariates: z
+
+14. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:19:3') - Removed unused spatial covariates: z
+
+15. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:19:3') - Removed unused spatial covariates: z
+
+16. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:19:3') - Removed unused spatial covariates: z
+
+17. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:19:3') - Removed unused spatial covariates: z
+
+18. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:19:3') - Removed unused spatial covariates: z
+
+19. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:19:3') - Removed unused spatial covariates: z
+
+20. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:26:3') - Removed unused spatial covariates: z
+
+21. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:26:3') - Removed unused spatial covariates: z
+
+22. mixed conductance factories and Gaussian-only baselines work ('test-cv-contracts.R:26:3') - Removed unused spatial covariates: z
+
+23. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:32:3') - Removed unused spatial covariates: z
+
+24. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:32:3') - Removed unused spatial covariates: z
+
+25. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:32:3') - Removed unused spatial covariates: z
+
+26. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+27. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+28. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+29. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+30. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+31. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+32. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+33. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+34. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+35. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+36. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+37. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+38. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+39. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+40. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+41. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+42. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+43. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+44. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+45. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+46. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+47. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+48. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+49. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+50. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+51. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+52. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+53. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+54. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+55. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+56. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+57. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+58. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+59. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+60. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+61. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+62. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+63. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:35:3') - Removed unused spatial covariates: z
+
+64. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:37:3') - Removed unused spatial covariates: z
+
+65. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:37:3') - Removed unused spatial covariates: z
+
+66. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:45:3') - Removed unused spatial covariates: z
+
+67. checkpoint signatures reject changed responses and repeated folds pool ('test-cv-contracts.R:45:3') - Removed unused spatial covariates: z
+
+68. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:50:3') - Removed unused spatial covariates: z
+
+69. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:50:3') - Removed unused spatial covariates: z
+
+70. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:50:3') - Removed unused spatial covariates: z
+
+71. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+72. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+73. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+74. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+75. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+76. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+77. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+78. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+79. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+80. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+81. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+82. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+83. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+84. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+85. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+86. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+87. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+88. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+89. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+90. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+91. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+92. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+93. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+94. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+95. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+96. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:54:3') - Removed unused spatial covariates: z
+
+97. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:61:3') - Removed unused spatial covariates: z
+
+98. fixed predictive scores retain training nuisance parameters ('test-cv-contracts.R:61:3') - Removed unused spatial covariates: z
+
+99. fixed no-structure predictions do not require identified conductance ('test-cv-contracts.R:80:3') - Removed unused spatial covariates: z
+
+100. fixed no-structure predictions do not require identified conductance ('test-cv-contracts.R:80:3') - Removed unused spatial covariates: z
+
+101. fixed no-structure predictions do not require identified conductance ('test-cv-contracts.R:80:3') - Removed unused spatial covariates: z
+
+102. fixed no-structure predictions do not require identified conductance ('test-cv-contracts.R:81:3') - Removed unused spatial covariates: z
+
+103. fixed no-structure predictions do not require identified conductance ('test-cv-contracts.R:88:3') - Removed unused spatial covariates: z
+
+104. fixed no-structure predictions do not require identified conductance ('test-cv-contracts.R:90:3') - Removed unused spatial covariates: z
+
+105. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:97:3') - Removed unused spatial covariates: z
+
+106. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:97:3') - Removed unused spatial covariates: z
+
+107. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:97:3') - Removed unused spatial covariates: z
+
+108. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:98:3') - Removed unused spatial covariates: z
+
+109. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:98:3') - Removed unused spatial covariates: z
+
+110. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:98:3') - Removed unused spatial covariates: z
+
+111. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:98:3') - Removed unused spatial covariates: z
+
+112. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:98:3') - Removed unused spatial covariates: z
+
+113. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:98:3') - Removed unused spatial covariates: z
+
+114. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:98:3') - Removed unused spatial covariates: z
+
+115. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:98:3') - Removed unused spatial covariates: z
+
+116. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:98:3') - Removed unused spatial covariates: z
+
+117. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:98:3') - Removed unused spatial covariates: z
+
+118. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:98:3') - Removed unused spatial covariates: z
+
+119. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:98:3') - Removed unused spatial covariates: z
+
+120. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:98:3') - Removed unused spatial covariates: z
+
+121. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:100:3') - Removed unused spatial covariates: z
+
+122. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:100:3') - Removed unused spatial covariates: z
+
+123. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:100:3') - Removed unused spatial covariates: z
+
+124. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:100:3') - Removed unused spatial covariates: z
+
+125. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:100:3') - Optimizer stalled: objective change is small but the projected gradient remains large.
+
+126. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:100:3') - Removed unused spatial covariates: z
+
+127. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:100:3') - Removed unused spatial covariates: z
+
+128. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:100:3') - Removed unused spatial covariates: z
+
+129. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:100:3') - Removed unused spatial covariates: z
+
+130. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:100:3') - Removed unused spatial covariates: z
+
+131. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:100:3') - Removed unused spatial covariates: z
+
+132. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:100:3') - Removed unused spatial covariates: z
+
+133. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:100:3') - Optimizer stalled: objective change is small but the projected gradient remains large.
+
+134. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:100:3') - Removed unused spatial covariates: z
+
+135. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:100:3') - Removed unused spatial covariates: z
+
+136. Wishart CV totals scale with nu without changing rank ('test-cv-contracts.R:100:3') - Failed uniform-baseline scores: linear/1/1, both/1/1. Model scores remain available; affected gains are NA.
+
+137. one failed fold makes the full total NA and preserves common-fold rankings ('test-cv-contracts.R:112:3') - Removed unused spatial covariates: z
+
+138. one failed fold makes the full total NA and preserves common-fold rankings ('test-cv-contracts.R:112:3') - Removed unused spatial covariates: z
+
+139. one failed fold makes the full total NA and preserves common-fold rankings ('test-cv-contracts.R:112:3') - Removed unused spatial covariates: z
+
+140. one failed fold makes the full total NA and preserves common-fold rankings ('test-cv-contracts.R:123:3') - Removed unused spatial covariates: z
+
+141. one failed fold makes the full total NA and preserves common-fold rankings ('test-cv-contracts.R:123:3') - Removed unused spatial covariates: z
+
+142. one failed fold makes the full total NA and preserves common-fold rankings ('test-cv-contracts.R:123:3') - Removed unused spatial covariates: z
+
+143. one failed fold makes the full total NA and preserves common-fold rankings ('test-cv-contracts.R:123:3') - Removed unused spatial covariates: z
+
+144. one failed fold makes the full total NA and preserves common-fold rankings ('test-cv-contracts.R:123:3') - Removed unused spatial covariates: z
+
+145. one failed fold makes the full total NA and preserves common-fold rankings ('test-cv-contracts.R:123:3') - Removed unused spatial covariates: z
+
+146. one failed fold makes the full total NA and preserves common-fold rankings ('test-cv-contracts.R:123:3') - Removed unused spatial covariates: z
+
+147. one failed fold makes the full total NA and preserves common-fold rankings ('test-cv-contracts.R:123:3') - Removed unused spatial covariates: z
+
+148. one failed fold makes the full total NA and preserves common-fold rankings ('test-cv-contracts.R:123:3') - Removed unused spatial covariates: z
+
+149. one failed fold makes the full total NA and preserves common-fold rankings ('test-cv-contracts.R:123:3') - Removed unused spatial covariates: z
+
+150. one failed fold makes the full total NA and preserves common-fold rankings ('test-cv-contracts.R:123:3') - Removed unused spatial covariates: z
+
+151. one failed fold makes the full total NA and preserves common-fold rankings ('test-cv-contracts.R:123:3') - Removed unused spatial covariates: z
+
+152. one failed fold makes the full total NA and preserves common-fold rankings ('test-cv-contracts.R:123:3') - Removed unused spatial covariates: z
+
+153. one failed fold makes the full total NA and preserves common-fold rankings ('test-cv-contracts.R:123:3') - Removed unused spatial covariates: z
+
+154. fixed-domain cross-validation scores trained and baseline models ('test-spatial-cv.R:43:3') - Removed unused spatial covariates: forestcover
+
+══ DONE ════════════════════════════════════════════════════════════════════════
+                                                                         test
+1          eight-neighbor graphs and graph notices follow the public contract
+2                     within-diagonal covariance gives an explicit diagnostic
+3                both families fit combined geographic and climate covariates
+4                      stored scaling is applied by layer name to new rasters
+5             combined pairwise inputs preserve ordering for both likelihoods
+6             spline monotonicity follows derivative signs over focal support
+7                mixed conductance factories and Gaussian-only baselines work
+8      checkpoint signatures reject changed responses and repeated folds pool
+9                 fixed predictive scores retain training nuisance parameters
+10       fixed no-structure predictions do not require identified conductance
+11                      Wishart CV totals scale with nu without changing rank
+12 one failed fold makes the full total NA and preserves common-fold rankings
+13                    Gaussian convolution is aligned on odd and even rasters
+14                   Gaussian upper bounds respect the retained kernel window
+15          new log-linear landscapes retain terms and fitted transformations
+16                  new spline landscapes retain training knots and centering
+17             mixed spline models retain transformations of parametric terms
+18   Gaussian prediction uses training post-smoothing scaling and derivatives
+19     overstated fit information reduces coverage without changing the truth
+20          small objective changes cannot conceal a large projected gradient
+21                   Newton steps use the free Hessian block at active bounds
+22              terradish_folds is reproducible and preserves the random seed
+23           fixed-domain cross-validation scores trained and baseline models
+24                         measurement profiling reports convergence metadata
+25           spline rebuilds preserve knots, centers, and fitted coefficients
+26                           simulated Gaussian theta uses reported map units
+27                 conductance_surface and conductance work with terra inputs
+28                                         utility helpers behave as expected
+29       crop_to_focal_buffer reduces raster extent before graph construction
+30                                  pca_dist works when adegenet is available
+   passed failed error warning
+1       8      0 FALSE       0
+2       2      0 FALSE       0
+3       6      0 FALSE       0
+4       3      0 FALSE       0
+5       8      0 FALSE       0
+6       5      0 FALSE       0
+7       3      0 FALSE      22
+8       6      0 FALSE      45
+9       7      0 FALSE      31
+10      4      0 FALSE       6
+11      6      0 FALSE      32
+12      5      0 FALSE      17
+13     13      0 FALSE       0
+14      2      0 FALSE       0
+15      8      0 FALSE       0
+16      2      0 FALSE       0
+17      1      0 FALSE       0
+18      4      0 FALSE       0
+19      7      0 FALSE       0
+20      6      0 FALSE       0
+21      4      0 FALSE       0
+22      5      0 FALSE       0
+23     10      0 FALSE       1
+24      2      0 FALSE       0
+25      6      0 FALSE       0
+26      2      0 FALSE       0
+27     13      0 FALSE       0
+28     11      0 FALSE       0
+29      6      0 FALSE       0
+30      2      0 FALSE       0

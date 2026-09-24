@@ -72,9 +72,17 @@ support before conductance is evaluated. This constrains prediction to
 empirical covariate support among \code{x$demes} and can stabilize extreme
 tails when focal sampling is sparse.
 
-The function requires the MLE to be in the interior of the parameter space
-(\code{fit$fit$boundary == FALSE}); if the MLE is on the boundary (no
-detectable IBR signal) an error is thrown.
+A no-structure fit leaves conductance coefficients unidentified and cannot
+produce a fitted conductance surface. Other nuisance-parameter boundaries
+do not by themselves prevent prediction.
+
+On a new graph, prediction reuses the fitted log-linear terms, spline knots
+and centers, or Gaussian smoothing parameters and post-smoothing scaling.
+It does not estimate new centers or scales on the prediction landscape.
+If the original inputs were scaled before fitting, use
+\code{scale_covariates(new_rasters, reference = original_scaled_rasters)}
+before constructing the new graph. Other conductance factories are not
+supported for prediction to a new graph.
 }
 \examples{
 \donttest{

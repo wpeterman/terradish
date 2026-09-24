@@ -7,7 +7,7 @@
 conductance_surface(
   covariates,
   coords,
-  directions = 4,
+  directions = 8,
   saveStack = TRUE,
   crop_buffer = NULL
 )
@@ -99,6 +99,15 @@ one level as the reference.
 that can underestimate resistance in diagonal corridors.
 \code{directions = 8} is preferred unless there is a specific reason to
 restrict movement to the cardinal directions.
+Eight-neighbor adjacency is the default. Each edge has conductance
+\eqn{c_i + c_j}; diagonal edges receive no additional distance weighting.
+Duplicate focal cells trigger a warning. Focal sites on pruned disconnected
+components cannot be fitted on the retained graph.
+
+Cropping removes possible movement paths and can inflate resistance. The
+supplied release audit measured increases of 15--23 percent with a two-cell
+buffer and 1--2 percent with ten cells. These are case-specific results;
+compare a larger-buffer fit before interpreting a cropped landscape.
 }
 \examples{
 

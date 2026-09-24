@@ -190,7 +190,8 @@ wishart_covariance <- function(E, S, phi, nu,
 
   if (anyNA(E) || anyNA(S) || anyNA(phi))
     stop("missing values are not supported")
-  stopifnot(nu > 0)
+  if (!is.numeric(nu) || length(nu) != 1L || !is.finite(nu) || nu <= 0)
+    stop("`nu` must be supplied as one finite positive number.", call. = FALSE)
 
   E <- symm(E)
   S <- symm(S)

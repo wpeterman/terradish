@@ -1,4 +1,4 @@
-assemble_model_matrix <- function(formula, spdat)
+assemble_model_matrix <- function(formula, spdat, check_rank = TRUE)
 {
   stopifnot(inherits(formula, "formula"))
   stopifnot(is.data.frame(spdat))
@@ -11,10 +11,10 @@ assemble_model_matrix <- function(formula, spdat)
     # interactions x:z do not appear as required column names; only the
     # underlying raw variables need to be present in the data frame.
     stopifnot(all.vars(formula) %in% colnames(spdat))
-    formula <- reformulate(colnames(formula_covariates))
+    formula <- reformulate(colnames(formula_covariates), env = environment(formula))
 
     # if any layers are not in formula, remove them
-    missing_covariates <- !(colnames(spdat) %in% rownames(formula_covariates))
+    missing_covariates <- !(colnames(spdat) %in% all.vars(formula))
     if (any(missing_covariates))
     {
       unused_covariates <- colnames(spdat)[missing_covariates]
@@ -28,11 +28,16 @@ assemble_model_matrix <- function(formula, spdat)
 
   # get model matrix and check for rank deficiency
   # NOTE: sparse via Matrix::sparse.model.matrix?
-  spdat <- model.matrix(formula, data = spdat)
-  stopifnot(qr(spdat)$rank == ncol(spdat))
+  frame <- stats::model.frame(formula, data = spdat, na.action = stats::na.fail)
+  spdat <- model.matrix(formula, data = frame)
+  prediction_spec <- list(terms = terms(frame),
+    xlevels = lapply(frame[vapply(frame, is.factor, logical(1))], levels),
+    contrasts = attr(spdat, "contrasts"))
+  if (check_rank) stopifnot(qr(spdat)$rank == ncol(spdat))
   if (ncol(spdat) > 1) #unless IBD, remove intercept
     spdat <- spdat[,colnames(spdat) != "(Intercept)", drop=FALSE]
 
+  attr(spdat, "prediction_spec") <- prediction_spec
   spdat
 }
 
@@ -150,7 +155,8 @@ assemble_model_matrix <- function(formula, spdat)
 }
 
 .smooth_loglinear_model_matrix <- function(formula, x, df, basis, degree,
-                                           intercept, smooth_specs = NULL)
+                                           intercept, smooth_specs = NULL,
+                                           param_spec = NULL)
 {
   fitting_basis <- is.null(smooth_specs)
   stopifnot(inherits(formula, "formula"))
@@ -167,9 +173,19 @@ assemble_model_matrix <- function(formula, spdat)
 
   if (length(param_labels))
   {
-    param_formula <- reformulate(param_labels)
+    param_formula <- reformulate(param_labels, env = environment(formula))
     param_vars <- all.vars(param_formula)
-    param_x <- assemble_model_matrix(param_formula, x[, param_vars, drop = FALSE])
+    if (is.null(param_spec)) {
+      param_x <- assemble_model_matrix(param_formula, x[, param_vars, drop = FALSE],
+                                       check_rank = fitting_basis)
+      param_spec <- attr(param_x, "prediction_spec", exact = TRUE)
+      param_spec$columns <- colnames(param_x)
+    } else {
+      frame <- stats::model.frame(param_spec$terms, x, xlev = param_spec$xlevels,
+                                   na.action = stats::na.fail)
+      param_x <- model.matrix(param_spec$terms, frame, contrasts.arg = param_spec$contrasts)
+      param_x <- param_x[, param_spec$columns, drop = FALSE]
+    }
   }
   else if (!length(smooth_labels))
     param_x <- assemble_model_matrix(~1, x)
@@ -201,6 +217,7 @@ assemble_model_matrix <- function(formula, spdat)
     stop("Smooth conductance model matrix is rank deficient.", call. = FALSE)
   rownames(out) <- NULL
   attr(out, "smooth_specs") <- smooth_specs
+  attr(out, "param_spec") <- param_spec
   out
 }
 
@@ -266,7 +283,8 @@ assemble_model_matrix <- function(formula, spdat)
     basis = basis,
     degree = degree,
     intercept = intercept,
-    smooth_specs = smooth_specs
+    smooth_specs = smooth_specs,
+    param_spec = attr(x, "param_spec", exact = TRUE)
   )
   conductance_model
 }
@@ -367,7 +385,11 @@ NULL
 
 loglinear_conductance <- function(formula, x)
 {
-  x <- assemble_model_matrix(formula, x)
+  .loglinear_conductance_from_matrix(assemble_model_matrix(formula, x))
+}
+
+.loglinear_conductance_from_matrix <- function(x)
+{
 
   # default starting values
   default <- rep(0, ncol(x))
@@ -424,6 +446,7 @@ loglinear_conductance <- function(formula, x)
   class(conductance_model) <- c("terradish_conductance_model",
                                 "radish_conductance_model")
   attr(conductance_model, "default") <- default
+  attr(conductance_model, "prediction_spec") <- attr(x, "prediction_spec", exact = TRUE)
   conductance_model
 }
 class(loglinear_conductance) <- c("terradish_conductance_model_factory",
@@ -518,7 +541,7 @@ attr(smooth_loglinear_conductance, "link") <- "log"
 
 .smooth_loglinear_factory <- function(df = 4L, basis = c("ns", "bs"),
                                       degree = 3L, intercept = FALSE,
-                                      smooth_specs = NULL)
+                                      smooth_specs = NULL, param_spec = NULL)
 {
   basis <- match.arg(basis)
   df <- as.integer(df)
@@ -529,7 +552,7 @@ attr(smooth_loglinear_conductance, "link") <- "log"
   {
     x <- .smooth_loglinear_model_matrix(
       formula, x, df = df, basis = basis, degree = degree,
-      intercept = intercept, smooth_specs = smooth_specs
+      intercept = intercept, smooth_specs = smooth_specs, param_spec = param_spec
     )
     .smooth_loglinear_conductance_from_matrix(
       x = x, df = df, basis = basis, degree = degree,

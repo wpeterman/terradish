@@ -27,6 +27,11 @@
 #'
 #' \code{conductance_surface()} also accepts \code{crop_buffer = } and applies
 #' this helper before graph construction.
+#' Cropping can increase resistance by removing paths outside the retained
+#' extent. The supplied release audit found increases of 15--23 percent at a
+#' two-cell buffer and 1--2 percent at ten cells. These results are specific to
+#' that landscape. Compare fits over larger buffers as a sensitivity check.
+#' A message flags buffers smaller than half the maximum intersite distance.
 #'
 #' @return A cropped \code{terra::SpatRaster}. Any \code{terradish_scale}
 #'   metadata attached by \code{\link{scale_covariates}} is preserved.
@@ -44,7 +49,7 @@
 #'
 #' # The same crop can be applied automatically while building the graph.
 #' surface <- conductance_surface(r, pts, directions = 4, crop_buffer = 2)
-#' surface$dim
+#' nrow(surface$x)  # number of retained graph cells
 #'
 #' @export
 crop_to_focal_buffer <- function(covariates, coords, buffer)
@@ -59,6 +64,8 @@ crop_to_focal_buffer <- function(covariates, coords, buffer)
          call. = FALSE)
   if (length(buffer) == 1L)
     buffer <- rep(buffer, 2L)
+  if (nrow(coords) > 1L && min(buffer) < max(stats::dist(coords)) / 2)
+    message("The crop buffer is less than half the maximum distance between focal sites. Cropping can inflate resistance; compare fits with a larger buffer.")
 
   resolution <- abs(res(covariates[[1]]))
   pad_x <- buffer[[1]] + resolution[[1]] / 2

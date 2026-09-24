@@ -539,7 +539,11 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   \code{control = NewtonRaphsonControl(ls.control = HagerZhangControl(verbose = TRUE))}.
 #' @param control A list containing options for the optimization routine (see \code{\link{NewtonRaphsonControl}} for list)
 #' @param validate Numerical validation of leverage via package \code{numDeriv} (very slow, use for debugging small examples)
-#' @param cores Number of worker processes to use for Hessian and leverage calculations. \code{1} evaluates serially.
+#' @param cores Number of worker processes. \code{1} evaluates serially.
+#'   Parallel execution is experimental and uses PSOCK workers on every
+#'   operating system. Only Hessian and partial solves run in parallel; AMG
+#'   and cached CHOLMOD ignore this setting. Multiple workers can be slower
+#'   on small graphs. A one-time message explains these limits when applicable.
 #'   On Windows, one PSOCK cluster is retained for the duration of the fit
 #'   instead of being rebuilt for every derivative evaluation.
 #' @param measurement_control Optional \code{\link{NewtonRaphsonControl}} object
@@ -561,7 +565,10 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   Standard errors from \code{summary()} are then the asymptotic
 #'   information-based errors. With \code{leverage = TRUE} the leverage
 #'   diagnostics inherit the same approximation.
-#' @param solver Linear-system solver. \code{"direct"} uses sparse Cholesky, \code{"amg"} uses algebraic multigrid, and \code{"auto"} chooses between them.
+#' @param solver Linear-system solver. \code{"direct"} uses sparse Cholesky,
+#'   \code{"amg"} uses algebraic multigrid, and \code{"auto"} chooses AMG
+#'   above the large-graph threshold regardless of the number of right-hand
+#'   sides. AMG iteration counts can rise with conductance contrast.
 #' @param solver_control Optional named list of solver settings passed to
 #'   \code{\link{terradish_algorithm}}. For \code{solver = "direct"}, supported
 #'   entries include \code{factorization}, \code{supernodal_min_vertices},
@@ -673,7 +680,10 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' reduce runtime. First, build the graph with
 #' \code{conductance_surface(..., crop_buffer = )} when focal sites occupy only
 #' part of the raster. This removes vertices outside the buffered sampling
-#' extent before fitting. Second, use
+#' extent before fitting. Cropping changes resistance: one sensitivity audit
+#' found increases of 15--23\% with a two-cell buffer and 1--2\% with a
+#' ten-cell buffer. These values are case-specific. Refit with a larger buffer
+#' to assess sensitivity on your landscape. Second, use
 #' \code{approximation = "coarse_raster"} with
 #' \code{approximation_control = list(factor = c(4, 2), exact_refine = TRUE)}
 #' to optimize on one or more aggregated rasters before refining on the original
@@ -682,6 +692,12 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' starting values. To keep the full-resolution cleanup deliberately short, pass
 #' \code{refine_control = NewtonRaphsonControl(maxit = 2, ...)} inside
 #' \code{approximation_control}. Exact refinement is required.
+#'
+#' For spline terms, \code{summary()} reports monotonicity over the covariate
+#' range at the focal sites, including the number of derivative sign changes.
+#' A monotone curve increases or decreases throughout that range; a
+#' nonmonotone curve changes direction. This describes the fitted curve, not
+#' a confidence statement about its shape outside or within that range.
 #'
 #' \strong{Gaussian scale-aware conductance.}
 #' \code{\link{gaussian_smoothed_loglinear_conductance}} can also use
@@ -820,6 +836,7 @@ terradish <- function(formula,
     control$verbose <- verbose
   }
   solver <- match.arg(solver)
+  .terradish_parallel_notice(data, cores, solver, solver_control)
   curvature <- match.arg(curvature)
   approximation <- match.arg(approximation)
 
@@ -829,6 +846,8 @@ terradish <- function(formula,
   response <- attr(terms, "response")
   S        <- if(response) eval(attr(terms, "variables")[[response + 1L]], parent.frame())
               else stop("'formula' must have a response matrix on the left-hand side")
+  if (identical(attr(S, "diagonal", exact = TRUE), "within"))
+    warning("This response uses diagonal = 'within', whose diagonal is on another scale. Reconstruct it with diagonal = 'gower' before interpreting covariance fits.", call. = FALSE)
   S        <- .validate_measurement_response(measurement_model, S)
   is_ibd   <- length(vars) == 1
   formula  <- if (!is_ibd) reformulate(attr(terms, "term.labels"))
@@ -1232,6 +1251,8 @@ terradish <- function(formula,
                                  "function_calls" = fcalls$count + 1),
               diagnostics    = .terradish_diagnostics_snapshot(diagnostics),
               gaussian_scale_info = attr(conductance_model, "gaussian_scale_info", exact = TRUE),
+              spline_monotonicity = if (no_coef) NULL else
+                .spline_monotonicity(conductance_model, theta_external, data$x[data$demes, , drop = FALSE]),
               convergence = list(
                 code = if (is_ibd) 0L else exact_problem$convergence,
                 message = if (is_ibd) "no conductance parameters" else
@@ -1548,6 +1569,7 @@ summary.radish <- function(object, conf.level = 0.95, ...)
                            abs(sigma - high) <= .01 * abs(high)))
   }
   out$ibe_ratio <- terradish_ibe_ratio(x)
+  out$spline_monotonicity <- x$spline_monotonicity
 
   class(out) <- c("summary.terradish", "summary.radish")
   out
@@ -1591,6 +1613,10 @@ print.summary.radish <- function(x, digits = max(3L, getOption("digits") - 3L), 
     cat("Resistance-distance equivalent of one unit of environmental difference:\n")
     print(x$ibe_ratio, row.names = FALSE)
     if (!is.null(attr(x$ibe_ratio, "note"))) cat(attr(x$ibe_ratio, "note"), "\n")
+  }
+  if (!is.null(x$spline_monotonicity)) {
+    cat("Spline shape over focal-site covariate ranges:\n")
+    print(x$spline_monotonicity, row.names = FALSE)
   }
   if (!x$no_structure_boundary && !is.null(x$ztable))
   {

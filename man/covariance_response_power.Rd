@@ -31,7 +31,8 @@ covariance_response_power(
   nonnegative = TRUE,
   leverage = FALSE,
   cores = 1L,
-  verbose = FALSE
+  verbose = FALSE,
+  nu_fit = nu
 )
 }
 \arguments{
@@ -103,6 +104,11 @@ recovery summary.}
 model-specific value is supplied in \code{fit_models}.}
 
 \item{verbose}{Logical; print progress messages?}
+
+\item{nu_fit}{Effective Wishart degrees of freedom used to fit each
+simulation. Defaults to the generating \code{nu}. Increasing this value
+narrows fitted intervals without adding independent information. Compare
+coverage as well as power when exploring this sensitivity.}
 }
 \value{
 An object of class \code{"terradish_covariance_power"} containing:

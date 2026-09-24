@@ -169,7 +169,8 @@ generalized_wishart <- function(E, S, phi, nu, gradient = TRUE, hessian = TRUE, 
 
   S <- .prepare_gw_response(S)
 
-  stopifnot(nu > 0)
+  if (!is.numeric(nu) || length(nu) != 1L || !is.finite(nu) || nu <= 0)
+    stop("`nu` must be supplied as one finite positive number.", call. = FALSE)
 
   names(phi) <- c("tau", "sigma")
   tau   <- phi["tau"]

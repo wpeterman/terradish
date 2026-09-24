@@ -181,6 +181,10 @@ pairwise_endpoint_covariates <- function(x,
 #'
 #' }
 #' @export
+#' @details Unclassed matrices are interpreted as pairwise columns and must
+#'   have \eqn{n(n-1)/2} rows. Use a data frame for site-level columns, or
+#'   \code{\link{pairwise_endpoint_covariates}} to construct their differences.
+#'   \code{\link{pairwise_covariates}} combines these with other pairwise inputs.
 mlpe_covariates <- function(x,
                             coords = NULL,
                             transform = c("absdiff", "sqdiff",
@@ -196,6 +200,11 @@ mlpe_covariates <- function(x,
   pairwise_covariates <- if (inherits(x, c("terradish_pairwise_covariates",
                                            "radish_pairwise_covariates")))
     x
+  else if (is.matrix(x)) {
+    .pairwise_site_count(nrow(x))
+    structure(.as_pairwise_covariate_matrix(x),
+              class = c("terradish_pairwise_covariates", "matrix", "array"))
+  }
   else
     pairwise_endpoint_covariates(x, coords = coords, transform = transform,
                                  scale = scale)
@@ -502,6 +511,18 @@ mlpe_covariates <- function(x,
 
   site_covariates <- attr(x, "site_covariates")
   transform <- attr(x, "transform")
+  if (is.null(site_covariates)) {
+    n <- .pairwise_site_count(nrow(x))
+    out <- vapply(seq_len(ncol(x)), function(j) {
+      D <- matrix(0, n, n)
+      D[lower.tri(D)] <- x[, j]
+      D <- D + t(D)
+      D <- D[index, index, drop = FALSE]
+      D[lower.tri(D)]
+    }, numeric(length(index) * (length(index) - 1) / 2))
+    out <- matrix(out, ncol = ncol(x), dimnames = list(NULL, colnames(x)))
+    return(structure(out, class = c("terradish_pairwise_covariates", "matrix", "array")))
+  }
   .make_pairwise_endpoint_covariates(site_covariates[index, , drop = FALSE],
                                      transform = transform)
 }

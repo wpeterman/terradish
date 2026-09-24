@@ -176,6 +176,17 @@ terradish_folds <- function(pts, k = 5L,
   stop("The training fit produced no conductance coefficients.", call. = FALSE)
 }
 
+.cv_prediction_metadata <- function(x) {
+  # Fitted terms retain a formula environment for prediction. That transient
+  # call frame is not part of a model definition or a checkpoint signature.
+  attrs <- attributes(x)
+  attrs$.Environment <- NULL
+  if (is.list(x)) x <- lapply(x, .cv_prediction_metadata)
+  if (length(attrs)) attrs <- lapply(attrs, .cv_prediction_metadata)
+  attributes(x) <- attrs
+  x
+}
+
 .cv_function_identity <- function(fn) {
   attrs <- attributes(fn)
   attrs <- attrs[!vapply(attrs, is.function, logical(1))]
@@ -184,7 +195,9 @@ terradish_folds <- function(pts, k = 5L,
   names(captured) <- references
   captured <- captured[vapply(captured, function(x)
     !is.null(x) && (is.atomic(x) || is.data.frame(x)), logical(1))]
-  list(formals = formals(fn), body = body(fn), attributes = attrs, captured = captured)
+  list(formals = formals(fn), body = body(fn),
+       attributes = .cv_prediction_metadata(attrs),
+       captured = .cv_prediction_metadata(captured))
 }
 
 .cv_signature <- function(value) {

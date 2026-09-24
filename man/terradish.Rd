@@ -87,7 +87,11 @@ it on with
 
 \item{validate}{Numerical validation of leverage via package \code{numDeriv} (very slow, use for debugging small examples)}
 
-\item{cores}{Number of worker processes to use for Hessian and leverage calculations. \code{1} evaluates serially.
+\item{cores}{Number of worker processes. \code{1} evaluates serially.
+Parallel execution is experimental and uses PSOCK workers on every
+operating system. Only Hessian and partial solves run in parallel; AMG
+and cached CHOLMOD ignore this setting. Multiple workers can be slower
+on small graphs. A one-time message explains these limits when applicable.
 On Windows, one PSOCK cluster is retained for the duration of the fit
 instead of being rebuilt for every derivative evaluation.}
 
@@ -102,7 +106,10 @@ Standard errors from \code{summary()} are then the asymptotic
 information-based errors. With \code{leverage = TRUE} the leverage
 diagnostics inherit the same approximation.}
 
-\item{solver}{Linear-system solver. \code{"direct"} uses sparse Cholesky, \code{"amg"} uses algebraic multigrid, and \code{"auto"} chooses between them.}
+\item{solver}{Linear-system solver. \code{"direct"} uses sparse Cholesky,
+\code{"amg"} uses algebraic multigrid, and \code{"auto"} chooses AMG
+above the large-graph threshold regardless of the number of right-hand
+sides. AMG iteration counts can rise with conductance contrast.}
 
 \item{solver_control}{Optional named list of solver settings passed to
 \code{\link{terradish_algorithm}}. For \code{solver = "direct"}, supported
@@ -243,7 +250,10 @@ The dummy coding of categorical covariates is done by the function passed to
 reduce runtime. First, build the graph with
 \code{conductance_surface(..., crop_buffer = )} when focal sites occupy only
 part of the raster. This removes vertices outside the buffered sampling
-extent before fitting. Second, use
+extent before fitting. Cropping changes resistance: one sensitivity audit
+found increases of 15--23\% with a two-cell buffer and 1--2\% with a
+ten-cell buffer. These values are case-specific. Refit with a larger buffer
+to assess sensitivity on your landscape. Second, use
 \code{approximation = "coarse_raster"} with
 \code{approximation_control = list(factor = c(4, 2), exact_refine = TRUE)}
 to optimize on one or more aggregated rasters before refining on the original
@@ -252,6 +262,12 @@ likelihood are from the full-resolution graph; the coarse fits are only
 starting values. To keep the full-resolution cleanup deliberately short, pass
 \code{refine_control = NewtonRaphsonControl(maxit = 2, ...)} inside
 \code{approximation_control}. Exact refinement is required.
+
+For spline terms, \code{summary()} reports monotonicity over the covariate
+range at the focal sites, including the number of derivative sign changes.
+A monotone curve increases or decreases throughout that range; a
+nonmonotone curve changes direction. This describes the fitted curve, not
+a confidence statement about its shape outside or within that range.
 
 \strong{Gaussian scale-aware conductance.}
 \code{\link{gaussian_smoothed_loglinear_conductance}} can also use

@@ -1,0 +1,174 @@
+══ Building ════════════════════════════════════════════════════════════════════
+Setting env vars:
+• CFLAGS    : -Wall -pedantic
+• CXXFLAGS  : -Wall -pedantic
+• CXX11FLAGS: -Wall -pedantic
+• CXX14FLAGS: -Wall -pedantic
+• CXX17FLAGS: -Wall -pedantic
+• CXX20FLAGS: -Wall -pedantic
+── R CMD build ─────────────────────────────────────────────────────────────────
+* checking for file 'C:\Users\peterman.73\OneDrive - The Ohio State University\R\Packages\terradish/DESCRIPTION' ... OK
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\3a1b1efe5cdc29fe0d04ff8a0f1ea88d3bfdde0c2c8abe2cec49117fa3faaf3e\26e3310fa80c861d38d713f17d173dd39b82fd4a7a69e063829a2d64985ff303: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\3a1b1efe5cdc29fe0d04ff8a0f1ea88d3bfdde0c2c8abe2cec49117fa3faaf3e\3414b11e69524e35a66116ba632312f478bd5efa70ab8ebf6aee53d339cbde18: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\3a1b1efe5cdc29fe0d04ff8a0f1ea88d3bfdde0c2c8abe2cec49117fa3faaf3e\38ad2bb298192bd097a62a36ef894244b49e75c1190b105b71286b9aff437841: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\3a1b1efe5cdc29fe0d04ff8a0f1ea88d3bfdde0c2c8abe2cec49117fa3faaf3e\5ed231dc3a18419f4616b4f52774971359ed9d418bf1d6fc01f551fbcab442be: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\3a1b1efe5cdc29fe0d04ff8a0f1ea88d3bfdde0c2c8abe2cec49117fa3faaf3e\69da750482ce8b83bb019a193e7911f3129a4760bbfb784bda9f19ec4df6afd5: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\3a1b1efe5cdc29fe0d04ff8a0f1ea88d3bfdde0c2c8abe2cec49117fa3faaf3e\79f42c338aca6c13a58c8fa76d2c57cc2361c8556649b7fd8999ff85fa03e61a: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\3a1b1efe5cdc29fe0d04ff8a0f1ea88d3bfdde0c2c8abe2cec49117fa3faaf3e\7ecbfdc30bc3e6811f0c91f34f7cebc0a07109c4dc3308fc6725096aef407a1c: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\3a1b1efe5cdc29fe0d04ff8a0f1ea88d3bfdde0c2c8abe2cec49117fa3faaf3e\9b96253a2d333b3e3182c67ab5d2c39e51da0ca358e729f9ad2d0a37660e186e: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\3a1b1efe5cdc29fe0d04ff8a0f1ea88d3bfdde0c2c8abe2cec49117fa3faaf3e\ab03deaba6308e10daa955fa0bb4ea41a6ce72dd4f8628f763ebf1f467bf8238: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\3a1b1efe5cdc29fe0d04ff8a0f1ea88d3bfdde0c2c8abe2cec49117fa3faaf3e\ce9988ce2785d786fcac236103cc483515303d45f4ed23f41238ae88da1aad88: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\3a1b1efe5cdc29fe0d04ff8a0f1ea88d3bfdde0c2c8abe2cec49117fa3faaf3e\d202dae46a8a45bd645fb9c88024ed2027d009319ff74a5cfbf7143af52a6f02: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\3a1b1efe5cdc29fe0d04ff8a0f1ea88d3bfdde0c2c8abe2cec49117fa3faaf3e\d28c8369fd949c748dc6b0ddab85c89c4b5d43eb6b1fb15fbf563e420d992609: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\3a1b1efe5cdc29fe0d04ff8a0f1ea88d3bfdde0c2c8abe2cec49117fa3faaf3e\d65e36bfc525cc1a35b3684b822c26e28b7ea12b83b1436d2d7f9fb83e7fbf00: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\3a1b1efe5cdc29fe0d04ff8a0f1ea88d3bfdde0c2c8abe2cec49117fa3faaf3e\dbf521f12e57c697b1e74e7a7ad753338cecd60ed9647ca0e0f53d5e1afbb2e4: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\3a1b1efe5cdc29fe0d04ff8a0f1ea88d3bfdde0c2c8abe2cec49117fa3faaf3e\de05144dbe5c03e2b35a632e6d47e1ff6eb96f8b7adf42d2752cc966ba157f5b: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\5e0d4ff9f8705fa491014e84a33cdb15ac8faa441ce1f6fdf0d84c0443440ff1\6d7fa86f10730fb2548ad60b01123c6627fb80ddcc012ff0f2a32b0764ccb71b: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\5e0d4ff9f8705fa491014e84a33cdb15ac8faa441ce1f6fdf0d84c0443440ff1\70e5ff7a6dceb20f61d4949efc956756344c960d55e08d66114ba62835056bed: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\5e0d4ff9f8705fa491014e84a33cdb15ac8faa441ce1f6fdf0d84c0443440ff1\815aaa0d388b265a151015aabc9b4c83a64db84c5dc1a6cd5f26a75eda3d50aa: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\5e0d4ff9f8705fa491014e84a33cdb15ac8faa441ce1f6fdf0d84c0443440ff1\866ae523007c7e5b99c3e48dd940aac4f3fc4db68e929e6dfe03622131ca3ab9: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\5e0d4ff9f8705fa491014e84a33cdb15ac8faa441ce1f6fdf0d84c0443440ff1\ccb56f3a5539c0b02eb8edcb0a807268baed25105431a897dbe4a2ad21e27ef9: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\5e0d4ff9f8705fa491014e84a33cdb15ac8faa441ce1f6fdf0d84c0443440ff1\e4bd453f75c5d53c8668c60f19b6e1a2b2c2cf1dfb9e1363f7dd0a294c8c4d0b: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\83fe198e6cdbd8eea089f333b6585c3d3561864c7016a7530ac04e89b6d7ad28\a7ce0289afa4e47ac85658d1c27836e5f28f13955cd4ec4687953d7d4339f1a6: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\93b1239236f0b50930d5b100a79a5e305daa9006e6a37c5939853d8fa575bfc1\7a30d9b0200de7b56e336fc968dae82ba5717033bcbcee5343f6423189bb52cf: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\93b1239236f0b50930d5b100a79a5e305daa9006e6a37c5939853d8fa575bfc1\bc34c2da2d5ea2bb096d5a3ddc44bbab31ec0b5d1871a5d0f87367cc8a02b746: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\93b1239236f0b50930d5b100a79a5e305daa9006e6a37c5939853d8fa575bfc1\d46019a998939aa5e2173f2222fa45e1fc2894616f584ca7a7bee81bf7d37d9d: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\93b1239236f0b50930d5b100a79a5e305daa9006e6a37c5939853d8fa575bfc1\f37b67a15a77a134f5cc9e48819e03cca9758913a148d3b26db0e311a8358e85: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\96da779b0c788b232e3d0295889ca0c89b4dcea244867135cfb2a804328d9e57\64ec15b4eaa7085fe8a97867388619490e8c55d8ecd97f04b626b883fcabf21a: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\96da779b0c788b232e3d0295889ca0c89b4dcea244867135cfb2a804328d9e57\ea1bd08f60e9a13e19cbb84cd2b43cd95e66d3c5ac800dc705cf2c26931ae4e9: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\b093aa538cb094a8c8be8083653019c97d79af2fc4d9a78424193ff4aebc6eb7\189a4000d6176af1b1954a01711b51f5b632bc09f322170d1dac4980fe5e7c9a: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\b093aa538cb094a8c8be8083653019c97d79af2fc4d9a78424193ff4aebc6eb7\8570a48bc0fcb808672b41b21a7b246ed611b81df0ff1ddcfb149d9122d6574e: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\ba66f06e8e42fdc985434127e35395e787896bbc3e91853c50d071eb9f3689a4\1eaed2d47631ac2677c34fc98484094b472ac045c2ccaf5595fe1bea112f94c6: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\ba66f06e8e42fdc985434127e35395e787896bbc3e91853c50d071eb9f3689a4\77310bb3e76ebc211669bf8b9a99b6a2f1762fe15dce38b3644ac04c9b22bf54: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\c4d563bfcce812b2d364b11ce1b208aaf43fb4c601b8c7a02a184777e26ad05c\0d6deb553e19342678684607ace4851d44bcdf3096a09439827037f53130b2c1: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\c4d563bfcce812b2d364b11ce1b208aaf43fb4c601b8c7a02a184777e26ad05c\5a465e24b436daea729f423f99ee7ff4fd02a9e40a58e4846928af4490c019ed: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\c4d563bfcce812b2d364b11ce1b208aaf43fb4c601b8c7a02a184777e26ad05c\6d92aae6e1fb9e7f9027350fef3de0b6614e9991b46c38bbc6cc165098f68bf1: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\c4d563bfcce812b2d364b11ce1b208aaf43fb4c601b8c7a02a184777e26ad05c\8b90af64729143388c0398a6bdedbd3d4eae66d6214e34f34e3cfac3b93ff485: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\c5397c5c42d256aba029b386d77663733f1190dcface91fc60532b9427c1643e\2a955b0fcb8cc381df11cfd6fd8a7cd7f1e1362fc13951f22c6683bd9dce4c23: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\c5397c5c42d256aba029b386d77663733f1190dcface91fc60532b9427c1643e\c81f587f633ba0816f606febe19f0393d21bbaa2d44588b9a7f57dfe76dea054: No such file or directory
+
+Warning in file.copy(pkgname, Tdir, recursive = TRUE, copy.date = TRUE) :
+
+  problem creating directory C:\Users\peterman.73\AppData\Local\Temp\RtmpWO83Q4\Rbuild3df821822f7c\terradish\.git\refs\codex\turn-diffs\checkpoints\c5397c5c42d256aba029b386d77663733f1190dcface91fc60532b9427c1643e\fa563c70492168722dc3a14fd6bdf8dc62b69aa5aa620af310b537a482234f6a: No such file or directory
+
+ ERROR
+
+copying to build directory failed
+
+$error
+[1] "! System command 'Rcmd.exe' failed"
+

@@ -121,6 +121,15 @@
 #' that can underestimate resistance in diagonal corridors.
 #' \code{directions = 8} is preferred unless there is a specific reason to
 #' restrict movement to the cardinal directions.
+#' Eight-neighbor adjacency is the default. Each edge has conductance
+#' \eqn{c_i + c_j}; diagonal edges receive no additional distance weighting.
+#' Duplicate focal cells trigger a warning. Focal sites on pruned disconnected
+#' components cannot be fitted on the retained graph.
+#'
+#' Cropping removes possible movement paths and can inflate resistance. The
+#' supplied release audit measured increases of 15--23 percent with a two-cell
+#' buffer and 1--2 percent with ten cells. These are case-specific results;
+#' compare a larger-buffer fit before interpreting a cropped landscape.
 #'
 #' @return An object of class \code{"terradish_graph"} (also inheriting
 #'   \code{"radish_graph"}) containing:
@@ -174,7 +183,7 @@
 #'
 #' @export
 
-conductance_surface <- function(covariates, coords, directions=4, saveStack=TRUE,
+conductance_surface <- function(covariates, coords, directions=8, saveStack=TRUE,
                                 crop_buffer = NULL)
 {
   covariates <- .as_spatraster(covariates)
@@ -190,6 +199,7 @@ conductance_surface <- function(covariates, coords, directions=4, saveStack=TRUE
   spdat <- values(covariates, dataframe = FALSE)
   missing_count <- rowSums(is.na(spdat))
   missing <- missing_count > 0
+  disconnected <- rep(FALSE, length(missing))
   if (any(missing_count > 0 & missing_count < ncol(spdat)))
     warning("Missing cells are not identical across rasters; be careful regarding model selection (see ?conductance_surface)")
 
@@ -221,6 +231,9 @@ conductance_surface <- function(covariates, coords, directions=4, saveStack=TRUE
   cells <- unmapped_cells <- cellFromXY(covariates[[1]], coords)
   if (any(is.na(unmapped_cells)))
     stop("At least one deme is located outside the raster extent")
+  if (anyDuplicated(unmapped_cells))
+    warning("Two or more focal sites share a raster cell; use a finer raster or review the site coordinates.",
+            call. = FALSE)
 
   # remove NAs and remap indices of adjacency list to be contiguous
   cell_map <- integer(ncell(covariates[[1]]))
@@ -232,6 +245,8 @@ conductance_surface <- function(covariates, coords, directions=4, saveStack=TRUE
   cells <- cell_map[cells]
 
   # check that cells lie on connected portion of raster
+  if (any(disconnected[unmapped_cells]))
+    stop("At least one focal site lies on a disconnected component removed from the graph; retain a connected landscape containing all focal sites.", call. = FALSE)
   if (any(missing[unmapped_cells]))
     stop("At least one deme is located on a missing cell")
 
@@ -319,9 +334,17 @@ conductance_surface <- function(covariates, coords, directions=4, saveStack=TRUE
 #' empirical covariate support among \code{x$demes} and can stabilize extreme
 #' tails when focal sampling is sparse.
 #'
-#' The function requires the MLE to be in the interior of the parameter space
-#' (\code{fit$fit$boundary == FALSE}); if the MLE is on the boundary (no
-#' detectable IBR signal) an error is thrown.
+#' A no-structure fit leaves conductance coefficients unidentified and cannot
+#' produce a fitted conductance surface. Other nuisance-parameter boundaries
+#' do not by themselves prevent prediction.
+#'
+#' On a new graph, prediction reuses the fitted log-linear terms, spline knots
+#' and centers, or Gaussian smoothing parameters and post-smoothing scaling.
+#' It does not estimate new centers or scales on the prediction landscape.
+#' If the original inputs were scaled before fitting, use
+#' \code{scale_covariates(new_rasters, reference = original_scaled_rasters)}
+#' before constructing the new graph. Other conductance factories are not
+#' supported for prediction to a new graph.
 #'
 #' @return
 #' If \code{x$stack} is non-\code{NULL} (the default when
@@ -386,20 +409,33 @@ conductance <- function(x, ...)
     clamp_covariates = clamp_covariates
   )
 
-  conductance_model <- fit$submodels$f
-  if (!identical(support, "none"))
-  {
-    conductance_factory <- fit$submodels$f_factory
-    if (!inherits(conductance_factory,
-                  c("terradish_conductance_model_factory",
-                    "radish_conductance_model_factory")))
-      stop("This `fit` does not store a reusable conductance-model factory for support-constrained prediction.",
-           " Refit the model with the current terradish version and retry.",
-           call. = FALSE)
-
-    rebuilt_internal <- conductance_factory(fit$formula, graph_eval$x)
-    conductance_model <- .externalize_conductance_model(rebuilt_internal)
-  }
+  reference <- fit$submodels$f_internal
+  if (!is.function(fit$submodels$f_factory))
+    stop("This fit does not retain a reusable conductance-model factory; refit before prediction.", call. = FALSE)
+  if (isTRUE(attr(reference, "gaussian_scale", exact = TRUE))) {
+    if (is.null(graph_eval$stack))
+      stop("Gaussian prediction requires the new graph's raster stack.", call. = FALSE)
+    if (!identical(support, "none")) {
+      cells <- cellFromXY(graph_eval$stack, graph_eval$vertex_coordinates)
+      raster_values <- values(graph_eval$stack, dataframe = FALSE)
+      raster_values[cells, names(graph_eval$x)] <- as.matrix(graph_eval$x)
+      values(graph_eval$stack) <- raster_values
+    }
+    rebuild <- attr(fit$submodels$f_factory, "predict_for_surface", exact = TRUE)
+    if (!is.function(rebuild)) stop("Refit this Gaussian model to retain prediction metadata.", call. = FALSE)
+    rebuilt_internal <- rebuild(fit$formula, graph_eval, reference)
+  } else if (isTRUE(attr(reference, "smooth_loglinear", exact = TRUE))) {
+    rebuilt_internal <- attr(reference, "plot_factory")(fit$formula, graph_eval$x)
+  } else if (identical(fit$submodels$f_factory, loglinear_conductance)) {
+    spec <- attr(reference, "prediction_spec", exact = TRUE)
+    if (is.null(spec)) stop("Refit this model to retain its prediction specification.", call. = FALSE)
+    frame <- stats::model.frame(spec$terms, graph_eval$x, xlev = spec$xlevels,
+                                na.action = stats::na.fail)
+    design <- model.matrix(spec$terms, frame, contrasts.arg = spec$contrasts)
+    design <- design[, names(attr(reference, "default")), drop = FALSE]
+    rebuilt_internal <- .loglinear_conductance_from_matrix(design)
+  } else stop("Prediction supports only log-linear, spline, and Gaussian conductance factories.", call. = FALSE)
+  conductance_model <- .externalize_conductance_model(rebuilt_internal)
 
   conductance <- conductance_model(fit$mle$theta)
   ci <- conductance$confint(theta = fit$mle$theta, vcov = -solve(fit$mle$hessian), 

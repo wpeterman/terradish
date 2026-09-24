@@ -1,3 +1,16 @@
+terradish 0.0.54
+----------------
+* Changed the default graph neighborhood to eight directions and improved
+  duplicate-site, disconnected-component, cropping, and parallel-worker notices.
+* Selected AMG above the large-graph threshold regardless of the number of
+  right-hand sides.
+* Added stored raster scaling and new-landscape prediction using fitted
+  log-linear terms, spline bases, and Gaussian standardization.
+* Added combined pairwise covariates, spline monotonicity summaries, and
+  separate simulation and fitting information through nu_fit.
+* Warned about within-diagonal covariance responses and rejected missing or
+  invalid Wishart information. Excluded nonconverged fits from power summaries.
+
 terradish 0.0.53
 ----------------
 * Added per-formula conductance factories, repeated folds, paired comparisons,

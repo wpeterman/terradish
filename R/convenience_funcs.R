@@ -127,14 +127,30 @@ scale_to_0_1 <- function(x)
 #' scaled_mm <- scale_covariates(r, method = "minmax")
 #'
 #' @export
+#' @param reference A previous scaled raster or its \code{terradish_scale}
+#'   attribute. Applies the stored centers and scales by layer name instead of
+#'   estimating new values. When supplied, \code{method}, \code{center}, and
+#'   \code{scale} do not change the stored transformation.
 scale_covariates <- function(covariates,
                              method = c("zscore", "minmax"),
                              center = TRUE,
-                             scale = TRUE)
+                             scale = TRUE,
+                             reference = NULL)
 {
   covariates <- .as_spatraster(covariates)
   method <- match.arg(method)
-  stats <- lapply(seq_len(nlyr(covariates)), function(i) {
+  if (!is.null(reference)) {
+    stats <- if (inherits(reference, "SpatRaster"))
+      attr(reference, "terradish_scale", exact = TRUE) else reference
+    if (!is.list(stats) || is.null(names(stats)) || anyDuplicated(names(stats)) ||
+        anyDuplicated(names(covariates)) || !all(names(covariates) %in% names(stats)))
+      stop("`reference` must provide named centers and scales for every raster layer.", call. = FALSE)
+    stats <- stats[names(covariates)]
+    valid <- vapply(stats, function(x) is.numeric(x) &&
+      all(c("center", "scale") %in% names(x)) &&
+      all(is.finite(x[c("center", "scale")])) && x[["scale"]] > 0, logical(1))
+    if (!all(valid)) stop("Reference centers must be finite and scales positive.", call. = FALSE)
+  } else stats <- lapply(seq_len(nlyr(covariates)), function(i) {
     vals <- values(covariates[[i]], dataframe = FALSE)[, 1]
     vals <- vals[is.finite(vals)]
 

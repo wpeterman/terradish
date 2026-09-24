@@ -41,6 +41,11 @@ interpretation.
 
 \code{conductance_surface()} also accepts \code{crop_buffer = } and applies
 this helper before graph construction.
+Cropping can increase resistance by removing paths outside the retained
+extent. The supplied release audit found increases of 15--23 percent at a
+two-cell buffer and 1--2 percent at ten cells. These results are specific to
+that landscape. Compare fits over larger buffers as a sensitivity check.
+A message flags buffers smaller than half the maximum intersite distance.
 }
 \examples{
 library(terra)
@@ -55,6 +60,6 @@ cropped
 
 # The same crop can be applied automatically while building the graph.
 surface <- conductance_surface(r, pts, directions = 4, crop_buffer = 2)
-surface$dim
+nrow(surface$x)  # number of retained graph cells
 
 }
