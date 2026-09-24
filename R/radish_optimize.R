@@ -508,10 +508,9 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' @param nu Effective Wishart degrees of freedom passed to measurement models
 #'   that require it, such as \code{\link{generalized_wishart}} and
 #'   \code{\link{wishart_covariance}}. It must be supplied and is not estimated.
-#'   For biallelic SNPs, use the number of approximately independent retained
-#'   SNPs. For microsatellites, use the number of loci as the conservative
-#'   primary value and examine larger plausible values in a sensitivity
-#'   analysis. Ignored by non-Wishart measurement models.
+#'   It controls effective information, not a marker count. Report sensitivity
+#'   across plausible values with \code{\link{terradish_rescale_nu}}.
+#'   Ignored by non-Wishart measurement models.
 #' @param theta Starting values for optimization
 #' @param leverage Compute influence measures and leverage?
 #' @param nonnegative Force regression-like \code{measurement_model} to have nonnegative slope?
@@ -577,7 +576,8 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   \code{"cholmod_cpp_cached"} backends.
 #'   For \code{solver = "auto"}, supported selection entries include
 #'   \code{auto_direct_max_vertices},
-#'   \code{auto_amg_min_vertices}, and \code{auto_direct_max_rhs}. For
+#'   \code{auto_amg_min_vertices}. The legacy \code{auto_direct_max_rhs}
+#'   setting is accepted but no longer affects selection. For
 #'   \code{solver = "amg"} or \code{"auto"}, \code{terradish()} also
 #'   understands an adaptive schedule with entries such as \code{adaptive},
 #'   \code{tol_early}, \code{tol_mid}, \code{tol_final}, \code{maxit_early},
@@ -712,9 +712,25 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' against a reference category). The intercept is excluded if it is not
 #' identifiable.
 #'
-#' If the fit is on the boundary (e.g. no spatial genetic structure) or is the
-#' null model of isolation-by-distance, the fitted object will not contain
-#' influence/leverage/gradient/hessian.
+#' If the resistance contribution is zero, or the formula specifies uniform
+#' conductance, conductance coefficients are not identified and their
+#' influence, gradient, and Hessian are unavailable. A zero environmental
+#' kernel weight does not by itself remove conductance inference.
+#'
+#' \strong{Convergence and starting values.} Inspect \code{fit$convergence}
+#' before interpreting estimates. Code 0 requires a largest absolute projected
+#' gradient below \code{ctol}, or an objective change below \code{ftol} together
+#' with a projected gradient below \code{sqrt(ctol)}. Code 1 means the iteration
+#' limit was reached; code 2 means a stall or failed line search. The projected
+#' gradient ignores components pointing outside active parameter bounds.
+#' The record includes the criterion, iterations, gradient, boundary status,
+#' and whether a restart was attempted. A small objective change alone is not
+#' convergence. Also inspect \code{fit$fit$subproblem$convergence} for nuisance
+#' optimization. Numerical convergence does not establish model adequacy.
+#'
+#' If a user-supplied starting point reaches a no-structure boundary, fitting
+#' retries the default starting point and keeps the better likelihood. Report
+#' starting-value sensitivity when distinct solutions remain plausible.
 #'
 #' @return An object of class \code{terradish} containing the fitted conductance
 #'   parameters, optimized nuisance parameters, log-likelihood, model
@@ -788,6 +804,7 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' }
 #' @export
 
+#' @template wishart-nu
 terradish <- function(formula, 
                    data,
                    conductance_model = loglinear_conductance, 

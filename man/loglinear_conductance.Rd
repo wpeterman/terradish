@@ -37,8 +37,9 @@ where \eqn{x_{ij}} is the value of covariate \eqn{j} at cell \eqn{i} and
 \eqn{\theta_j} is the corresponding conductance parameter.
 
 The intercept is intentionally omitted: multiplying all conductances by a
-constant does not change the effective resistance distances, so an intercept
-is non-identifiable.
+common factor rescales resistance inversely, and the measurement model's
+resistance coefficient absorbs that factor. The absolute conductance level
+is therefore not identifiable.
 
 \strong{Interpreting \eqn{\theta}:}
 \itemize{

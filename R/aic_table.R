@@ -21,6 +21,11 @@
 #' @param verbose Should the table be printed to the console?
 #'
 #' @details
+#' At nominal Wishart information, information criteria can favor extensions
+#' that are unsupported across replicate histories. Use
+#' \code{\link{terradish_cv_folds}} to select conductance terms and
+#' \code{\link{terradish_rescale_nu}} to assess inferential sensitivity.
+#'
 #' Information-criterion comparison requires the same observed response,
 #' focal sites, graph domain, and likelihood family. Wishart fits
 #' must also use the same effective degrees of freedom, \code{nu}.
@@ -31,9 +36,8 @@
 #' rankings, such as \code{mlpe} versus \code{generalized_wishart}, are invalid.
 #'
 #' The function checks response values, model family, fitted dimensions,
-#' and recorded \code{nu}. It cannot establish that two
-#' separately constructed graphs with the same dimensions have identical
-#' domains, so users must verify that condition.
+#' recorded \code{nu}, and retained graph signatures. Older fits without
+#' signatures require the user to verify the graph domain.
 #'
 #' @return A data frame containing model ranks, parameter counts, information
 #'   criterion values, delta values, weights, cumulative weights, and

@@ -73,6 +73,18 @@ effective Wishart degrees-of-freedom value is unavailable or the response is
 not admissible for \code{\link{generalized_wishart}}.
 }
 \details{
+The likelihood uses maximum likelihood (ML), not restricted maximum
+likelihood (REML). AIC can therefore compare different conductance formulas
+fitted to the same response, sites, graph, and likelihood family. That
+comparison does not validate the correlation model: in package validation,
+model-based standard errors understated replicate variation about 1.7-fold.
+Use spatial CV to assess out-of-sample support for conductance terms.
+
+Summaries report shared-site correlation on its natural scale. Near zero,
+the stored logit parameter is poorly identified; its standard error is
+reported as unavailable and a boundary note is shown. This boundary differs
+from a zero resistance coefficient, which leaves conductance unidentified.
+
 The nuisance parameters are:
 \describe{
   \item{\code{alpha}}{Intercept of the mean structure.}

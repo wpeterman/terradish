@@ -46,6 +46,11 @@ Creates a model-selection table from fitted \code{terradish} models using
 AIC, AICc, or BIC.
 }
 \details{
+At nominal Wishart information, information criteria can favor extensions
+that are unsupported across replicate histories. Use
+\code{\link{terradish_cv_folds}} to select conductance terms and
+\code{\link{terradish_rescale_nu}} to assess inferential sensitivity.
+
 Information-criterion comparison requires the same observed response,
 focal sites, graph domain, and likelihood family. Wishart fits
 must also use the same effective degrees of freedom, \code{nu}.
@@ -56,9 +61,8 @@ response representations and must not be ranked together. Cross-family
 rankings, such as \code{mlpe} versus \code{generalized_wishart}, are invalid.
 
 The function checks response values, model family, fitted dimensions,
-and recorded \code{nu}. It cannot establish that two
-separately constructed graphs with the same dimensions have identical
-domains, so users must verify that condition.
+recorded \code{nu}, and retained graph signatures. Older fits without
+signatures require the user to verify the graph domain.
 }
 \examples{
 \donttest{

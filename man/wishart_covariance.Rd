@@ -30,13 +30,10 @@ or \code{\link{cov_from_biallelic}}.  Must have the same dimensions as
 \item{phi}{Named numeric vector of nuisance parameters \code{(tau, sigma)}.
 Omit to obtain least-squares starting values.}
 
-\item{nu}{Positive number.  Effective Wishart degrees of freedom for the
-genetic covariance \code{S}: the number of (approximately) independent
-genetic markers that went into computing \code{S}.  Must be supplied; it
-is not estimated.  Pass via the \code{nu} argument of
-\code{\link{terradish}}.  See the \dQuote{The role of \code{nu}} section
-below; choosing \code{nu} is consequential and is explained in detail
-there.}
+\item{nu}{One finite positive number describing effective Wishart information.
+You must supply it; the fit does not estimate it. It is not the marker
+count. See the effective-information section and report sensitivity across
+plausible values with \code{\link{terradish_rescale_nu}}.}
 
 \item{gradient}{Logical. Compute gradient of the negative log-likelihood
 with respect to \code{phi}?}
@@ -103,65 +100,38 @@ or centering it across sites does not change this objective. This is the
 same objective as \code{generalized_wishart(dist_from_cov(S))}; the nugget
 contributes \eqn{2\exp(\sigma)} to the expected squared distances.
 
-\strong{The role of \code{nu} (read this before choosing a value).}
-\code{nu} is the single most consequential setting in a covariance-based
-fit, yet it behaves in a way that surprises many users.  Because the entire
-negative log-likelihood above is multiplied by \eqn{\nu/2}, \code{nu}
-enters as a global multiplier of the objective surface.  This has three
-distinct consequences:
-\itemize{
-  \item \strong{Point estimates do not depend on \code{nu}.}  The maximizing
-    conductance parameters \eqn{\theta} and nuisance parameters
-    \eqn{(\tau, \sigma)} are invariant to \code{nu} at the exact optimum for
-    a fixed response and model because scaling the objective by a positive
-    constant does not move its optimum. Numerical optimizer tolerances can
-    produce negligible differences in practice.
-  \item \strong{Standard errors and confidence intervals scale as}
-    \eqn{1/\sqrt{\nu}}.  The Hessian scales with \code{nu}, so the
-    asymptotic covariance scales with \eqn{1/\nu}.  Doubling \code{nu}
-    shrinks every standard error by a factor of \eqn{\sqrt{2}}.  This is the
-    reflects the assumption that larger effective marker information should
-    yield tighter intervals.
-  \item \strong{Model selection and likelihood-ratio tests depend strongly
-    on \code{nu}.}  The log-likelihood scales linearly with \code{nu}, but
-    the AIC/BIC complexity penalty (and the \eqn{\chi^2} reference
-    distribution for an LRT) does not.  With large \code{nu} the penalty
-    becomes negligible and extra covariates are almost always
-    \dQuote{selected}; with small \code{nu} parsimony dominates.  The same
-    data can therefore favor a simpler or a more complex model purely
-    through the choice of \code{nu}.
+The former full-rank likelihood included the arbitrary site-mean direction.
+It has been removed because centered genetic covariance contains no
+information in that direction. The contrast form retains the interpretable
+comparisons among sites and agrees with covariance-derived distances.
+
+\strong{Preparing the response.} Use a coherent covariance construction,
+such as \code{diagonal = "gower"} for grouped data in landgraph. A
+\code{"within"} diagonal is on a different scale and is unsuitable for
+Wishart fitting, even when the matrix happens to be positive definite.
+Per-locus standardization up-weights rare variants; filter by minor-allele
+frequency and assess sensitivity. Unequal group sizes create unequal
+sampling variance that a common diagonal nugget does not automatically fix.
 }
-In short, \code{nu} is an \emph{effective sample size}: it does not change
-what the data say about the shape of the conductance surface, but it
-determines how strongly the data speak.  Choosing \code{nu} requires care:
-\itemize{
-  \item \emph{Biallelic SNPs:} use the number of retained polymorphic SNPs.
-    Reduce for linkage disequilibrium if markers are not independent.
-  \item \emph{Microsatellites:} use the number of loci \eqn{L} as the
-    conservative default.  Allele frequencies within a locus are correlated
-    (they sum to a constant), so the locus is the natural unit of
-    information. \eqn{\sum_l (K_l - 1)}, where \eqn{K_l} is the number of
-    observed alleles at locus \eqn{l}, is a larger sensitivity value that
-    would count within-locus allele-frequency dimensions more aggressively.
-    Treating it as independent information can produce confidence intervals
-    that are too narrow and model-selection statistics that are too large.
-    Report the primary \code{nu} and a justified sensitivity analysis.
+\section{Effective Wishart information}{
+
+For Wishart likelihoods, \code{nu} scales the log likelihood. Point
+estimates do not depend on it, but standard errors, likelihood-ratio tests,
+and information criteria do. It is a dispersion parameter that you set,
+rather than the number of markers. Linkage and the population history
+shared by loci can make effective information much smaller than the SNP
+count. In forward-time simulations used to validate terradish, standard
+errors at the SNP count were three to five times smaller than the spread
+among replicate histories. Those model-based errors understated uncertainty.
+
+Use \code{\link{terradish_cv_folds}} to compare conductance formulas, and
+\code{\link{terradish_rescale_nu}} to report inference across plausible
+values. For the same successful folds and nuisance settings, changing
+\code{nu} rescales Wishart CV scores without changing their ranking.
+Neither procedure identifies the true effective information or repairs
+an unsuitable response matrix.
 }
 
-\strong{Typical workflow:}
-\enumerate{
-  \item Compute \code{S} from raw genotypes:
-    \code{S <- cov_from_genetic_data(dosage_matrix, groups = pop_vector)}.
-  \item Set \code{nu}: for biallelic SNPs use the retained SNP count; for
-    microsatellites use the number of loci as the conservative starting point.
-  \item Fit:
-    \code{terradish(S ~ ..., measurement_model = wishart_covariance, nu = nu)}.
-}
-
-If \code{S} has a non-positive-definite covariance (which can happen with
-the \code{diagonal = "within"} option of \code{cov_from_genetic_data}),
-inspect eigenvalues before fitting.
-}
 \examples{
 E <- matrix(c(1.2, 0.3, 0.2,
               0.3, 1.5, 0.4,

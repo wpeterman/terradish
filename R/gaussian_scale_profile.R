@@ -33,6 +33,30 @@
 #'   At a boundary the usual chi-square calibration is an approximation.
 #'   Failed optimizations stop the calculation instead of silently dropping
 #'   profile points. This can be substantially slower than Wald intervals.
+#' @seealso \code{\link{gaussian_scale_summary}},
+#'   \code{\link{gaussian_smoothed_loglinear_conductance}},
+#'   \code{\link{terradish_inference}}
+#' @examples
+#' \donttest{
+#' set.seed(24)
+#' r <- terra::rast(nrows = 10, ncols = 10, xmin = 0, xmax = 10,
+#'                  ymin = 0, ymax = 10, crs = "EPSG:3857")
+#' terra::values(r) <- rnorm(100)
+#' names(r) <- "x"
+#' graph <- conductance_surface(r, terra::xyFromCell(r, seq(3, 98, 5)),
+#'                              directions = 4)
+#' factory <- gaussian_smoothed_loglinear_conductance(graph,
+#'   sigma_lower = 0.4, sigma_upper = 1.5)
+#' response <- simulate_covariance_response(c(x = 0.7, sigma.x = 0.8),
+#'   ~x, graph, conductance_model = factory, tau = 1, sigma = 0.1,
+#'   nu = 10000, seed = 14)$covariance
+#' fit <- terradish(response ~ x, graph, conductance_model = factory,
+#'   measurement_model = wishart_covariance, nu = 10000, optimizer = "newton")
+#' profile <- gaussian_scale_profile(fit, "x", n = 5)
+#' profile$interval
+#' confint(profile$fit)
+#' # The stored profile interval replaces the matching scale Wald interval.
+#' }
 #' @export
 gaussian_scale_profile <- function(fit, layer, n = 25, level = 0.95) {
   .terradish_require_submodels(fit, "Gaussian scale profiling")

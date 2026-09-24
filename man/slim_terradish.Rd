@@ -29,7 +29,7 @@ and approximation metadata are retained unless explicitly dropped.
 }
 \details{
 A slim object remains suitable for \code{print()}, \code{summary()},
-\code{coef()}, \code{vcov()}, \code{logLik()}, \code{AIC()}, and fitted-value
+\code{coef()}, \code{vcov()}, \code{confint()}, \code{logLik()}, \code{AIC()}, and fitted-value
 extraction and residual-permutation simulation. Operations that must
 reevaluate the conductance or measurement model, including conductance-
 surface prediction and most plot types, require the retained model closures

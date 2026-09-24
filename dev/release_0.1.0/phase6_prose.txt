@@ -1,0 +1,293 @@
+At nominal Wishart information, information criteria can favor extensions
+that are unsupported across replicate histories. Use
+\code{\link{terradish_cv_folds}} to select conductance terms and
+\code{\link{terradish_rescale_nu}} to assess inferential sensitivity.
+
+recorded \code{nu}, and retained graph signatures. Older fits without
+signatures require the user to verify the graph domain.
+Passing this geometry check does not create a Wishart sampling model.
+Use covariance-derived squared distances with a defensible effective
+information parameter. F\eqn{_{ST}} ratio estimators have no Wishart
+degrees of freedom merely because their distance matrix passes the check;
+consider \code{\link{mlpe}} for those responses.
+
+# Preserve the training transformation on new values, matched by layer name.
+new_scaled <- scale_covariates(r + 10, reference = scaled_r)
+terra::values(new_scaled)
+# Values can fall outside the training range; they are not re-centered.
+Larger values reduce simulated sampling noise. The fitting value defaults
+to it through \code{nu_fit = nu}; neither is an estimate
+of information from real data. Report a sensitivity analysis rather than
+substituting the marker count. Simulation requires \code{nu} to be at
+least the largest assessed covariance-matrix dimension.
+\item{\code{settings}}{Simulation settings and true parameters, including
+\code{nu} for simulation and \code{nu_fit} for inference.}
+Power and coverage are internal to the assumed response model. Matching
+simulation and fitting values cannot diagnose incorrect information in a
+real data set. Nonconverged fits count as failed fits and non-detections;
+inspect \code{fit_rate} before interpreting power or coverage.
+\code{coef()}, \code{vcov()}, \code{confint()}, \code{logLik()}, \code{AIC()}, and fitted-value
+With the default standardization, a coefficient is relative log conductance
+per standard deviation of the smoothed layer at the current sigma. The
+layer is re-standardized at every candidate sigma during fitting. The
+half-cell lower bound still smooths; near the upper bound, the smoothed
+layer acts as a broad spatial trend. Dispersal averaging can favor a positive
+sigma even when no separate ecological scale of effect exists.
+
+The Gaussian kernel is truncated to a raster-sized window. The default
+upper bound keeps approximately three sigma inside half the smaller raster
+dimension; increasing it cannot recover kernel mass outside that window.
+Inspect \code{summary(fit)$sigma_table} for bound flags and
+\code{\link{gaussian_scale_profile}} for profile intervals. Scale estimates
+do not receive z or p values because zero is outside the fitting interval.
+Wald intervals are truncated at the bounds; a bound-limited interval does
+not demonstrate a precisely identified scale.
+Use \code{summary(object)$sigma_table} to inspect standard errors and
+bound flags, and \code{confint(object)} for bound-truncated intervals;
+smoothing scales have no
+reported z or p values. Use \code{\link{gaussian_scale_profile}} when a
+profile interval is needed. A positive scale can reflect dispersal
+averaging, and even the half-cell lower bound applies some smoothing.
+\code{covariate} identifies the layer. \code{sigma} is its fitted map-unit
+scale; \code{sigma_lower} and \code{sigma_upper} are fitting bounds.
+\code{sigma_internal}, \code{sigma_conversion}, and
+\code{sigma_conversion_mode} describe the optimization units.
+\code{native_unit} labels map units or degrees, and
+\code{sigma_cells_x}, \code{sigma_cells_y} express the scale in cell widths.
+Probability-specific \code{axis_*} and \code{radial_*} columns give the
+theoretical Gaussian distances described above, in native units and,
+when requested, converted units. They describe the untruncated Gaussian;
+retained raster windows can omit some of that mass.
+\code{\link{gaussian_smoothed_loglinear_conductance}},
+\code{\link{terradish_inference}}
+\donttest{
+set.seed(24)
+r <- terra::rast(nrows = 10, ncols = 10, xmin = 0, xmax = 10,
+ymin = 0, ymax = 10, crs = "EPSG:3857")
+terra::values(r) <- rnorm(100)
+names(r) <- "x"
+graph <- conductance_surface(r, terra::xyFromCell(r, seq(3, 98, 5)),
+directions = 4)
+factory <- gaussian_smoothed_loglinear_conductance(graph,
+sigma_lower = 0.4, sigma_upper = 1.5)
+response <- simulate_covariance_response(c(x = 0.7, sigma.x = 0.8),
+~x, graph, conductance_model = factory, tau = 1, sigma = 0.1,
+nu = 10000, seed = 14)$covariance
+fit <- terradish(response ~ x, graph, conductance_model = factory,
+measurement_model = wishart_covariance, nu = 10000, optimizer = "newton")
+profile <- gaussian_scale_profile(fit, "x", n = 5)
+profile$interval
+confint(profile$fit)
+# The stored profile interval replaces the matching scale Wald interval.
+}
+You must supply it; the fit does not estimate it. It is not the marker
+count. See the effective-information section and report sensitivity across
+plausible values with \code{\link{terradish_rescale_nu}}.
+F\eqn{_{ST}} ratio estimators do not have Wishart degrees of freedom. A
+passed geometry check is necessary but does not establish this sampling
+likelihood. Prefer covariance-derived squared distances and document the
+construction; use \code{\link{mlpe}} for ratio-estimator responses.
+draws around \code{Sigma}. This is a model assumption, not a marker
+count or an estimate of information from biological data. Examine a range
+of plausible values. The simulation requires
+These results are internal to the assumed model. Simulating and fitting
+at the same incorrect \code{nu} cannot reveal that error. Use
+\code{\link{covariance_response_power}} with different \code{nu} and
+\code{nu_fit} to examine its effect on coverage.
+\code{\link{gaussian_scale_profile}}, \code{\link{terradish_rescale_nu}}
+coef(fit)       # Relative log conductance per unit of x.
+vcov(fit)       # Joint uncertainty in conductance parameters.
+confint(fit)    # A model-based interval conditional on the supplied nu.
+nobs(fit)       # Number of unordered site pairs, not independent replicates.
+If \code{nu} is divided by 20, standard errors grow by \code{sqrt(20)};
+the likelihood and likelihood-ratio statistics are divided by 20. AIC
+changes because its likelihood term changes while its parameter penalty
+stays fixed. Report conclusions over a scientifically plausible range.
+\code{\link{terradish_cv_folds}}
+sensitivity <- terradish_rescale_nu(fit, nu = 50)
+rbind(original = coef(fit), sensitivity = coef(sensitivity))
+rbind(original = sqrt(diag(vcov(fit))),
+sensitivity = sqrt(diag(vcov(sensitivity))))
+\code{\link{wishart_covariates}}, \code{\link{terradish_rescale_nu}}
+environment <- pairwise_covariates(
+pairwise_endpoint_covariates(data.frame(climate = c(2, 4, 1, 7, 5, 9))))
+measurement <- wishart_covariates(environment, model = "wishart_covariance")
+kernel <- attr(measurement, "kernel_covariates")[, , 1]
+response <- response + 0.1 * kernel
+joint <- terradish(response ~ x, graph, measurement_model = measurement,
+nu = 1000)
+terradish_ibe_ratio(joint)
+# Each ratio is the resistance-distance equivalent of one unit of difference.
+The likelihood uses maximum likelihood (ML), not restricted maximum
+likelihood (REML). AIC can therefore compare different conductance formulas
+fitted to the same response, sites, graph, and likelihood family. That
+comparison does not validate the correlation model: in package validation,
+model-based standard errors understated replicate variation about 1.7-fold.
+Use spatial CV to assess out-of-sample support for conductance terms.
+
+Summaries report shared-site correlation on its natural scale. Near zero,
+the stored logit parameter is poorly identified; its standard error is
+reported as unavailable and a boundary note is shown. This boundary differs
+from a zero resistance coefficient, which leaves conductance unidentified.
+
+Absolute eigenvalues smaller than \code{etol} times the largest absolute
+Hessian entry are replaced by one when forming the Newton step.
+Increasing this value regularizes the step
+common factor rescales resistance inversely, and the measurement model's
+resistance coefficient absorbs that factor. The absolute conductance level
+is therefore not identifiable.
+numeric covariates into spline basis columns. The result is an unpenalized
+regression spline with a fixed number of coefficients, fitted through the
+selected terradish measurement likelihood.
+for grid cell \eqn{i}. The same conductance factory works with MLPE and
+Wishart measurement models.
+AIC and AICc at nominal Wishart information can over-select flexible
+curves. Prefer spatial CV for selecting conductance terms, and examine
+sensitivity to \code{nu} before interpreting uncertainty. Tails beyond
+the sampled covariate range are poorly identified. A selected curve can
+describe how a process maps onto the graph without identifying an
+ecological response mechanism.
+
+\code{summary(fit)$spline_monotonicity} describes each fitted smooth over
+the range at focal sites. It reports whether the curve is monotone, its
+direction, and the number of derivative sign changes. This is a shape
+diagnostic, not an uncertainty test.
+that require it. This is a user-supplied effective-information parameter,
+not the marker count. Report sensitivity to plausible values; see
+\code{\link{wishart_covariance}}.
+It controls effective information, not a marker count. Report sensitivity
+across plausible values with \code{\link{terradish_rescale_nu}}.
+Ignored by non-Wishart measurement models.
+\code{auto_amg_min_vertices}. The legacy \code{auto_direct_max_rhs}
+setting is accepted but no longer affects selection. For
+If the resistance contribution is zero, or the formula specifies uniform
+conductance, conductance coefficients are not identified and their
+influence, gradient, and Hessian are unavailable. A zero environmental
+kernel weight does not by itself remove conductance inference.
+
+\strong{Convergence and starting values.} Inspect \code{fit$convergence}
+before interpreting estimates. Code 0 requires a largest absolute projected
+gradient below \code{ctol}, or an objective change below \code{ftol} together
+with a projected gradient below \code{sqrt(ctol)}. Code 1 means the iteration
+limit was reached; code 2 means a stall or failed line search. The projected
+gradient ignores components pointing outside active parameter bounds.
+The record includes the criterion, iterations, gradient, boundary status,
+and whether a restart was attempted. A small objective change alone is not
+convergence. Also inspect \code{fit$fit$subproblem$convergence} for nuisance
+optimization. Numerical convergence does not establish model adequacy.
+
+If a user-supplied starting point reaches a no-structure boundary, fitting
+retries the default starting point and keeps the better likelihood. Report
+starting-value sensitivity when distinct solutions remain plausible.
+Keep the response, focal sites, covariate scaling, and formula fixed, then
+refit with successively larger buffers. Compare coefficients, confidence
+intervals, and fitted resistance distances. Report the buffer and whether
+increasing it changes the substantive conclusion.
+It is a speed probe. A fast candidate is not evidence of optimizer
+convergence, identification, correct standard errors, or biological validity.
+r <- terra::rast(nrows = 8, ncols = 8, xmin = 0, xmax = 8,
+ymin = 0, ymax = 8, crs = "EPSG:32617")
+terra::values(r) <- sin(seq_len(64) / 5) + seq_len(64) / 64
+names(r) <- "x"
+sites <- terra::xyFromCell(r, c(1, 5, 8, 12, 20, 27, 33, 37, 45, 53, 57, 64))
+surface <- conductance_surface(r, sites)
+response <- simulate_covariance_response(c(x = 0.8), ~x, surface,
+nu = 1000, seed = 93)$covariance
+folds <- terradish_folds(sites, k = 3, method = "random", seed = 1)
+list(uniform = response ~ 1, gradient = response ~ x),
+model = wishart_covariance, nu = 1000, nuisance = "fixed",
+control = NewtonRaphsonControl(maxit = 100))
+# Check fold success counts before comparing common-fold predictive scores.
+# Random folds illustrate the call; choose ecological spatial blocks in practice.
+Estimates landscape conductance surfaces from genetic data by maximum
+likelihood on a raster graph. It fits log-linear conductance models and can
+optionally estimate each covariate's Gaussian smoothing scale and spline
+shape. Models fit pairwise genetic distances through the MLPE likelihood,
+or allele-frequency covariance and squared distances derived from it through
+a Wishart likelihood on site contrasts. Both families accept the same
+pairwise environmental covariates alongside resistance. Exact sparse
+Cholesky and algebraic multigrid solvers handle large rasters; fixed-domain
+spatial cross-validation compares conductance formulas.
+For Wishart models, the user-supplied effective degrees of freedom,
+\code{nu}, sets inferential precision. Using the SNP count substantially
+overstated information in the package's forward-time validation experiments.
+Report sensitivity across plausible values with
+\code{\link{terradish_rescale_nu}}.
+\item{Pairwise inputs and inference}{\code{\link{pairwise_covariates}}
+combines geographic distances and environmental differences;
+\code{\link{terradish_ibe_ratio}} expresses their fitted effects in
+resistance-distance units. \code{\link{terradish_inference}} provides
+covariance matrices and confidence intervals, and
+\code{\link{gaussian_scale_profile}} profiles smoothing-scale uncertainty.}
+\code{\link{terradish_assess_settings}}, a speed probe for solver and
+optimizer settings. It does not establish statistical validity.}
+\item{Preparation and design}{\code{\link{scale_covariates}},
+\code{\link{crop_to_focal_buffer}},
+\code{\link{simulate_covariance_response}}, and
+\code{\link{covariance_response_power}} support reproducible inputs and
+model-based study design. \code{\link{slim_terradish}} reduces stored
+fit size when later prediction is unnecessary.}
+
+\strong{Experimental features.} Directed and hierarchical models,
+site-specific drift terms, selected-pair likelihoods, and other research
+prototypes remain on the \code{experimental} branch. Their identifiability
+and validation limits are described in that branch's \code{EXPERIMENTAL.md}.
+Install it explicitly with
+\code{remotes::install_github("wpeterman/terradish@experimental")}.
+Each searched scale counts toward the parameter total used for information
+criteria. Prefer the joint Gaussian model when its kernel matches the
+scientific question; this outer search is a secondary option for other
+kernels or an explicit scale grid. The default terradish kernel matches
+the joint model, whereas multiScaleR uses a different construction even
+when both scales are expressed in map units.
+You must supply it; the fit does not estimate it. It is not the marker
+count. See the effective-information section and report sensitivity across
+plausible values with \code{\link{terradish_rescale_nu}}.
+The former full-rank likelihood included the arbitrary site-mean direction.
+It has been removed because centered genetic covariance contains no
+information in that direction. The contrast form retains the interpretable
+comparisons among sites and agrees with covariance-derived distances.
+
+\strong{Preparing the response.} Use a coherent covariance construction,
+such as \code{diagonal = "gower"} for grouped data in landgraph. A
+\code{"within"} diagonal is on a different scale and is unsuitable for
+Wishart fitting, even when the matrix happens to be positive definite.
+Per-locus standardization up-weights rare variants; filter by minor-allele
+frequency and assess sensitivity. Unequal group sizes create unequal
+sampling variance that a common diagonal nugget does not automatically fix.
+In the package's null-simulation audit, AIC selected an environmental kernel
+in 19 of 40 runs at the SNP-count value of \code{nu}, and in none at a
+replicate-calibrated value. These are results of that design, not general
+error-rate guarantees. Use \code{\link{terradish_rescale_nu}} for sensitivity
+and \code{terradish_cv_folds(..., nuisance = "fixed")} to assess predictive
+support for a measurement-model extension.
+Construct one \code{\link{pairwise_covariates}} object to use the same
+environmental transforms and geographic distances in both likelihood
+families. Their fitted conductance surfaces are conditional on these terms,
+and conductance signs can change when the mean structure changes. Report
+fits with and without pairwise effects. A uniform \code{~ 1} conductance
+model with pairwise terms represents IBD plus IBE, not IBE alone.
+
+A positive environmental coefficient means differentiation increases with
+environmental difference conditional on resistance. It does not distinguish
+assortative mating, dispersal filtering, local adaptation, or site variance
+that rises at environmental extremes. MLPE coefficients are unconstrained;
+Wishart kernel weights are nonnegative. Compare their effects in
+resistance-distance units with \code{\link{terradish_ibe_ratio}}, which
+divides by the resistance coefficient and propagates joint uncertainty.
+Ratios are undefined when that denominator is zero.
+For Wishart likelihoods, \code{nu} scales the log likelihood. Point
+estimates do not depend on it, but standard errors, likelihood-ratio tests,
+and information criteria do. It is a dispersion parameter that you set,
+rather than the number of markers. Linkage and the population history
+shared by loci can make effective information much smaller than the SNP
+count. In forward-time simulations used to validate terradish, standard
+errors at the SNP count were three to five times smaller than the spread
+among replicate histories. Those model-based errors understated uncertainty.
+
+Use \code{\link{terradish_cv_folds}} to compare conductance formulas, and
+\code{\link{terradish_rescale_nu}} to report inference across plausible
+values. For the same successful folds and nuisance settings, changing
+\code{nu} rescales Wishart CV scores without changing their ranking.
+Neither procedure identifies the true effective information or repairs
+an unsuitable response matrix.

@@ -11,8 +11,9 @@
 #'   the absolute change in the objective is below \code{ftol} and the largest
 #'   absolute projected gradient is below \code{sqrt(ctol)}.
 #' @param etol Eigenvalue threshold used to detect near-singular Hessians.
-#'   Eigenvalues smaller than \code{etol * length(par)} are treated as zero
-#'   when forming the Newton step.  Increasing this value regularizes the step
+#'   Absolute eigenvalues smaller than \code{etol} times the largest absolute
+#'   Hessian entry are replaced by one when forming the Newton step.
+#'   Increasing this value regularizes the step
 #'   at the cost of slower convergence near flat regions.
 #' @param verbose Logical.  If \code{TRUE}, print the iteration count,
 #'   objective value, and gradient norm at each step.

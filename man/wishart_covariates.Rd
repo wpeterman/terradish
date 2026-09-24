@@ -115,7 +115,51 @@ and kernels are spatially correlated.
 Scaling is applied to site values before the pairwise transform; kernels
 are not normalized afterward. Site subsets retain these original pairwise
 values and rebuild centered kernels without restandardizing the subset.
+In the package's null-simulation audit, AIC selected an environmental kernel
+in 19 of 40 runs at the SNP-count value of \code{nu}, and in none at a
+replicate-calibrated value. These are results of that design, not general
+error-rate guarantees. Use \code{\link{terradish_rescale_nu}} for sensitivity
+and \code{terradish_cv_folds(..., nuisance = "fixed")} to assess predictive
+support for a measurement-model extension.
 }
+\section{Interpreting pairwise effects}{
+
+Construct one \code{\link{pairwise_covariates}} object to use the same
+environmental transforms and geographic distances in both likelihood
+families. Their fitted conductance surfaces are conditional on these terms,
+and conductance signs can change when the mean structure changes. Report
+fits with and without pairwise effects. A uniform \code{~ 1} conductance
+model with pairwise terms represents IBD plus IBE, not IBE alone.
+
+A positive environmental coefficient means differentiation increases with
+environmental difference conditional on resistance. It does not distinguish
+assortative mating, dispersal filtering, local adaptation, or site variance
+that rises at environmental extremes. MLPE coefficients are unconstrained;
+Wishart kernel weights are nonnegative. Compare their effects in
+resistance-distance units with \code{\link{terradish_ibe_ratio}}, which
+divides by the resistance coefficient and propagates joint uncertainty.
+Ratios are undefined when that denominator is zero.
+}
+
+\section{Effective Wishart information}{
+
+For Wishart likelihoods, \code{nu} scales the log likelihood. Point
+estimates do not depend on it, but standard errors, likelihood-ratio tests,
+and information criteria do. It is a dispersion parameter that you set,
+rather than the number of markers. Linkage and the population history
+shared by loci can make effective information much smaller than the SNP
+count. In forward-time simulations used to validate terradish, standard
+errors at the SNP count were three to five times smaller than the spread
+among replicate histories. Those model-based errors understated uncertainty.
+
+Use \code{\link{terradish_cv_folds}} to compare conductance formulas, and
+\code{\link{terradish_rescale_nu}} to report inference across plausible
+values. For the same successful folds and nuisance settings, changing
+\code{nu} rescales Wishart CV scores without changing their ranking.
+Neither procedure identifies the true effective information or repairs
+an unsuitable response matrix.
+}
+
 \examples{
 library(terra)
 

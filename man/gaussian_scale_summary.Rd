@@ -28,6 +28,16 @@ example, if the raster CRS is in meters, use \code{distance_per_map_unit =
 }
 \value{
 A data frame with one row per fitted \code{sigma} parameter.
+  \code{covariate} identifies the layer. \code{sigma} is its fitted map-unit
+  scale; \code{sigma_lower} and \code{sigma_upper} are fitting bounds.
+  \code{sigma_internal}, \code{sigma_conversion}, and
+  \code{sigma_conversion_mode} describe the optimization units.
+  \code{native_unit} labels map units or degrees, and
+  \code{sigma_cells_x}, \code{sigma_cells_y} express the scale in cell widths.
+  Probability-specific \code{axis_*} and \code{radial_*} columns give the
+  theoretical Gaussian distances described above, in native units and,
+  when requested, converted units. They describe the untruncated Gaussian;
+  retained raster windows can omit some of that mass.
 }
 \description{
 Converts fitted Gaussian \code{sigma} parameters into map-unit, cell-based,
@@ -45,6 +55,12 @@ two-dimensional radius \eqn{sigma * sqrt(-2 * log(1 - p))} containing
 proportion \code{p} of the Gaussian kernel mass.
 These quantities summarize the fitted raster-smoothing kernel. They are not
 estimates of dispersal distance, movement distance, or home-range size.
+Use \code{summary(object)$sigma_table} to inspect standard errors and
+bound flags, and \code{confint(object)} for bound-truncated intervals;
+smoothing scales have no
+reported z or p values. Use \code{\link{gaussian_scale_profile}} when a
+profile interval is needed. A positive scale can reflect dispersal
+averaging, and even the half-cell lower bound applies some smoothing.
 
 If the retained raster is in longitude/latitude, the native-unit results are
 in degrees. In that case, use a projected raster for direct distance

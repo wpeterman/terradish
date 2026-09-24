@@ -26,6 +26,11 @@
 #' The response is admissible when \eqn{B} is positive semidefinite within the
 #' requested tolerance. Symmetry, nonnegative entries, and a zero diagonal are
 #' necessary but are not sufficient.
+#' Passing this geometry check does not create a Wishart sampling model.
+#' Use covariance-derived squared distances with a defensible effective
+#' information parameter. F\eqn{_{ST}} ratio estimators have no Wishart
+#' degrees of freedom merely because their distance matrix passes the check;
+#' consider \code{\link{mlpe}} for those responses.
 #'
 #' This function checks the matrix that you actually intend to analyze because
 #' scaling, transformations, locus aggregation, and missing-data handling can

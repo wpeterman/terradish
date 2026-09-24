@@ -44,9 +44,9 @@ A function of class \code{"terradish_conductance_model"} that
 \description{
 Returns a function of class \code{"terradish_conductance_model"} that
 represents a log-linear conductance surface after expanding selected
-numeric covariates into spline basis columns. This provides a GAM-like
-conductance model while retaining terradish's existing likelihood and MLPE
-measurement machinery.
+numeric covariates into spline basis columns. The result is an unpenalized
+regression spline with a fixed number of coefficients, fitted through the
+selected terradish measurement likelihood.
 }
 \details{
 The model first expands all \code{s()} terms into basis columns and then
@@ -62,15 +62,24 @@ likelihood and fitted conductance coefficients. Uncertainty bands are
 relative to the landscape-mean spline contribution to log conductance.
 
 where \eqn{B_i} is the row of the expanded spline/parametric design matrix
-for grid cell \eqn{i}. This is GAM-like in the conductance surface, not a
-replacement for the MLPE response model. The \code{\link{mlpe}} measurement
-model can be used with this conductance factory in the same way it is used
-with \code{\link{loglinear_conductance}}.
+for grid cell \eqn{i}. The same conductance factory works with MLPE and
+Wishart measurement models.
 
 Smoothing parameters are not estimated in this first implementation. The
 effective smoothness is controlled by fixed basis dimension through
 \code{df} or \code{k}; use small values for stable first-pass model
 comparison.
+AIC and AICc at nominal Wishart information can over-select flexible
+curves. Prefer spatial CV for selecting conductance terms, and examine
+sensitivity to \code{nu} before interpreting uncertainty. Tails beyond
+the sampled covariate range are poorly identified. A selected curve can
+describe how a process maps onto the graph without identifying an
+ecological response mechanism.
+
+\code{summary(fit)$spline_monotonicity} describes each fitted smooth over
+the range at focal sites. It reports whether the curve is monotone, its
+direction, and the number of derivative sign changes. This is a shape
+diagnostic, not an uncertainty test.
 }
 \examples{
 x <- data.frame(altitude = seq(-1, 1, length.out = 8),

@@ -532,10 +532,9 @@
 #'   \code{terradish_measurement_model} (see
 #'   \code{\link{terradish_measurement_model}})
 #' @param nu Effective Wishart degrees of freedom passed to measurement models
-#'   that require it. For biallelic SNPs, use the number of approximately
-#'   independent retained SNPs. For microsatellites, use the number of loci as
-#'   the conservative primary value and report sensitivity to larger plausible
-#'   values.
+#'   that require it. This is a user-supplied effective-information parameter,
+#'   not the marker count. Report sensitivity to plausible values; see
+#'   \code{\link{wishart_covariance}}.
 #' @param nonnegative Force regression-like \code{measurement_model} to have nonnegative slope?
 #' @param conductance Retained for backward compatibility. Only
 #'   \code{conductance = TRUE} is currently implemented.

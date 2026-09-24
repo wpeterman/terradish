@@ -87,6 +87,12 @@
 #' Scaling is applied to site values before the pairwise transform; kernels
 #' are not normalized afterward. Site subsets retain these original pairwise
 #' values and rebuild centered kernels without restandardizing the subset.
+#' In the package's null-simulation audit, AIC selected an environmental kernel
+#' in 19 of 40 runs at the SNP-count value of \code{nu}, and in none at a
+#' replicate-calibrated value. These are results of that design, not general
+#' error-rate guarantees. Use \code{\link{terradish_rescale_nu}} for sensitivity
+#' and \code{terradish_cv_folds(..., nuisance = "fixed")} to assess predictive
+#' support for a measurement-model extension.
 #'
 #' @return A function of class \code{"terradish_measurement_model"} suitable
 #'   for the \code{measurement_model} argument of \code{\link{terradish}} and
@@ -144,6 +150,8 @@
 #' }
 #'
 #' @export
+#' @template pairwise-interpretation
+#' @template wishart-nu
 wishart_covariates <- function(x,
                                coords = NULL,
                                transform = c("absdiff", "sqdiff", "euclidean", "manhattan"),

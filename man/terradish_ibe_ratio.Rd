@@ -36,8 +36,34 @@ The ratios are \eqn{\gamma_k/\beta} for MLPE and
   approximate. The distance-equivalent ratio interpretation also appears in
   BEDASSLE, although that model uses geographic rather than resistance distance.
 }
+\examples{
+# A small model-based example, with fixed information supplied explicitly.
+r <- terra::rast(nrows = 8, ncols = 8, xmin = 0, xmax = 8, ymin = 0, ymax = 8)
+terra::values(r) <- sin(seq_len(64) / 5) + seq_len(64) / 64
+names(r) <- "x"
+sites <- terra::xyFromCell(r, c(1, 8, 20, 37, 57, 64))
+graph <- conductance_surface(r, sites)
+simulated <- simulate_covariance_response(c(x = 0.6), ~x, graph,
+                                          nu = 1000, seed = 93)
+response <- simulated$covariance
+fit <- terradish(response ~ x, graph, measurement_model = wishart_covariance,
+                 nu = 1000)
+environment <- pairwise_covariates(
+  pairwise_endpoint_covariates(data.frame(climate = c(2, 4, 1, 7, 5, 9))))
+measurement <- wishart_covariates(environment, model = "wishart_covariance")
+kernel <- attr(measurement, "kernel_covariates")[, , 1]
+response <- response + 0.1 * kernel
+joint <- terradish(response ~ x, graph, measurement_model = measurement,
+                   nu = 1000)
+terradish_ibe_ratio(joint)
+# Each ratio is the resistance-distance equivalent of one unit of difference.
+}
 \references{
 Bradburd GS, Ralph PL, Coop GM (2013). Disentangling the effects
   of geographic and ecological isolation on genetic differentiation.
   Evolution, 67, 3258--3273. \doi{10.1111/evo.12193}.
+}
+\seealso{
+\code{\link{pairwise_covariates}}, \code{\link{mlpe_covariates}},
+  \code{\link{wishart_covariates}}, \code{\link{terradish_rescale_nu}}
 }

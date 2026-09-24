@@ -126,6 +126,11 @@ scale_to_0_1 <- function(x)
 #' # min-max scaling to [0, 1]
 #' scaled_mm <- scale_covariates(r, method = "minmax")
 #'
+#' # Preserve the training transformation on new values, matched by layer name.
+#' new_scaled <- scale_covariates(r + 10, reference = scaled_r)
+#' terra::values(new_scaled)
+#' # Values can fall outside the training range; they are not re-centered.
+#'
 #' @export
 #' @param reference A previous scaled raster or its \code{terradish_scale}
 #'   attribute. Applies the stored centers and scales by layer name instead of

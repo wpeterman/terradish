@@ -126,6 +126,12 @@ raster representation, not direct estimates of dispersal distance,
 home-range size, organismal movement, or a causal ecological-process scale.
 Report the search range and objective, and account for this outer selection
 when describing model-selection uncertainty.
+Each searched scale counts toward the parameter total used for information
+criteria. Prefer the joint Gaussian model when its kernel matches the
+scientific question; this outer search is a secondary option for other
+kernels or an explicit scale grid. The default terradish kernel matches
+the joint model, whereas multiScaleR uses a different construction even
+when both scales are expressed in map units.
 
 Coordinate search updates one raster scale at a time using
 \code{\link[stats]{optimize}} while holding the others fixed. Grid search

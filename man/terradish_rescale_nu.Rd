@@ -24,4 +24,29 @@ and their derivatives are proportional to this user-supplied quantity.
 \details{
 This is a sensitivity calculation, not an estimate of effective
 information. It does not remedy misspecification or dependent histories.
+If \code{nu} is divided by 20, standard errors grow by \code{sqrt(20)};
+the likelihood and likelihood-ratio statistics are divided by 20. AIC
+changes because its likelihood term changes while its parameter penalty
+stays fixed. Report conclusions over a scientifically plausible range.
+}
+\examples{
+# A small model-based example, with fixed information supplied explicitly.
+r <- terra::rast(nrows = 8, ncols = 8, xmin = 0, xmax = 8, ymin = 0, ymax = 8)
+terra::values(r) <- sin(seq_len(64) / 5) + seq_len(64) / 64
+names(r) <- "x"
+sites <- terra::xyFromCell(r, c(1, 8, 20, 37, 57, 64))
+graph <- conductance_surface(r, sites)
+simulated <- simulate_covariance_response(c(x = 0.6), ~x, graph,
+                                          nu = 1000, seed = 93)
+response <- simulated$covariance
+fit <- terradish(response ~ x, graph, measurement_model = wishart_covariance,
+                 nu = 1000)
+sensitivity <- terradish_rescale_nu(fit, nu = 50)
+rbind(original = coef(fit), sensitivity = coef(sensitivity))
+rbind(original = sqrt(diag(vcov(fit))),
+      sensitivity = sqrt(diag(vcov(sensitivity))))
+}
+\seealso{
+\code{\link{terradish_inference}}, \code{\link{aic_table}},
+  \code{\link{terradish_cv_folds}}
 }

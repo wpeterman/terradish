@@ -38,10 +38,9 @@ to create \code{data} on the right-hand side.}
 \code{\link{terradish_measurement_model}})}
 
 \item{nu}{Effective Wishart degrees of freedom passed to measurement models
-that require it. For biallelic SNPs, use the number of approximately
-independent retained SNPs. For microsatellites, use the number of loci as
-the conservative primary value and report sensitivity to larger plausible
-values.}
+that require it. This is a user-supplied effective-information parameter,
+not the marker count. Report sensitivity to plausible values; see
+\code{\link{wishart_covariance}}.}
 
 \item{nonnegative}{Force regression-like \code{measurement_model} to have nonnegative slope?}
 

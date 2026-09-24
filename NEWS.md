@@ -1,3 +1,12 @@
+terradish 0.0.55
+----------------
+* Rewrote Wishart information guidance and documented covariance construction,
+  conditional environmental effects, and inference across plausible nu values.
+* Explained convergence, smoothing-scale bounds, spline shape diagnostics,
+  retained prediction transformations, and model-comparison limits.
+* Added runnable inference, profile, and predictive cross-validation examples,
+  and updated the package overview and spelling dictionary.
+
 terradish 0.0.54
 ----------------
 * Changed the default graph neighborhood to eight directions and improved

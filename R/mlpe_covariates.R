@@ -81,6 +81,7 @@
 #' head(z_env)
 #'
 #' @export
+#' @template pairwise-interpretation
 pairwise_endpoint_covariates <- function(x,
                                          coords = NULL,
                                          transform = c("absdiff", "sqdiff",
@@ -185,6 +186,7 @@ pairwise_endpoint_covariates <- function(x,
 #'   have \eqn{n(n-1)/2} rows. Use a data frame for site-level columns, or
 #'   \code{\link{pairwise_endpoint_covariates}} to construct their differences.
 #'   \code{\link{pairwise_covariates}} combines these with other pairwise inputs.
+#' @template pairwise-interpretation
 mlpe_covariates <- function(x,
                             coords = NULL,
                             transform = c("absdiff", "sqdiff",

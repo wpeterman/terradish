@@ -29,6 +29,7 @@
 #' @seealso \code{\link{pairwise_endpoint_covariates}},
 #'   \code{\link{mlpe_covariates}}, \code{\link{wishart_covariates}}
 #' @export
+#' @template pairwise-interpretation
 pairwise_covariates <- function(...) {
   inputs <- list(...)
   if (!length(inputs)) stop("Supply at least one pairwise covariate.", call. = FALSE)

@@ -131,6 +131,8 @@ to identify the fastest computational configuration for your data.
 procedure.  It does not change package defaults and its output does not
 affect parameter estimation.  Use it to choose \emph{computational}
 settings; then fit and interpret your model as usual.
+It is a speed probe. A fast candidate is not evidence of optimizer
+convergence, identification, correct standard errors, or biological validity.
 
 Short probes work well for comparing early-iteration cost of different
 optimizers.  They are most informative for large graphs (> 100,000 vertices)

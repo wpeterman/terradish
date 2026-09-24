@@ -5,12 +5,15 @@
 \alias{terradish-package}
 \title{terradish: Fast Gradient-Based Optimization of Resistance Surfaces}
 \description{
-Fits associations between raster covariates and population-genetic distance
-or covariance by maximum likelihood. You supply raster covariates, sampling
-locations, and an observed genetic matrix. \pkg{terradish} maps covariates to
-vertex conductance, builds a weighted graph Laplacian, derives its generalized
-inverse \eqn{E(\theta)}, and links that shared process layer to the response
-through a selected measurement likelihood.
+Estimates landscape conductance surfaces from genetic data by maximum
+likelihood on a raster graph. It fits log-linear conductance models and can
+optionally estimate each covariate's Gaussian smoothing scale and spline
+shape. Models fit pairwise genetic distances through the MLPE likelihood,
+or allele-frequency covariance and squared distances derived from it through
+a Wishart likelihood on site contrasts. Both families accept the same
+pairwise environmental covariates alongside resistance. Exact sparse
+Cholesky and algebraic multigrid solvers handle large rasters; fixed-domain
+spatial cross-validation compares conductance formulas.
 }
 \details{
 \if{html}{\figure{terradish-sticker.png}{options: width=150 alt='terradish logo'}}
@@ -25,6 +28,11 @@ conductance per unit of a covariate.
 These coefficients describe conditional associations within the fitted
 graph and candidate set. They do not, by themselves, identify causal
 mechanisms, absolute migration or dispersal rates, or habitat suitability.
+For Wishart models, the user-supplied effective degrees of freedom,
+\code{nu}, sets inferential precision. Using the SNP count substantially
+overstated information in the package's forward-time validation experiments.
+Report sensitivity across plausible values with
+\code{\link{terradish_rescale_nu}}.
 
 \strong{Main components.}
 \describe{
@@ -40,11 +48,30 @@ for a Wishart likelihood, which need the effective degrees of freedom
 \code{nu}; \code{\link{check_distance_response}} to verify a
 generalized-Wishart squared-distance response; \code{\link{mlpe_covariates}} and
 \code{\link{wishart_covariates}} to add isolation-by-environment terms.}
+\item{Pairwise inputs and inference}{\code{\link{pairwise_covariates}}
+combines geographic distances and environmental differences;
+\code{\link{terradish_ibe_ratio}} expresses their fitted effects in
+resistance-distance units. \code{\link{terradish_inference}} provides
+covariance matrices and confidence intervals, and
+\code{\link{gaussian_scale_profile}} profiles smoothing-scale uncertainty.}
 \item{Comparison and diagnostics}{\code{\link{aic_table}},
 \code{\link{terradish_cv_folds}}, \code{\link{terradish_grid}}, and
-\code{\link{terradish_assess_settings}}, which profiles the graph and
-recommends solver and optimizer settings.}
+\code{\link{terradish_assess_settings}}, a speed probe for solver and
+optimizer settings. It does not establish statistical validity.}
+\item{Preparation and design}{\code{\link{scale_covariates}},
+\code{\link{crop_to_focal_buffer}},
+\code{\link{simulate_covariance_response}}, and
+\code{\link{covariance_response_power}} support reproducible inputs and
+model-based study design. \code{\link{slim_terradish}} reduces stored
+fit size when later prediction is unnecessary.}
 }
+
+\strong{Experimental features.} Directed and hierarchical models,
+site-specific drift terms, selected-pair likelihoods, and other research
+prototypes remain on the \code{experimental} branch. Their identifiability
+and validation limits are described in that branch's \code{EXPERIMENTAL.md}.
+Install it explicitly with
+\code{remotes::install_github("wpeterman/terradish@experimental")}.
 
 \strong{Vignettes.}  Start with
 \code{vignette("getting-started", package = "terradish")}.  The others cover

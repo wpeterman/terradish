@@ -774,6 +774,21 @@
 #' centered and scaled after smoothing, which keeps conductance coefficients on
 #' a stable scale while still allowing \code{sigma} to be interpreted in map
 #' units.
+#' With the default standardization, a coefficient is relative log conductance
+#' per standard deviation of the smoothed layer at the current sigma. The
+#' layer is re-standardized at every candidate sigma during fitting. The
+#' half-cell lower bound still smooths; near the upper bound, the smoothed
+#' layer acts as a broad spatial trend. Dispersal averaging can favor a positive
+#' sigma even when no separate ecological scale of effect exists.
+#'
+#' The Gaussian kernel is truncated to a raster-sized window. The default
+#' upper bound keeps approximately three sigma inside half the smaller raster
+#' dimension; increasing it cannot recover kernel mass outside that window.
+#' Inspect \code{summary(fit)$sigma_table} for bound flags and
+#' \code{\link{gaussian_scale_profile}} for profile intervals. Scale estimates
+#' do not receive z or p values because zero is outside the fitting interval.
+#' Wald intervals are truncated at the bounds; a bound-limited interval does
+#' not demonstrate a precisely identified scale.
 #'
 #' The current implementation supports numeric raster formulas built from raw
 #' raster names, interactions, and polynomial/arithmetic terms that can be
@@ -1220,6 +1235,12 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
 #' proportion \code{p} of the Gaussian kernel mass.
 #' These quantities summarize the fitted raster-smoothing kernel. They are not
 #' estimates of dispersal distance, movement distance, or home-range size.
+#' Use \code{summary(object)$sigma_table} to inspect standard errors and
+#' bound flags, and \code{confint(object)} for bound-truncated intervals;
+#' smoothing scales have no
+#' reported z or p values. Use \code{\link{gaussian_scale_profile}} when a
+#' profile interval is needed. A positive scale can reflect dispersal
+#' averaging, and even the half-cell lower bound applies some smoothing.
 #'
 #' If the retained raster is in longitude/latitude, the native-unit results are
 #' in degrees. In that case, use a projected raster for direct distance
@@ -1227,6 +1248,16 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
 #' conversion if you need a quick descriptive summary.
 #'
 #' @return A data frame with one row per fitted \code{sigma} parameter.
+#'   \code{covariate} identifies the layer. \code{sigma} is its fitted map-unit
+#'   scale; \code{sigma_lower} and \code{sigma_upper} are fitting bounds.
+#'   \code{sigma_internal}, \code{sigma_conversion}, and
+#'   \code{sigma_conversion_mode} describe the optimization units.
+#'   \code{native_unit} labels map units or degrees, and
+#'   \code{sigma_cells_x}, \code{sigma_cells_y} express the scale in cell widths.
+#'   Probability-specific \code{axis_*} and \code{radial_*} columns give the
+#'   theoretical Gaussian distances described above, in native units and,
+#'   when requested, converted units. They describe the untruncated Gaussian;
+#'   retained raster windows can omit some of that mass.
 #'
 #' @examples
 #' \donttest{

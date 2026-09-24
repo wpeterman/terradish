@@ -14,6 +14,14 @@
 #' @return \code{vcov()} returns a covariance matrix; \code{confint()} returns
 #' a two-column interval matrix; \code{nobs()} returns the number of pairs.
 #' @name terradish_inference
+#' @seealso \code{\link{terradish}}, \code{\link{slim_terradish}},
+#'   \code{\link{gaussian_scale_profile}}, \code{\link{terradish_rescale_nu}}
+#' @template small-wishart-fit
+#' @examples
+#' coef(fit)       # Relative log conductance per unit of x.
+#' vcov(fit)       # Joint uncertainty in conductance parameters.
+#' confint(fit)    # A model-based interval conditional on the supplied nu.
+#' nobs(fit)       # Number of unordered site pairs, not independent replicates.
 #' @importFrom stats nobs vcov confint
 NULL
 
@@ -115,6 +123,18 @@ confint.terradish <- function(object, parm, level = 0.95, ...) {
 #' \code{summary()} and \code{vcov()} use the rescaled curvature.
 #' @details This is a sensitivity calculation, not an estimate of effective
 #' information. It does not remedy misspecification or dependent histories.
+#' If \code{nu} is divided by 20, standard errors grow by \code{sqrt(20)};
+#' the likelihood and likelihood-ratio statistics are divided by 20. AIC
+#' changes because its likelihood term changes while its parameter penalty
+#' stays fixed. Report conclusions over a scientifically plausible range.
+#' @seealso \code{\link{terradish_inference}}, \code{\link{aic_table}},
+#'   \code{\link{terradish_cv_folds}}
+#' @template small-wishart-fit
+#' @examples
+#' sensitivity <- terradish_rescale_nu(fit, nu = 50)
+#' rbind(original = coef(fit), sensitivity = coef(sensitivity))
+#' rbind(original = sqrt(diag(vcov(fit))),
+#'       sensitivity = sqrt(diag(vcov(sensitivity))))
 #' @export
 terradish_rescale_nu <- function(fit, nu) {
   family <- .terradish_fit_comparison_contract(fit)$likelihood_family
@@ -172,6 +192,19 @@ terradish_rescale_nu <- function(fit, nu) {
 #' @references Bradburd GS, Ralph PL, Coop GM (2013). Disentangling the effects
 #'   of geographic and ecological isolation on genetic differentiation.
 #'   Evolution, 67, 3258--3273. \doi{10.1111/evo.12193}.
+#' @seealso \code{\link{pairwise_covariates}}, \code{\link{mlpe_covariates}},
+#'   \code{\link{wishart_covariates}}, \code{\link{terradish_rescale_nu}}
+#' @template small-wishart-fit
+#' @examples
+#' environment <- pairwise_covariates(
+#'   pairwise_endpoint_covariates(data.frame(climate = c(2, 4, 1, 7, 5, 9))))
+#' measurement <- wishart_covariates(environment, model = "wishart_covariance")
+#' kernel <- attr(measurement, "kernel_covariates")[, , 1]
+#' response <- response + 0.1 * kernel
+#' joint <- terradish(response ~ x, graph, measurement_model = measurement,
+#'                    nu = 1000)
+#' terradish_ibe_ratio(joint)
+#' # Each ratio is the resistance-distance equivalent of one unit of difference.
 #' @export
 terradish_ibe_ratio <- function(fit) {
   phi <- fit$fit$phi[, 1]

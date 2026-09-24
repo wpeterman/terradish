@@ -34,3 +34,4 @@
 ^\.codex$
 ^figure$
 ^vignettes/.*\.rds$
+^man-roxygen$

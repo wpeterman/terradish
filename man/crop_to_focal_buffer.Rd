@@ -45,6 +45,10 @@ Cropping can increase resistance by removing paths outside the retained
 extent. The supplied release audit found increases of 15--23 percent at a
 two-cell buffer and 1--2 percent at ten cells. These results are specific to
 that landscape. Compare fits over larger buffers as a sensitivity check.
+Keep the response, focal sites, covariate scaling, and formula fixed, then
+refit with successively larger buffers. Compare coefficients, confidence
+intervals, and fitted resistance distances. Report the buffer and whether
+increasing it changes the substantive conclusion.
 A message flags buffers smaller than half the maximum intersite distance.
 }
 \examples{

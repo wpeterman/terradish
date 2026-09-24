@@ -69,17 +69,12 @@ matrix during simulation.}
 \item{sigma}{Nonnegative nugget variance added to the covariance diagonal
 during simulation.}
 
-\item{nu}{Effective Wishart degrees of freedom, passed to both simulation
-and \code{\link{wishart_covariance}} fitting.  For biallelic SNPs use the
-number of retained polymorphic SNPs (reduced for linkage disequilibrium).
-For microsatellites, use the number of loci \eqn{L} as the primary value;
-\eqn{\sum_l (K_l - 1)}, where \eqn{K_l} is the number of observed alleles
-at locus \eqn{l}, is a larger sensitivity value rather than a default.
-Because \code{nu} acts as an effective sample size, it is a primary lever
-for power. Report the primary value and sensitivity analysis. See
-\code{\link{wishart_covariance}} for details on how \code{nu} scales
-inference. For simulation, \code{nu} must also be at least the largest
-assessed covariance-matrix dimension.}
+\item{nu}{Effective Wishart information used to simulate the response.
+Larger values reduce simulated sampling noise. The fitting value defaults
+to it through \code{nu_fit = nu}; neither is an estimate
+of information from real data. Report a sensitivity analysis rather than
+substituting the marker count. Simulation requires \code{nu} to be at
+least the largest assessed covariance-matrix dimension.}
 
 \item{nsim}{Number of covariance-response simulations per sampling design.}
 
@@ -120,8 +115,13 @@ An object of class \code{"terradish_covariance_power"} containing:
     simulation replicate.}
   \item{\code{parameter_summary}}{Parameter-level power, bias, RMSE, and
     coverage summaries.}
-  \item{\code{settings}}{Simulation settings and true parameters.}
+  \item{\code{settings}}{Simulation settings and true parameters, including
+    \code{nu} for simulation and \code{nu_fit} for inference.}
 }
+Power and coverage are internal to the assumed response model. Matching
+simulation and fitting values cannot diagnose incorrect information in a
+real data set. Nonconverged fits count as failed fits and non-detections;
+inspect \code{fit_rate} before interpreting power or coverage.
 }
 \description{
 Runs a fast simulation study for covariance-response \code{terradish} fits.

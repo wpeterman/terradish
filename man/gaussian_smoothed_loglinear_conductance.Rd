@@ -86,6 +86,21 @@ values are needed so the Gaussian convolution can be applied at each proposed
 centered and scaled after smoothing, which keeps conductance coefficients on
 a stable scale while still allowing \code{sigma} to be interpreted in map
 units.
+With the default standardization, a coefficient is relative log conductance
+per standard deviation of the smoothed layer at the current sigma. The
+layer is re-standardized at every candidate sigma during fitting. The
+half-cell lower bound still smooths; near the upper bound, the smoothed
+layer acts as a broad spatial trend. Dispersal averaging can favor a positive
+sigma even when no separate ecological scale of effect exists.
+
+The Gaussian kernel is truncated to a raster-sized window. The default
+upper bound keeps approximately three sigma inside half the smaller raster
+dimension; increasing it cannot recover kernel mass outside that window.
+Inspect \code{summary(fit)$sigma_table} for bound flags and
+\code{\link{gaussian_scale_profile}} for profile intervals. Scale estimates
+do not receive z or p values because zero is outside the fitting interval.
+Wald intervals are truncated at the bounds; a bound-limited interval does
+not demonstrate a precisely identified scale.
 
 The current implementation supports numeric raster formulas built from raw
 raster names, interactions, and polynomial/arithmetic terms that can be

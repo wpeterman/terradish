@@ -25,8 +25,9 @@ this update supersedes its next-action instructions.
   all eight vignette revisions are drafted. Six freshly rendered successfully;
   IBE and simulation rendering is pending a code-example type correction.
   Metadata, final builds, audits, and release gates are still pending.
-- C5 source has been adopted for its .54 commit. Adopt C6 next as a separate
-  .55 commit. Preserve each version and NEWS entry. Propagate fixes into C7.
+- C5 is committed as 9b75ff4 (.54). C6 source and function documentation are
+  adopted for the .55 commit. Preserve the checked C5/C6 candidates as evidence;
+  continue edits in C7 and propagate only deliberate subsequent fixes.
 - Resume scripts and receipts are in this directory. Some diagnostic runs were
   interrupted or failed during development; only final named acceptance
   receipts establish validation. Do not overwrite those artifacts.
@@ -35,16 +36,18 @@ The original logoff details remain in logoff_status.md.
 
 ## Current checkout and commits
 
-Branch: release/0.1.0. Current development version: 0.0.53 (C4).
-The C4 commit includes this checkpoint; use git log -1 for its hash.
+Branch: release/0.1.0. Current development version: 0.0.55 (C6).
+Use git log -1 for the latest commit hash.
 
 - C0 c80425d, .48: baseline evidence and owner vignette wrapping.
 - C1a 488ac6d, .49: helper relocation; 414 function contracts unchanged.
 - C1b 604a3a1, .50: supported-core split (amended authoritative hash).
 - C2 c3ac708, .51: F1-F8 numerical/default corrections; full check clean.
 - C3 c2aa209, .52: inference and constrained-optimization repairs.
-- C4 current HEAD, .53: per-model/repeated CV, fixed nuisance prediction,
+- C4 0bfb63e, .53: per-model/repeated CV, fixed nuisance prediction,
   checkpoint signatures, failure accounting, and paired comparisons.
+- C5 9b75ff4, .54: robustness, prediction transforms, and common pairwise inputs.
+- C6 current HEAD after commit, .55: function documentation and inference guidance.
 
 Original master 6a2c13f (.47) is preserved by v0.0.47 and experimental.
 Nothing has been pushed, merged to master, or submitted for release.

@@ -2,8 +2,12 @@
 #
 # The genetic-covariance and distance helpers now live
 # in landgraph and are re-exported here so existing terradish workflows and
-# documentation links are unchanged. terradish's own functions (resistance, Tier-1/2/3,
-# wishart measurement models, simulation) continue to call them as before.
+# documentation links point to landgraph's authoritative help. Grouped covariance
+# should use the coherent gower diagonal; within-population diagonals have a
+# different scale. Rare-variant standardization and unequal group sizes need
+# sensitivity checks. FST ratio estimators are not Wishart responses. pca_dist
+# replaces missing entries with means. These caveats also belong in the
+# covariance and getting-started vignettes.
 
 #' @importFrom landgraph cov_from_biallelic
 #' @export

@@ -292,26 +292,24 @@ terradish_folds <- function(pts, k = 5L,
 #'
 #' @examples
 #' \donttest{
-#' data(melip)
-#' altitude <- terra::unwrap(melip.altitude)
-#' forestcover <- terra::unwrap(melip.forestcover)
-#' coords <- terra::unwrap(melip.coords)
-#' keep <- 1:8
-#' response <- melip.Fst[keep, keep]
-#' covariates <- terra::aggregate(c(altitude, forestcover), fact = 6,
-#'                                na.rm = TRUE)
-#' names(covariates) <- c("altitude", "forestcover")
-#' surface <- conductance_surface(covariates, coords[keep])
-#' coords_projected <- terra::project(coords[keep], "EPSG:5070")
-#' folds <- terradish_folds(coords_projected, k = 2, seed = 1)
+#' r <- terra::rast(nrows = 8, ncols = 8, xmin = 0, xmax = 8,
+#'                  ymin = 0, ymax = 8, crs = "EPSG:32617")
+#' terra::values(r) <- sin(seq_len(64) / 5) + seq_len(64) / 64
+#' names(r) <- "x"
+#' sites <- terra::xyFromCell(r, c(1, 5, 8, 12, 20, 27, 33, 37, 45, 53, 57, 64))
+#' surface <- conductance_surface(r, sites)
+#' response <- simulate_covariance_response(c(x = 0.8), ~x, surface,
+#'   nu = 1000, seed = 93)$covariance
+#' folds <- terradish_folds(sites, k = 3, method = "random", seed = 1)
 #' cv <- terradish_cv_folds(
 #'   surface,
-#'   list(altitude = response ~ altitude,
-#'        both = response ~ altitude + forestcover),
+#'   list(uniform = response ~ 1, gradient = response ~ x),
 #'   folds = folds,
-#'   model = "ls",
-#'   control = NewtonRaphsonControl(maxit = 1))
+#'   model = wishart_covariance, nu = 1000, nuisance = "fixed",
+#'   control = NewtonRaphsonControl(maxit = 100))
 #' cv$summary
+#' # Check fold success counts before comparing common-fold predictive scores.
+#' # Random folds illustrate the call; choose ecological spatial blocks in practice.
 #' }
 #'
 #' @export
