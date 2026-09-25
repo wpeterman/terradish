@@ -1,0 +1,107 @@
+ℹ Loading terradish
+Registered S3 methods overwritten by 'RcppEigen':
+  method               from         
+  predict.fastLm       RcppArmadillo
+  print.fastLm         RcppArmadillo
+  summary.fastLm       RcppArmadillo
+  print.summary.fastLm RcppArmadillo
+ℹ Re-compiling terradish (debug build)
+Writing 'aic_table.Rd'
+Writing 'check_distance_response.Rd'
+Writing 'gaussian_scale_summary.Rd'
+Writing 'generalized_wishart.Rd'
+Writing 'leastsquares.Rd'
+Writing 'mlpe.Rd'
+Writing 'mlpe_covariates.Rd'
+Writing 'mlpe_response_change.Rd'
+Writing 'wishart_covariance.Rd'
+Writing 'wishart_covariates.Rd'
+All executable R syntax unchanged.
+ [1]  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE FALSE  TRUE  TRUE  TRUE
+[13]  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE
+[25]  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE
+[37]  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE
+[49]  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE  TRUE
+[61]  TRUE  TRUE  TRUE
+All help pages parsed and rendered.
+RENDER model-comparison.Rmd 
+$started
+[1] "2026-09-25 08:17:50 EDT"
+
+$finished
+[1] "2026-09-25 08:20:09 EDT"
+
+$result
+[1] "C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/dev/check/docs-math-20260925-render/model-comparison.html"
+
+RENDER gaussian-scale-optimization.Rmd 
+$started
+[1] "2026-09-25 08:20:09 EDT"
+
+$finished
+[1] "2026-09-25 08:21:06 EDT"
+
+$result
+[1] "C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/dev/check/docs-math-20260925-render/gaussian-scale-optimization.html"
+
+RENDER getting-started.Rmd 
+$started
+[1] "2026-09-25 08:21:06 EDT"
+
+$finished
+[1] "2026-09-25 08:22:27 EDT"
+
+$result
+[1] "C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/dev/check/docs-math-20260925-render/getting-started.html"
+
+RENDER ibe-ibr-workflow.Rmd 
+$started
+[1] "2026-09-25 08:22:27 EDT"
+
+$finished
+[1] "2026-09-25 08:22:34 EDT"
+
+$result
+[1] "C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/dev/check/docs-math-20260925-render/ibe-ibr-workflow.html"
+
+RENDER large-landscapes.Rmd 
+$started
+[1] "2026-09-25 08:22:34 EDT"
+
+$finished
+[1] "2026-09-25 08:22:36 EDT"
+
+$result
+[1] "C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/dev/check/docs-math-20260925-render/large-landscapes.html"
+
+RENDER simulation-design.Rmd 
+$started
+[1] "2026-09-25 08:22:36 EDT"
+
+$finished
+[1] "2026-09-25 08:22:44 EDT"
+
+$result
+[1] "C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/dev/check/docs-math-20260925-render/simulation-design.html"
+
+RENDER spline-conductance.Rmd 
+$started
+[1] "2026-09-25 08:22:44 EDT"
+
+$finished
+[1] "2026-09-25 08:23:48 EDT"
+
+$result
+[1] "C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/dev/check/docs-math-20260925-render/spline-conductance.html"
+
+RENDER wishart-covariance.Rmd 
+$started
+[1] "2026-09-25 08:23:48 EDT"
+
+$finished
+[1] "2026-09-25 08:24:14 EDT"
+
+$result
+[1] "C:/Users/peterman.73/OneDrive - The Ohio State University/R/Packages/terradish/dev/check/docs-math-20260925-render/wishart-covariance.html"
+
+All eight vignettes rendered successfully.

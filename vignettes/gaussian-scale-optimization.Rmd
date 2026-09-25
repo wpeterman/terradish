@@ -52,18 +52,18 @@ log-linear conductance model.
 
 Conceptually:
 
-$$C_i = \exp(\beta \cdot x_{i,\sigma})$$
+$$C_i = \exp(\theta \cdot x_{i,\sigma})$$
 
 where:
 
 - $x_{i,\sigma}$ is the Gaussian-smoothed raster value at cell *i*,
   standardized over retained cells after smoothing
-- $\beta$ is the conductance coefficient
+- $\theta$ is the conductance coefficient
 - $\sigma$ controls how broad the smoothing kernel is
 
 Small `sigma` means that the raster is averaged over a narrow neighborhood.
 Large `sigma` means that it is averaged over a broader neighborhood. The
-coefficient `beta` describes a one-standard-deviation change in that smoothed
+coefficient `theta` describes a one-standard-deviation change in that smoothed
 layer, with standardization recomputed at each trial scale. Its magnitude
 therefore needs to be interpreted jointly with `sigma`. Here,
 `sigma` is a Gaussian smoothing scale in the raster's map units. It is not an
@@ -185,7 +185,7 @@ you can justify.
 `optimizer = "auto"` currently resolves to BFGS for this conductance model.
 That is intentional: the native Gaussian scale path supports analytic
 gradients, and BFGS is the stable first optimizer for the joint
-`beta + sigma` parameter vector.
+vector of conductance coefficients (`theta`) and smoothing scales (`sigma`).
 
 ```{r fit}
 fit_gaussian <- terradish(

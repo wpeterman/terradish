@@ -90,7 +90,8 @@ The fitted covariance is \eqn{\Sigma = \tau E + \exp(\sigma) I}.  The
 likelihood is evaluated on orthonormal site contrasts. Let \eqn{L} have
 \eqn{n-1} orthonormal columns perpendicular to the constant vector, and let
 \eqn{\tilde\Sigma = L^T\Sigma L} and \eqn{\tilde S = L^T S L}. The
-negative log-likelihood is:
+negative log-likelihood, omitting terms constant in the fitted parameters
+for a fixed response and supplied \eqn{\nu}, is:
 
 \deqn{-\ell = \frac{\nu}{2} \left[ \log|\tilde\Sigma| + \mathrm{tr}(\tilde\Sigma^{-1} \tilde S) \right]}
 

@@ -1,0 +1,264 @@
+{
+  "files_scanned": 179,
+  "encoding_issues": [],
+  "vignette_math": {
+    "gaussian-scale-optimization.Rmd": [
+      {
+        "type": "DisplayMath",
+        "tex": "C_i = \\exp(\\theta \\cdot x_{i,\\sigma})"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "x_{i,\\sigma}"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\theta"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\sigma"
+      }
+    ],
+    "getting-started.Rmd": [
+      {
+        "type": "InlineMath",
+        "tex": "L(\\theta)"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "E(\\theta)=L(\\theta)^+"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "E(\\theta)"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "E(\\theta)"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\exp(\\theta_1 x_{i,\\mathrm{altitude}} + \\theta_2 x_{i,\\mathrm{forestcover}} + \\cdots)"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\theta"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\exp(\\boldsymbol{\\theta}^{\\mathsf T}\\mathbf{x})"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\theta"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\theta"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\theta"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\theta_{\\mathrm{forestcover}} > 0"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\theta_{\\mathrm{altitude}} < 0"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\exp(\\theta_{\\mathrm{forestcover}})"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\theta"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\alpha"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\beta"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\tau"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\rho"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\theta"
+      }
+    ],
+    "ibe-ibr-workflow.Rmd": [],
+    "large-landscapes.Rmd": [],
+    "model-comparison.Rmd": [
+      {
+        "type": "DisplayMath",
+        "tex": "\\mathrm{LR} = 2\\left(\\ell_{\\mathrm{larger}} - \\ell_{\\mathrm{smaller}}\\right)."
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\ell"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\chi^2_q"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "q"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\theta"
+      }
+    ],
+    "simulation-design.Rmd": [
+      {
+        "type": "DisplayMath",
+        "tex": "\\Sigma = \\tau \\, E(\\theta) + \\sigma\\, I, \\qquad\n  \\nu\\, S \\sim \\mathrm{Wishart}(\\nu, \\Sigma)"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "E(\\theta)"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\theta"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\tau \\ge 0"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\sigma \\ge 0"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "E(\\theta)"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\nu"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\nu"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\Sigma"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\nu"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\sigma"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\tau / \\sigma"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "E(\\theta)"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "1/\\sqrt{\\nu}"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\tau / \\sigma"
+      }
+    ],
+    "spline-conductance.Rmd": [
+      {
+        "type": "DisplayMath",
+        "tex": "C_i = \\exp(\\theta_1 x_{i1} + \\theta_2 x_{i2} + \\cdots)"
+      },
+      {
+        "type": "DisplayMath",
+        "tex": "C_i = \\exp(B_i \\boldsymbol{\\theta})"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "B_i"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "i"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "B_i"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "B_i"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "-2"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\Delta\\mathrm{AICc}"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\Delta\\mathrm{AICc}"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "\\theta"
+      }
+    ],
+    "wishart-covariance.Rmd": [
+      {
+        "type": "InlineMath",
+        "tex": "{D = d^2}"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "{n}"
+      },
+      {
+        "type": "DisplayMath",
+        "tex": "B = -\\frac{1}{2} H D H, \\qquad\nH = I - \\frac{1}{n}\\mathbf{1}\\mathbf{1}^{\\mathsf T},"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "{B}"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "{d}"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "{D = d^2}"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "{D^2}"
+      },
+      {
+        "type": "InlineMath",
+        "tex": "{D}"
+      }
+    ]
+  }
+}

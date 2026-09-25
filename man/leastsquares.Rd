@@ -23,7 +23,7 @@ Passed automatically by the optimizer; users normally do not call this
 function directly.}
 
 \item{S}{Square, symmetric matrix of observed pairwise genetic distances
-(e.g. F\eqn{_{ST}}). Must have the same dimensions as \code{E}.}
+(e.g. \eqn{F_{ST}}). Must have the same dimensions as \code{E}.}
 
 \item{phi}{Named numeric vector of nuisance parameters \code{(alpha, beta,
 tau)}.  Omit to obtain maximum-likelihood starting values from an

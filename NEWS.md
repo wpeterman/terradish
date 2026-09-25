@@ -1,3 +1,11 @@
+terradish 0.0.58
+----------------
+* Repaired corrupted mathematical symbols in the model-comparison and spline
+  guides, and standardized coefficient and subscript notation across the docs.
+* Corrected the MLPE covariate equation's row-vector product, typeset Gaussian
+  kernel distances, and clarified the likelihood-ratio reference conditions.
+* Rebuilt all eight vignettes and checked rendered equations and function help.
+
 terradish 0.0.57
 ----------------
 * Added fast analytic-derivative and AMG agreement tests that run on CRAN.

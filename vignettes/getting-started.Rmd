@@ -90,7 +90,7 @@ Raster covariates                   Sampling locations
 
 The **conductance model** maps raster values at each grid cell to a
 conductance value. `loglinear_conductance` is the default: conductance =
-exp(θ₁·altitude + θ₂·forestcover + ...). The parameters θ are what we
+$\exp(\theta_1 x_{i,\mathrm{altitude}} + \theta_2 x_{i,\mathrm{forestcover}} + \cdots)$. The parameters $\theta$ are what we
 estimate.
 
 The **measurement model** links the graph to the observed genetic summary.
@@ -187,8 +187,8 @@ points(melip.coords, pch = 19, cex = 0.8, col = 'red')
 
 ## Scale your rasters: an important step
 
-Conductance in the loglinear model is exp(θ·x). If `x` (e.g. altitude in
-meters) has a very large range, small changes in θ produce enormous
+Conductance in the loglinear model is $\exp(\boldsymbol{\theta}^{\mathsf T}\mathbf{x})$. If `x` (e.g. altitude in
+meters) has a very large range, small changes in $\theta$ produce enormous
 changes in conductance, making optimization numerically unstable.
 **Always scale continuous covariates** before fitting.
 
@@ -471,9 +471,9 @@ summary(fit_ls)
 
 **How to read the output:**
 
-- **theta**: the conductance parameters. A positive θ for a covariate
+- **theta**: the conductance parameters. A positive $\theta$ for a covariate
   means that higher values are associated with higher fitted relative
-  conductance, conditional on other terms and the graph. A negative θ
+  conductance, conditional on other terms and the graph. A negative $\theta$
   means lower fitted relative conductance. Neither sign is a direct
   estimate of movement or a causal landscape effect.
 - **phi**: nuisance parameters of the measurement model. For MLPE, these
@@ -638,14 +638,14 @@ coef(fit_mlpe)
 
 The log-linear conductance model means:
 
-- θ~forestcover~ \> 0: higher forest cover is associated with higher
+- $\theta_{\mathrm{forestcover}} > 0$: higher forest cover is associated with higher
   fitted relative conductance, conditional on altitude and the model.
-- θ~altitude~ \< 0: higher altitude is associated with lower fitted
+- $\theta_{\mathrm{altitude}} < 0$: higher altitude is associated with lower fitted
   relative conductance, conditional on forest cover and the model.
 
 You can convert back from the log scale to a relative conductance ratio.
 For example, a one standard-deviation increase in forest cover
-multiplies conductance by exp(θ~forestcover~):
+multiplies conductance by $\exp(\theta_{\mathrm{forestcover}})$:
 
 ```{r interpret}
 theta <- coef(fit_mlpe)
@@ -747,11 +747,11 @@ covariate value, marginalized over the rest of the landscape.
 The **shaded predictive band** combines three sources of uncertainty:
 
 1.  *Theta (conductance parameter) uncertainty*: imprecision in the
-    estimated conductance parameters θ, propagated through the
+    estimated conductance parameters $\theta$, propagated through the
     resistance-distance calculation via the delta method.
 2.  *Phi (measurement-model parameter) uncertainty*: imprecision in the
-    nuisance parameters (intercept α, IBR slope β, log precision τ, and
-    the unconstrained correlation parameter ρ), again via the delta
+    nuisance parameters (intercept $\alpha$, IBR slope $\beta$, log precision $\tau$, and
+    the unconstrained correlation parameter $\rho$), again via the delta
     method. The corresponding shared-site correlation is
     `plogis(rho) / 2`.
 3.  *Residual variation*: the irreducible scatter in pairwise genetic
@@ -782,7 +782,7 @@ plot(fit_mlpe, type = "marginal", data = surface)
 
 Here the band is a **confidence interval** (delta-method, 95% pointwise)
 on the mean conductance, not a predictive interval; it reflects only
-parameter uncertainty in θ, not residual variation. A rising curve means
+parameter uncertainty in $\theta$, not residual variation. A rising curve means
 higher covariate values are associated with higher fitted conductance; a
 declining curve means the fitted conditional association is negative.
 

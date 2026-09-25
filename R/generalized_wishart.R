@@ -57,7 +57,7 @@
 #' only by a data-dependent constant. This equivalence does not make AIC values
 #' from arbitrary distance and covariance fits interchangeable.
 #'
-#' F\eqn{_{ST}} ratio estimators do not have Wishart degrees of freedom. A
+#' \eqn{F_{ST}} ratio estimators do not have Wishart degrees of freedom. A
 #' passed geometry check is necessary but does not establish this sampling
 #' likelihood. Prefer covariance-derived squared distances and document the
 #' construction; use \code{\link{mlpe}} for ratio-estimator responses.

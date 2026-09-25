@@ -131,12 +131,15 @@ A **likelihood ratio test (LRT)** asks whether adding a covariate
 improves the model fit enough to reject the reduced model under its
 assumptions. The test statistic is:
 
-> 2 Ã— (log-likelihood of larger model âˆ’ log-likelihood of smaller model)
+$$\mathrm{LR} = 2\left(\ell_{\mathrm{larger}} - \ell_{\mathrm{smaller}}\right).$$
 
-Under the null hypothesis that the extra parameter does not help, this
-statistic follows asymptotically a Ï‡Â² distribution with degrees of
-freedom equal to the number of extra parameters. This approximation
-improves as sample size (number of focal sites) increases.
+Here each $\ell$ is the maximized log-likelihood for that model.
+
+For nested models under the usual regularity conditions, including null
+parameters in the interior of their allowed ranges, the reference distribution
+is $\chi^2_q$, where $q$ is the difference in the number of estimated
+parameters. Boundary parameters require a different reference distribution,
+as discussed below; adding sites alone does not guarantee calibration.
 
 `terradish` provides `anova()` for this:
 
@@ -168,9 +171,10 @@ absolute permeability.
 ### Testing against the null model of isolation by distance (IBD)
 
 The formula `~ 1` fits a null conductance surface where all cells have
-equal conductance. Resistance still combines all routes through the graph;
-it is neither shortest-path distance nor necessarily proportional to Euclidean
-distance. This uniform-surface model is the graph-based IBD baseline:
+equal conductance. Resistance still combines all routes through the
+graph; it is neither shortest-path distance nor necessarily proportional
+to Euclidean distance. This uniform-surface model is the graph-based IBD
+baseline:
 
 ```{r ibd-test}
 fit_ibd <- terradish(
@@ -219,12 +223,12 @@ anova(fit_full, fit_interaction)
 > formula non-nesting, but the analyst must still verify substantive
 > nesting and whether boundary parameters invalidate the usual
 > chi-squared reference distribution. The response, site order, graph,
-> pairwise design, basis definition, and supplied Wishart `nu` must agree.
-> A linear term is not automatically nested in an arbitrary spline basis, and
-> a fitted Gaussian scale changes the model dimension. For Wishart fits,
-> the LRT magnitude depends on `nu`; interpret it descriptively at the declared
-> value and report sensitivity rather than treating nominal marker counts as
-> calibrated replication.
+> pairwise design, basis definition, and supplied Wishart `nu` must
+> agree. A linear term is not automatically nested in an arbitrary
+> spline basis, and a fitted Gaussian scale changes the model dimension.
+> For Wishart fits, the LRT magnitude depends on `nu`; interpret it
+> descriptively at the declared value and report sensitivity rather than
+> treating nominal marker counts as calibrated replication.
 
 ------------------------------------------------------------------------
 
@@ -259,26 +263,27 @@ common likelihood basis and are rejected.
 aic_table(
   list(fit_ibd, fit_altitude_only, fit_fc_only, fit_full, fit_interaction),
   mod_names = c("IBD", "Altitude only", "Forestcover only",
-                "Full (A + FC)", "Interaction (A Ã— FC)")
+                "Full (A + FC)", "Interaction (A * FC)")
 )
 ```
 
 **How to read the table:**
 
-- **logLik**: larger is better (less negative = higher likelihood).
-- **df**: number of estimated parameters; more complex models have
-  higher df.
+- **loglik**: larger values indicate higher maximized log-likelihood.
+- **K**: number of estimated parameters; more complex models have
+  larger K.
 - **AIC**: balances fit and complexity. Smaller is better.
-- **delta**: difference from the best model's AIC. Values below about 2
+- **Delta_AIC**: difference from the best model's AIC. Values below about 2
   are a common heuristic for similar support within the declared
   candidate set, not proof that the models are equivalent.
 
 ### Effective information and over-selection
 
 Wishart AIC can select unnecessary conductance terms when nominal `nu`
-overstates effective information. AICc does not repair an incorrectly scaled
-likelihood. Use the same predeclared candidates in cross-validation and
-compare inference over plausible effective degrees of freedom:
+overstates effective information. AICc does not repair an incorrectly
+scaled likelihood. Use the same predeclared candidates in
+cross-validation and compare inference over plausible effective degrees
+of freedom:
 
 ```{r nu-sensitivity, eval = FALSE}
 # fit_wishart is a converged Wishart fit at the declared primary nu.
@@ -288,10 +293,11 @@ sensitivity <- lapply(c(10, 30, 100), function(value) {
 lapply(sensitivity, confint)
 ```
 
-**How to read the output.** Rescaling changes uncertainty and likelihood-based
-comparisons without changing the fitted coefficients. If conclusions depend
-on a high `nu`, report that dependence. Rescale every candidate to the same
-value before comparing their information criteria.
+**How to read the output.** Rescaling changes uncertainty and
+likelihood-based comparisons without changing the fitted coefficients.
+If conclusions depend on a high `nu`, report that dependence. Rescale
+every candidate to the same value before comparing their information
+criteria.
 
 ### When to use AICc
 
@@ -438,7 +444,7 @@ grid or a final optimization on the full-resolution graph.
 
 `plot(fit, type = "surface", data = surface)` renders the fitted
 conductance alongside its asymptotic lower and upper confidence interval
-bounds in a single three-panel figure. Uncertainty in Î¸ is propagated
+bounds in a single three-panel figure. Uncertainty in $\theta$ is propagated
 through the log-linear model via the delta method, and all panels share
 the same color scale:
 
@@ -475,8 +481,8 @@ predictors already in the model.
 When focal sites sparsely cover a covariate tail, unconstrained
 marginals can show unstable extremes that dominate interpretation. Use
 focal-support clamping to inspect predictions within sampled covariate
-ranges. This display choice does not alter the fitted likelihood or model
-comparison:
+ranges. This display choice does not alter the fitted likelihood or
+model comparison:
 
 ```{r support-clamp-marginal, eval = FALSE}
 plot(
@@ -513,11 +519,11 @@ sampled landscape. They do not directly ask whether the fitted
 association transfers across space. For that question, construct spatial
 folds and use `terradish_cv_folds()`.
 
-The fixed-domain method builds the graph once, then changes only which focal sites
-contribute to the training and test responses. Unsampled raster cells,
-graph edges, and raster covariates remain available in every fold. This
-matches the prediction target of transferring to held-out sites within
-the observed landscape.
+The fixed-domain method builds the graph once, then changes only which
+focal sites contribute to the training and test responses. Unsampled
+raster cells, graph edges, and raster covariates remain available in
+every fold. This matches the prediction target of transferring to
+held-out sites within the observed landscape.
 
 Use ecological blocks when the study design supplies them. Watersheds,
 barrier units, or sampling campaigns can be more defensible than an
@@ -556,23 +562,24 @@ cv_spatial$summary
 cv_spatial$results
 ```
 
-With `nuisance = "fixed"`, all measurement-model coefficients are learned
-from training sites and used unchanged to score held-out sites. This tests
-prediction from the trained model. A separately fitted uniform-conductance
-baseline provides `loglik_gain`; positive gain favors the trained landscape
-surface over that baseline on the same held-out response.
+With `nuisance = "fixed"`, all measurement-model coefficients are
+learned from training sites and used unchanged to score held-out sites.
+This tests prediction from the trained model. A separately fitted
+uniform-conductance baseline provides `loglik_gain`; positive gain
+favors the trained landscape surface over that baseline on the same
+held-out response.
 
-The default `nuisance = "reprofile"` instead optimizes nuisance coefficients
-using each test response, separately for the trained surface and baseline.
-That asks whether the learned surface retains useful structure after local
-recalibration. It is a different prediction target. Declare the mode and do
-not compare scores across modes.
+The default `nuisance = "reprofile"` instead optimizes nuisance
+coefficients using each test response, separately for the trained
+surface and baseline. That asks whether the learned surface retains
+useful structure after local recalibration. It is a different prediction
+target. Declare the mode and do not compare scores across modes.
 
 ### Different models and repeated folds
 
-Each formula can have its own conductance or measurement-model factory. For
-example, compare a linear forest-cover term with a fixed-degree spline using
-the same response and folds:
+Each formula can have its own conductance or measurement-model factory.
+For example, compare a linear forest-cover term with a fixed-degree
+spline using the same response and folds:
 
 ```{r cv-repeats, eval = FALSE}
 folds_repeated <- lapply(c(42, 91, 137), function(seed) {
@@ -592,20 +599,22 @@ cv_shape$summary
 cv_shape$results
 ```
 
-**How to read the output.** Inspect convergence and score failures first.
-Rankings use folds on which every candidate succeeded. `mean_difference`
-and `se_difference` describe paired score differences against the best
-candidate on those common folds; `within_one_se` flags a difference no larger
-than its estimated standard error. Prefer a simpler model when its predictive
-performance is indistinguishable under the declared design. Overlapping
-training sets and repeated partitions make these standard errors descriptive,
-not independent-replicate hypothesis tests. Repeats expose split sensitivity;
-they do not create new independent sites.
+**How to read the output.** Inspect convergence and score failures
+first. Rankings use folds on which every candidate succeeded.
+`mean_difference` and `se_difference` describe paired score differences
+against the best candidate on those common folds; `within_one_se` flags
+a difference no larger than its estimated standard error. Prefer a
+simpler model when its predictive performance is indistinguishable under
+the declared design. Overlapping training sets and repeated partitions
+make these standard errors descriptive, not independent-replicate
+hypothesis tests. Repeats expose split sensitivity; they do not create
+new independent sites.
 
-Checkpoint files retain completed fits and scores. Resume only the identical
-response, graph, formulas, model settings, and folds; changed inputs are
-rejected. Keep failed baseline scores separate from failed trained-model scores:
-a valid held-out score can exist even when its baseline gain is unavailable.
+Checkpoint files retain completed fits and scores. Resume only the
+identical response, graph, formulas, model settings, and folds; changed
+inputs are rejected. Keep failed baseline scores separate from failed
+trained-model scores: a valid held-out score can exist even when its
+baseline gain is unavailable.
 
 The comparison boundary remains strict. Raw held-out log-likelihood and
 `loglik_gain` are meaningful only when candidates use the same response
@@ -627,13 +636,13 @@ A complete analysis typically uses all three approaches together:
 | `terradish_cv_folds()` | Which candidate transfers best across declared spatial blocks? | Fixed-domain prediction under identical folds and one likelihood family |
 | `mlpe_response_change()` | How large is an MLPE pairwise-covariate association on the response scale? | IBE terms fitted with `mlpe_covariates()` |
 
-Use cross-validation to assess conductance terms and shape, then use `nu`
-sensitivity to describe the uncertainty of Wishart inference. Treat an LRT at
-a fixed `nu` as conditional, descriptive evidence. Information criteria add
-a view of in-sample fit and complexity, but agreement among these summaries
-does not validate the underlying effective sample size. None establishes
-causality, observed movement, absolute permeability, or unique attribution to
-a landscape mechanism.
+Use cross-validation to assess conductance terms and shape, then use
+`nu` sensitivity to describe the uncertainty of Wishart inference. Treat
+an LRT at a fixed `nu` as conditional, descriptive evidence. Information
+criteria add a view of in-sample fit and complexity, but agreement among
+these summaries does not validate the underlying effective sample size.
+None establishes causality, observed movement, absolute permeability, or
+unique attribution to a landscape mechanism.
 
 ------------------------------------------------------------------------
 

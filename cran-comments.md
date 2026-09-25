@@ -1,10 +1,18 @@
 ## Submission status
 
 This is preparation for the first CRAN release of terradish 0.1.0.
-The current development version is 0.0.57. No submission has been made for
+The current development version is 0.0.58. No submission has been made for
 this core overhaul; owner release approval remains pending.
 
 ## Validation
+
+The 0.0.58 follow-up changes documentation and metadata only. All eight
+vignettes rebuilt successfully, all 62 Rd pages passed checkRd, and browser
+inspection found no rendering errors in 61 vignette math expressions and 124
+help-page math expressions. Executable R syntax is unchanged from 0.0.57.
+The complete numerical test suite and package archive check were not repeated
+for this documentation-only follow-up; the earlier evidence below remains
+specific to the .57 archives.
 
 Windows, R 4.6.1: the complete .57 development archive passed
 devtools::check(args = "--as-cran") with 0 errors, 0 warnings, and 0 notes,

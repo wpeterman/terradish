@@ -22,7 +22,7 @@ of pairwise observations).  A common guideline is to prefer AICc over AIC
 when \eqn{n / K < 40}, where \eqn{K} is the number of estimated parameters.}
 
 \item{BIC}{Should BIC be used instead of AIC? BIC uses
-\eqn{n = n_{sites}(n_{sites}-1)/2} as an implementation convention. Those
+\eqn{n = n_{\mathrm{sites}}(n_{\mathrm{sites}}-1)/2} as an implementation convention. Those
 pairs are not independent in MLPE and related designs, so report the
 convention and do not treat it as a uniquely determined effective sample
 size.}

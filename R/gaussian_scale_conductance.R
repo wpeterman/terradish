@@ -1230,9 +1230,10 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
 #' fitting, the table also reports the internal optimization scale and its
 #' conversion factor back to map units. For each probability \code{p},
 #' \code{axis_*} gives the one-dimensional half-width
-#' \eqn{qnorm((1 + p) / 2) * sigma}, while \code{radial_*} gives the isotropic
-#' two-dimensional radius \eqn{sigma * sqrt(-2 * log(1 - p))} containing
-#' proportion \code{p} of the Gaussian kernel mass.
+#' \eqn{\sigma \Phi^{-1}((1+p)/2)}, while \code{radial_*} gives the isotropic
+#' two-dimensional radius \eqn{\sigma\sqrt{-2\log(1-p)}} containing
+#' proportion \code{p} of the Gaussian kernel mass. Here \eqn{\Phi^{-1}} is
+#' the standard normal quantile function and \eqn{\sigma} is the smoothing scale.
 #' These quantities summarize the fitted raster-smoothing kernel. They are not
 #' estimates of dispersal distance, movement distance, or home-range size.
 #' Use \code{summary(object)$sigma_table} to inspect standard errors and

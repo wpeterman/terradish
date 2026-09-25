@@ -1,3 +1,8 @@
+Documentation follow-up, September 25: development version 0.0.58 repairs
+math notation and encoding without changing numerical implementation. See
+../docs_math_20260925/REVIEW.md. The archive checks described below remain
+specific to 0.0.57; do not distribute that older archive as the corrected docs.
+
 # terradish core overhaul: owner review
 
 The core implementation and documentation follow the supplied 0.1.0 plan and

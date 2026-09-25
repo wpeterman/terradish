@@ -1,0 +1,44 @@
+==================================================================
+HUMANIZER AUDIT
+==================================================================
+Paragraphs: 12   Sentences: 47   Words: 603
+
+-- BURSTINESS (sentence length variation) -----------------------
+  mean 12.8  sd 8.0  cv 0.62  range 1-40
+  coefficient of variation: GOOD
+     target cv >= 0.5; human expert prose is bursty
+  ! 5 run(s) of >=3 same-length sentences:
+      sentences 20-22: lengths [9, 12, 10]
+      sentences 30-33: lengths [11, 12, 14, 12]
+      sentences 34-37: lengths [17, 13, 9, 9]
+      sentences 38-40: lengths [3, 5, 8]
+      sentences 44-47: lengths [14, 12, 9, 10]
+
+-- SENTENCE OPENERS ---------------------------------------------
+  no >2 identical openers in a row
+  most common openers: the(7), no(3), model(2), all(2), browser(2)
+
+-- AI VOCABULARY ------------------------------------------------
+  banned words: none
+
+-- AI PHRASES & THROAT-CLEARING ---------------------------------
+  banned phrases: none
+
+-- OVERUSED CONNECTIVES -----------------------------------------
+  none
+
+-- MACHINE CONSTRUCTIONS ----------------------------------------
+  none detected
+
+-- VOICE-STYLE MECHANICS ----------------------------------------
+  em-dashes (U+2014, forbidden): 0
+  curly quotes (use straight ASCII): 0
+  british spelling: none
+
+-- PARAGRAPH LENGTH VARIATION -----------------------------------
+  mean 50 words  cv 1.30
+
+==================================================================
+Diagnostic only. Fix by rewriting for meaning + voice, then re-run.
+A true technical term that scores as low-probability is not a defect.
+==================================================================

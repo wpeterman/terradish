@@ -1,3 +1,12 @@
+# September 25 documentation follow-up
+
+Current development version is 0.0.58 after a documentation-only math and
+encoding audit. See ../docs_math_20260925/REVIEW.md for corrections and evidence.
+All eight guides rebuilt, all 62 Rd pages passed checks, and 61 vignette plus
+124 help-page math expressions rendered without errors. Executable R syntax
+is unchanged. The .57 archives below remain historical validation artifacts;
+rebuild from current sources before release. Owner release gates remain open.
+
 # terradish 0.1.0: resume checkpoint
 
 Updated September 24, 2026 after final local validation.

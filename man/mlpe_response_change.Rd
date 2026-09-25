@@ -45,7 +45,7 @@ than conductance-surface coefficients.
 \details{
 For a model fitted with \code{mlpe_covariates()}, the pairwise mean structure
 includes terms of the form \eqn{\gamma Z_{ij}}.  This function reports
-\eqn{\gamma (z_{high} - z_{low})}, the expected response-scale change in
+\eqn{\gamma (z_{\mathrm{high}} - z_{\mathrm{low}})}, the expected response-scale change in
 genetic distance across the requested covariate contrast, conditional on the
 fitted conductance surface.
 

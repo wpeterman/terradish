@@ -197,3 +197,11 @@ Final diff cleanup corrected two obsolete setup comments in the spline and
 model-comparison vignette sources. This comment-only change followed the final
 archive check; evaluation settings, executable chunks, and rendered prose are
 unchanged. The archive fingerprint refers to the preserved checked candidate.
+
+## September 25: documentation math correction (0.0.58)
+
+Repaired encoding damage, equation notation, and symbol/column consistency.
+Preserved the owner's existing model-comparison paragraph wrapping. All eight
+vignettes rebuilt; 62 Rd checks passed; 61 vignette and 124 help math expressions
+rendered without errors. Executable R syntax is unchanged. No complete numerical
+suite or archive check was repeated. See ../docs_math_20260925/REVIEW.md.

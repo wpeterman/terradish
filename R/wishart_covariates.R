@@ -18,7 +18,7 @@
 #'   \code{"generalized_wishart"} is appropriate only when \code{S} is an
 #'   admissible squared-distance matrix coherently related to a centered
 #'   positive-semidefinite covariance matrix. An arbitrary distance matrix,
-#'   including an unchecked F\eqn{_{ST}} matrix, is not sufficient.
+#'   including an unchecked \eqn{F_{ST}} matrix, is not sufficient.
 #'   \code{"wishart_covariance"} is appropriate when \code{S} is a
 #'   \strong{covariance} matrix (e.g. from \code{\link{cov_from_genetic_data}}).
 #'   In both cases the same \eqn{\Sigma} parameterization is used; they differ

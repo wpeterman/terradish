@@ -122,7 +122,7 @@ pairwise_endpoint_covariates <- function(x,
 #' @details
 #' The fitted mean structure is:
 #'
-#' \deqn{S_{ij} = \alpha + \beta R_{ij} + Z_{ij}^\top \gamma + e_{ij}}
+#' \deqn{S_{ij} = \alpha + \beta R_{ij} + Z_{ij}\gamma + e_{ij}}
 #'
 #' where \eqn{R_{ij}} is the resistance distance (IBR) and \eqn{Z_{ij}} is the
 #' row of pairwise endpoint-difference covariates for the pair \eqn{(i,j)}
