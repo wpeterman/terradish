@@ -129,6 +129,7 @@ Candidate sampling designs are created by subsetting the focal sites in an
 existing \code{\link{conductance_surface}} object, responses are generated
 with \code{\link{simulate_covariance_response}}, and one or more candidate
 conductance models are refit to each simulated covariance matrix.
+Gaussian smoothing widths are simulated and reported in map units.
 }
 \details{
 This helper avoids forward-time genetic simulation. It assumes a proposed

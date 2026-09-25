@@ -1,3 +1,10 @@
+terradish 0.0.59
+----------------
+* Fixed `covariance_response_power()` so Gaussian-scale truths generate
+  responses at the reported map-unit smoothing width. Previously the width
+  was divided by cell width twice, invalidating Gaussian power and recovery
+  results when cells were not one map unit wide.
+
 terradish 0.0.58
 ----------------
 * Repaired corrupted mathematical symbols in the model-comparison and spline

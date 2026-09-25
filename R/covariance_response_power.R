@@ -5,6 +5,7 @@
 #' existing \code{\link{conductance_surface}} object, responses are generated
 #' with \code{\link{simulate_covariance_response}}, and one or more candidate
 #' conductance models are refit to each simulated covariance matrix.
+#' Gaussian smoothing widths are simulated and reported in map units.
 #'
 #' @param theta True conductance parameters. By default these are interpreted on
 #'   the same external scale returned by \code{\link{coef}} for fitted
@@ -288,7 +289,8 @@ covariance_response_power <- function(theta,
                     " sim=", sim_id)
 
           sim <- simulate_covariance_response(
-            theta = theta_internal,
+            # The simulator converts map-unit Gaussian widths to cell units.
+            theta = theta_external,
             formula = formula,
             data = subset_data,
             conductance_model = conductance_model,

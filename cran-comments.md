@@ -1,10 +1,23 @@
 ## Submission status
 
 This is preparation for the first CRAN release of terradish 0.1.0.
-The current development version is 0.0.58. No submission has been made for
+The current development version is 0.0.59. No submission has been made for
 this core overhaul; owner release approval remains pending.
 
 ## Validation
+
+Version 0.0.59 fixes Gaussian map-unit widths in
+`covariance_response_power()`. The focused Gaussian refit regression passed.
+`devtools::document()` regenerated the affected help page, and the full source
+test suite passed with 991 assertions, 0 failures, 197 expected diagnostic
+warnings, and one intentional parallel skip. The vignette-enabled source archive
+`terradish_0.0.59.tar.gz` (SHA-256
+`6b8597a1c1bae7e8a99537c1aeed12a6a0ba50dfebf7f9ff9b4c707312a5bdb`)
+passed `R CMD check --no-manual` on Windows R 4.6.1 with Status: OK, including
+the installed tests (792 passing assertions, 190 diagnostic warnings, five
+expected skips), examples, and all eight vignette rebuilds. The affected W1
+Gaussian results are being rerun from preserved per-cell checkpoints; no
+incomplete W1 aggregate will be used for the manuscript.
 
 The 0.0.58 follow-up changes documentation and metadata only. All eight
 vignettes rebuilt successfully, all 62 Rd pages passed checkRd, and browser
