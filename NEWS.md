@@ -1,3 +1,9 @@
+terradish 0.0.60
+----------------
+* Bound Gaussian factory settings when the factory is created. Factories built
+  in a loop now retain their own raster choices, smoothing bounds,
+  standardization setting, and scale conversion factor.
+
 terradish 0.0.59
 ----------------
 * Fixed `covariance_response_power()` so Gaussian-scale truths generate

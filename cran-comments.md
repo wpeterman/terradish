@@ -1,10 +1,23 @@
 ## Submission status
 
 This is preparation for the first CRAN release of terradish 0.1.0.
-The current development version is 0.0.59. No submission has been made for
+The current development version is 0.0.60. No submission has been made for
 this core overhaul; owner release approval remains pending.
 
 ## Validation
+
+Version 0.0.60 binds Gaussian factory settings at construction so factories
+built in a loop retain their own raster choices and scale settings. The new
+14-expectation regression failed seven expectations on 0.0.59 and passed on
+0.0.60. The full source test suite completed without failures or errors, with
+198 diagnostic warnings and one intentional parallel skip. The installed
+archive tests passed 806 assertions with no failures, 190 diagnostic warnings,
+and five expected skips. Objective, gradient, Hessian, exact and coarse-raster
+fits, and prediction were identical between the two builds for a concrete
+Gaussian factory call. The vignette-enabled source archive
+`terradish_0.0.60.tar.gz` (SHA-256
+`218d9a86114740c08beed4dbfc8ff1eef21aa8cce5fdc6eff0976051af151c23`)
+passed `R CMD check --no-manual` on Windows R 4.6.1 with Status: OK.
 
 Version 0.0.59 fixes Gaussian map-unit widths in
 `covariance_response_power()`. The focused Gaussian refit regression passed.
@@ -12,12 +25,12 @@ Version 0.0.59 fixes Gaussian map-unit widths in
 test suite passed with 991 assertions, 0 failures, 197 expected diagnostic
 warnings, and one intentional parallel skip. The vignette-enabled source archive
 `terradish_0.0.59.tar.gz` (SHA-256
-`6b8597a1c1bae7e8a99537c1aeed12a6a0ba50dfebf7f9ff9b4c707312a5bdb`)
+`6b8597a1c1bae7e8a99537c1aeeed12a6a0ba50dfebf7f9ff9b4c707312a5bdb`)
 passed `R CMD check --no-manual` on Windows R 4.6.1 with Status: OK, including
 the installed tests (792 passing assertions, 190 diagnostic warnings, five
-expected skips), examples, and all eight vignette rebuilds. The affected W1
-Gaussian results are being rerun from preserved per-cell checkpoints; no
-incomplete W1 aggregate will be used for the manuscript.
+expected skips), examples, and all eight vignette rebuilds. The corrected W1
+run later completed with 720 fitted cells, 80 structural skips, and no top-level
+cell errors. Its scientific interpretation remains under review.
 
 The 0.0.58 follow-up changes documentation and metadata only. All eight
 vignettes rebuilt successfully, all 62 Rd pages passed checkRd, and browser

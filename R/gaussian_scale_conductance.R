@@ -749,6 +749,8 @@
 #'
 #' @details
 #' This is a scale-aware extension of \code{\link{loglinear_conductance}}.
+#' Factory settings are evaluated when the factory is created, so factories
+#' constructed in a loop retain their own raster choices and scale bounds.
 #' Given a model formula such as
 #' \code{~ altitude * forestcover + I(altitude^2)}, the fitted parameter vector
 #' contains both conductance coefficients and one natural-scale \code{sigma}
@@ -871,6 +873,14 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
     stop("`surface` must retain its raster stack; use `conductance_surface(..., saveStack = TRUE)`",
          call. = FALSE)
   sigma_conversion <- match.arg(sigma_conversion)
+
+  # Bind settings now; otherwise factories made in a loop can all read the
+  # loop variable's final value when they are first used.
+  force(scale_vars)
+  force(standardize)
+  force(sigma_lower)
+  force(sigma_upper)
+  force(sigma_conversion_factor)
 
   stack <- .as_spatraster(surface$stack)
   active_cells <- cellFromXY(stack[[1]], surface$vertex_coordinates)

@@ -61,6 +61,8 @@ parameters as part of the optimized conductance parameter vector.
 }
 \details{
 This is a scale-aware extension of \code{\link{loglinear_conductance}}.
+Factory settings are evaluated when the factory is created, so factories
+constructed in a loop retain their own raster choices and scale bounds.
 Given a model formula such as
 \code{~ altitude * forestcover + I(altitude^2)}, the fitted parameter vector
 contains both conductance coefficients and one natural-scale \code{sigma}
