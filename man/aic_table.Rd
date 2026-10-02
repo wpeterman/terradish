@@ -21,11 +21,11 @@ correction uses \eqn{n} = number of focal sampling sites (not the number
 of pairwise observations).  A common guideline is to prefer AICc over AIC
 when \eqn{n / K < 40}, where \eqn{K} is the number of estimated parameters.}
 
-\item{BIC}{Should BIC be used instead of AIC? BIC uses
-\eqn{n = n_{\mathrm{sites}}(n_{\mathrm{sites}}-1)/2} as an implementation convention. Those
-pairs are not independent in MLPE and related designs, so report the
-convention and do not treat it as a uniquely determined effective sample
-size.}
+\item{BIC}{Should BIC be used instead of AIC? When \code{TRUE}, the
+penalty uses \eqn{n} = number of focal sampling sites (individuals or
+populations), the same sample size as AICc, not the number of pairwise
+observations. Pairs that share a site are not independent, so the number
+of pairs overstates the information in the data.}
 
 \item{mod_names}{Optional model names. By default the right-hand side of
 each fitted formula is used. For MLPE measurement models with additional

@@ -24,7 +24,7 @@
 }
 \value{
 \code{vcov()} returns a covariance matrix; \code{confint()} returns
-a two-column interval matrix; \code{nobs()} returns the number of pairs.
+a two-column interval matrix; \code{nobs()} returns the number of focal sites.
 }
 \description{
 Extracts observed-curvature uncertainty from a full or slim fit.
@@ -32,9 +32,10 @@ Extracts observed-curvature uncertainty from a full or slim fit.
 \details{
 Gaussian scale intervals are Wald intervals truncated at the fitted bounds.
 Stored profile intervals take precedence when their confidence level matches.
-The observation count is the number of unordered site pairs, matching the
-BIC convention in \code{\link{aic_table}}. AICc instead uses the number of
-sites. Neither convention represents independent observations in these models.
+The observation count is the number of focal sites (individuals or
+populations), the sample size that AICc and BIC use in
+\code{\link{aic_table}}. Pairwise observations are not counted, because
+pairs that share a site are not independent.
 }
 \examples{
 # A small model-based example, with fixed information supplied explicitly.
@@ -51,7 +52,7 @@ fit <- terradish(response ~ x, graph, measurement_model = wishart_covariance,
 coef(fit)       # Relative log conductance per unit of x.
 vcov(fit)       # Joint uncertainty in conductance parameters.
 confint(fit)    # A model-based interval conditional on the supplied nu.
-nobs(fit)       # Number of unordered site pairs, not independent replicates.
+nobs(fit)       # Number of focal sites, the sample size for AICc and BIC.
 }
 \seealso{
 \code{\link{terradish}}, \code{\link{slim_terradish}},

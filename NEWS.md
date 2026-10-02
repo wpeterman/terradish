@@ -1,3 +1,14 @@
+terradish 0.0.62
+----------------
+* `aic_table(BIC = TRUE)` now uses the number of focal sites (individuals or
+  populations) as the BIC sample size, matching AICc. It previously used the
+  number of site pairs, which are not independent observations. BIC values
+  and, potentially, BIC rankings change.
+* `nobs()` now returns the number of focal sites instead of the number of site
+  pairs, so `stats::BIC()` agrees with `aic_table(BIC = TRUE)`.
+* Updated the inference help, the model-comparison guide, and tests to the new
+  convention.
+
 terradish 0.0.61
 
 ----------------

@@ -29,6 +29,10 @@ test_that("aic_table ranks fitted terradish models across supported criteria", {
   bic_tab <- aic_table(list(fit1, fit2), BIC = TRUE)
   expect_true(is.data.frame(bic_tab))
   expect_true(all(c("BIC", "Delta_BIC", "BIC_wt") %in% names(bic_tab)))
+  # BIC penalizes with the number of focal sites, as AICc does, not site pairs
+  n_sites <- fit1$dim[["focal"]]
+  expect_equal(sort(bic_tab$BIC),
+               sort(round(-2 * c(fit1$loglik, fit2$loglik) + c(fit1$df, fit2$df) * log(n_sites), 4)))
 
   expect_error(aic_table(list(fit1, fit2), AICc = TRUE, BIC = TRUE),
                "Set only one")

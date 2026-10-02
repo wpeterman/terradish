@@ -325,12 +325,12 @@ parameter.
 ### BIC for stricter parsimony
 
 BIC penalizes complexity more heavily than AIC and tends to favor
-simpler models. The implementation uses the number of pairwise
-observations (`n = n_sites * (n_sites - 1) / 2`) as the BIC sample size.
-AICc instead uses the number of focal sites. Which count is the most
-appropriate `n` for landscape-genetic data is debated; treat BIC values
-as one input among several rather than a single definitive arbiter of
-model choice:
+simpler models. As with AICc, the BIC sample size is the number of focal
+sites (individuals or populations), not the number of pairwise
+observations. Pairs that share a site are not independent, so counting
+pairs would overstate the information in the data. Treat BIC values as
+one input among several rather than a single definitive arbiter of model
+choice:
 
 ```{r bic-table}
 aic_table(

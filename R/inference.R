@@ -8,11 +8,12 @@
 #' @details
 #' Gaussian scale intervals are Wald intervals truncated at the fitted bounds.
 #' Stored profile intervals take precedence when their confidence level matches.
-#' The observation count is the number of unordered site pairs, matching the
-#' BIC convention in \code{\link{aic_table}}. AICc instead uses the number of
-#' sites. Neither convention represents independent observations in these models.
+#' The observation count is the number of focal sites (individuals or
+#' populations), the sample size that AICc and BIC use in
+#' \code{\link{aic_table}}. Pairwise observations are not counted, because
+#' pairs that share a site are not independent.
 #' @return \code{vcov()} returns a covariance matrix; \code{confint()} returns
-#' a two-column interval matrix; \code{nobs()} returns the number of pairs.
+#' a two-column interval matrix; \code{nobs()} returns the number of focal sites.
 #' @name terradish_inference
 #' @seealso \code{\link{terradish}}, \code{\link{slim_terradish}},
 #'   \code{\link{gaussian_scale_profile}}, \code{\link{terradish_rescale_nu}}
@@ -21,7 +22,7 @@
 #' coef(fit)       # Relative log conductance per unit of x.
 #' vcov(fit)       # Joint uncertainty in conductance parameters.
 #' confint(fit)    # A model-based interval conditional on the supplied nu.
-#' nobs(fit)       # Number of unordered site pairs, not independent replicates.
+#' nobs(fit)       # Number of focal sites, the sample size for AICc and BIC.
 #' @importFrom stats nobs vcov confint
 NULL
 
@@ -72,8 +73,8 @@ vcov.terradish <- function(object, ...) {
 #' @rdname terradish_inference
 #' @export
 nobs.terradish <- function(object, ...) {
-  n <- object$dim[["focal"]]
-  n * (n - 1) / 2
+  # focal sites (individuals or populations), not site pairs
+  object$dim[["focal"]]
 }
 
 #' @rdname terradish_inference

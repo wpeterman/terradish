@@ -21,7 +21,9 @@ test_that("inference methods agree across full and slim fits", {
   slim <- slim_terradish(fit)
   expect_equal(vcov(slim), vcov(fit))
   expect_equal(confint(slim), confint(fit))
-  expect_equal(nobs(fit), 45)
+  # sample size is the 10 focal sites, not the 45 site pairs
+  expect_equal(nobs(fit), 10)
+  expect_equal(as.numeric(BIC(fit)), -2 * fit$loglik + fit$df * log(10))
   expect_equal(rep(as.numeric(BIC(fit)), 2), suppressWarnings(aic_table(list(fit, fit), BIC = TRUE))$BIC)
   expect_error(confint(fit, parm = "missing"), "Unknown")
   expect_error(confint(fit, level = 1), "between")
