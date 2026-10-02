@@ -769,13 +769,15 @@
 #' map units. They are not direct estimates of dispersal distance, movement
 #' distance, home-range size, or the scale of a causal ecological process.
 #'
-#' Unlike the standard fixed-raster workflow, users generally should not call
-#' \code{\link{scale_covariates}} before fitting this model. The original raster
-#' values are needed so the Gaussian convolution can be applied at each proposed
-#' \code{sigma}. If \code{standardize = TRUE}, the smoothed raster values are
-#' centered and scaled after smoothing, which keeps conductance coefficients on
-#' a stable scale while still allowing \code{sigma} to be interpreted in map
-#' units.
+#' Unlike the standard fixed-raster workflow, pre-scaling with
+#' \code{\link{scale_covariates}} is unnecessary when
+#' \code{standardize = TRUE}: the supplied raster is smoothed at each proposed
+#' \code{sigma}, then its active-cell values are centered and scaled. Because
+#' \code{scale_covariates} applies a positive affine transformation to each
+#' layer, pre-scaling gives the same standardized smoothed values up to
+#' numerical tolerance. Supplying original values keeps the preprocessing and
+#' coefficient interpretation clear. With \code{standardize = FALSE},
+#' pre-scaling changes the covariate and coefficient units.
 #' With the default standardization, a coefficient is relative log conductance
 #' per standard deviation of the smoothed layer at the current sigma. The
 #' layer is re-standardized at every candidate sigma during fitting. The

@@ -141,10 +141,12 @@ coords <- melip.coords[keep]
 
 ### Step 1: Build a conductance surface with the original raster
 
-Unlike the standard fixed-raster workflow, we do **not** pre-scale the raster
-with `scale_covariates()` here. The Gaussian conductance model smooths the raw
-raster first, then standardizes the active-cell values internally at each
-parameter evaluation.
+Unlike the standard fixed-raster workflow, we do not need to pre-scale the
+raster with `scale_covariates()` here. At each parameter evaluation, the
+Gaussian conductance model smooths the supplied raster and then standardizes
+its active-cell values. Pre-scaling applies a positive affine transformation,
+so it gives the same standardized smoothed values up to numerical tolerance.
+We retain the original units to make the preprocessing easier to follow.
 
 ```{r surface}
 covariates <- melip.forestcover
@@ -162,8 +164,8 @@ Two details matter here:
 
 - `saveStack = TRUE` is required, because the Gaussian conductance model needs
   the retained raster stack as its smoothing domain.
-- We are fitting a smoothing scale for the raster itself, so the original
-  raster values need to be available.
+- The fitted smoothing scale is in map units, regardless of whether the raster
+  values were pre-scaled.
 
 ### Step 2: Create the Gaussian scale-aware conductance model
 

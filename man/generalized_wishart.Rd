@@ -94,9 +94,10 @@ same \eqn{\Sigma} parameterization but differ in what \code{S} represents:
 this function takes a \strong{squared-distance} matrix; \code{wishart_covariance}
 takes a \strong{covariance} matrix.  When the covariance and its implied
 distance representation carry the same information under the same centering,
-scaling, sites, and \code{nu}, the two models give likelihoods that differ
-only by a data-dependent constant. This equivalence does not make AIC values
-from arbitrary distance and covariance fits interchangeable.
+scaling, sites, and \code{nu}, the two functions return the same objective
+(up to numerical tolerance) because both use the same site-contrast
+likelihood and omit response-only normalizing terms. This equality does not
+make AIC values from arbitrary distance and covariance fits interchangeable.
 
 \eqn{F_{ST}} ratio estimators do not have Wishart degrees of freedom. A
 passed geometry check is necessary but does not establish this sampling

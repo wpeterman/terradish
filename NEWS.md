@@ -1,3 +1,12 @@
+terradish 0.0.61
+
+----------------
+* Clarified that Gaussian raster pre-scaling is unnecessary with internal
+  standardization, but does not change its smoothed standardized values.
+* Corrected the matched Wishart covariance and squared-distance help to state
+  that their implemented contrast objectives agree numerically.
+* Added a regression test for Gaussian pre-scaling equivalence.
+
 terradish 0.0.60
 ----------------
 * Bound Gaussian factory settings when the factory is created. Factories built
