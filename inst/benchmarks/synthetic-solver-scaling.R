@@ -1,4 +1,3 @@
-#!/usr/bin/env Rscript
 
 # Synthetic solver-scaling benchmark for terradish.
 #

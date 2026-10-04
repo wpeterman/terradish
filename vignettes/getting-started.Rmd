@@ -54,7 +54,7 @@ measurable covariates (rasters), we can:
 5.  Optimize the conductance and nuisance parameters by maximum
     likelihood.
 
-Version 0.1.0 focuses on symmetric resistance models with log-linear,
+Version 1.0.0 focuses on symmetric resistance models with log-linear,
 fixed-degree spline, or jointly estimated Gaussian-scale conductance.
 Environmental differences between sites can enter either MLPE or Wishart
 measurement models. Directional, selected-pair, hierarchical, and other

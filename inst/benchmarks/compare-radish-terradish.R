@@ -1,4 +1,3 @@
-#!/usr/bin/env Rscript
 
 # Compare original `radish` with `terradish` on 1 and 6 cores using
 # microbenchmark. Each package is benchmarked in its own fresh R session to

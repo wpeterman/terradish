@@ -1,4 +1,3 @@
-#!/usr/bin/env Rscript
 
 # Resumable benchmark for coarse-raster grid screening in terradish.
 #

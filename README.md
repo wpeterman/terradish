@@ -117,7 +117,7 @@ Directed conductance, hierarchical fields, site-specific drift terms, pair subse
 remotes::install_github("wpeterman/terradish@experimental")
 ```
 
-## Changes in 0.1.0
+## Changes in 1.0.0
 
 - The supported core concentrates on log-linear, Gaussian, and spline conductance with MLPE and contrast Wishart likelihoods.
 - Graphs use eight directions by default. Gaussian alignment, kernel bounds, spline prediction, and environmental kernels are corrected.

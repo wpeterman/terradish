@@ -203,7 +203,7 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
   defaults <- .terradish_landmark_control_defaults()
   control <- modifyList(defaults, control)
   if (!isTRUE(control$exact_refine))
-    stop("Unrefined approximations are not supported in terradish 0.1.0; available on the experimental branch.",
+    stop("Unrefined approximations are not supported in the terradish core; available on the experimental branch.",
          call. = FALSE)
 
   requested <- control$n_landmarks

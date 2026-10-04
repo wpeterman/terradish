@@ -1,10 +1,10 @@
 test_that("screening stages require full-graph refinement", {
   unrefined <- list(exact_refine = FALSE)
   expect_error(.normalize_coarse_raster_control(unrefined),
-               "not supported in terradish 0.1.0; available on the experimental branch",
+               "not supported in the terradish core; available on the experimental branch",
                fixed = TRUE)
   expect_error(.normalize_landmark_control(unrefined, n_focal = 12L),
-               "not supported in terradish 0.1.0; available on the experimental branch",
+               "not supported in the terradish core; available on the experimental branch",
                fixed = TRUE)
   expect_true(.normalize_coarse_raster_control(NULL)$exact_refine)
   expect_true(.normalize_landmark_control(NULL, 12L)$exact_refine)

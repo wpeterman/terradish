@@ -1,4 +1,3 @@
-#!/usr/bin/env Rscript
 
 # Focused benchmark for terradish direct CHOLMOD backends.
 #

@@ -31,7 +31,7 @@
   )
   control <- modifyList(defaults, control)
   if (!isTRUE(control$exact_refine))
-    stop("Unrefined approximations are not supported in terradish 0.1.0; available on the experimental branch.",
+    stop("Unrefined approximations are not supported in the terradish core; available on the experimental branch.",
          call. = FALSE)
   control$factor <- sort(unique(as.integer(control$factor)), decreasing = TRUE)
   if (!length(control$factor) || anyNA(control$factor) || any(control$factor < 1L))
