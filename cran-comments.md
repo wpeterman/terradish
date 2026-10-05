@@ -7,32 +7,34 @@ research prototypes remain on the experimental branch.
 
 ## Test environments
 
-- Windows 11 x86_64, R 4.6.1 (R-release): `R CMD check --as-cran`,
-  0 errors, 0 warnings, 1 NOTE (New submission).
-- Windows 11 x86_64, R 4.5.3 (R-oldrelease): `R CMD check --as-cran`,
-  0 errors, 0 warnings, 1 NOTE (New submission).
+- Windows 11 x86_64, R 4.6.1 (R-release): full `R CMD check --as-cran`
+  on the submission archive, 0 errors, 0 warnings, 1 NOTE (New submission).
+- Windows 11 x86_64, R 4.5.3 (R-oldrelease): full `R CMD check --as-cran`
+  on the preceding metadata candidate, 0 errors, 0 warnings, 1 NOTE
+  (New submission).
 
-Both checks used the same vignette-enabled `terradish_1.0.0.tar.gz` source
-archive (SHA-256 `224645503742cf2ab9811ccfad0186f308b0642b8b0fb7184d524134016adca9`,
-2,975,022 bytes). Each ran ordinary and `\donttest{}` examples, installed tests,
-all vignette rebuilds, and the PDF and HTML manuals. Installed tests reported
-814 passing expectations, no failures, 190 captured diagnostic warnings, and
-five intentional CRAN skips in each environment. The warnings did not produce
-package-check warnings. The source test suite also ran; after updating one
-test's obsolete version-string expectation, its focused rerun passed, and the
-final installed suites passed on both R versions. Spelling and URL checks
-passed.
+The submission archive is `terradish_1.0.0.tar.gz` (SHA-256
+`0d12f2b8b866a21a157f05f31fe09f891235e29701bcd3848e01123b34b011be`,
+2,975,048 bytes). The R 4.6.1 check ran ordinary and `\donttest{}` examples,
+installed tests, all vignette rebuilds, and the PDF and HTML manuals.
+Installed tests reported 814 passing expectations, no failures, 190 captured
+diagnostic warnings, and five intentional CRAN skips. The warnings did not
+produce package-check warnings. The R 4.5.3 check used the earlier archive
+(SHA-256 `224645503742cf2ab9811ccfad0186f308b0642b8b0fb7184d524134016adca9`),
+before the release date and Zenodo citation were corrected. The source test
+suite, spelling, and URL checks also passed on the prior candidate.
 
 The old-release check used a temporary private library containing landgraph
 0.0.3; no user package library was modified. The local R-release library also
 contains landgraph 0.0.3. R-hub Ubuntu R-release and macOS R-devel checks
 passed on earlier candidates differing only in benchmark script packaging.
-The R-hub Windows R-devel job for the final archive flagged CRLF line endings
-in its temporary Git checkout, although the submitted archive itself contains
+The R-hub Windows R-devel job for the prior archive flagged CRLF line endings
+in its temporary Git checkout, although that archive itself contains
 LF shell scripts and passed the local checks. The release branch now has a
-GitHub Actions workflow to check its committed source on Windows R-devel and
-other R platforms. Two sanitizer attempts stopped during dependency setup
-before checking terradish. Local checks are not CRAN acceptance.
+GitHub Actions workflow. Its six jobs passed on Windows R-release and R-devel,
+macOS R-release, and Ubuntu R-oldrelease, R-release, and R-devel for commit
+`396790f`. Two sanitizer attempts stopped during dependency setup before
+checking terradish. Local checks are not CRAN acceptance.
 
 ## Note explanation
 

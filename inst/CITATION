@@ -7,6 +7,6 @@ bibentry(
                person(c("Nathaniel", "S."), "Pope")),
   year     = sub("-.*", "", meta$Date),
   note     = paste("R package version", meta$Version),
-  doi      = "10.5281/zenodo.21225712",
-  url      = "https://doi.org/10.5281/zenodo.21225712"
+  doi      = "10.5281/zenodo.21225711",
+  url      = "https://doi.org/10.5281/zenodo.21225711"
 )

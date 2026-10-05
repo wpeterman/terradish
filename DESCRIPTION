@@ -2,7 +2,7 @@ Package: terradish
 Type: Package
 Title: Fast Gradient-Based Optimization of Resistance Surfaces
 Version: 1.0.0
-Date: 2026-10-03
+Date: 2026-10-05
 Language: en-US
 Authors@R: c(
   person(
@@ -32,7 +32,7 @@ Description: Maximum likelihood estimation of landscape conductance surfaces
   formulas, and simulation tools for study design. Works natively with 'terra'
   objects.
 URL: https://github.com/wpeterman/terradish,
-  https://doi.org/10.5281/zenodo.21225712
+  https://doi.org/10.5281/zenodo.21225711
 BugReports: https://github.com/wpeterman/terradish/issues
 License: BSD_3_clause + file LICENSE
 Depends: R (>= 4.3.0)

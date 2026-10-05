@@ -1,6 +1,6 @@
 # terradish <img src="man/figures/terradish-sticker.png" align="right" height="200"/>
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21225712.svg)](https://doi.org/10.5281/zenodo.21225712)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21225711.svg)](https://doi.org/10.5281/zenodo.21225711)
 
 terradish estimates landscape conductance surfaces from genetic data by maximum likelihood on a raster graph. It fits log-linear conductance models and can optionally estimate each covariate's Gaussian smoothing scale and spline shape. Models fit pairwise genetic distances through the MLPE likelihood, or allele-frequency covariance and squared distances derived from it through a Wishart likelihood on site contrasts. Both families accept the same pairwise environmental covariates alongside resistance. Exact sparse Cholesky and algebraic multigrid solvers handle large rasters. Fixed-domain spatial cross-validation compares conductance formulas.
 
