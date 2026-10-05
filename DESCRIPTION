@@ -27,9 +27,9 @@ Description: Maximum likelihood estimation of landscape conductance surfaces
   linked to pairwise genetic distances through maximum likelihood population
   effects models or to allele-frequency covariance through a Wishart likelihood
   on site contrasts, with the same pairwise distance and environment covariates
-  available in both. Provides exact sparse and algebraic multigrid solvers for
+  available in both. Provides exact sparse and iterative solvers for
   large rasters, fixed-domain spatial cross-validation for comparing conductance
-  formulas, and simulation tools for study design. Works natively with 'terra'
+  formulas, and simulation tools for study design. Works with 'terra'
   objects.
 URL: https://github.com/wpeterman/terradish,
   https://doi.org/10.5281/zenodo.21225711

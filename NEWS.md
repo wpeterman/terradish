@@ -14,6 +14,8 @@ terradish 1.0.0
   `nobs()` use the number of focal sites rather than site pairs.
 * Rebuilt the core documentation around model interpretation, response
   assumptions, predictive comparison, and limits on causal inference.
+* Reworded the package DESCRIPTION after CRAN incoming checks flagged two
+  spelling false positives. Package behavior is unchanged.
 
 terradish 0.0.62
 ----------------
