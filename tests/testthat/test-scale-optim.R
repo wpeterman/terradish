@@ -34,6 +34,9 @@ test_that("terradish_scale_optim evaluates a full grid of candidate scales", {
 })
 
 test_that("terra_radish_scale_optim alias supports coordinate search", {
+  # Coordinate search performs repeated refits; the two-point grid above
+  # retains a lightweight scale-optimizer check on CRAN.
+  skip_on_cran()
   dat <- melip_fixture(1:6)
   melip.Fst <- dat$melip.Fst
   covariates <- dat$covariates[["altitude"]]

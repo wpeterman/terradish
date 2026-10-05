@@ -4,7 +4,7 @@
 #   2. a tau2 grid point whose fit fails is skipped, not fatal.
 
 test_that("terradish() is quiet by default and verbose = TRUE turns the trace on", {
-  res <- fit_fixture(keep = 1:8)
+  res <- fit_fixture(keep = 1:8, aggregate_factor = 4)
   surface <- res$surface
   melip.Fst <- res$data$melip.Fst
 
@@ -29,7 +29,7 @@ test_that("terradish() is quiet by default and verbose = TRUE turns the trace on
 })
 
 test_that("an explicit verbose overrides control, and control alone still works", {
-  res <- fit_fixture(keep = 1:8)
+  res <- fit_fixture(keep = 1:8, aggregate_factor = 4)
   surface <- res$surface
   melip.Fst <- res$data$melip.Fst
 

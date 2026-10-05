@@ -16,6 +16,9 @@ terradish 1.0.0
   assumptions, predictive comparison, and limits on causal inference.
 * Reworded the package DESCRIPTION after CRAN incoming checks flagged two
   spelling false positives. Package behavior is unchanged.
+* Reduced CRAN check time with smaller, explicitly labeled vignette examples
+  and lightweight routine tests; longer numerical comparisons remain in the
+  extended test suite run by continuous integration.
 
 terradish 0.0.62
 ----------------

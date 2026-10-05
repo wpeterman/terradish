@@ -55,6 +55,17 @@ melip.altitude    <- terra::unwrap(melip.altitude)
 melip.forestcover <- terra::unwrap(melip.forestcover)
 melip.coords      <- terra::unwrap(melip.coords)
 
+# Keep live fits small. Select 12 sites in distinct cells of the coarsened
+# raster so each response row still maps to a unique focal cell.
+melip.altitude <- terra::aggregate(melip.altitude, fact = 4,
+                                   fun = mean, na.rm = TRUE)
+melip.forestcover <- terra::aggregate(melip.forestcover, fact = 4,
+                                      fun = mean, na.rm = TRUE)
+site_cells <- terra::cellFromXY(melip.altitude, terra::crds(melip.coords))
+keep <- which(!is.na(site_cells) & !duplicated(site_cells))[1:12]
+melip.Fst <- melip.Fst[keep, keep, drop = FALSE]
+melip.coords <- melip.coords[keep]
+
 covariates <- c(melip.altitude, melip.forestcover)
 names(covariates) <- c("altitude", "forestcover")
 covariates <- scale_covariates(covariates)
@@ -91,6 +102,11 @@ fit_full <- terradish(
   approximation_control = rec$approximation_control
 )
 ```
+
+The live results below come from this 12-site, coarsened teaching subset.
+They demonstrate comparison methods, not inference for the original
+37-site landscape. Refit the declared candidate set on the full data for a
+substantive analysis.
 
 ### A note on computational settings
 
@@ -357,11 +373,11 @@ space. This reveals:
 grid:
 
 ```{r likelihood-grid}
-# Define a 21 x 21 grid of (forestcover, altitude) combinations
+# Define a small 5 x 5 grid of (forestcover, altitude) combinations
 theta_grid <- as.matrix(
   expand.grid(
-    forestcover = seq(-1, 1, length.out = 21),
-    altitude    = seq(-1, 1, length.out = 21)
+    forestcover = seq(-1, 1, length.out = 5),
+    altitude    = seq(-1, 1, length.out = 5)
   )
 )
 
@@ -373,6 +389,10 @@ grid_result <- terradish_grid(
   measurement_model = mlpe
 )
 ```
+
+This coarse grid illustrates the method. For inference about peak location or
+multiple optima, increase the resolution around regions of interest and check
+that the conclusions persist.
 
 Plot the result as a heat map with contours:
 

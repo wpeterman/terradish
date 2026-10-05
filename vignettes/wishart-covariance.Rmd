@@ -241,6 +241,15 @@ melip.altitude    <- terra::unwrap(melip.altitude)
 melip.forestcover <- terra::unwrap(melip.forestcover)
 melip.coords      <- terra::unwrap(melip.coords)
 
+# Use a coarsened 12-site teaching landscape for the live simulation and fit.
+melip.altitude <- terra::aggregate(melip.altitude, fact = 4,
+                                   fun = mean, na.rm = TRUE)
+melip.forestcover <- terra::aggregate(melip.forestcover, fact = 4,
+                                      fun = mean, na.rm = TRUE)
+site_cells <- terra::cellFromXY(melip.altitude, terra::crds(melip.coords))
+keep <- which(!is.na(site_cells) & !duplicated(site_cells))[1:12]
+melip.coords <- melip.coords[keep]
+
 covariates <- c(melip.altitude, melip.forestcover)
 names(covariates) <- c("altitude", "forestcover")
 covariates <- scale_covariates(covariates)
@@ -250,6 +259,10 @@ surface <- conductance_surface(covariates, melip.coords, directions = 8)
 n_sites <- nrow(melip.coords)
 cat("Number of sampling sites:", n_sites, "\n")
 ```
+
+This synthetic response demonstrates the covariance workflow on the reduced
+graph. It is not an analysis of the full *Melipona* sample. Use a resolution
+and site set justified by the study design for substantive inference.
 
 ------------------------------------------------------------------------
 

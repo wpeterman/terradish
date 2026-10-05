@@ -6,7 +6,7 @@
 # arguments intact.
 
 test_that("radish() warns and forwards to terradish()", {
-  res <- fit_fixture(keep = 1:8)
+  res <- fit_fixture(keep = 1:8, aggregate_factor = 4)
   surface <- res$surface
   melip.Fst <- res$data$melip.Fst
 
@@ -31,7 +31,7 @@ test_that("radish() warns and forwards to terradish()", {
 })
 
 test_that("radish_algorithm() warns and forwards to terradish_algorithm()", {
-  res <- fit_fixture(keep = 1:8)
+  res <- fit_fixture(keep = 1:8, aggregate_factor = 4)
   surface <- res$surface
   S <- ifelse(res$data$melip.Fst < 0, 0, res$data$melip.Fst)
   f <- loglinear_conductance(~ altitude + forestcover, surface$x)
@@ -49,7 +49,7 @@ test_that("radish_algorithm() warns and forwards to terradish_algorithm()", {
 })
 
 test_that("radish_distance() and radish_grid() warn and forward", {
-  res <- fit_fixture(keep = 1:8)
+  res <- fit_fixture(keep = 1:8, aggregate_factor = 4)
   surface <- res$surface
   melip.Fst <- res$data$melip.Fst
   theta <- matrix(c(-0.3, 0.3), nrow = 1,

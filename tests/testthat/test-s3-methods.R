@@ -1,5 +1,13 @@
+# One small fit suffices for the independent S3-method checks below.
+# Reusing it avoids repeated graph construction and optimization on CRAN.
+s3_fixture <- fit_fixture(
+  keep = 1:8,
+  aggregate_factor = 4,
+  control = NewtonRaphsonControl(maxit = 2, verbose = FALSE)
+)
+
 test_that("S3 methods for terradish objects return consistent outputs", {
-  fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+  fx <- s3_fixture
   fit <- fx$fit
 
   expect_gt(length(capture.output(print(fit))), 0)
@@ -35,7 +43,7 @@ test_that("S3 methods for terradish objects return consistent outputs", {
 })
 
 test_that("anova compares fitted terradish models", {
-  fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+  fx <- s3_fixture
   surface <- fx$surface
   melip.Fst <- fx$data$melip.Fst
 
@@ -106,7 +114,7 @@ test_that("legacy radish wrapper warns and keeps compatibility classes", {
 })
 
 test_that("plot methods return expected objects", {
-  fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+  fx <- s3_fixture
   collect_plot_data <- function(obj) {
     if (inherits(obj, "ggplot"))
       return(obj$data)
@@ -176,7 +184,7 @@ test_that("plot methods return expected objects", {
 })
 
 test_that("plot assignment suppresses auto-printing until explicit print", {
-  fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+  fx <- s3_fixture
   p <- NULL
   assigned <- withVisible(p <- plot(fx$fit, type = "fit"))
   expect_false(assigned$visible)
@@ -185,7 +193,7 @@ test_that("plot assignment suppresses auto-printing until explicit print", {
 })
 
 test_that("marginal plots support covariate panel selection", {
-  fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+  fx <- s3_fixture
 
   marg <- plot(fx$fit, type = "marginal", data = fx$surface, n = 8,
                marginal_covariates = "altitude")
@@ -208,7 +216,7 @@ test_that("marginal plots support covariate panel selection", {
 })
 
 test_that("marginal plots can infer original covariate units from surface metadata", {
-  fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+  fx <- s3_fixture
 
   surface_scaled <- fx$surface
   attr(surface_scaled$stack, "terradish_scale") <- NULL
@@ -225,11 +233,22 @@ test_that("marginal plots can infer original covariate units from surface metada
                                 range(marg_orig_data$x))))
 
   x_ranges <- tapply(marg_orig_data$x, marg_orig_data$covariate, range)
+  data(melip, package = "terradish", envir = environment())
+  source_layers <- c(
+    terra::aggregate(terra::unwrap(melip.altitude), fact = 4,
+                     fun = mean, na.rm = TRUE),
+    terra::aggregate(terra::unwrap(melip.forestcover), fact = 4,
+                     fun = mean, na.rm = TRUE)
+  )
+  source_values <- terra::values(source_layers)
+  source_values <- source_values[stats::complete.cases(source_values), ,
+                                 drop = FALSE]
+  expected_ranges <- apply(source_values, 2, range)
   expect_equal(unname(x_ranges[["altitude (original scale)"]]),
-               c(-0.0001180684, 1.0632071528),
+               unname(expected_ranges[, 1]),
                tolerance = 1e-6)
   expect_equal(unname(x_ranges[["forestcover (original scale)"]]),
-               c(0.004033356, 0.94775),
+               unname(expected_ranges[, 2]),
                tolerance = 1e-6)
   expect_true(all(vapply(split(marg_orig_data$x, marg_orig_data$covariate),
                          function(z) !any(diff(z) < 0),
@@ -237,7 +256,7 @@ test_that("marginal plots can infer original covariate units from surface metada
 })
 
 test_that("marginal plots can clamp evaluation support to focal-site ranges", {
-  fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+  fx <- s3_fixture
   surface <- fx$surface
 
   focal <- unique(surface$demes)
@@ -280,7 +299,7 @@ test_that("marginal plots can clamp evaluation support to focal-site ranges", {
 })
 
 test_that("legacy-only radish classes dispatch S3 methods", {
-  fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+  fx <- s3_fixture
 
   fit <- fx$fit
   class(fit) <- "radish"

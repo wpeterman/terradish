@@ -129,7 +129,11 @@ More basis functions allow more flexible shapes but require more parameters to e
 
 ## Data preparation
 
-The rest of this vignette uses the bundled *Melipona* bee example with all 37 sampling sites.
+The rest of this vignette uses a 20-site teaching subset of the bundled
+*Melipona* bee example. We aggregate the rasters by a factor of four so the
+many live candidate fits remain quick to build. Model rankings from this
+subset are illustrative and should not be treated as results for the full
+37-site, original-resolution study.
 
 ```{r load-data}
 library(terradish)
@@ -150,10 +154,12 @@ Scale the raster covariates. This step is important for spline models because: (
 covariates <- c(melip.altitude, melip.forestcover)
 names(covariates) <- c("altitude", "forestcover")
 
-# Coarsen the demonstration graph so the many candidate fits remain suitable
-# for a package vignette. Use a scientifically justified resolution in an
-# applied analysis.
-covariates <- terra::aggregate(covariates, fact = 3, na.rm = TRUE)
+# Coarsen both covariates and retain sites in distinct focal cells.
+covariates <- terra::aggregate(covariates, fact = 4, na.rm = TRUE)
+site_cells <- terra::cellFromXY(covariates, terra::crds(melip.coords))
+keep <- which(!is.na(site_cells) & !duplicated(site_cells))[1:20]
+melip.Fst <- melip.Fst[keep, keep, drop = FALSE]
+melip.coords <- melip.coords[keep]
 
 # Center and scale each layer to mean 0, sd 1
 covariates <- scale_covariates(covariates)

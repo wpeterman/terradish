@@ -1,4 +1,6 @@
 test_that("overstated fit information reduces coverage without changing the truth", {
+  # Thirty simulation replicates are retained in the extended suite.
+  skip_on_cran()
   g <- robustness_surface()
   args <- list(theta = c(x = 0.6), formula = ~x, data = g,
     sample_sizes = 6, strategies = "spacefill", nu = 50, nsim = 30,

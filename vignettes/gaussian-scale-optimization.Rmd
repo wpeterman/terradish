@@ -111,7 +111,7 @@ Two practical caveats are worth keeping in mind:
 We will fit a small staged example using the `melip` data. To keep the vignette
 fast and stable, we will:
 
-- use only eight sampling sites
+- use only eight sampling sites and aggregate the rasters by a factor of four
 - start with one raster covariate (`forestcover`)
 - use `mlpe` as the measurement model, because the response matrix contains
   non-independent pairwise genetic distances
@@ -137,9 +137,19 @@ melip.coords <- terra::unwrap(melip.coords)
 keep <- 1:8
 melip.Fst <- melip.Fst[keep, keep, drop = FALSE]
 coords <- melip.coords[keep]
+# Aggregate both layers identically so the two stages use the same graph.
+melip.forestcover <- terra::aggregate(melip.forestcover, fact = 4,
+                                      fun = mean, na.rm = TRUE)
+melip.altitude <- terra::aggregate(melip.altitude, fact = 4,
+                                   fun = mean, na.rm = TRUE)
 ```
 
-### Step 1: Build a conductance surface with the original raster
+These fits illustrate the workflow on a coarsened subset. Their coefficients
+and smoothing scales should not be interpreted as estimates for the full
+37-site, original-resolution data set. For a substantive analysis, rebuild the
+surface at the resolution and site set specified by the study design.
+
+### Step 1: Build a conductance surface with the input raster
 
 Unlike the standard fixed-raster workflow, we do not need to pre-scale the
 raster with `scale_covariates()` here. At each parameter evaluation, the

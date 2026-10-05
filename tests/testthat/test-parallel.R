@@ -1,3 +1,7 @@
+## PSOCK startup and cross-core fits are exercised in the extended test suite.
+## Keep CRAN's routine check focused on single-core numerical contracts.
+skip_on_cran()
+
 test_that("terradish respects cores argument", {
   dat <- melip_fixture(1:12)
   melip.Fst <- dat$melip.Fst

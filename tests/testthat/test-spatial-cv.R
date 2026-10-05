@@ -14,6 +14,8 @@ test_that("terradish_folds is reproducible and preserves the random seed", {
 })
 
 test_that("fixed-domain cross-validation scores trained and baseline models", {
+  # Three refits plus checkpoint replay are covered by the extended suite.
+  skip_on_cran()
   dat <- melip_fixture(1:9)
   melip.Fst <- dat$melip.Fst
   surface <- conductance_surface(dat$covariates, dat$coords)

@@ -185,6 +185,23 @@ points(melip.coords, pch = 19, cex = 0.8, col = 'red')
 
 ------------------------------------------------------------------------
 
+## Use a small teaching subset for the fitted models
+
+The plots above show all 37 sites on the original rasters. The live fits
+below use the first eight sites and rasters aggregated by a factor of four.
+This keeps the vignette quick to build. The fitted values illustrate how to
+use the functions; they are not estimates for the full study area and sample.
+
+```{r teaching-subset}
+keep <- 1:8
+melip.Fst <- melip.Fst[keep, keep, drop = FALSE]
+melip.coords <- melip.coords[keep]
+melip.altitude <- terra::aggregate(melip.altitude, fact = 4,
+                                   fun = mean, na.rm = TRUE)
+melip.forestcover <- terra::aggregate(melip.forestcover, fact = 4,
+                                      fun = mean, na.rm = TRUE)
+```
+
 ## Scale your rasters: an important step
 
 Conductance in the loglinear model is $\exp(\boldsymbol{\theta}^{\mathsf T}\mathbf{x})$. If `x` (e.g. altitude in
@@ -337,7 +354,9 @@ assessment <- terradish_assess_settings(
 assessment
 ```
 
-The printed output has three main parts:
+The printed output has three main parts. The illustration below comes from a
+full-resolution run with all 37 sites; counts and recommendations will differ
+for the teaching subset above and for your own landscape:
 
 ```         
 terradish setting assessment

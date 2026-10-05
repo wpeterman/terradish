@@ -1,4 +1,6 @@
 test_that("focal spline support and exact coarse refinement reuse the fitted basis", {
+  # This full-resolution double fit remains in the extended suite.
+  skip_on_cran()
   data(melip, package = "terradish", envir = environment())
   rasters <- c(terra::unwrap(melip.altitude), terra::unwrap(melip.forestcover))
   names(rasters) <- c("altitude", "forestcover")
