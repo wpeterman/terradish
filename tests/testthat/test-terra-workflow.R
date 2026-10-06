@@ -1,3 +1,6 @@
+# Extended terra integration regressions run in CI with NOT_CRAN=true.
+skip_on_cran()
+
 test_that("conductance_surface and conductance work with terra inputs", {
   fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
 

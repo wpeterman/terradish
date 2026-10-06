@@ -1,3 +1,6 @@
+# Extended inference regressions run in CI with NOT_CRAN=true.
+skip_on_cran()
+
 inference_fixture <- function() {
   set.seed(251)
   r <- terra::rast(nrows = 8, ncols = 8, xmin = 0, xmax = 8, ymin = 0, ymax = 8)

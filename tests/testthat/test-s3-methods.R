@@ -1,5 +1,8 @@
+# Extended S3 plotting and fit regressions run in CI with NOT_CRAN=true.
+skip_on_cran()
+
 # One small fit suffices for the independent S3-method checks below.
-# Reusing it avoids repeated graph construction and optimization on CRAN.
+# Reusing it avoids repeated graph construction and optimization in CI.
 s3_fixture <- fit_fixture(
   keep = 1:8,
   aggregate_factor = 4,

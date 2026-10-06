@@ -1,3 +1,6 @@
+# Extended stored-fit regressions run in CI with NOT_CRAN=true.
+skip_on_cran()
+
 test_that("slim_terradish reduces storage and retains inference methods", {
   fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
   fit <- fx$fit

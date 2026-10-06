@@ -1,3 +1,6 @@
+# Extended covariance-model fit and plotting regressions run in CI.
+skip_on_cran()
+
 test_that("wishart_covariance returns the full measurement-model interface", {
   E <- matrix(c(1.2, 0.3, 0.2,
                 0.3, 1.5, 0.4,

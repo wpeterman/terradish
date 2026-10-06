@@ -17,8 +17,9 @@ terradish 1.0.0
 * Reworded the package DESCRIPTION after CRAN incoming checks flagged two
   spelling false positives. Package behavior is unchanged.
 * Reduced CRAN check time with smaller, explicitly labeled vignette examples
-  and lightweight routine tests; longer numerical comparisons remain in the
-  extended test suite run by continuous integration.
+  and a short routine test set. Longer multi-fit integration, simulation,
+  solver, and plotting regressions remain in the full suite run by continuous
+  integration on Windows, macOS, and Linux.
 
 terradish 0.0.62
 ----------------

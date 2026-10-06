@@ -1,3 +1,6 @@
+# Simulation-based power regressions run in CI with NOT_CRAN=true.
+skip_on_cran()
+
 test_that("covariance_response_power summarizes spline recovery scenarios", {
   dat <- melip_fixture(keep = 1:7)
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)

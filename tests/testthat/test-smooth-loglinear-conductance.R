@@ -1,3 +1,6 @@
+# Extended smooth-model fit regressions run in CI with NOT_CRAN=true.
+skip_on_cran()
+
 test_that("smooth_loglinear_conductance expands smooth terms", {
   x <- data.frame(
     altitude = seq(-1, 1, length.out = 12),

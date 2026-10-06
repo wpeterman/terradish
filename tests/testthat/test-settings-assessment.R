@@ -1,3 +1,6 @@
+# Extended solver-assessment probes run in CI with NOT_CRAN=true.
+skip_on_cran()
+
 test_that("terradish_assess_settings profiles a graph and benchmarks direct solver settings", {
   dat <- melip_fixture(1:6)
   melip.Fst <- dat$melip.Fst

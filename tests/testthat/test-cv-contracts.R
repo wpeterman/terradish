@@ -1,3 +1,6 @@
+# Extended multi-fit CV regressions run in CI with NOT_CRAN=true.
+skip_on_cran()
+
 cv_contract_fixture <- function() {
   set.seed(19)
   r <- terra::rast(nrows = 9, ncols = 9, xmin = 0, xmax = 9, ymin = 0, ymax = 9,

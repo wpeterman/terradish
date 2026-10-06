@@ -1,3 +1,6 @@
+# Extended curvature regressions run in CI with NOT_CRAN=true.
+skip_on_cran()
+
 # Tests for the `curvature` argument (exact vs Gauss-Newton/Fisher) added to
 # terradish_algorithm() and terradish().
 

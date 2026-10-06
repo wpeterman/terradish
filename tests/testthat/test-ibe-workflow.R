@@ -1,3 +1,6 @@
+# Extended IBE/IBR fit regressions run in CI with NOT_CRAN=true.
+skip_on_cran()
+
 test_that("pairwise endpoint covariates can be built from raster values", {
   data(melip, package = "terradish")
   melip.altitude <- terra::unwrap(melip.altitude)

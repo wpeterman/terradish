@@ -1,3 +1,6 @@
+# Extended multi-fit selection regressions run in CI with NOT_CRAN=true.
+skip_on_cran()
+
 test_that("aic_table ranks fitted terradish models across supported criteria", {
   fx <- fit_fixture(control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
   surface <- fx$surface
