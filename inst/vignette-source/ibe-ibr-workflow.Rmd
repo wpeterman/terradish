@@ -11,15 +11,10 @@ vignette: >
   %\VignetteEncoding{UTF-8}
 ---
 
-The displayed results and figures in this guide were computed from the
-executable R Markdown source shipped with the package. Routine package
-checks use these precomputed results to keep the CRAN check time modest.
-To rerun every code chunk, copy `system.file("vignette-source", "ibe-ibr-workflow.Rmd", package = "terradish")` to a writable directory and render that copy with `rmarkdown::render()`.
-
----
-
-
-
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
+  fig.width = 6, fig.height = 4.5, warning = FALSE, message = FALSE)
+```
 
 ## What the joint model estimates
 
@@ -54,8 +49,7 @@ the `sqdiff` transform gives that special case.
 
 ## 1. Build a landscape and one pairwise design
 
-
-``` r
+```{r landscape}
 library(terradish)
 library(terra)
 
@@ -74,13 +68,6 @@ environment_pairs <- pairwise_endpoint_covariates(
 )
 z <- pairwise_covariates(environment_pairs, geographic = dist(coords))
 head(z)
-#>      absdiff_climate geographic
-#> [1,]      0.08970956   4.000000
-#> [2,]      0.92630800   7.000000
-#> [3,]      2.11393080   3.162278
-#> [4,]      2.38126394   3.605551
-#> [5,]      1.48252254   3.605551
-#> [6,]      0.24400532   4.000000
 ```
 
 **How to read the output.** Each row is an unordered site pair in R's
@@ -96,8 +83,7 @@ Choose the transform before fitting and retain it across families. A Wishart
 kernel must be positive semidefinite in site contrasts; the constructor rejects
 incompatible pairwise geometry rather than silently correcting it.
 
-
-``` r
+```{r measurement-models}
 g_mlpe <- mlpe_covariates(z)
 g_wishart <- wishart_covariates(z, model = "wishart_covariance")
 ```
@@ -113,8 +99,7 @@ information represented in two forms. This example draws from a declared
 Wishart model with landscape, climate, and geographic components. It does
 not imply that a generic genetic distance or F~ST~ follows that distribution.
 
-
-``` r
+```{r response}
 nu_demo <- 1000
 base <- simulate_covariance_response(c(x = 0.8), ~x, surface,
   tau = 1, sigma = 0.1, nu = nu_demo, seed = 301)
@@ -124,7 +109,6 @@ set.seed(301)
 S_cov <- stats::rWishart(1, df = nu_demo, Sigma = Sigma)[, , 1] / nu_demo
 S_dist <- dist_from_cov(S_cov)
 check_distance_response(S_dist)$admissible
-#> [1] TRUE
 ```
 
 The diagnostic checks distance geometry. Here the generating model also
@@ -139,8 +123,7 @@ environmental terms to it is therefore **IBD + IBE (uniform surface)**, not
 an IBE-only model. Geographic distance is an additional explicit measurement
 predictor; uniform-graph resistance is generally not Euclidean distance.
 
-
-``` r
+```{r fit-models}
 ctrl <- NewtonRaphsonControl(maxit = 100, verbose = FALSE)
 fit_ibd <- terradish(S_dist ~ 1, surface,
   measurement_model = mlpe, control = ctrl)
@@ -165,10 +148,6 @@ fits <- list(mlpe_ibd = fit_ibd, mlpe_uniform_ibe = fit_ibe,
   wishart_ibd = fit_w_ibd, wishart_uniform_ibe = fit_w_ibe,
   wishart_ibr = fit_w_ibr, wishart_joint = fit_w_joint)
 vapply(fits, function(fit) fit$convergence$code, numeric(1))
-#>            mlpe_ibd    mlpe_uniform_ibe            mlpe_ibr          mlpe_joint
-#>                   0                   0                   0                   0
-#>         wishart_ibd wishart_uniform_ibe         wishart_ibr       wishart_joint
-#>                   0                   0                   0                   0
 ```
 
 Interpret code 0 as numerical convergence under the stopping criteria.
@@ -178,78 +157,11 @@ surface unidentified; a zero environmental weight alone does not.
 
 ## 4. Read conditional conductance and environmental associations
 
-
-``` r
+```{r conditional-coefficients}
 rbind(MLPE_without_pairs = coef(fit_ibr), MLPE_with_pairs = coef(fit_joint),
       Wishart_without_pairs = coef(fit_w_ibr), Wishart_with_pairs = coef(fit_w_joint))
-#>                               x
-#> MLPE_without_pairs    0.6680284
-#> MLPE_with_pairs       0.8724362
-#> Wishart_without_pairs 0.5717631
-#> Wishart_with_pairs    0.9750254
 summary(fit_joint)
-#> Conductance surface with 64 vertices (12 focal) estimated by maximum likelihood
-#> Call:   terradish(formula = S_dist ~ x, data = surface, measurement_model = g_mlpe,
-#>     control = ctrl)
-#>
-#> Loglikelihood: 202.3103 (7 degrees freedom)
-#> AIC: -390.6205
-#>
-#> Number of function calls: 12
-#> Number of optimization steps: 4
-#> Convergence: converged | projected gradient: 1.27e-13
-#> Norm of gradient at MLE: 1.270095e-13
-#>
-#> Nuisance parameters (conditional on fitted conductance surface; measurement-model scale):
-#>                  Estimate   Std. Error  Lower 95%  Upper 95%
-#> alpha             0.196145   0.019870    0.157200   0.235090
-#> beta              1.285672   0.126366    1.038000   1.533345
-#> absdiff_climate   0.084677   0.004012    0.076814   0.092539
-#> geographic        0.042636   0.003393    0.035985   0.049287
-#> tau               6.750276   0.262462    6.235860   7.264692
-#> rho               0.066161   0.542338   -0.996802   1.129124
-#>
-#> Resistance-distance equivalent of one unit of environmental difference:
-#>        covariate      ratio          SE      lower      upper            family
-#>  absdiff_climate 0.06586175 0.007663448 0.05084167 0.08088183 gaussian_distance
-#>       geographic 0.03316249 0.005654669 0.02207954 0.04424544 gaussian_distance
-#> Coefficients:
-#>   Estimate Std. Error z value Pr(>|z|)
-#> x   0.8724     0.1450   6.016 1.79e-09 ***
-#> ---
-#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 summary(fit_w_joint)
-#> Conductance surface with 64 vertices (12 focal) estimated by maximum likelihood
-#> Call:   terradish(formula = S_cov ~ x, data = surface, measurement_model = g_wishart,
-#>     nu = nu_demo, control = ctrl)
-#>
-#> Loglikelihood: 644.3709 (5 degrees freedom)
-#> AIC: -1278.742
-#>
-#> Number of function calls: 19
-#> Number of optimization steps: 6
-#> Convergence: converged | projected gradient: 3.46e-14
-#> Norm of gradient at MLE: 3.463896e-14
-#>
-#> Nuisance parameters (conditional on fitted conductance surface; measurement-model scale):
-#>                         Estimate   Std. Error  Lower 95%  Upper 95%
-#> tau                      1.224681   0.124053    0.981541   1.467821
-#> lambda_absdiff_climate   0.093468   0.006626    0.080482   0.106454
-#> lambda_geographic        0.046175   0.004264    0.037818   0.054533
-#> sigma                   -2.310036   0.061823   -2.431206  -2.188865
-#>
-#> Resistance-distance equivalent of one unit of environmental difference:
-#>               covariate      ratio          SE      lower      upper
-#>  lambda_absdiff_climate 0.07632053 0.010350276 0.05603436 0.09660669
-#>       lambda_geographic 0.03770393 0.006839377 0.02429900 0.05110886
-#>              family
-#>  wishart_covariance
-#>  wishart_covariance
-#> Coefficients:
-#>   Estimate Std. Error z value Pr(>|z|)
-#> x   0.9750     0.1752   5.566 2.61e-08 ***
-#> ---
-#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
 
 **How to read the output.** A positive `x` coefficient means greater relative
@@ -265,15 +177,8 @@ An association in the opposite direction is represented at the zero bound.
 The Wishart summary marks that boundary and gives an approximate one-sided
 upper limit rather than a symmetric interval.
 
-
-``` r
+```{r response-change}
 mlpe_response_change(fit_joint)
-#>         covariate       low     high contrast  estimate  conf.low conf.high
-#> 1 absdiff_climate 0.2743825 2.256586 1.982203 0.1678463 0.1522608 0.1834318
-#> 2      geographic 2.2360680 7.211103 4.975035 0.2121161 0.1790279 0.2452042
-#>   conf.level
-#> 1       0.95
-#> 2       0.95
 ```
 
 This reports the MLPE response change over the stored 10th-to-90th-percentile
@@ -283,21 +188,10 @@ measurement assumptions.
 
 ### Compare IBE:IBR ratios
 
-
-``` r
+```{r ratios}
 ratios <- rbind(terradish_ibe_ratio(fit_joint),
                 terradish_ibe_ratio(fit_w_joint))
 ratios
-#>                covariate      ratio          SE      lower      upper
-#> 1        absdiff_climate 0.06586175 0.007663448 0.05084167 0.08088183
-#> 2             geographic 0.03316249 0.005654669 0.02207954 0.04424544
-#> 3 lambda_absdiff_climate 0.07632053 0.010350276 0.05603436 0.09660669
-#> 4      lambda_geographic 0.03770393 0.006839377 0.02429900 0.05110886
-#>               family
-#> 1  gaussian_distance
-#> 2  gaussian_distance
-#> 3 wishart_covariance
-#> 4 wishart_covariance
 ```
 
 The ratio is `gamma / beta` for MLPE and `lambda / tau` for Wishart. It is
@@ -319,31 +213,10 @@ does not establish causal IBE.
 
 Information criteria are computed separately within each likelihood family:
 
-
-``` r
+```{r information-criteria}
 labels <- c("IBD", "IBD + IBE (uniform surface)", "IBR", "IBR + pairwise terms")
 aic_table(list(fit_ibd, fit_ibe, fit_ibr, fit_joint), mod_names = labels)
-#>                         model K       AIC Delta_AIC AIC_wt Cum.wt   loglik
-#> 4        IBR + pairwise terms 7 -390.6205    0.0000 0.9999 0.9999 202.3103
-#> 2 IBD + IBE (uniform surface) 6 -371.5977   19.0228 0.0001 1.0000 191.7989
-#> 3                         IBR 5 -258.4388  132.1817 0.0000 1.0000 134.2194
-#> 1                         IBD 4 -246.4814  144.1391 0.0000 1.0000 127.2407
-#>   converged boundary
-#> 4      TRUE    FALSE
-#> 2      TRUE    FALSE
-#> 3      TRUE    FALSE
-#> 1      TRUE    FALSE
 aic_table(list(fit_w_ibd, fit_w_ibe, fit_w_ibr, fit_w_joint), mod_names = labels)
-#>                         model K        AIC Delta_AIC AIC_wt Cum.wt   loglik
-#> 4        IBR + pairwise terms 5 -1278.7417    0.0000      1      1 644.3709
-#> 2 IBD + IBE (uniform surface) 4 -1244.7385   34.0033      0      1 626.3692
-#> 3                         IBR 3  -672.7047  606.0371      0      1 339.3523
-#> 1                         IBD 2  -638.9348  639.8069      0      1 321.4674
-#>   converged boundary
-#> 4      TRUE    FALSE
-#> 2      TRUE    FALSE
-#> 3      TRUE    FALSE
-#> 1      TRUE    FALSE
 ```
 
 Lower AIC balances fit and parameter count within the declared candidate set.
@@ -353,26 +226,9 @@ have no common likelihood basis.
 
 ### Nested tests and boundaries
 
-
-``` r
+```{r nested-tests}
 anova(fit_ibr, fit_joint)
-#> Likelihood ratio test: chi-square (2 df)
-#> Null: ~ x
-#> Alt: ~ x
-#>      logLik Df  ChiSq Df(ChiSq)  Pr(>Chi)
-#> Null 134.22  5
-#> Alt  202.31  7 136.18         2 < 2.2e-16 ***
-#> ---
-#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 anova(fit_w_ibr, fit_w_joint)
-#> Likelihood ratio test: chi-bar-square, binomial weights (2 kernels; exact for information-orthogonal kernels, approximate otherwise)
-#> Null: ~ x
-#> Alt: ~ x
-#>      logLik Df  ChiSq Df(ChiSq)  Pr(>Chi)
-#> Null 339.35  3
-#> Alt  644.37  5 610.04         2 < 2.2e-16 ***
-#> ---
-#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
 
 Adding unconstrained MLPE slopes uses the ordinary chi-square reference under
@@ -383,20 +239,10 @@ and geographic kernels here need not be orthogonal. Wishart test magnitudes
 also depend on supplied `nu`; treat them as descriptive at that value.
 The uniform-surface IBE model and the IBR model are not nested in each other.
 
-
-``` r
+```{r nu-sensitivity}
 fit_w_lower_nu <- terradish_rescale_nu(fit_w_joint, nu = 50)
 rbind(primary = coef(fit_w_joint), sensitivity = coef(fit_w_lower_nu))
-#>                     x
-#> primary     0.9750254
-#> sensitivity 0.9750254
 terradish_ibe_ratio(fit_w_lower_nu)
-#>                covariate      ratio         SE       lower      upper
-#> 1 lambda_absdiff_climate 0.07632053 0.04628784 -0.01440198 0.16704303
-#> 2      lambda_geographic 0.03770393 0.03058662 -0.02224475 0.09765261
-#>               family
-#> 1 wishart_covariance
-#> 2 wishart_covariance
 ```
 
 Rescaling retains coefficient estimates and broadens uncertainty when `nu`
@@ -405,8 +251,7 @@ This is a sensitivity calculation, not estimation of effective information.
 
 ### Fixed-nuisance cross-validation
 
-
-``` r
+```{r fixed-cv, eval = FALSE}
 # Use the identical site folds for the plain and extended measurement models.
 folds <- terradish_folds(coords, k = 3, method = "random", seed = 42)
 cv_mlpe <- terradish_cv_folds(surface,
@@ -430,37 +275,24 @@ independent observations.
 
 ## 6. Visualize the joint model
 
-
-``` r
+```{r fit-plot, fig.cap = "Observed and fitted pairwise distances for the joint MLPE model."}
 plot(fit_joint, type = "fit")
 ```
-
-![Observed and fitted pairwise distances for the joint MLPE model.](precomputed/ibe-ibr-workflow-fit-plot-1.png)
 
 Agreement describes the fitted response summary. It does not show that the
 two spatial predictors identify distinct processes.
 
-
-``` r
+```{r surface-plot, fig.cap = "Relative conductance conditional on the pairwise climate and geographic terms."}
 plot(fit_joint, type = "surface", data = surface)
 ```
-
-![Relative conductance conditional on the pairwise climate and geographic terms.](precomputed/ibe-ibr-workflow-surface-plot-1.png)
-
-![Relative conductance conditional on the pairwise climate and geographic terms.](precomputed/ibe-ibr-workflow-surface-plot-2.png)
-
-![Relative conductance conditional on the pairwise climate and geographic terms.](precomputed/ibe-ibr-workflow-surface-plot-3.png)
 
 The map and its intervals concern the conductance component after including
 pairwise terms. Compare it with the fit omitting those terms before attributing
 the spatial pattern to landscape `x`.
 
-
-``` r
+```{r marginal-plot, fig.cap = "Conditional conductance association with landscape x."}
 plot(fit_joint, type = "marginal", data = surface)
 ```
-
-![Conditional conductance association with landscape x.](precomputed/ibe-ibr-workflow-marginal-plot-1.png)
 
 For weakly sampled tails, compare unclamped predictions with
 `support = "focal"`. Clamping uses focal-cell covariate limits and changes
@@ -468,8 +300,7 @@ prediction, not the fitted likelihood or the evidence for a mechanism.
 
 ## Quick reference
 
-
-``` r
+```{r quick-reference, eval = FALSE}
 # 1. Preserve identical transforms and site ordering across families.
 z <- pairwise_covariates(
   pairwise_endpoint_covariates(environment, transform = "absdiff", scale = TRUE),

@@ -14,15 +14,17 @@ editor_options:
     wrap: 72
 ---
 
-The displayed results and figures in this guide were computed from the
-executable R Markdown source shipped with the package. Routine package
-checks use these precomputed results to keep the CRAN check time modest.
-To rerun every code chunk, copy `system.file("vignette-source", "getting-started.Rmd", package = "terradish")` to a writable directory and render that copy with `rmarkdown::render()`.
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(
+  collapse = TRUE,
+  comment  = "#>",
+  fig.width  = 6,
+  fig.height = 4.5,
+  warning  = FALSE,
+  message  = FALSE
+)
 
----
-
-
-
+```
 
 ## What is terradish for?
 
@@ -103,8 +105,7 @@ also requires an analyst-supplied effective degrees of freedom, `nu`.
 
 ## Installation
 
-
-``` r
+```{r, eval = FALSE}
 # Released version
 install.packages("terradish")
 
@@ -118,8 +119,7 @@ package, `adegenet`, is used only by `pca_dist()` for turning `genind`
 genotype objects into a distance matrix; install it if you need that
 helper.
 
-
-``` r
+```{r, eval = FALSE}
 install.packages("adegenet")
 ```
 
@@ -127,8 +127,7 @@ install.packages("adegenet")
 
 ## Load the package and example data
 
-
-``` r
+```{r load}
 library(terradish)
 library(terra)
 ```
@@ -136,8 +135,7 @@ library(terra)
 `terradish` ships with example data from a study of *Melipona* bees in
 Brazil. Load everything with one call:
 
-
-``` r
+```{r data}
 data(melip)
 
 # The rasters are stored as "packed" objects to comply with CRAN policy;
@@ -158,21 +156,13 @@ What do we have?
   measure of genetic differentiation; larger values mean more
   differentiation).
 
-
-``` r
+```{r inspect-data}
 # How many sampling sites?
 nrow(melip.coords)
-#> [1] 37
 
 # Quick look at the genetic distance matrix
 # (only the first 5 x 5 block for readability)
 round(melip.Fst[1:5, 1:5], 3)
-#>       [,1]  [,2]  [,3]  [,4]  [,5]
-#> [1,] 0.000 0.009 0.104 0.048 0.075
-#> [2,] 0.009 0.000 0.109 0.049 0.078
-#> [3,] 0.104 0.109 0.000 0.052 0.066
-#> [4,] 0.048 0.049 0.052 0.000 0.038
-#> [5,] 0.075 0.078 0.066 0.038 0.000
 ```
 
 F~ST~ is symmetric (the differentiation between site A and site B is the
@@ -183,33 +173,26 @@ information.
 
 ## Visualize the spatial data
 
-
-``` r
+```{r plot-covariates, fig.cap = "***Altitude raster with sampling sites.***"}
 plot(melip.altitude, main = "Altitude (rescaled)")
 points(melip.coords, pch = 19, cex = 0.8, col = 'red')
 ```
 
-![***Altitude raster with sampling sites.***](precomputed/getting-started-plot-covariates-1.png)
-
-
-``` r
+```{r plot-forestcover, fig.cap = "***Forest cover raster (0 = no forest, 1 = full cover).***"}
 plot(melip.forestcover, main = "Forest cover")
 points(melip.coords, pch = 19, cex = 0.8, col = 'red')
 ```
-
-![***Forest cover raster (0 = no forest, 1 = full cover).***](precomputed/getting-started-plot-forestcover-1.png)
 
 ------------------------------------------------------------------------
 
 ## Use a small teaching subset for the fitted models
 
-The plots above show all 37 sites on the original rasters. The fitted examples
+The plots above show all 37 sites on the original rasters. The live fits
 below use the first eight sites and rasters aggregated by a factor of four.
 This keeps the vignette quick to build. The fitted values illustrate how to
 use the functions; they are not estimates for the full study area and sample.
 
-
-``` r
+```{r teaching-subset}
 keep <- 1:8
 melip.Fst <- melip.Fst[keep, keep, drop = FALSE]
 melip.coords <- melip.coords[keep]
@@ -226,8 +209,7 @@ meters) has a very large range, small changes in $\theta$ produce enormous
 changes in conductance, making optimization numerically unstable.
 **Always scale continuous covariates** before fitting.
 
-
-``` r
+```{r scale}
 covariates <- c(melip.altitude, melip.forestcover)
 names(covariates) <- c("altitude", "forestcover")
 covariates <- scale_covariates(covariates)
@@ -244,8 +226,7 @@ original units automatically.
 
 ## Build the conductance surface
 
-
-``` r
+```{r surface}
 surface <- conductance_surface(covariates, melip.coords, directions = 8)
 ```
 
@@ -261,21 +242,12 @@ surface <- conductance_surface(covariates, melip.coords, directions = 8)
 movement and is less sensitive to grid orientation than
 `directions = 4`.
 
-
-``` r
+```{r surface-check}
 # How many grid cells are in the graph?
 nrow(surface$x)
-#> [1] 1433
 
 # The covariate data for the first few cells
 head(surface$x)
-#>    altitude forestcover
-#> 1 -1.541981  -1.0061545
-#> 2 -1.590461  -0.6267880
-#> 3 -1.524037   0.2256962
-#> 4 -1.567606  -0.3593741
-#> 5 -1.537671  -0.3466381
-#> 6 -1.576870  -0.4427675
 ```
 
 ### Optional: reduce graph size for large rasters
@@ -285,8 +257,7 @@ landscapes, graph size becomes the main driver of runtime. If your
 sampling locations occupy only part of the raster, you can crop the
 raster to a buffered sampling extent before the graph is constructed:
 
-
-``` r
+```{r crop-buffer-example, eval=FALSE}
 surface_cropped <- conductance_surface(
   covariates,
   melip.coords,
@@ -307,8 +278,7 @@ Another speed option is a coarse-raster warm start. This fits the same
 model on aggregated rasters first, then refines the estimate on the
 full-resolution surface:
 
-
-``` r
+```{r coarse-raster-example, eval=FALSE}
 surface_for_coarse <- conductance_surface(
   covariates,
   melip.coords,
@@ -363,8 +333,7 @@ and solver can meaningfully reduce wall-clock time.
 The function does **not** change any package defaults and does **not**
 affect parameter estimation; only the computational path differs.
 
-
-``` r
+```{r assess-settings-demo, eval = FALSE}
 # saveStack = TRUE is required for the coarse-raster probe
 surface_for_assess <- conductance_surface(
   covariates, melip.coords,
@@ -417,8 +386,7 @@ Defaults comparison: Assessment matched terradish defaults.
 
 The `$recommended` list maps directly onto `terradish()` arguments:
 
-
-``` r
+```{r assess-use, eval = FALSE}
 fit_tuned <- terradish(
   melip.Fst ~ forestcover + altitude,
   data              = surface_for_assess,
@@ -437,8 +405,7 @@ You can also inspect and edit the list before using it. For example, to
 override the recommended `maxit` without losing the solver
 recommendation:
 
-
-``` r
+```{r assess-edit, eval = FALSE}
 my_control <- assessment$recommended$control
 my_control$maxit <- 50          # allow more iterations than the probe default
 
@@ -497,8 +464,7 @@ We will start with the simplest case: are altitude and forest cover
 conditionally associated with genetic differentiation through the fitted
 conductance model?
 
-
-``` r
+```{r fit-leastsquares}
 fit_ls <- terradish(
   melip.Fst ~ forestcover + altitude,  # formula: response ~ covariates
   data              = surface,          # the conductance surface
@@ -518,37 +484,8 @@ genetic distances as independent observations regressed on resistance
 distances. That is not strictly correct (measurements sharing a site are
 correlated), but it gives a useful exploratory or diagnostic fit.
 
-
-``` r
+```{r summary-ls}
 summary(fit_ls)
-#> Conductance surface with 1433 vertices (8 focal) estimated by maximum likelihood
-#> Call:   terradish(formula = melip.Fst ~ forestcover + altitude, data = surface,
-#>     conductance_model = loglinear_conductance, measurement_model = leastsquares)
-#>
-#> Loglikelihood: 112.8611 (5 degrees freedom)
-#> AIC: -215.7221
-#>
-#> Number of function calls: 22
-#> Number of optimization steps: 5
-#> Convergence: converged | projected gradient: 7.36e-13
-#> Norm of gradient at MLE: 8.762246e-13
-#>
-#> Nuisance parameters (conditional on fitted conductance surface; measurement-model scale):
-#>        Estimate   Std. Error  Lower 95%  Upper 95%
-#> alpha  -0.014001   0.006213   -0.026177  -0.001824
-#> beta    0.327014   0.024074    0.279830   0.374198
-#> tau     9.061504   0.267261    8.537682   9.585327
-#>
-#> Coefficients:
-#>             Estimate Std. Error z value Pr(>|z|)
-#> forestcover -0.31249    0.12442  -2.512    0.012 *
-#> altitude    -0.45364    0.09555  -4.748 2.06e-06 ***
-#> ---
-#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#>
-#> Correlation of Coefficients:
-#>          forestcover
-#> altitude    0.709798
 ```
 
 **How to read the output:**
@@ -575,8 +512,7 @@ sites A-B and A-C both involve site A. `mlpe` ("maximum likelihood
 population effects") accounts for this correlation structure and is the
 recommended choice for inference.
 
-
-``` r
+```{r fit-mlpe}
 fit_mlpe <- terradish(
   melip.Fst ~ forestcover + altitude,
   data              = surface,
@@ -585,35 +521,6 @@ fit_mlpe <- terradish(
 )
 
 summary(fit_mlpe)
-#> Conductance surface with 1433 vertices (8 focal) estimated by maximum likelihood
-#> Call:   terradish(formula = melip.Fst ~ forestcover + altitude, data = surface,
-#>     conductance_model = loglinear_conductance, measurement_model = mlpe)
-#>
-#> Loglikelihood: 115.4389 (6 degrees freedom)
-#> AIC: -218.8778
-#>
-#> Number of function calls: 20
-#> Number of optimization steps: 5
-#> Convergence: converged | projected gradient: 1.21e-11
-#> Norm of gradient at MLE: 1.216662e-11
-#>
-#> Nuisance parameters (conditional on fitted conductance surface; measurement-model scale):
-#>        Estimate    Std. Error  Lower 95%   Upper 95%
-#> alpha  -0.0128210   0.0069249  -0.0263935   0.0007514
-#> beta    0.3268905   0.0228992   0.2820090   0.3717720
-#> tau     8.9835660   0.3477203   8.3020467   9.6650853
-#> rho    -0.0368831   0.8120693  -1.6285096   1.5547435
-#>
-#> Coefficients:
-#>             Estimate Std. Error z value Pr(>|z|)
-#> forestcover  -0.3755     0.1741  -2.157 0.031041 *
-#> altitude     -0.4784     0.1269  -3.771 0.000163 ***
-#> ---
-#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-#>
-#> Correlation of Coefficients:
-#>          forestcover
-#> altitude   0.7468926
 ```
 
 Compare the point estimates and standard errors between `fit_ls` and
@@ -677,8 +584,7 @@ complexity. See `vignette("wishart-covariance", package = "terradish")` and
 
 ### Fitting with `generalized_wishart`
 
-
-``` r
+```{r fit-wishart}
 # Construct an admissible squared-distance response from a simulated positive
 # semidefinite covariance matrix. The same nu is used for simulation and fit.
 nu_gw <- 50
@@ -694,14 +600,6 @@ sim_gw <- simulate_covariance_response(
 gw_distance <- dist_from_cov(sim_gw$covariance)
 gw_check <- check_distance_response(gw_distance)
 gw_check[c("admissible", "relative_min_eigenvalue", "n_negative")]
-#> $admissible
-#> [1] TRUE
-#>
-#> $relative_min_eigenvalue
-#> [1] 1.45901e-16
-#>
-#> $n_negative
-#> [1] 0
 
 fit_gw <- terradish(
   gw_distance ~ forestcover + altitude,
@@ -712,32 +610,6 @@ fit_gw <- terradish(
 )
 
 summary(fit_gw)
-#> Conductance surface with 1433 vertices (8 focal) estimated by maximum likelihood
-#> Call:   terradish(formula = gw_distance ~ forestcover + altitude, data = surface,
-#>     conductance_model = loglinear_conductance, measurement_model = generalized_wishart,
-#>     nu = nu_gw)
-#>
-#> Loglikelihood: 36.76978 (4 degrees freedom)
-#> AIC: -65.53957
-#>
-#> Number of function calls: 16
-#> Number of optimization steps: 5
-#> Convergence: converged | projected gradient: 4.17e-12
-#> Norm of gradient at MLE: 5.645481e-12
-#>
-#> Nuisance parameters (conditional on fitted conductance surface; measurement-model scale):
-#>       Estimate  Std. Error  Lower 95%  Upper 95%
-#> [1,]   1.3603    0.3228      0.7276     1.9931
-#> [2,]  -1.9289    0.2207     -2.3614    -1.4964
-#>
-#> Coefficients:
-#>             Estimate Std. Error z value Pr(>|z|)
-#> forestcover   0.1417     0.3872   0.366    0.714
-#> altitude     -0.2915     0.3238  -0.900    0.368
-#>
-#> Correlation of Coefficients:
-#>          forestcover
-#> altitude   0.5996269
 ```
 
 **How to read the response check:** `admissible = TRUE` means the
@@ -767,27 +639,20 @@ not directly comparable to those of `leastsquares` or `mlpe`. Use
 differing in their conductance formula, or all `generalized_wishart`
 fits differing in their conductance formula).
 
-
-``` r
+```{r compare-measurement-models}
 # Valid: both use a Gaussian likelihood on pairwise distances.
 aic_table(
   list(fit_ls, fit_mlpe),
   mod_names = c("leastsquares", "mlpe")
 )
-#>          model K       AIC Delta_AIC AIC_wt Cum.wt   loglik converged boundary
-#> 2         mlpe 6 -218.8778    0.0000 0.8289 0.8289 115.4389      TRUE    FALSE
-#> 1 leastsquares 5 -215.7221    3.1557 0.1711 1.0000 112.8611      TRUE    FALSE
 ```
 
 ------------------------------------------------------------------------
 
 ## Extract and interpret coefficients
 
-
-``` r
+```{r coef}
 coef(fit_mlpe)
-#> forestcover    altitude
-#>  -0.3754790  -0.4783884
 ```
 
 The log-linear conductance model means:
@@ -801,54 +666,23 @@ You can convert back from the log scale to a relative conductance ratio.
 For example, a one standard-deviation increase in forest cover
 multiplies conductance by $\exp(\theta_{\mathrm{forestcover}})$:
 
-
-``` r
+```{r interpret}
 theta <- coef(fit_mlpe)
 cat("One SD increase in forest cover multiplies conductance by",
     round(exp(theta["forestcover"]), 2), "\n")
-#> One SD increase in forest cover multiplies conductance by 0.69
 cat("One SD increase in altitude multiplies conductance by",
     round(exp(theta["altitude"]), 2), "\n")
-#> One SD increase in altitude multiplies conductance by 0.62
 ```
 
 ------------------------------------------------------------------------
 
 ### Uncertainty and convergence
 
-
-``` r
+```{r coefficient-uncertainty}
 vcov(fit_mlpe)
-#>             forestcover   altitude
-#> forestcover  0.03031471 0.01649763
-#> altitude     0.01649763 0.01609435
 confint(fit_mlpe)
-#>                  2.5 %      97.5 %
-#> forestcover -0.7167307 -0.03422735
-#> altitude    -0.7270363 -0.22974049
 fit_mlpe$convergence
-#> $code
-#> [1] 0
-#>
-#> $message
-#> [1] "converged"
-#>
-#> $iterations
-#> [1] 5
-#>
-#> $max_abs_projected_gradient
-#> [1] 1.210835e-11
-#>
-#> $criterion
-#> [1] "projected_gradient"
-#>
-#> $boundary
-#> [1] FALSE
-#>
-#> $restarted
-#> [1] FALSE
 fit_mlpe$fit$subproblem$convergence
-#> [1] 0
 ```
 
 **How to read the output.** `vcov()` gives the covariance of the conductance
@@ -886,12 +720,9 @@ Numerical convergence alone does not establish model adequacy.
 The `plot()` S3 method with `type = "fit"` produces an
 observed-vs-fitted scatter plot with a least-squares regression line:
 
-
-``` r
+```{r plot-fit, fig.cap = "***Observed vs. resistance-distance-fitted genetic distances.***"}
 plot(fit_mlpe, type = "fit")
 ```
-
-![***Observed vs. resistance-distance-fitted genetic distances.***](precomputed/getting-started-plot-fit-1.png)
 
 ### Fitted conductance surface
 
@@ -900,16 +731,9 @@ alongside its lower and upper confidence interval bounds in a single
 three-panel figure. All panels share the same color scale so relative
 differences are easy to read:
 
-
-``` r
+```{r conductance-surface, fig.cap = "***Estimated conductance surface with 95% confidence interval bounds.***"}
 plot(fit_mlpe, type = "surface", data = surface)
 ```
-
-![***Estimated conductance surface with 95% confidence interval bounds.***](precomputed/getting-started-conductance-surface-1.png)
-
-![***Estimated conductance surface with 95% confidence interval bounds.***](precomputed/getting-started-conductance-surface-2.png)
-
-![***Estimated conductance surface with 95% confidence interval bounds.***](precomputed/getting-started-conductance-surface-3.png)
 
 Brighter cells have higher fitted relative conductance. Panels where the
 lower and upper bounds are close together indicate narrower conditional
@@ -924,14 +748,9 @@ response variable itself) rather than the intermediate conductance
 scale. Because genetic distance is the observed response that the model
 fits, this is usually the most directly interpretable view.
 
-
-``` r
+```{r marginal-effects, fig.cap = "***Marginal association of each covariate with predicted genetic distance, with predictive bands.***"}
 plot(fit_mlpe, data = surface)
 ```
-
-![***Marginal association of each covariate with predicted genetic distance, with predictive bands.***](precomputed/getting-started-marginal-effects-1.png)
-
-![***Marginal association of each covariate with predicted genetic distance, with predictive bands.***](precomputed/getting-started-marginal-effects-2.png)
 
 **How to read these plots**
 
@@ -976,14 +795,9 @@ conductance surface (without residual variation in the band, and on the
 conductance rather than genetic distance scale), use
 `type = "marginal"`:
 
-
-``` r
+```{r marginal-conductance, fig.cap = "***Marginal association of each covariate with conductance, with a 95% CI.***"}
 plot(fit_mlpe, type = "marginal", data = surface)
 ```
-
-![***Marginal association of each covariate with conductance, with a 95% CI.***](precomputed/getting-started-marginal-conductance-1.png)
-
-![***Marginal association of each covariate with conductance, with a 95% CI.***](precomputed/getting-started-marginal-conductance-2.png)
 
 Here the band is a **confidence interval** (delta-method, 95% pointwise)
 on the mean conductance, not a predictive interval; it reflects only
@@ -998,8 +812,7 @@ conductance maps can be dominated by extrapolation. `terradish` now
 supports focal-support clamping directly in both `plot()` and
 `conductance()`:
 
-
-``` r
+```{r support-clamp}
 # Clamp selected covariates to focal-site quantile support before plotting.
 plot(
   fit_mlpe,
@@ -1009,13 +822,6 @@ plot(
   support_probs = c(0.01, 0.99),
   clamp_covariates = c("altitude", "forestcover")
 )
-```
-
-![plot of chunk support-clamp](precomputed/getting-started-support-clamp-1.png)
-
-![plot of chunk support-clamp](precomputed/getting-started-support-clamp-2.png)
-
-``` r
 
 # Apply the same support rule to raster conductance prediction.
 cond_focal <- conductance(
@@ -1045,8 +851,7 @@ new surface rather than scaling each domain independently.
 
 ## Quick-reference: the full workflow in one block
 
-
-``` r
+```{r full-workflow, eval = FALSE}
 library(terradish)
 library(terra)
 

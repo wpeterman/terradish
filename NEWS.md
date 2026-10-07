@@ -20,6 +20,9 @@ terradish 1.0.0
   and a short routine test set. Longer multi-fit integration, simulation,
   solver, and plotting regressions remain in the full suite run by continuous
   integration on Windows, macOS, and Linux.
+* Precomputed the displayed results and figures in five computational guides
+  while shipping their full executable R Markdown sources. The remaining
+  guides continue to run during routine package checks.
 
 terradish 0.0.62
 ----------------
