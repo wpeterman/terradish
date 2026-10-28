@@ -12,6 +12,14 @@ radish_distance(...)
 \code{radish_distance()} compatibility wrapper to
 \code{\link{terradish_distance}}.}
 }
+\value{
+A list of class \code{terradish_grid} (also inheriting
+  \code{radish_grid}) containing the parameter grid \code{theta} and either
+  \code{distance}, an array of resistance distances, or \code{covariance},
+  an array of graph covariances when \code{covariance = TRUE}. The first two
+  array dimensions index focal sites; the third indexes parameter-grid rows.
+  See \code{\link{terradish_distance}}.
+}
 \description{
 Deprecated compatibility wrapper retained for older code that still calls
 \code{radish_distance()}.

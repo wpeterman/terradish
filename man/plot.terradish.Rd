@@ -87,7 +87,7 @@ A plot object that is returned visibly so base R auto-printing works as
 expected:
 \itemize{
   \item \code{"fit"}: a \code{ggplot} object with observed-vs-fitted
-    pairwise distances.
+    pairwise distances or genetic covariance, according to the response model.
   \item \code{"surface"}, \code{"marginal"}, \code{"marginal_response"},
     and \code{"sigma"}: either a single \code{ggplot} object (one panel) or
     a named list of \code{ggplot} objects (multiple panels), with one plot
@@ -122,7 +122,12 @@ Five plot types for objects returned by \code{\link{terradish}}:
     Covariance-response fits from \code{\link{wishart_covariance}} are shown
     as the average fitted genetic covariance over the modeled lower triangle.
     For Gaussian scale-aware conductance models, the predictive bands are
-    likewise conditional on the fitted \code{sigma} values.}
+    likewise conditional on the fitted \code{sigma} values. Each curve sets
+    one covariate to a common value in every cell. In a model with a
+    single covariate this makes conductance uniform, so the curve is the
+    \code{"marginal"} conductance curve inverted and rescaled; the plot is
+    most informative when other covariates still vary across the
+    landscape.}
   \item{\code{"sigma"}}{For Gaussian scale-aware conductance models, plots
     the fitted Gaussian kernel against distance for each \code{sigma} term,
     with a dashed line at the fitted distance containing 90\% of
@@ -138,6 +143,13 @@ For \code{type = "surface"}, \code{"marginal"}, and
 requested with \code{support = "focal"} to clamp selected covariates to
 empirical focal-site support before prediction.
 }
+\section{Worked examples}{
+
+\code{vignette("getting-started", package = "terradish")},
+\code{vignette("gaussian-scale-optimization", package = "terradish")},
+\code{vignette("spline-conductance", package = "terradish")}.
+}
+
 \examples{
 \donttest{
 data(melip)

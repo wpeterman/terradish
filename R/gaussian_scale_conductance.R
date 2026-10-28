@@ -812,6 +812,10 @@
 #'   can be supplied as the \code{conductance_model=} argument to
 #'   \code{\link{terradish}}.
 #'
+#' @section Worked example:
+#' See \code{vignette("gaussian-scale-optimization", package = "terradish")}
+#' for fitting, plotting, and interpreting smoothing scales on the pond landscape.
+#'
 #' @examples
 #' \donttest{
 #' data(melip)

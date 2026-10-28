@@ -65,7 +65,9 @@ for profiling nuisance parameters.}
 separately on each held-out block. \code{"fixed"} holds every measurement
 parameter, including environmental coefficients, at its training estimate.}
 
-\item{...}{Additional arguments passed to \code{\link{terradish}}.}
+\item{...}{Additional arguments passed to \code{\link{terradish}}. An
+explicit \code{optimizer} is used for each training fit. Otherwise the
+training call tries Newton and retries with BFGS if Newton raises an error.}
 }
 \value{
 An object of class \code{"terradish_cv_folds"}. Its \code{folds}
@@ -99,8 +101,14 @@ although ideal fitted rankings are invariant to its scale.
 
 Checkpoints include a signature of the response, graph, focal cells,
 covariates, model definitions, formulas, \code{nu}, and fold assignments.
+For factor covariates the signature retains class placement, levels, and
+contrasts. Uniform \code{~1} formulas are scored with unit conductance.
 A mismatched signature stops resumption. Nonconverged fits and failed scores
-count as failed folds. With fixed nuisance parameters, no-structure boundary
+count as failed folds. Training fits must record code 0 for both outer and
+final nuisance optimization; missing diagnostics also fail the fold.
+Checkpoints predating this convergence requirement are incompatible and
+must be recomputed (use a new checkpoint or \code{resume = FALSE}).
+With fixed nuisance parameters, no-structure boundary
 fits remain scoreable because predictions do not depend on conductance.
 A failed uniform-baseline score is recorded separately: model scores remain
 usable, but baseline gains are unavailable for that fold.
@@ -117,6 +125,13 @@ likelihood, folds, graph, and effective degrees of freedom. They are not a
 common scoring rule for comparing MLPE, generalized-Wishart distance, and
 covariance-Wishart models.
 }
+\section{Worked examples}{
+
+See \code{vignette("model-comparison", package = "terradish")} for pond
+comparisons and \code{vignette("individual-salamanders", package = "terradish")}
+for individual sampling, matched markers, and spatial prediction plots.
+}
+
 \examples{
 \donttest{
 r <- terra::rast(nrows = 8, ncols = 8, xmin = 0, xmax = 8,

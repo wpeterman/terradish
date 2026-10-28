@@ -1,14 +1,20 @@
 ---
-title: "Joint Gaussian Scale Optimization in terradish"
+title: "Gaussian Scale Optimization"
 author: "Bill Peterman"
 output:
   rmarkdown::html_vignette:
     number_sections: true
     toc: true
+    self_contained: true
+    mathjax: null
+    pandoc_args: ["--mathml"]
 vignette: >
-  %\VignetteIndexEntry{Joint Gaussian Scale Optimization in terradish}
+  %\VignetteIndexEntry{Gaussian Scale Optimization}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
+editor_options:
+  markdown:
+    wrap: 72
 ---
 
 The displayed results and figures in this guide were computed from the
@@ -21,210 +27,132 @@ To rerun every code chunk, copy `system.file("vignette-source", "gaussian-scale-
 
 
 
-## Why optimize sigma inside the model?
+**Goal.** Estimate the forest neighborhood in meters, read its uncertainty, and compare its predictions with those of a fixed neighborhood.
 
-The original `radish` workflow for raster smoothing usually worked in two steps:
+[`vignette("data-generation", package = "terradish")`](data-generation.html)
+explains the landscapes, SLiM histories, sampling, and matched markers used
+in these examples.
 
-1. Smooth each raster at several candidate scales.
-2. Fit a resistance model to each smoothed raster surface and compare the fits.
+## What question does a Gaussian scale answer?
 
-That approach is still useful, but it treats scale as an **outer** tuning
-parameter. The new native Gaussian conductance system in `terradish` moves the
-scale parameter into the conductance model itself, so the optimizer can update:
+A single 100 m cell may not capture the forest context that matters to
+gene exchange. A Gaussian smoother averages neighboring cells, weighting
+nearer cells more, and its standard deviation, $\sigma_{\mathrm{forest}}$,
+sets how broadly forest is averaged. `terradish` estimates that scale
+jointly with the conductance association. Start with
+[`vignette("getting-started", package = "terradish")`](getting-started.html)
+for genotype construction and the resistance-graph workflow.
 
-- the conductance coefficient(s), and
-- the smoothing scale(s)
+This guide uses the same 24 Ohio ponds and 2,500 SNPs, simulated with a
+500 m forest context (five cells on the 100 m grid). Do the genetic data
+support a similar context, and does estimating it improve prediction? The
+smoothing scale describes a raster transformation in this model, not
+necessarily a dispersal distance, home range, or barrier width.
 
-in the same likelihood calculation.
+<details>
+<summary>Optional: what the Gaussian smoother computes</summary>
 
-This vignette shows the current implementation of that idea using
-`gaussian_smoothed_loglinear_conductance()`.
+For each candidate scale, the model smooths the raw forest fraction and
+standardizes the result over the retained landscape:
 
----
+$$
+\bar f_{i,\sigma} = \frac{\sum_j w_{ij}(\sigma)f_j}
+ {\sum_j w_{ij}(\sigma)},\qquad
+w_{ij}(\sigma) \propto \exp\left(-\frac{d_{ij}^2}{2\sigma^2}\right),
+\qquad C_i = \exp(\theta_{\mathrm{forest}}z_{i,\sigma}).
+$$
 
-## What sigma means here
+Here $f_j$ is raw forest fraction, $d_{ij}$ is map distance between cells,
+and $z_{i,\sigma}$ is the standardized smoothed value. The kernel is finite
+and its available weights are renormalized, so boundary behavior and raster
+extent matter. The simulation used the same convention.
 
-For a raster covariate `x`, the Gaussian scale-aware model first smooths the
-raster with a Gaussian kernel and then uses the smoothed values in the usual
-log-linear conductance model.
+</details>
 
-Conceptually:
-
-$$C_i = \exp(\theta \cdot x_{i,\sigma})$$
-
-where:
-
-- $x_{i,\sigma}$ is the Gaussian-smoothed raster value at cell *i*,
-  standardized over retained cells after smoothing
-- $\theta$ is the conductance coefficient
-- $\sigma$ controls how broad the smoothing kernel is
-
-Small `sigma` means that the raster is averaged over a narrow neighborhood.
-Large `sigma` means that it is averaged over a broader neighborhood. The
-coefficient `theta` describes a one-standard-deviation change in that smoothed
-layer, with standardization recomputed at each trial scale. Its magnitude
-therefore needs to be interpreted jointly with `sigma`. Here,
-`sigma` is a Gaussian smoothing scale in the raster's map units. It is not an
-estimate of dispersal distance, home-range size, movement distance, or the
-spatial scale of a causal ecological process. Dispersal can average exposure
-over a neighborhood, so a fitted positive scale may reflect that averaging
-even when the underlying ecological response is local.
-
-### Are there limits on sigma?
-
-Yes. `terradish` now estimates `sigma` directly on its natural distance scale
-and fits it within explicit lower and upper bounds.
-
-By default, those bounds are data-derived:
-
-- the lower bound is half of the mean raster cell width
-- the upper bound is `min(nrow(raster), ncol(raster)) * mean(res(raster)) / 6`,
-  approximately one-sixth of the smaller raster dimension for square cells
-
-You can override those defaults with `sigma_lower =` and `sigma_upper =` when
-you create the conductance model. The kernel is truncated to a raster-sized
-window. The default upper bound keeps approximately three standard deviations
-inside half the smaller dimension; larger requested bounds issue a truncation
-warning. Near that upper bound the covariate can become almost constant, so
-scale and effect size may be weakly identified. The half-cell lower bound
-still smooths and is not equivalent to an unsmoothed raster.
-
-Internally, the optimizer now works on a converted sigma scale by default,
-using approximate cell-width units. The fitted coefficients and summaries are
-still reported back in map units for users, so the conversion helps the
-optimization without changing the interpretation target.
-
-Two practical caveats are worth keeping in mind:
-
-- factor-valued raster layers are rejected for this Gaussian conductance model
-  rather than being treated as scalable predictors
-- leverage / `partial_X` diagnostics are still unavailable, because the current
-  diagnostic machinery assumes a one-to-one match between conductance
-  parameters and design-matrix covariates
-
----
-
-## Worked example
-
-We will fit a small staged example using the `melip` data. To keep the vignette
-fast and stable, we will:
-
-- use only eight sampling sites and aggregate the rasters by a factor of four
-- start with one raster covariate (`forestcover`)
-- use `mlpe` as the measurement model, because the response matrix contains
-  non-independent pairwise genetic distances
-
-This is enough to show the practical workflow without making the vignette slow.
-The main goal here is not to maximize model complexity. Instead, we will use
-the staged workflow that is usually safest for real data:
-
-1. fit a one-raster Gaussian scale model
-2. compare it to a standard fixed-raster model
-3. only then add a second raster and inspect whether the fitted scales still
-   behave sensibly
+## Rebuild the shared response and graph
 
 
 ``` r
 library(terradish)
 library(terra)
+library(ggplot2)
+data(ohio_ponds)
+ponds <- ohio_ponds$ponds
+samples <- ohio_ponds$samples
+groups <- factor(samples$pond, levels = ponds$pond)
+N <- 2 * as.numeric(table(groups))
+stopifnot(all(N == N[1]))
+S <- cov_from_biallelic(rowsum(ohio_ponds$snp, groups, reorder = FALSE)[ponds$pond, , drop = FALSE], N) / N[1]
 
-data(melip)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.altitude <- terra::unwrap(melip.altitude)
-melip.coords <- terra::unwrap(melip.coords)
-
-keep <- 1:8
-melip.Fst <- melip.Fst[keep, keep, drop = FALSE]
-coords <- melip.coords[keep]
-# Aggregate both layers identically so the two stages use the same graph.
-melip.forestcover <- terra::aggregate(melip.forestcover, fact = 4,
-                                      fun = mean, na.rm = TRUE)
-melip.altitude <- terra::aggregate(melip.altitude, fact = 4,
-                                   fun = mean, na.rm = TRUE)
+# Retain raw forest for estimated smoothing, and the known fixed context
+# for a comparison on the identical graph. Neither layer is standardized here.
+x <- c(unwrap(ohio_ponds$covariates)[["forest"]],
+       unwrap(ohio_ponds$forest500))
+surface <- conductance_surface(x, ponds[c("x", "y")], directions = 8)
+terra::res(x)
+#> [1] 100 100
+range(terra::values(x[["forest"]]))
+#> [1] 0 1
 ```
 
-These fits illustrate the workflow on a coarsened subset. Their coefficients
-and smoothing scales should not be interpreted as estimates for the full
-37-site, original-resolution data set. For a substantive analysis, rebuild the
-surface at the resolution and site set specified by the study design.
+**How to read the output.** Map units are meters, and raw forest is a
+fraction from 0 to 1. Supply it unsmoothed, because the Gaussian model
+smooths and standardizes it at every candidate scale, and pre-smoothing
+would change the scale being estimated. Skip `scale_covariates()`, which
+would give the same fit and obscure the units.
 
-### Step 1: Build a conductance surface with the input raster
+The fixed `forest500` layer stays on its **raw fraction** scale, so its
+coefficient is per unit fraction, while the Gaussian coefficient is per
+one SD after smoothing. Both models share the response and graph, so their
+fit and predictive scores remain comparable.
 
-Unlike the standard fixed-raster workflow, we do not need to pre-scale the
-raster with `scale_covariates()` here. At each parameter evaluation, the
-Gaussian conductance model smooths the supplied raster and then standardizes
-its active-cell values. Pre-scaling applies a positive affine transformation,
-so it gives the same standardized smoothed values up to numerical tolerance.
-We retain the original units to make the preprocessing easier to follow.
+## Set interpretable scale bounds and fit
 
 
 ``` r
-covariates <- melip.forestcover
-names(covariates) <- "forestcover"
+gaussian_model <- gaussian_smoothed_loglinear_conductance(surface,
+  scale_vars = "forest", sigma_lower = 100, sigma_upper = 1500)
+control <- NewtonRaphsonControl(maxit = 200, ctol = 1e-8, ftol = 1e-8)
 
-surface <- conductance_surface(
-  covariates,
-  coords,
-  directions = 8,
-  saveStack = TRUE
-)
-```
-
-Two details matter here:
-
-- `saveStack = TRUE` is required, because the Gaussian conductance model needs
-  the retained raster stack as its smoothing domain.
-- The fitted smoothing scale is in map units, regardless of whether the raster
-  values were pre-scaled.
-
-### Step 2: Create the Gaussian scale-aware conductance model
-
-
-``` r
-gaussian_model <- gaussian_smoothed_loglinear_conductance(surface)
-```
-
-This conductance model will estimate two parameters:
-
-- `forestcover`: the conductance coefficient
-- `sigma.forestcover`: the Gaussian smoothing scale on the natural distance scale
-
-The same mechanism also supports interactions and polynomial terms after
-smoothing, but it is usually better to start with the simplest one-raster model
-you can justify.
-
-### Step 3: Fit the one-raster Gaussian scale model
-
-`optimizer = "auto"` currently resolves to BFGS for this conductance model.
-That is intentional: the native Gaussian scale path supports analytic
-gradients, and BFGS is the stable first optimizer for the joint
-vector of conductance coefficients (`theta`) and smoothing scales (`sigma`).
-
-
-``` r
-fit_gaussian <- terradish(
-  melip.Fst ~ forestcover,
-  data = surface,
+fit_gaussian <- terradish(S ~ forest, surface,
   conductance_model = gaussian_model,
-  measurement_model = mlpe,
-  optimizer = "auto",
-  leverage = FALSE,
-  control = NewtonRaphsonControl(maxit = 100, verbose = FALSE)
-)
-
-fit_gaussian
-#> Conductance surface estimated by maximum likelihood
-#> Call:   terradish(formula = melip.Fst ~ forestcover, data = surface,
-#>     conductance_model = gaussian_model, measurement_model = mlpe,
-#>     leverage = FALSE, optimizer = "auto", control = NewtonRaphsonControl(maxit = 100,
-#>         verbose = FALSE))
+  measurement_model = wishart_covariance, nu = 40,
+  theta = c(forest = 1, sigma.forest = 500),
+  optimizer = "bfgs", control = control)
+summary(fit_gaussian)
+#> Conductance surface with 10404 vertices (24 focal) estimated by maximum likelihood
+#> Call:   terradish(formula = S ~ forest, data = surface, conductance_model = gaussian_model,
+#>     measurement_model = wishart_covariance, nu = 40, theta = c(forest = 1,
+#>         sigma.forest = 500), optimizer = "bfgs", control = control)
+#>
+#> Loglikelihood: 141.3347 (4 degrees freedom)
+#> AIC: -274.6694
+#>
+#> Number of function calls: 24
+#> Number of optimization steps: 9
+#> Convergence: converged | projected gradient: 4.65e-10
+#> Norm of gradient at MLE: 4.653653e-10
+#>
+#> Gaussian scales (map units; no Wald test against zero):
+#>   layer estimate       SE lower_bound upper_bound near_bound
+#>  forest 480.0157 93.70678         100        1500      FALSE
+#> near_bound marks estimates within 1% of a bound.
+#>
+#> Nuisance parameters (conditional on fitted conductance surface; measurement-model scale):
+#>        Estimate  Std. Error  Lower 95%  Upper 95%
+#> tau     1.4993    0.1908      1.1254     1.8731
+#> sigma  -3.3796    0.7236     -4.7977    -1.9614
 #>
 #> Coefficients:
-#>       forestcover  sigma.forestcover
-#>           -0.2283             1.1700
+#>              Estimate Std. Error z value Pr(>|z|)
+#> forest         0.5884     0.1039    5.66 1.51e-08 ***
+#> sigma.forest 480.0157    93.7068      NA       NA
+#> ---
+#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 #>
-#> Loglikelihood: 111.9805 (6 degrees freedom)   AIC: -211.9611
-#> Convergence: converged | projected gradient: 1.35e-12
+#> Correlation of Coefficients:
+#>                  forest
+#> sigma.forest -0.3940096
 fit_gaussian$convergence
 #> $code
 #> [1] 0
@@ -233,532 +161,404 @@ fit_gaussian$convergence
 #> [1] "converged"
 #>
 #> $iterations
-#> [1] 10
+#> [1] 9
 #>
 #> $max_abs_projected_gradient
-#> [1] 1.350944e-12
+#> [1] 4.653466e-10
 #>
 #> $criterion
 #> [1] "projected_gradient"
 #>
 #> $boundary
-#> [1] TRUE
+#> [1] FALSE
 #>
 #> $restarted
 #> [1] FALSE
+fit_gaussian$fit$subproblem$convergence
+#> [1] 0
 ```
 
-### Optional speed-up: coarse-raster warm starts
+The 100 to 1,500 m bounds span one to 15 cells and include the simulated
+context. Set bounds from the raster resolution, domain, and question
+before interpreting the fit. Scales much smaller than a cell are hard to
+distinguish, and very broad scales flatten local variation. An estimate at
+a bound calls for checking identification and the landscape, not for
+reporting an ecological threshold.
 
-Gaussian scale optimization can be expensive because every likelihood
-evaluation has two costly pieces:
+**How to read the output.** Both convergence codes should be zero. The
+table below locates each parameter. Each smoothed layer gets a scale named
+`sigma.<layer>`, in meters. Do not confuse `sigma.forest` with the
+measurement parameter `sigma`.
 
-1. smooth the raster at the proposed `sigma`
-2. solve the graph Laplacian to get resistance distances
-
-For large rasters, you can ask `terradish()` to optimize first on one or more
-aggregated rasters and then refine the result on the original surface:
+| Parameter | Where it appears | What it measures |
+|---|---|---|
+| `forest` (theta) | `coef(fit_gaussian)` | Change in log conductance per SD of smoothed forest |
+| `sigma.forest` | `coef(fit_gaussian)`, meters | Width of the forest neighborhood (Gaussian sigma) |
+| `tau` | `summary(fit_gaussian)$phi` | Weight of the graph covariance |
+| `sigma` | `summary(fit_gaussian)$phi`, log scale | Log of the extra variance added to each pond |
+| `nu` | Supplied by you | Assumed information in `S`, here 40 |
 
 
 ``` r
-fit_gaussian_coarse <- terradish(
-  melip.Fst ~ forestcover,
-  data = surface,
-  conductance_model = gaussian_model,
-  measurement_model = mlpe,
-  approximation = "coarse_raster",
-  approximation_control = list(
-    factor = c(4, 2),
-    exact_refine = TRUE
-  ),
-  optimizer = "auto",
-  leverage = FALSE,
-  control = NewtonRaphsonControl(maxit = 100, verbose = FALSE)
-)
-```
-
-The coarse stages rebuild the Gaussian smoother on each aggregated raster, but
-they keep the full-resolution `sigma` bounds and unit conversion. That means a
-coarse-stage `sigma` is still interpreted in the original map units. With
-`exact_refine = TRUE`, the final model is not a coarse approximation; it is the
-full-resolution fit initialized from the coarse result.
-
-### Step 4: Inspect the fitted one-raster scale
-
-
-``` r
-coef(fit_gaussian)
-#>       forestcover sigma.forestcover
-#>        -0.2282588         1.1700000
-summary(fit_gaussian)$sigma_table
-#>         layer estimate       SE lower_bound upper_bound near_bound
-#> 1 forestcover     1.17 0.771114        0.09        1.17       TRUE
-confint(fit_gaussian)
-#>                       2.5 %     97.5 %
-#> forestcover       -0.553207 0.09668939
-#> sigma.forestcover  0.090000 1.17000000
-#> attr(,"note")
-#> [1] "Gaussian scale Wald intervals are truncated at the fitted bounds."
-```
-
-The conductance coefficient tells us whether smoothed forest cover is
-associated with higher or lower conductance. The scale parameter is already on
-its natural scale, so we can summarize it directly:
-
-
-``` r
-coef(fit_gaussian)[["sigma.forestcover"]]
-#> [1] 1.17
-```
-
-**How to read the output.** The scale table includes its estimate, standard
-error, and proximity to a fitting bound. Wald intervals from `confint()` are
-limited to those bounds; a bound-limited interval does not establish an
-interior optimum. Inspect the likelihood profile when scale is important:
-
-
-``` r
-# Refit the other parameters at a grid of fixed forest-cover scales.
-profile <- gaussian_scale_profile(fit_gaussian, "forestcover", n = 15)
-profile$interval
-confint(profile$fit)
-```
-
-The returned fit stores the profile interval. Increase grid resolution when
-the profile is irregular. Failed profile fits stop the calculation rather
-than being silently omitted. Boundary likelihood-ratio calibration remains
-approximate; report a bound-limited interval as such.
-
-`gaussian_scale_summary()` converts the fitted sigma values into:
-
-- the native raster distance scale
-- the internal optimization scale and its conversion factor
-- raster cell widths
-- one-dimensional Gaussian half-widths
-- two-dimensional radial extents that contain a chosen amount of kernel mass
-
-
-``` r
-gaussian_scale_summary(fit_gaussian)
-#>     covariate sigma sigma_lower sigma_upper sigma_internal sigma_conversion
-#> 1 forestcover  1.17        0.09        1.17            6.5             0.18
+scale_table <- gaussian_scale_summary(fit_gaussian, probabilities = c(0.5, 0.9))
+scale_table
+#>   covariate    sigma sigma_lower sigma_upper sigma_internal sigma_conversion
+#> 1    forest 480.0157         100        1500       4.800157              100
 #>   sigma_conversion_mode native_unit sigma_cells_x sigma_cells_y  axis_50
-#> 1                  cell     degrees           6.5           6.5 0.789153
-#>   radial_50  axis_95 radial_95
-#> 1   1.37757 2.293158  2.863864
+#> 1                  cell   map_units      4.800157      4.800157 323.7657
+#>   radial_50  axis_90 radial_90
+#> 1  565.1753 789.5556  1030.097
+c(estimated_context_m = coef(fit_gaussian)[["sigma.forest"]],
+  simulated_context_m = ohio_ponds$simulation$forest_sigma_m,
+  conductance_ratio_per_SD = exp(coef(fit_gaussian)[["forest"]]))
+#>      estimated_context_m      simulated_context_m conductance_ratio_per_SD
+#>               480.015731               500.000000                 1.801026
 ```
 
-That table is often the quickest way to interpret the fitted smoothing scale.
-For
-example, `radial_95` is the radius that contains approximately 95% of the
-untruncated Gaussian kernel mass, while `sigma_cells_x` and `sigma_cells_y` show how broad
-the smoothing kernel is relative to the raster resolution. These ideal
-Gaussian radii are descriptive; raster truncation and edge handling can
-change the realized weights.
+**How to read the scale summary.** The fitted scale is sigma =
+480 m
+(4.8 cells), close to the simulated
+500 m. Half of the kernel weight lies within
+565 m of a cell (`radial_50`) and 90% within
+1030 m (`radial_90`), so each cell's smoothed
+forest value mostly reflects forest within about
+1 km. The forest coefficient is on
+the log scale: a cell one SD above the landscape average has
+1.8 times the conductance of
+an average cell.
 
-You can also visualize the fitted kernel directly. The `sigma` plot shows the
-Gaussian weight curve over distance for each fitted scale parameter, with a
-vertical dashed line at the fitted distance containing 90% of the
-one-dimensional kernel mass and a shaded uncertainty band for that distance.
-Each panel is also annotated with:
+This fit starts at 500 m. With your own data, try several starting scales
+across the bounds, record their convergence, and resolve any
+log-likelihood disagreement before you interpret a profile.
 
-- the fitted `sigma`
-- the fitted 90% kernel-mass distance
-- the corresponding confidence interval bounds
+<details>
+<summary>Optional: axis and radial distances are different summaries</summary>
+
+`sigma_cells_x` and `sigma_cells_y` express the estimate in raster cells.
+`axis_*` distances hold the stated central probability of an ideal
+one-dimensional Gaussian, and `radial_*` distances hold it within a circle
+for an ideal two-dimensional Gaussian:
+
+$$d_{\mathrm{axis},p}=\sigma\Phi^{-1}((1+p)/2),\qquad
+d_{\mathrm{radial},p}=\sigma\sqrt{-2\log(1-p)}.$$
+
+At 90%, the radial distance is about $2.146\sigma$ and the axis distance
+about $1.645\sigma$. Both describe an ideal kernel, not movement quantiles
+or the weights retained where a raster boundary clips the kernel.
+
+</details>
+
+## Inspect scale uncertainty with a likelihood profile
+
+A standard error assumes symmetric uncertainty, so it can miss a lopsided
+likelihood or an estimate near a bound. A likelihood profile instead fixes
+the scale at a series of values and reoptimizes all other parameters at
+each one.
 
 
 ``` r
-plot(fit_gaussian, type = "sigma")
+profile <- gaussian_scale_profile(fit_gaussian, "forest", n = 15)
+profile$interval
+#>    lower    upper
+#> 310.9080 697.2514
+
+# The returned fit stores this profile interval for its scale parameter.
+profile_fit <- profile$fit
+confint(profile_fit)
+#>                    2.5 %      97.5 %
+#> forest         0.3846334   0.7920802
+#> sigma.forest 310.9080153 697.2513966
+#> attr(,"note")
+#> [1] "Stored Gaussian profile intervals are used where available; remaining scale intervals are truncated Wald intervals."
 ```
 
-![***Fitted Gaussian kernel with uncertainty band. The dashed line marks the distance containing 90% of the one-dimensional kernel mass.***](precomputed/gaussian-scale-optimization-sigma-plot-1.png)
-
-If you already know how to convert your map units into a more interpretable
-distance scale, you can relabel the plot directly. For example, if one map
-unit corresponds to one meter, then multiplying by `0.001` reports distances
-in kilometers. This conversion is only valid for a meter-based raster;
-do not apply it to longitude/latitude degrees:
+**How to read the interval.** The 95% profile interval runs from about
+311 to
+697 m under `nu = 40` and contains the
+simulated 500 m. It extends farther above the estimate than below, so
+report this interval, not a standard error, for scale. An endpoint at `sigma_lower` or `sigma_upper` means the data cannot
+exclude scales beyond that bound. If any profile point fails to converge or
+finds a better optimum than the fit, refit before you report the interval.
 
 
 ``` r
-plot(
-  fit_gaussian,
-  type = "sigma",
-  distance_per_map_unit = 0.001,
-  distance_unit = "km"
-)
+profile_plot <- transform(profile$grid,
+  loss = 2 * (as.numeric(logLik(fit_gaussian)) - logLik))
+ggplot(profile_plot, aes(sigma, loss)) +
+  geom_line() + geom_point(size = 1.5) +
+  geom_hline(yintercept = qchisq(0.95, 1), linetype = 2) +
+  geom_vline(xintercept = 500, color = "#0072B2", linetype = 3) +
+  theme_bw() + labs(x = "Gaussian forest context (m)",
+                    y = "Twice the log-likelihood loss")
 ```
 
-### Step 5: Compare against a standard fixed-raster fit
+![***Profile support for forest context.*** The curve shows twice the log-likelihood loss relative to the fitted optimum. The horizontal line is the 95% one-parameter likelihood cutoff; the vertical line is the 500 m generating context.](precomputed/gaussian-scale-optimization-profile-plot-1.png)
 
-The scale-aware fit is easiest to interpret when it is compared directly to the
-same model without an estimated `sigma`.
+**How to read the plot.** A clear interior minimum means these data can
+distinguish the forest scale. A flat curve would mean many scales have
+similar support. The grid traces the shape, but the interval endpoints come
+from additional fits. Because broader context also changes the raster SD,
+interpret the conductance coefficient jointly with scale.
 
 
 ``` r
-fit_fixed <- terradish(
-  melip.Fst ~ forestcover,
-  data = surface,
-  conductance_model = loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer = "auto",
-  leverage = FALSE,
-  control = NewtonRaphsonControl(maxit = 100, verbose = FALSE)
-)
-
-fit_fixed
-#> Conductance surface estimated by maximum likelihood
-#> Call:   terradish(formula = melip.Fst ~ forestcover, data = surface,
-#>     conductance_model = loglinear_conductance, measurement_model = mlpe,
-#>     leverage = FALSE, optimizer = "auto", control = NewtonRaphsonControl(maxit = 100,
-#>         verbose = FALSE))
-#>
-#> Coefficients:
-#> forestcover
-#>     -0.7385
-#>
-#> Loglikelihood: 111.1118 (5 degrees freedom)   AIC: -212.2237
-#> Convergence: converged | projected gradient: 2.45e-09
+plot(profile_fit, type = "sigma") +
+  labs(x = "Distance (m)") +
+  theme(plot.margin = margin(6, 18, 6, 6))
 ```
+
+![***Fitted Gaussian kernel.*** The curve shows the weight given to forest at each distance from a cell. The dashed line marks the distance holding 90% of the weight along one axis. The shaded band and printed interval are Wald intervals for that distance, not the profile interval above.](precomputed/gaussian-scale-optimization-kernel-plot-1.png)
+
+## View conductance at the fitted scale
+
+The kernel plot shows the neighborhood used to smooth forest. The marginal
+plot shows how forest, averaged over that neighborhood, relates to fitted
+conductance.
 
 
 ``` r
-aic_table(
-  list(fit_gaussian, fit_fixed),
-  mod_names = c("Gaussian scale-aware", "Fixed raster")
-)
-#>                  model K       AIC Delta_AIC AIC_wt Cum.wt   loglik converged
-#> 2         Fixed raster 5 -212.2237    0.0000 0.5328 0.5328 111.1118      TRUE
-#> 1 Gaussian scale-aware 6 -211.9611    0.2626 0.4672 1.0000 111.9805      TRUE
-#>   boundary
-#> 2    FALSE
-#> 1     TRUE
+plot(profile_fit, type = "marginal", data = surface,
+     marginal_covariates = "forest") +
+  labs(x = "Forest fraction at fitted Gaussian scale", y = "Relative conductance")
 ```
 
-The two fits use the same response, sites, graph, and MLPE likelihood, so their
-AIC values have a common basis. The scale-aware model's parameter count includes
-the estimated smoothing scale. In a larger analysis, declare the candidate
-scale and formula set before comparing it, and report the search that was
-performed.
+![Forest and conductance at the estimated smoothing scale. The interval is conditional on that fitted scale.](precomputed/gaussian-scale-optimization-gaussian-marginal-1.png)
 
-Assess whether the scale is identified away from its bounds, whether the
-profile supports a useful range, and whether estimating it improves held-out
-prediction. With only eight sites this illustration cannot provide a strong
-spatial-transfer assessment. On a larger sampling design, use common folds
-and a distinct conductance factory for each candidate:
+**How to read the curve.** Its shape describes forest amount, while `sigma`
+describes how broadly forest was averaged. The band conditions on the fitted
+sigma, so it omits scale uncertainty, which the profile above addresses.
 
 
 ``` r
-# Center a local distance projection on the sampled Brazilian sites.
-lonlat <- terra::crds(terra::project(coords, "EPSG:4326"))
-local_crs <- sprintf("+proj=aeqd +lat_0=%f +lon_0=%f +datum=WGS84 +units=m",
-                     mean(lonlat[, 2]), mean(lonlat[, 1]))
-coords_projected <- terra::project(coords, local_crs)
-folds <- terradish_folds(coords_projected, k = 2, seed = 42)
-cv_scale <- terradish_cv_folds(
-  data = surface,
-  formulas = list(fixed = melip.Fst ~ forestcover,
-                  gaussian = melip.Fst ~ forestcover),
-  folds = folds, model = mlpe, nuisance = "fixed",
-  conductance_model = list(fixed = loglinear_conductance,
-                           gaussian = gaussian_model),
-  control = NewtonRaphsonControl(maxit = 100)
-)
-cv_scale$summary
+maps <- plot(profile_fit, type = "surface", data = surface)
+C <- conductance(surface, profile_fit)
+map_limits <- range(terra::values(C), na.rm = TRUE)
+
+# Keep all cells and share limits across the estimate and both bounds.
+for (p in maps) {
+  print(p + scale_fill_viridis_c(
+    trans = "log10", limits = map_limits,
+    breaks = c(0.01, 0.1, 0.5, 1, 2, 5, 10, 20),
+    name = "Conductance\n(log color scale)"
+  ))
+}
 ```
 
-Inspect failures and paired differences on common successful folds. A scale
-that improves in-sample fit but not prediction needs cautious interpretation.
+![Conductance estimate and model bounds after smoothing forest at the fitted scale. Colors use a shared logarithmic scale, with legend labels in conductance units.](precomputed/gaussian-scale-optimization-gaussian-map-1.png)
 
-### Step 6: Summarize the one-raster fit
+![Conductance estimate and model bounds after smoothing forest at the fitted scale. Colors use a shared logarithmic scale, with legend labels in conductance units.](precomputed/gaussian-scale-optimization-gaussian-map-2.png)
+
+![Conductance estimate and model bounds after smoothing forest at the fitted scale. Colors use a shared logarithmic scale, with legend labels in conductance units.](precomputed/gaussian-scale-optimization-gaussian-map-3.png)
+
+As in Getting Started, the three panels share one logarithmic color scale.
+The broad pattern matches the fixed 500 m map there, as expected from a
+fitted scale near 500 m.
+
+## Compare estimated and fixed context
 
 
 ``` r
-summary(fit_gaussian)
-#> Conductance surface with 1433 vertices (8 focal) estimated by maximum likelihood
-#> Call:   terradish(formula = melip.Fst ~ forestcover, data = surface,
-#>     conductance_model = gaussian_model, measurement_model = mlpe,
-#>     leverage = FALSE, optimizer = "auto", control = NewtonRaphsonControl(maxit = 100,
-#>         verbose = FALSE))
-#>
-#> Loglikelihood: 111.9805 (6 degrees freedom)
-#> AIC: -211.9611
-#>
-#> Number of function calls: 31
-#> Number of optimization steps: 10
-#> Convergence: converged | projected gradient: 1.35e-12
-#> Norm of gradient at MLE: 0.2675569
-#>
-#> Gaussian scales (map units; no Wald test against zero):
-#>        layer estimate       SE lower_bound upper_bound near_bound
-#>  forestcover     1.17 0.771114        0.09        1.17       TRUE
-#> near_bound marks estimates within 1% of a bound.
-#>
-#> Nuisance parameters (conditional on fitted conductance surface; measurement-model scale):
-#>        Estimate   Std. Error  Lower 95%  Upper 95%
-#> alpha  -0.011078   0.010225   -0.031119   0.008962
-#> beta    0.241837   0.016805    0.208900   0.274773
-#> tau     7.959384   0.451403    7.074650   8.844119
-#> rho     1.729476   0.628867    0.496920   2.962033
-#>
-#> Coefficients:
-#>                   Estimate Std. Error z value Pr(>|z|)
-#> forestcover        -0.2283     0.1658  -1.377    0.169
-#> sigma.forestcover   1.1700     0.7711      NA       NA
-#>
-#> Correlation of Coefficients:
-#>                   forestcover
-#> sigma.forestcover   0.1523604
+fit_uniform <- terradish(S ~ 1, surface,
+  measurement_model = wishart_covariance, nu = 40,
+  optimizer = "bfgs", control = control)
+fit_fixed <- terradish(S ~ forest500, surface,
+  measurement_model = wishart_covariance, nu = 40,
+  optimizer = "bfgs", control = control)
+aic_table(list(fit_uniform, fit_fixed, fit_gaussian),
+  mod_names = c("uniform", "fixed500", "estimated"))
+#>       model K       AIC Delta_AIC AIC_wt Cum.wt   loglik converged boundary
+#> 2  fixed500 3 -276.6249    0.0000 0.7267 0.7267 141.3124      TRUE    FALSE
+#> 3 estimated 4 -274.6694    1.9555 0.2733 1.0000 141.3347      TRUE    FALSE
+#> 1   uniform 2 -203.5238   73.1011 0.0000 1.0000 103.7619      TRUE    FALSE
 ```
 
-For this conductance model, the coefficient table includes both:
+**How to read the table.** Both forest models beat uniform conductance by
+more than 70 AIC units. The estimated-scale model nearly matches the
+log-likelihood of the true 500 m layer, so its `Delta_AIC` of about 2 is
+the penalty for one extra parameter. Models within 2 AIC units of the best
+have comparable support. With field data the true scale is unknown, which
+is why you estimate it.
 
-- the conductance coefficient, and
-- `sigma`
+## Evaluate prediction in whole held-out ponds
 
-So the scale parameter is treated just like any other model parameter in the
-joint optimization.
-
-### Step 7: Recover the fitted conductance surface
-
-Once the model is fitted, the usual conductance helper still works.
+The three provided blocks keep whole ponds together, because an ordinary
+pairwise split would leak shared-site information. First verify that no
+immediate pedigree relationships cross blocks. If any do, redefine the
+blocks or purge related training samples before fitting.
 
 
 ``` r
-fitted_conductance <- conductance(surface, fit_gaussian)
-fitted_conductance
-#> class       : SpatRaster
-#> size        : 39, 45, 3  (nrow, ncol, nlyr)
-#> resolution  : 0.18, 0.18  (x, y)
-#> extent      : -42.9125, -34.8125, -9.4975, -2.4775  (xmin, xmax, ymin, ymax)
-#> coord. ref. : +proj=longlat +ellps=WGS84 +towgs84=0,0,0,0,0,0,0 +no_defs
-#> source(s)   : memory
-#> names       :      est,  lower95,  upper95
-#> min values  : 0.475606, 0.164754, 1.014295
-#> max values  : 1.431653, 0.993076, 2.407759
+animal_fold <- ponds$fold[match(samples$pond, ponds$pond)]
+relations <- lapply(seq_len(nrow(samples)), function(i)
+  setdiff(unlist(samples[i, c("pedigree_id", "parent_1", "parent_2")]), -1))
+cross_block_kin <- sum(vapply(seq_len(nrow(samples) - 1L), function(i) {
+  j <- seq.int(i + 1L, nrow(samples))
+  sum(vapply(j[animal_fold[j] != animal_fold[i]], function(k)
+    length(intersect(relations[[i]], relations[[k]])) > 0, logical(1)))
+}, integer(1)))
+cross_block_kin
+#> [1] 0
 ```
 
-And we can plot the fitted conductance layer directly:
+The count is zero here. It covers only known immediate pedigree
+relationships, not deeper genetic independence. The blocks were fixed
+before fitting and are reused for every candidate.
 
 
 ``` r
-plot(fitted_conductance[[1]], main = "Fitted conductance")
-points(coords, pch = 19, col = "red")
+cv <- terradish_cv_folds(surface,
+  formulas = list(uniform = S ~ 1, fixed500 = S ~ forest500,
+                  estimated = S ~ forest),
+  folds = ponds$fold, model = wishart_covariance, nu = 40,
+  conductance_model = list(uniform = loglinear_conductance,
+    fixed500 = loglinear_conductance, estimated = gaussian_model),
+  nuisance = "fixed", keep_fits = "none", control = control)
+stopifnot(all(cv$results$error == ""),
+          all(cv$results$nuisance_iterations == 0))
+cv$results[, c("model", "fold", "n_train", "n_test", "loglik",
+               "loglik_gain", "nuisance_iterations", "error")]
+#>       model fold n_train n_test     loglik loglik_gain nuisance_iterations
+#> 1   uniform    3      14     10  58.752411    0.000000                   0
+#> 2   uniform    1      17      7  68.908763    0.000000                   0
+#> 3   uniform    2      17      7 -33.318439    0.000000                   0
+#> 4  fixed500    3      14     10  63.474314    4.721903                   0
+#> 5  fixed500    1      17      7  83.096136   14.187373                   0
+#> 6  fixed500    2      17      7  -6.286712   27.031727                   0
+#> 7 estimated    3      14     10  63.229022    4.476610                   0
+#> 8 estimated    1      17      7  82.949304   14.040541                   0
+#> 9 estimated    2      17      7 -11.030352   22.288087                   0
+#>   error
+#> 1
+#> 2
+#> 3
+#> 4
+#> 5
+#> 6
+#> 7
+#> 8
+#> 9
+cv$summary
+#>       model folds failed n_folds_ok total_loglik common_folds_total
+#> 1  fixed500     3      0          3    140.28374          140.28374
+#> 2 estimated     3      0          3    135.14797          135.14797
+#> 3   uniform     3      0          3     94.34274           94.34274
+#>   n_common_folds between_repeat_sd mean_loglik total_loglik_gain
+#> 1              3                NA    46.76125          45.94100
+#> 2              3                NA    45.04932          40.80524
+#> 3              3                NA    31.44758           0.00000
+#>   mean_loglik_gain se_difference mean_difference within_one_se
+#> 1         15.31367      0.000000        0.000000          TRUE
+#> 2         13.60175      1.516125       -1.711922         FALSE
+#> 3          0.00000      6.464866      -15.313668         FALSE
 ```
 
-![***Fitted conductance surface from the Gaussian scale-aware model, with sampling sites shown in red.***](precomputed/gaussian-scale-optimization-conductance-plot-1.png)
-
-When tails are weakly supported at focal sites, you can request focal-support
-clamping directly in prediction:
+**How to read these outputs.** With `nuisance = "fixed"`, every parameter
+is learned from the training ponds and held fixed on the test block, so
+confirm that every `error` is empty and every `nuisance_iterations` is
+zero. Every fold keeps the full landscape graph. Larger held-out
+log-likelihood is better, and `loglik_gain` is the improvement over
+uniform conductance in the same block. Compare models only on the same
+folds, response, likelihood, graph, and `nu`.
 
 
 ``` r
-fitted_conductance_focal <- conductance(
-  surface,
-  fit_gaussian,
-  support = "focal",
-  support_probs = c(0.01, 0.99),
-  clamp_covariates = "forestcover"
-)
+ggplot(cv$results, aes(model, loglik_gain, color = fold)) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_point(position = position_dodge(width = 0.3), size = 2.5) +
+  theme_bw() + labs(x = "Conductance candidate", y = "Held-out log-likelihood gain")
 ```
 
----
+![***Prediction relative to the uniform graph.*** Each point is one spatial block scored with training parameters held fixed. Blocks contain different numbers of ponds, so their raw gains need not have similar magnitude.](precomputed/gaussian-scale-optimization-cv-plot-1.png)
 
-## Stage 2: Add a second raster only after sigma looks sensible
+**How to read the plot.** Both forest models beat uniform conductance in
+every block. Summed over blocks, the fixed 500 m layer scores
+5.1
+log-likelihood units above the estimated scale, the price of estimating a
+scale you would not know in a field study. For long runs, `checkpoint`
+saves completed folds to a file you supply so an interrupted run can
+resume.
 
-Once the one-raster scale parameter looks stable enough to trust, we can add a
-second raster and inspect whether the scale estimates remain interpretable.
+## What to take to your own study
 
+The matched microsatellites use the same graph and scale model once you
+build their covariance with `cov_from_genetic_data()` as in Getting
+Started. Keep their likelihood and score comparisons separate from SNP
+results. Add another continuous
+raster only after you understand the one-layer profile, because extra
+coefficients and scales can compete for the same information.
 
-``` r
-covariates_two <- c(melip.altitude, melip.forestcover)
-names(covariates_two) <- c("altitude", "forestcover")
+Gaussian smoothing is for continuous layers. Averaging land-cover codes
+such as forest 41 and cropland 82 has no ecological meaning. Use factors
+for unsmoothed class contrasts, or derive continuous class proportions
+before estimating their context, as described in
+[`vignette("categorical-conductance", package = "terradish")`](categorical-conductance.html).
 
-surface_two <- conductance_surface(
-  covariates_two,
-  coords,
-  directions = 8,
-  saveStack = TRUE
-)
-```
+<details>
+<summary>Quick reference: expand for the complete copyable workflow</summary>
 
-
-``` r
-fit_gaussian_two <- terradish(
-  melip.Fst ~ forestcover + altitude,
-  data = surface_two,
-  conductance_model = gaussian_smoothed_loglinear_conductance(surface_two),
-  measurement_model = mlpe,
-  optimizer = "auto",
-  leverage = FALSE,
-  control = NewtonRaphsonControl(maxit = 100, verbose = FALSE)
-)
-
-fit_gaussian_two
-#> Conductance surface estimated by maximum likelihood
-#> Call:   terradish(formula = melip.Fst ~ forestcover + altitude, data = surface_two,
-#>     conductance_model = gaussian_smoothed_loglinear_conductance(surface_two),
-#>     measurement_model = mlpe, leverage = FALSE, optimizer = "auto",
-#>     control = NewtonRaphsonControl(maxit = 100, verbose = FALSE))
-#>
-#> Coefficients:
-#>       forestcover           altitude  sigma.forestcover     sigma.altitude
-#>           -0.4123            -0.4819             1.0525             0.0900
-#>
-#> Loglikelihood: 116.7616 (8 degrees freedom)   AIC: -217.5232
-#> Convergence: converged | projected gradient: 0.000112
-```
-
-
-``` r
-gaussian_scale_summary(fit_gaussian_two)
-#>     covariate   sigma sigma_lower sigma_upper sigma_internal sigma_conversion
-#> 1 forestcover 1.05253        0.09        1.17        5.84739             0.18
-#> 2    altitude 0.09000        0.09        1.17        0.50000             0.18
-#>   sigma_conversion_mode native_unit sigma_cells_x sigma_cells_y    axis_50
-#> 1                  cell     degrees       5.84739       5.84739 0.70992086
-#> 2                  cell     degrees       0.50000       0.50000 0.06070408
-#>   radial_50   axis_95 radial_95
-#> 1 1.2392597 2.0629214 2.5763276
-#> 2 0.1059669 0.1763968 0.2202972
-```
-
-This is exactly the point where the staged workflow helps. If one or more
-sigma estimates now collapse to the lower bound, or drift toward the upper
-bound, that is useful information. It suggests one of several things:
-
-- the added raster may not need smoothing at all
-- the data may not support estimating multiple scales simultaneously
-- the smaller one-raster scale was not as stable as it first appeared
-
-Check convergence separately from boundary status. A converged boundary fit
-can indicate limited scale information or preference for an extreme allowed
-scale. A nonconverged fit requires numerical investigation before ecological
-interpretation.
-
-In the small `melip` subset used here, that is exactly the kind of pattern to
-watch for: the one-raster `forestcover` scale can be inspected on its own
-before adding `altitude`. After `altitude` is added, one or both fitted scale
-parameters may move toward the lower bound, which is a cue to
-proceed cautiously rather than immediately adding more landscape terms.
-
----
-
-## Outer scale searches
-
-`terradish_scale_optim()` remains available for an outer search, while joint
-Gaussian fitting provides derivatives and joint scale inference directly.
-Outer-search radii are in map units and the default outer kernel is Gaussian.
-A Gaussian standard deviation, a uniform-disk radius, and other kernel
-parameters represent different weighting functions even when their numeric
-values match. Record the kernel, units, search bounds, and estimated scales.
-The parameter count includes optimized scales; repeated searching is still
-part of the declared model-selection procedure. Prefer projected rasters
-when distances are to be interpreted in meters or kilometers.
-
-## Important current limitations
-
-This first version is intentionally focused. Right now it supports:
-
-- additive formulas made of raw numeric raster names
-- interactions among numeric raster names
-- polynomial/arithmetic terms such as `I(forestcover^2)`
-- one Gaussian scale parameter per selected raster
-- joint optimization through analytic gradients and BFGS
-- opt-in coarse-raster starts through `approximation = "coarse_raster"`
-
-It does **not yet** support:
-
-- factor-valued raster layers
-- leverage / `partial_X` diagnostics
-
-It does now support conditional-on-sigma marginal-association plotting, so you can
-inspect conductance and response-scale curves after fitting, but the leverage
-machinery is still intentionally disabled.
-
----
-
-## Where to go with your analysis
-
-If this workflow looks reasonable for your data, practical steps are:
-
-1. Fit a small one-raster model first and inspect `sigma`.
-2. Compare it to a standard fixed-raster `loglinear_conductance` fit.
-3. Add additional rasters only after the one-raster scale parameter behaves
-   sensibly.
-4. Treat boundary-hitting sigma estimates as a model-selection signal, not just
-   an optimization nuisance.
-5. Reproject rasters before interpreting smoothing distances, because
-   longitude/latitude rasters report sigma in degrees.
-
-This staged approach makes it easier to assess whether the likelihood identifies
-an interior Gaussian smoothing scale under the fitted model. An identified
-smoothing scale is not, by itself, an identified movement or ecological-process
-scale.
-
----
-
-
-## Quick reference: the full scale-optimization workflow
+## Quick reference: estimate and validate one Gaussian context
 
 
 ``` r
 library(terradish)
+library(terra)
+data(ohio_ponds)
+g <- factor(ohio_ponds$samples$pond, levels = ohio_ponds$ponds$pond)
+N <- 2 * as.numeric(table(g))
+S <- cov_from_biallelic(rowsum(ohio_ponds$snp, g, reorder = FALSE)[ohio_ponds$ponds$pond, , drop = FALSE], N) / N[1]
 
-# 1. Build the surface from the ORIGINAL raster; do not pre-smooth it
-surface <- conductance_surface(covariates, coords, directions = 8,
-                               saveStack = TRUE)
+# 1. Use raw forest; include fixed forest500 only for a common-graph comparison.
+x <- c(unwrap(ohio_ponds$covariates)[["forest"]], unwrap(ohio_ponds$forest500))
+graph <- conductance_surface(x, ohio_ponds$ponds[c("x", "y")])
+cm <- gaussian_smoothed_loglinear_conductance(graph,
+  scale_vars = "forest", sigma_lower = 100, sigma_upper = 1500)
 
-# 2. Scale-aware conductance model: sigma is estimated, not fixed. The model
-#    is built from the surface itself; sigma_upper bounds the search in map
-#    units, and defaults to the smaller raster dimension / 6 for square cells.
-cm <- gaussian_smoothed_loglinear_conductance(surface)
+# 2. Estimate context in meters and the log-conductance association jointly.
+fit <- terradish(S ~ forest, graph, conductance_model = cm,
+  measurement_model = wishart_covariance, nu = 40,
+  theta = c(forest = 1, sigma.forest = 500), optimizer = "bfgs",
+  control = NewtonRaphsonControl(maxit = 200, ctol = 1e-8, ftol = 1e-8))
+summary(fit)                   # check the Convergence line first
+gaussian_scale_summary(fit, probabilities = c(0.5, 0.9))  # sigma in meters and cells
 
-# 3. Fit; theta and sigma.<layer> are estimated jointly
-fit <- terradish(melip.Fst ~ forestcover, data = surface,
-                 conductance_model = cm, measurement_model = mlpe)
+# 3. Require valid nuisance and conductance fits at every profile point.
+profile <- gaussian_scale_profile(fit, "forest", n = 15)
+profile$interval
 
-# 4. Read the fitted scale. `sigma` is in map units, so reproject a
-#    longitude/latitude raster first or it will be reported in degrees.
-gaussian_scale_summary(fit)   # sigma + kernel-mass distances in map units
-
-# 5. Sanity check against a fixed-raster fit of the same covariate
-fit_fixed <- terradish(melip.Fst ~ forestcover, data = surface,
-                       conductance_model = loglinear_conductance,
-                       measurement_model = mlpe)
-aic_table(list(fit, fit_fixed),
-          mod_names = c("Scale-aware", "Fixed raster"))
-
-# 6. Recover the conductance surface at the estimated scale
-plot(conductance(surface, fit))
+# 4. Score held-out ponds without refitting the measurement model there.
+cv <- terradish_cv_folds(graph, list(estimated = S ~ forest),
+  folds = ohio_ponds$ponds$fold, model = wishart_covariance, nu = 40,
+  conductance_model = cm, nuisance = "fixed",
+  control = NewtonRaphsonControl(maxit = 200, ctol = 1e-8, ftol = 1e-8))
+cv$results
+cv$summary
 ```
+
+</details>
 
 ## Summary of key functions
 
 | Function | Purpose |
-|----------|---------|
-| `conductance_surface()` | Build the graph from the original, unsmoothed raster |
-| `gaussian_smoothed_loglinear_conductance()` | Conductance model that estimates sigma jointly with theta |
-| `terradish()` | Fit the scale-aware model |
-| `gaussian_scale_summary()` | Fitted sigma per layer and corresponding Gaussian kernel-mass distances |
-| `gaussian_scale_profile()` | Profile scale uncertainty while reoptimizing other parameters |
-| `terradish_cv_folds()` | Compare fixed and estimated scales on common held-out sites |
-| `conductance()` | Extract the fitted conductance surface at the estimated scale |
-| `aic_table()` | Compare the scale-aware fit against a fixed-raster fit |
+|---|---|
+| `gaussian_smoothed_loglinear_conductance()` | Smooth and standardize raw raster layers while estimating context |
+| `gaussian_scale_summary()` | Report scale in map and cell units with ideal-kernel distances |
+| `gaussian_scale_profile()` | Refit other parameters across candidate smoothing scales |
+| `confint()` | Read coefficient intervals and stored scale profiles |
+| `aic_table()` | Compare compatible fits with an explicit parameter penalty |
+| `terradish_cv_folds()` | Score whole held-out sites on the unchanged landscape |
 
 ## See also
 
-- **`vignette("getting-started", package = "terradish")`**: the core
-  `terradish` workflow: scaling covariates, building a conductance surface,
-  fitting and interpreting models, and the five plot types.
-- **`vignette("model-comparison", package = "terradish")`**: likelihood ratio
-  tests, AIC/AICc/BIC tables, likelihood surface visualization, and
-  cross-validation.
-- **`vignette("ibe-ibr-workflow", package = "terradish")`**: fitting isolation
-  by environment (IBE) and isolation by resistance (IBR) simultaneously in the
-  same model.
-- **`vignette("spline-conductance", package = "terradish")`**: fitting
-  non-linear conductance responses with spline terms when the response shape is
-  flexible but the raster scale is fixed.
-- **`vignette("wishart-covariance", package = "terradish")`**: fitting
-  covariance-based Wishart IBR models when raw genotype data are available.
+- [`vignette("getting-started", package = "terradish")`](getting-started.html): build SNP and
+  microsatellite responses and read the measurement parameters.
+- [`vignette("model-comparison", package = "terradish")`](model-comparison.html): compare
+  candidates without mixing incompatible likelihoods.
+- [`vignette("spline-conductance", package = "terradish")`](spline-conductance.html): estimate
+  response shape after defining its spatial context.
+- [`vignette("categorical-conductance", package = "terradish")`](categorical-conductance.html):
+  class coding, as distinct from continuous forest context.
+- [`vignette("large-landscapes", package = "terradish")`](large-landscapes.html):
+  coarse-raster warm starts for Gaussian scale models.
+- [`vignette("wishart-covariance", package = "terradish")`](wishart-covariance.html):
+  how the assumed `nu` affects the profile interval and AIC.
+- `?ohio_ponds`: sampling, provenance, and simulation limits.

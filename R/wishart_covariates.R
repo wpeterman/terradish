@@ -94,6 +94,13 @@
 #' and \code{terradish_cv_folds(..., nuisance = "fixed")} to assess predictive
 #' support for a measurement-model extension.
 #'
+#' @section Numerical nugget limits:
+#' Fitting uses the same small-nugget safeguards as
+#' \code{\link{wishart_covariance}}, retaining supplied bounds and fixed
+#' parameters. A verified numerical zero residual-variance limit does not
+#' remove the graph or environmental kernel coefficients. \code{summary()}
+#' omits Wald uncertainty for the log-scale nugget at that limit.
+#'
 #' @return A function of class \code{"terradish_measurement_model"} suitable
 #'   for the \code{measurement_model} argument of \code{\link{terradish}} and
 #'   \code{\link{terradish_grid}}.  The nuisance parameter vector \eqn{\phi}
@@ -107,6 +114,10 @@
 #'   \code{\link{generalized_wishart}}, \code{\link{wishart_covariance}},
 #'   \code{\link{mlpe_covariates}},
 #'   \code{\link{pairwise_endpoint_covariates}}, \code{\link{terradish}}
+#'
+#' @section Worked example:
+#' See \code{vignette("ibe-ibr-workflow", package = "terradish")} for
+#' environmental covariance kernels and their distinction from MLPE slopes.
 #'
 #' @references
 #' McCullagh P. 2009. Marginal likelihood for distance matrices. Statistica

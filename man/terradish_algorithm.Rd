@@ -81,6 +81,20 @@ exact Hessian.}
 \code{reuse_preconditioner_max_age} can be set to a finite nonnegative
 value to periodically rebuild the AMG hierarchy instead of reusing it
 indefinitely.
+Direct solvers also accept \code{reference = "auto"} (default), which
+grounds a maximum-conductance vertex when the conductance ratio exceeds
+one million, or \code{"last"} and \code{"max_conductance"}. This changes
+the numerical reference potential while preserving the graph and model.
+It improves some stiff solves but cannot guarantee accuracy at arbitrary
+conductance contrasts.
+Direct solves check the maximum absolute residual in each right-hand
+side, divided by its maximum absolute input or one, whichever is larger.
+\code{residual_tolerance = 1e-8} rejects unresolved systems by default;
+\code{Inf} disables this check for diagnosis. A small residual is
+necessary but does not guarantee small forward error on an ill-conditioned
+graph.
+Before rejection, \code{refinement_steps = 3} permits up to three
+correction solves using the same factorization and the current residual.
 Direct supernodal factorizations can benefit from a threaded BLAS, but the
 relevant thread counts are controlled by the external R/BLAS build rather
 than by \code{terradish_algorithm()}.

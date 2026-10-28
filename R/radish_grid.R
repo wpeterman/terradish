@@ -359,15 +359,16 @@
   {
     worker_files <- c("R/backtracking.R", "R/hager_zhang.R", "R/newton_raphson.R",
                       "R/radish_conductance_model.R", "R/leastsquares.R",
-                      "R/mlpe.R", "R/check_distance_response.R",
+                      "R/mlpe.R", "R/mlpe_profile.R", "R/check_distance_response.R",
                       "R/generalized_wishart.R", "R/wishart_covariance.R",
+                      "R/wishart_profile.R",
                       "R/radish_subproblem.R", "R/radish_algorithm.R")
     worker_wd <- getwd()
     clusterExport(cl, varlist = c("worker_files", "worker_wd"), envir = environment())
     clusterEvalQ(cl, {
-      setwd(worker_wd)
+      # Resolve source paths without changing the worker's working directory.
       for (f in worker_files)
-        source(f)
+        source(file.path(worker_wd, f))
       NULL
     })
   }
@@ -544,9 +545,21 @@
 #'   uses the full graph and focal set.
 #' @param approximation_control Reserved for compatibility; unused.
 #'
-#' @return An object of class \code{terradish_grid} with components
-#'   \code{theta}, \code{loglik}, \code{phi}, and, when requested,
-#'   \code{covariance}.
+#' @return A list of class \code{c("terradish_grid", "radish_grid")}, with one
+#'   entry per row of \code{theta}:
+#'   \item{theta}{Data frame of the evaluated conductance coefficients (log
+#'     conductance per unit of each covariate).}
+#'   \item{loglik}{Numeric vector of profile log-likelihoods, with nuisance
+#'     parameters optimized at each grid point. Larger values indicate better
+#'     fit, and differences between grid points are on the log-likelihood
+#'     scale.}
+#'   \item{phi}{Matrix of optimized nuisance parameters, one column per grid
+#'     point, on the measurement model's internal scale.}
+#'   \item{covariance}{When \code{covariance = TRUE}, a focal-site by
+#'     focal-site by grid-point array of graph covariance (the generalized
+#'     inverse of the graph Laplacian); otherwise \code{NULL}.}
+#'   \item{approximation}{Record of the approximation setting (always
+#'     \code{"none"}).}
 #'
 #' @examples
 #' \donttest{
@@ -639,6 +652,14 @@ terradish_grid <- function(theta,
 #' @param ... Arguments passed through the deprecated \code{radish_grid()}
 #'   compatibility wrapper to \code{\link{terradish_grid}}.
 #' @name legacy_radish_grid_wrapper
+#' @return A list of class \code{terradish_grid} (also inheriting
+#'   \code{radish_grid}) containing the parameter grid \code{theta}, the
+#'   maximized log-likelihood \code{loglik} and nuisance parameters \code{phi}
+#'   at each grid row, and optionally the focal-site covariance array
+#'   \code{covariance}. Larger log-likelihoods indicate better fit within the
+#'   supplied grid. See \code{\link{terradish_grid}}.
+#'   The \code{approximation} element records any coarse-raster screening and
+#'   exact refinement used in the evaluation.
 #' @keywords internal
 NULL
 
@@ -667,7 +688,17 @@ radish_grid <- function(...)
 #' @param covariance If \code{TRUE}, instead of a matrix of resistance distances, return the associated submatrix of the generalized inverse of graph Laplacian
 #' @param cores Number of worker processes to use. \code{1} evaluates the grid serially.
 #'
-#' @return An object of class \code{terradish_grid}
+#' @return A list of class \code{c("terradish_grid", "radish_grid")}:
+#'   \item{theta}{Data frame of the evaluated conductance coefficients, one
+#'     row per grid point.}
+#'   \item{distance}{When \code{covariance = FALSE}, a focal-site by
+#'     focal-site by grid-point array of resistance distances. Larger values
+#'     mean greater graph resistance between two sites. Their units depend on
+#'     the conductance scale, so compare them within a grid rather than as
+#'     map distances.}
+#'   \item{covariance}{When \code{covariance = TRUE}, the corresponding array
+#'     of graph covariance (the generalized inverse of the graph Laplacian),
+#'     returned in place of \code{distance}.}
 #'
 #' @examples
 #'
@@ -777,9 +808,9 @@ terradish_distance <- function(theta,
       worker_wd <- getwd()
       clusterExport(cl, varlist = c("worker_files", "worker_wd"), envir = environment())
       clusterEvalQ(cl, {
-        setwd(worker_wd)
+        # Resolve source paths without changing the worker's working directory.
         for (f in worker_files)
-          source(f)
+          source(file.path(worker_wd, f))
         NULL
       })
     }
@@ -810,6 +841,12 @@ terradish_distance <- function(theta,
 #'   \code{radish_distance()} compatibility wrapper to
 #'   \code{\link{terradish_distance}}.
 #' @name legacy_radish_distance_wrapper
+#' @return A list of class \code{terradish_grid} (also inheriting
+#'   \code{radish_grid}) containing the parameter grid \code{theta} and either
+#'   \code{distance}, an array of resistance distances, or \code{covariance},
+#'   an array of graph covariances when \code{covariance = TRUE}. The first two
+#'   array dimensions index focal sites; the third indexes parameter-grid rows.
+#'   See \code{\link{terradish_distance}}.
 #' @keywords internal
 NULL
 

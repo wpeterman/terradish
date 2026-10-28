@@ -97,6 +97,10 @@ the parameterization used by the measurement model. For example, MLPE
 \code{tau} is log precision and its stored \code{rho} is unconstrained; the
 actual shared-site correlation is \eqn{\text{plogis}(\rho)/2}. Consult the
 selected measurement-model help page before interpreting \code{phi}.
+For a verified numerical zero residual-variance limit in a Wishart fit,
+\code{summary()} retains the finite log-scale representation of \code{sigma}
+but suppresses its Wald standard error and interval. A zero residual variance
+does not imply a zero graph contribution.
 Covariance-response residuals are centered on both site dimensions:
 \eqn{H(S-\Sigma)H}, where \eqn{H} is the site-centering matrix. Fitted
 covariance matrices retain their full \eqn{n\times n} form.
@@ -104,7 +108,9 @@ covariance matrices retain their full \eqn{n\times n} form.
 \code{anova()} is a likelihood-ratio test for nested conductance formulas
 fitted to the same response, sites, graph domain, conductance-model factory,
 measurement model, and pair subset; Wishart fits must also use the same
-\code{nu}. The function checks formula-term nesting, but the analyst must
+\code{nu}. Both fits must record successful outer and final nuisance
+convergence; missing diagnostics require refitting. The function checks
+formula-term nesting, but the analyst must
 still verify that the full measurement and conductance parameterization is
 substantively nested. Its chi-squared reference distribution assumes the
 tested parameters are regular interior parameters. It can be unreliable when

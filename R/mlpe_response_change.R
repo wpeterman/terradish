@@ -37,6 +37,9 @@
 #'   low and high covariate values, the contrast, estimated response-scale
 #'   change, confidence limits, and confidence level.
 #'
+#' @section Worked examples:
+#' \code{vignette("ibe-ibr-workflow", package = "terradish")}.
+#'
 #' @seealso \code{\link{mlpe_covariates}},
 #'   \code{\link{pairwise_endpoint_covariates}}, \code{\link{terradish}}
 #'

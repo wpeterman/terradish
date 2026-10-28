@@ -1,0 +1,89 @@
+{
+  "bbox": [
+    367650,
+    4365900,
+    377850,
+    4376100
+  ],
+  "epsg": 26917,
+  "source_pixel_m": 30,
+  "layers": {
+    "dem": {
+      "source": "https://elevation.nationalmap.gov/arcgis/rest/services/3DEPElevation/ImageServer",
+      "parameters": {
+        "f": "json",
+        "bbox": "367650,4365900,377850,4376100",
+        "bboxSR": 26917,
+        "imageSR": 26917,
+        "size": "340,340",
+        "format": "tiff",
+        "pixelType": "F32",
+        "interpolation": "RSP_BilinearInterpolation",
+        "renderingRule": "{\"rasterFunction\": \"None\"}",
+        "compression": "LZ77",
+        "noData": -9999
+      },
+      "export": {
+        "href": "https://elevation.nationalmap.gov/arcgis/rest/directories/elevation_output/3DEPElevation_ImageServer/_ags_3d5006c4_9bce_4cab_b6a1_b85e7b92bc91.tif",
+        "width": 340,
+        "height": 340,
+        "extent": {
+          "xmin": 367650,
+          "ymin": 4365900,
+          "xmax": 377850,
+          "ymax": 4376100,
+          "spatialReference": {
+            "wkid": 26917,
+            "latestWkid": 26917
+          }
+        },
+        "scale": 0
+      },
+      "filename": "dem_30m.tif",
+      "bytes": 479548,
+      "sha256": "91fd3d2e5240f951aaf433cecdcff60e474ebc282af5b2c6a99255b5441bba13"
+    },
+    "landcover": {
+      "source": "https://di-nlcd.img.arcgis.com/arcgis/rest/services/USA_NLCD_Annual_LandCover/ImageServer",
+      "parameters": {
+        "f": "json",
+        "bbox": "367650,4365900,377850,4376100",
+        "bboxSR": 26917,
+        "imageSR": 26917,
+        "size": "340,340",
+        "format": "tiff",
+        "pixelType": "U8",
+        "interpolation": "RSP_NearestNeighbor",
+        "renderingRule": "{\"rasterFunction\": \"None\"}",
+        "compression": "LZ77",
+        "noData": 0,
+        "mosaicRule": "{\"mosaicMethod\": \"esriMosaicLockRaster\", \"lockRasterIds\": [39]}"
+      },
+      "export": {
+        "href": "https://di-nlcd.img.arcgis.com/arcgis/rest/directories/arcgisoutput/USA_NLCD_Annual_LandCover_ImageServer/x_____xOA7D5R3HgrceM0Fc4FSzzixi2lXxKsEEOF_nAleyr7ClEolzoL1WfG59PEy6tsLWx_____x_ags_876da2b8_48d3_449b_9252_83a0a0fb243c.tif",
+        "width": 340,
+        "height": 340,
+        "extent": {
+          "xmin": 367650,
+          "ymin": 4365900,
+          "xmax": 377850,
+          "ymax": 4376100,
+          "spatialReference": {
+            "wkid": 26917,
+            "latestWkid": 26917
+          }
+        },
+        "scale": 0
+      },
+      "filename": "nlcd_2023_30m.tif",
+      "bytes": 23819,
+      "sha256": "a99f52c87a37d0db6059848211732d012ea7053305c9de7ce5e673f613cd7899"
+    }
+  },
+  "landcover_catalog_item": {
+    "OBJECTID": 39,
+    "Name": "Annual_NLCD_LndCov_2023_CU_C1V0",
+    "Year": 2023,
+    "Version": "Annual NLCD Collction 1.0: 1985 - 2023"
+  }
+}

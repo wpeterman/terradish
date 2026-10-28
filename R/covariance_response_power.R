@@ -91,7 +91,9 @@
 #' Power and coverage are internal to the assumed response model. Matching
 #' simulation and fitting values cannot diagnose incorrect information in a
 #' real data set. Nonconverged fits count as failed fits and non-detections;
-#' inspect \code{fit_rate} before interpreting power or coverage.
+#' both outer and final nuisance optimization must record code 0. Missing
+#' convergence diagnostics also count as failed fits.
+#' Inspect \code{fit_rate} before interpreting power or coverage.
 #'
 #' @examples
 #' \donttest{
@@ -738,10 +740,10 @@ print.terradish_covariance_power <- function(x, ...)
                                          conductance_cor_threshold)
 {
   ok <- identical(status, "OK") && inherits(fit, c("terradish", "radish")) &&
-    !is.null(fit$mle$theta) && isTRUE(fit$convergence$code == 0L)
-  if (identical(status, "OK") && !is.null(fit$convergence$code) &&
-      fit$convergence$code != 0L)
-    status <- paste("NONCONVERGED:", fit$convergence$message)
+    !is.null(fit$mle$theta) && .terradish_fit_converged(fit)
+  if (identical(status, "OK") && inherits(fit, c("terradish", "radish")) &&
+      !.terradish_fit_converged(fit))
+    status <- "NONCONVERGED: outer or final nuisance optimization failed or lacks diagnostics."
   fitted_conductance <- if (ok)
     tryCatch(fit$submodels$f(fit$mle$theta)$conductance,
              error = function(e) rep(NA_real_, length(true_conductance)))

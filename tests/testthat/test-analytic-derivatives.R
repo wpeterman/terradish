@@ -24,15 +24,19 @@ deriv_fixture <- function(keep = 1:8)
 # Compare the analytic gradient and Hessian at `theta` against Richardson
 # extrapolated finite differences of the objective.
 expect_derivatives_match <- function(f, g, surface, S, theta, nu = NULL,
-                                     tol = 1e-5, ...)
+                                     tol = 1e-5, recovered_warnings = character(), ...)
 {
-  objective <- function(par)
-    terradish_algorithm(f, g, surface, S, par, nu = nu,
+  objective <- function(par) {
+    evaluated <- expect_fixture_warnings(terradish_algorithm(f, g, surface, S, par, nu = nu,
                         gradient = FALSE, hessian = FALSE, partial = FALSE,
-                        ...)$objective
+                        ...), recovered_warnings, required = character())
+    expect_equal(evaluated$subproblem$convergence, 0L)
+    evaluated$objective
+  }
 
   analytic <- terradish_algorithm(f, g, surface, S, theta, nu = nu,
                                   partial = FALSE, ...)
+  expect_equal(analytic$subproblem$convergence, 0L)
 
   numeric_gradient <- numDeriv::grad(objective, theta, method = "Richardson")
   numeric_hessian <- numDeriv::hessian(objective, theta, method = "Richardson")
@@ -55,7 +59,8 @@ test_that("generalized_wishart gradient and Hessian match finite differences", {
   skip_if_not_installed("numDeriv")
   fx <- deriv_fixture()
   expect_derivatives_match(fx$f, generalized_wishart, fx$surface, fx$S_dist,
-                           c(-0.3, 0.3), nu = 1000)
+                           c(-0.3, 0.3), nu = 1000,
+                           recovered_warnings = "^Optimizer stalled:")
 })
 
 test_that("mlpe gradient and Hessian match finite differences", {
@@ -96,8 +101,8 @@ test_that("the profile Hessian is correct when a nuisance parameter is pinned at
   fit <- terradish_algorithm(fx$f, g, fx$surface, S_cov, theta, nu = 40,
                              partial = FALSE)
   # the fixture is chosen so the kernel coefficient really is on its bound;
-  # `.free_parameter_index()` uses a sqrt(.Machine$double.eps) tolerance, so
-  # anything below that counts as pinned
+  # the fitted coefficient is projected onto its exact zero bound;
+  # small positive values in other parameter units must remain free
   expect_lt(abs(unname(fit$phi[2])), sqrt(.Machine$double.eps))
   # A zero kernel coefficient is flagged without erasing conductance curvature.
   expect_true(isTRUE(fit$boundary))

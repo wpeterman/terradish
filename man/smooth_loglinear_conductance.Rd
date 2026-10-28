@@ -81,6 +81,12 @@ the range at focal sites. It reports whether the curve is monotone, its
 direction, and the number of derivative sign changes. This is a shape
 diagnostic, not an uncertainty test.
 }
+\section{Worked example}{
+
+See \code{vignette("spline-conductance", package = "terradish")} for
+fitted conductance curves, genetic-response plots, and model comparison.
+}
+
 \examples{
 x <- data.frame(altitude = seq(-1, 1, length.out = 8),
                 forestcover = c(0.2, 0.4, 0.6, 0.7, 0.5, 0.3, 0.2, 0.1))

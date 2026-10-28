@@ -10,13 +10,13 @@ test_that("radish() warns and forwards to terradish()", {
   surface <- res$surface
   melip.Fst <- res$data$melip.Fst
 
-  expect_warning(
+  expect_fixture_warnings(
     legacy <- radish(melip.Fst ~ altitude + forestcover,
                      data = surface,
                      conductance_model = loglinear_conductance,
                      measurement_model = leastsquares,
                      control = NewtonRaphsonControl(maxit = 3, verbose = FALSE)),
-    "deprecated"
+    c("deprecated", "`maxit` reached for Newton steps")
   )
   modern <- suppressWarnings(
     terradish(melip.Fst ~ altitude + forestcover,

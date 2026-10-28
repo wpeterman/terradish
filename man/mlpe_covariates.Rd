@@ -77,6 +77,13 @@ Unclassed matrices are interpreted as pairwise columns and must
   \code{\link{pairwise_endpoint_covariates}} to construct their differences.
   \code{\link{pairwise_covariates}} combines these with other pairwise inputs.
 }
+\section{Worked example}{
+
+See \code{vignette("ibe-ibr-workflow", package = "terradish")} for
+paired environmental differences, genetic-response contrasts, and their
+distinction from covariance kernels.
+}
+
 \section{Interpreting pairwise effects}{
 
 Construct one \code{\link{pairwise_covariates}} object to use the same

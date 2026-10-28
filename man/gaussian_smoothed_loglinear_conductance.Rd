@@ -120,6 +120,12 @@ leverage machinery assumes a one-to-one mapping between fitted conductance
 parameters and design-matrix covariates, which does not hold once separate
 Gaussian \code{sigma} parameters are introduced.
 }
+\section{Worked example}{
+
+See \code{vignette("gaussian-scale-optimization", package = "terradish")}
+for fitting, plotting, and interpreting smoothing scales on the pond landscape.
+}
+
 \examples{
 \donttest{
 data(melip)

@@ -12,6 +12,18 @@
 
 \item{...}{Additional graphical parameters.}
 }
+\value{
+A plot object that is returned visibly so base R auto-printing works as
+expected:
+\itemize{
+  \item \code{"fit"}: a \code{ggplot} object with observed-vs-fitted
+    pairwise distances or genetic covariance, according to the response model.
+  \item \code{"surface"}, \code{"marginal"}, \code{"marginal_response"},
+    and \code{"sigma"}: either a single \code{ggplot} object (one panel) or
+    a named list of \code{ggplot} objects (multiple panels), with one plot
+    per panel/covariate.
+}
+}
 \description{
 Deprecated S3 method retained so legacy \code{"radish"} fit objects still
 dispatch to \code{\link[graphics]{plot}}.

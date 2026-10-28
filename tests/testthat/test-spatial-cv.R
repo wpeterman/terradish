@@ -18,7 +18,7 @@ test_that("fixed-domain cross-validation scores trained and baseline models", {
   skip_on_cran()
   dat <- melip_fixture(1:9)
   melip.Fst <- dat$melip.Fst
-  surface <- conductance_surface(dat$covariates, dat$coords)
+  surface <- conductance_surface(dat$covariates[["altitude"]], dat$coords)
   folds <- terradish_folds(dat$coords, k = 3, method = "random", seed = 1)
   checkpoint <- tempfile(fileext = ".rds")
 

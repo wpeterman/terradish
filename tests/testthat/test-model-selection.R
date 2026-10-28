@@ -21,15 +21,18 @@ test_that("aic_table ranks fitted terradish models across supported criteria", {
               control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
   )
 
-  aic_tab <- aic_table(list(fit1, fit2))
+  expect_warning(aic_tab <- aic_table(list(fit1, fit2)), "Some models have not converged")
+  expect_false(all(aic_tab$converged))
   expect_true(is.data.frame(aic_tab))
   expect_true(all(c("model", "K", "AIC", "Delta_AIC", "AIC_wt", "Cum.wt", "loglik") %in% names(aic_tab)))
 
-  aicc_tab <- aic_table(list(fit1, fit2), AICc = TRUE)
+  expect_warning(aicc_tab <- aic_table(list(fit1, fit2), AICc = TRUE), "Some models have not converged")
+  expect_false(all(aicc_tab$converged))
   expect_true(is.data.frame(aicc_tab))
   expect_true(all(c("AICc", "Delta_AICc", "AICc_wt") %in% names(aicc_tab)))
 
-  bic_tab <- aic_table(list(fit1, fit2), BIC = TRUE)
+  expect_warning(bic_tab <- aic_table(list(fit1, fit2), BIC = TRUE), "Some models have not converged")
+  expect_false(all(bic_tab$converged))
   expect_true(is.data.frame(bic_tab))
   expect_true(all(c("BIC", "Delta_BIC", "BIC_wt") %in% names(bic_tab)))
   # BIC penalizes with the number of focal sites, as AICc does, not site pairs
@@ -53,6 +56,8 @@ test_that("default model labels append [mlpe:n] when pairwise covariates are pre
     loglik = -10,
     aic = 30,
     df = 2,
+    convergence = list(code = 0L),
+    fit = list(subproblem = list(convergence = 0L)),
     submodels = list(g = mlpe)
   )
   fit_joint <- list(
@@ -61,6 +66,8 @@ test_that("default model labels append [mlpe:n] when pairwise covariates are pre
     loglik = -9,
     aic = 28,
     df = 3,
+    convergence = list(code = 0L),
+    fit = list(subproblem = list(convergence = 0L)),
     submodels = list(g = g_joint)
   )
 
@@ -82,7 +89,8 @@ test_that("aic_table rejects incomparable likelihoods, responses, and nu", {
       loglik = -10,
       aic = 26,
       df = 3,
-      fit = list(response = response),
+      convergence = list(code = 0L),
+      fit = list(response = response, subproblem = list(convergence = 0L)),
       submodels = list(g = model),
       comparison = terradish:::.terradish_comparison_contract(model, nu, response)
     )
@@ -123,7 +131,8 @@ test_that("aic_table keeps log-likelihoods aligned when model labels repeat", {
       loglik = loglik,
       aic = aic,
       df = 3,
-      fit = list(response = response),
+      convergence = list(code = 0L),
+      fit = list(response = response, subproblem = list(convergence = 0L)),
       submodels = list(g = mlpe),
       comparison = terradish:::.terradish_comparison_contract(mlpe)
     )

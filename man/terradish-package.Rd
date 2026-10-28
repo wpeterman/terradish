@@ -74,13 +74,23 @@ Install it explicitly with
 \code{remotes::install_github("wpeterman/terradish@experimental")}.
 
 \strong{Vignettes.}  Start with
-\code{vignette("getting-started", package = "terradish")}.  The others cover
+\code{vignette("getting-started", package = "terradish")}, or with
+\code{vignette("mlpe-pairwise-distance", package = "terradish")} if your
+data are a pairwise genetic distance matrix.  The others cover
 model comparison, joint isolation by environment and resistance, the
 covariance-based Wishart workflow, spline conductance, scale optimization,
 large landscapes, and simulation-based
 study design.  List them all with
 \code{browseVignettes("terradish")}.
 }
+\section{Worked examples}{
+
+\code{vignette("data-generation", package = "terradish")},
+\code{vignette("getting-started", package = "terradish")},
+\code{vignette("individual-salamanders", package = "terradish")},
+\code{vignette("mlpe-pairwise-distance", package = "terradish")}.
+}
+
 \seealso{
 \code{\link{terradish}}, \code{\link{conductance_surface}},
 \code{\link{terradish_methods}}, \code{\link{melip}}

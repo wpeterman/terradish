@@ -57,9 +57,21 @@ uses the full graph and focal set.}
 \item{approximation_control}{Reserved for compatibility; unused.}
 }
 \value{
-An object of class \code{terradish_grid} with components
-  \code{theta}, \code{loglik}, \code{phi}, and, when requested,
-  \code{covariance}.
+A list of class \code{c("terradish_grid", "radish_grid")}, with one
+  entry per row of \code{theta}:
+  \item{theta}{Data frame of the evaluated conductance coefficients (log
+    conductance per unit of each covariate).}
+  \item{loglik}{Numeric vector of profile log-likelihoods, with nuisance
+    parameters optimized at each grid point. Larger values indicate better
+    fit, and differences between grid points are on the log-likelihood
+    scale.}
+  \item{phi}{Matrix of optimized nuisance parameters, one column per grid
+    point, on the measurement model's internal scale.}
+  \item{covariance}{When \code{covariance = TRUE}, a focal-site by
+    focal-site by grid-point array of graph covariance (the generalized
+    inverse of the graph Laplacian); otherwise \code{NULL}.}
+  \item{approximation}{Record of the approximation setting (always
+    \code{"none"}).}
 }
 \description{
 Calculates the profile likelihood of a parameterized conductance surface across

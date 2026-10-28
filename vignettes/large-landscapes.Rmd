@@ -5,6 +5,9 @@ output:
   rmarkdown::html_vignette:
     number_sections: true
     toc: true
+    self_contained: true
+    mathjax: null
+    pandoc_args: ["--mathml"]
 vignette: >
   %\VignetteIndexEntry{Large Landscapes}
   %\VignetteEngine{knitr::rmarkdown}
@@ -22,50 +25,66 @@ knitr::opts_chunk$set(
 )
 ```
 
-This vignette covers fitting `terradish` models on large rasters: hundreds of
-thousands to millions of grid cells. If you have not read
-`vignette("getting-started", package = "terradish")`, start there. It explains
-conductance surfaces, the model formula, and how to read a fitted model. Here we
-assume you already know how to fit a small model and focus on what changes when
-the landscape gets big.
+This vignette covers fitting `terradish` models on large rasters, with
+hundreds of thousands to millions of grid cells. It assumes you can already
+fit and read a small model as shown in
+[`vignette("getting-started", package = "terradish")`](getting-started.html).
 
-The runnable code uses the bundled `melip` data to show the workflow.
-Time and memory depend on graph geometry, conductance contrast, the number of
-focal sites, and hardware. Measure those costs on your own design before
-committing to a large analysis.
+The runnable setup uses the Ohio pond data from the other guides
+(`vignette("data-generation", package = "terradish")` describes how they
+were made). It teaches configuration, not speed. Time and memory depend on
+graph geometry, conductance contrast, focal-site count, and hardware, so
+measure them on your own design.
+
+**Goal.** Start with solver choice and domain sensitivity. Read the optional
+sections on worker reuse, nuisance optimization, and curvature when a
+measured computational problem calls for them.
 
 ```{r load}
 library(terradish)
-
-data(melip)
-melip.altitude    <- terra::unwrap(melip.altitude)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords      <- terra::unwrap(melip.coords)
-
-covariates <- c(melip.altitude, melip.forestcover)
-names(covariates) <- c("altitude", "forestcover")
-covariates <- scale_covariates(covariates)
-surface    <- conductance_surface(covariates, melip.coords, directions = 8)
+data(ohio_ponds)
+coords <- ohio_ponds$ponds[c("x", "y")]
+g <- factor(ohio_ponds$samples$pond, levels = ohio_ponds$ponds$pond)
+Y <- rowsum(ohio_ponds$snp, g, reorder = FALSE)
+Y <- Y[ohio_ponds$ponds$pond, , drop = FALSE]
+N <- 2 * as.numeric(table(g))
+stopifnot(all(N == N[1]))
+S <- cov_from_biallelic(Y, N) / N[1]
+covariates <- scale_covariates(terra::unwrap(ohio_ponds$forest500))
+surface <- conductance_surface(covariates, coords, directions = 8)
 ```
 
----
+The graph covers the full landscape, but the response is covariance among 24
+ponds, so more raster cells add no sampled populations or marker information.
+The fitting recipes below use the `nu = 40` working assumption from Getting
+Started and do not run during package builds.
+
+```{r domain-map, fig.cap = "The full forest-context grid and sampled ponds. Computational shortcuts must preserve the routes needed for the biological question."}
+terra::plot(covariates, main = "Standardized 500 m forest context")
+points(coords, pch = 21, bg = "white", cex = 0.7)
+```
+
+**How to read the map.** Sampled ponds occupy only part of the raster, but
+paths connecting them can extend beyond it. A tightly cropped map is
+therefore not automatically an equivalent, faster analysis (see the cropping
+section below).
 
 ## When a landscape is "large"
 
 `terradish` builds a weighted graph over the raster grid and solves a linear
-system on that graph to get resistance distances among focal sites. The cost of
-that solve grows with the number of grid cells, `N`. Two things change as `N`
-grows into the hundreds of thousands and beyond:
+system on it to get resistance distances among focal sites. The cost of that
+solve grows with the number of grid cells, `N`. In the hundreds of thousands
+and beyond:
 
-1. The linear **solver** that computes resistance distances can run out of
-   memory. Picking the right one (Section 3) is what keeps a fit feasible.
-2. The **inference** machinery (standard errors and confidence intervals) is
-   unchanged in form, but larger analyses can include more focal sites. Wishart
-   precision also depends on the supplied effective degrees of freedom, `nu`
-   (Section 4).
+1. The linear **solver** can run out of memory, so solver choice decides
+   whether a fit is feasible.
+2. The **inference** machinery (standard errors and confidence intervals)
+   keeps its form, but larger analyses can include more focal sites, and
+   Wishart precision still depends on the supplied effective degrees of
+   freedom, `nu` (see the information section below).
 
-"Large" here means that graph factorization or repeated derivative solves
-dominate the analysis. There is no universal cell-count limit: missing cells,
+"Large" means that graph factorization or repeated derivative solves dominate
+the analysis. There is no universal cell-count limit, because missing cells,
 graph connectivity, and conductance contrast can change the practical limit.
 
 ---
@@ -73,90 +92,128 @@ graph connectivity, and conductance contrast can change the practical limit.
 ## Choosing a solver
 
 Both `terradish()` (the fitting wrapper) and `terradish_algorithm()` (one
-likelihood and gradient evaluation) take a `solver` argument. The solver only
-changes **how** the resistance-distance linear system is solved; it does not
-change the statistical model. Iterative solvers should agree with the direct
-solver within their numerical tolerances, but estimates need not be bitwise
-identical.
+likelihood and gradient evaluation) take a `solver` argument. The solver
+changes **how** the resistance-distance system is solved, not the statistical
+model. Iterative solvers should agree with the direct solver within numerical
+tolerance, though not necessarily bit for bit.
 
 ```{r solver-calls, eval = FALSE}
 # direct (the default): exact sparse Cholesky factorization
-fit <- terradish(melip.Fst ~ forestcover + altitude, surface,
-                 conductance_model = loglinear_conductance,
+fit <- terradish(S ~ forest500, surface,
+                 measurement_model = wishart_covariance, nu = 40,
                  solver = "direct")
 
 # amg: algebraic multigrid, the large-N path
-fit <- terradish(melip.Fst ~ forestcover + altitude, surface,
-                 conductance_model = loglinear_conductance,
+fit <- terradish(S ~ forest500, surface,
+                 measurement_model = wishart_covariance, nu = 40,
                  solver = "amg")
 ```
 
 The choices are:
 
-- **`direct`** (default) uses sparse Cholesky factorization. It is a useful
-  reference for checking iterative results. The factor can contain many more
-  nonzero entries than the graph, so its memory requirements can grow rapidly.
-- **`amg`** uses algebraic multigrid as an iterative solver. It can reduce memory
-  demands on large grids, but convergence depends on conductance contrast and
-  graph structure. Strong barriers can require more iterations or tighter
-  solver settings. Check agreement with a direct solve on a manageable case.
-- **`auto`** uses `direct` below 1,500,000 graph vertices and `amg` at or above
-  that threshold with the default controls. The number of focal sites does not
-  override the large-graph switch. `solver_control$auto_amg_min_vertices`
-  changes the threshold; the legacy `auto_direct_max_rhs` is ignored.
+- **`direct`** (default) uses sparse Cholesky factorization. The factor can
+  hold many more nonzero entries than the graph, so its memory can grow
+  rapidly.
+- **`amg`** uses algebraic multigrid, an iterative solver that can reduce
+  memory on large grids. Its convergence depends on conductance contrast and
+  graph structure, and strong barriers can require more iterations or tighter
+  solver settings.
+- **`auto`**, with default controls, uses `direct` below 1,500,000 graph
+  vertices and `amg` at or above. The number of focal sites does not override
+  this switch, and `solver_control$auto_amg_min_vertices` changes the threshold.
 
-Use `terradish_assess_settings()` for a local speed and accuracy probe. Its
-recommendation concerns the tested settings and graph, not the scientific
-adequacy of the measurement model. Record the resolved solver and compare
-coefficient estimates and likelihoods when changing solver tolerances.
+Before a long fit, `terradish_assess_settings()` runs short optimizer and
+solver probes on your graph and recommends settings, and
+`terradish_solver_benchmark()` times each direct factorization:
 
-This applies to every symmetric resistance model: any `conductance_model`
-(`loglinear_conductance`, `smooth_loglinear_conductance`, the Gaussian
-scale-aware model) paired with any measurement model (`mlpe`,
-`leastsquares`, `generalized_wishart`, and `wishart_covariance`). The solver sits underneath
-all of them.
+```{r assess-settings, eval = FALSE}
+settings <- terradish_assess_settings(S ~ forest500, surface,
+  measurement_model = wishart_covariance, nu = 40)
+settings                        # graph size, probe timings, and a one-line verdict
+settings$recommended$solver     # pass to terradish(solver = ...)
+settings$recommended$optimizer  # pass to terradish(optimizer = ...)
+
+terradish_solver_benchmark(surface)  # setup, solve, and total seconds per factorization
+```
+
+**How to read the output.** `settings$profile` reports graph size, the
+benchmark tables give each probe's time and whether it reached the same
+log-likelihood, and `settings$recommended` holds settings to pass straight to
+`terradish()`. The fastest `total` time in the solver benchmark names the
+factorization to request with `solver_control = list(factorization = ...)`.
+On a graph this small the timings mostly measure R overhead, so run both on
+your full raster. The recommendation concerns speed and agreement, not whether
+the measurement model suits your data.
+
+Solver choice applies to every symmetric resistance model, whatever the
+`conductance_model` (`loglinear_conductance`, `smooth_loglinear_conductance`,
+the Gaussian scale-aware model) or measurement model (`mlpe`,
+`leastsquares`, `generalized_wishart`, `wishart_covariance`).
+
+After a fit, use the same diagnostics as for a small graph, starting with the
+fitted-response scatter, and keep the fitted graph for conductance mapping.
+
+```{r large-fit-plots, eval = FALSE}
+plot(fit, type = "fit")  # observed versus fitted covariance for this response
+library(ggplot2)
+maps <- plot(fit, type = "surface", data = surface)
+C <- conductance(surface, fit)
+map_limits <- range(terra::values(C), na.rm = TRUE)
+
+# Keep all cells and share limits across the estimate and both bounds.
+for (p in maps) {
+  print(p + scale_fill_viridis_c(
+    trans = "log10", limits = map_limits,
+    breaks = c(0.01, 0.1, 0.5, 1, 2, 5, 10, 20),
+    name = "Conductance\n(log color scale)"
+  ))
+}
+```
+
+Map colors run from dark purple (low conductance) to yellow (high). Equal
+color steps are equal ratios, labels stay in conductance units, and the
+estimate and bounds share limits without clipping.
+
+A smooth map does not establish solver accuracy. Check that estimates and
+likelihoods agree with a direct solve on a manageable case, and inspect both
+outer and nuisance convergence. Marginal-response plots need a graph solve at
+every plotted value, so start with `n = 25` on a large graph.
 
 ---
 
-## Inference at scale
-
-Scaling the solver lets you fit larger graph domains and sampling designs. More
-informative designs can tighten inference, but cell count alone does not.
-Several computational choices matter here.
+<details>
+<summary>Optional: worker reuse, nuisance optimization, and curvature</summary>
 
 ## Reusing Windows workers
 
 Worker reuse is **experimental**. On Windows, `cores > 1` requests PSOCK
-workers for supported Hessian and partial-derivative calculations. It does
-not parallelize every step of a fit. The pool is reused during optimization
-and stopped before return; fitted objects do not retain live workers.
-AMG and the cached CHOLMOD backend ignore this setting. On small graphs,
-worker startup and data transfer can make multiple cores slower than one.
-Benchmark `cores = 1` first, then compare the elapsed time and numerical
-results with the requested worker count.
+workers for supported Hessian and partial-derivative calculations, not for
+every step of a fit. The pool is reused during optimization and stopped before
+return, so fitted objects hold no live workers. AMG and the cached CHOLMOD
+backend ignore this setting. On small graphs, worker startup and data transfer
+can make multiple cores slower than one, so benchmark `cores = 1` first and
+compare elapsed time and results with the requested worker count.
 
-Use one level of parallelism at a time. In particular, fixed-domain
-cross-validation evaluates folds serially and passes `cores` to each fit. This
-avoids creating an outer fold cluster whose workers each create another inner
-cluster.
+Use one level of parallelism at a time. Fixed-domain cross-validation, for
+example, evaluates folds serially and passes `cores` to each fit.
 
 ## Controlling the nuisance profile
 
-Each conductance-parameter trial profiles the nuisance parameters of the
-measurement model. Smooth conductance models paired with
-`generalized_wishart` can make that two-level optimization costly because each
-outer step may require many inner Newton steps. The inner optimizer already
-uses the previous nuisance solution as a warm start. Use
-`measurement_control` to inspect or tune it separately from `control`:
+Each trial of the conductance parameters profiles the measurement model's
+nuisance parameters. Smooth conductance models paired with
+`generalized_wishart` can make this two-level optimization costly, because
+each outer step may need many inner Newton steps. The inner optimizer already
+warm-starts from the previous nuisance solution. Use `measurement_control` to
+inspect or tune it separately from `control`:
 
 ```{r measurement-control, eval = FALSE}
+D <- dist_from_cov(S)  # coherent squared distances from the pond covariance
 fit_smooth_gw <- terradish(
-  admissible_squared_distance ~ s(forestcover, df = 4) +
-    s(altitude, df = 4),
+  D ~ s(forest500, df = 3),
   surface,
   conductance_model = smooth_loglinear_conductance,
   measurement_model = generalized_wishart,
-  nu = effective_marker_df,
+  nu = 40,
   optimizer = "bfgs",
   control = NewtonRaphsonControl(maxit = 80, verbose = TRUE),
   measurement_control = NewtonRaphsonControl(
@@ -171,59 +228,56 @@ fit_smooth_gw$fit$subproblem
 ```
 
 The returned `convergence` code and `iters` count describe the final nuisance
-profile. A value of 0 indicates convergence; 1 means the profile reached
-`maxit`; 2 indicates a line-search failure. Do not loosen tolerances simply to
-remove a warning. First inspect coefficient stability, gradient size, the
-likelihood, and sensitivity to tighter settings. The control separates a
-computational decision from the scientific model, but overly loose profiling
-can still change the fitted likelihood surface.
+profile. A code of 0 means convergence, 1 means the profile reached `maxit`,
+and 2 means a line-search failure. Do not loosen tolerances just to remove a
+warning. First inspect coefficient stability, gradient size, the likelihood,
+and sensitivity to tighter settings, because overly loose profiling can change
+the fitted likelihood surface.
 
 ## Curvature for standard errors
 
 `terradish()` and `terradish_algorithm()` take `curvature = c("exact",
-"gauss_newton")`. The objective and gradient are the same; the options differ
-in the Hessian approximation used for optimization and standard errors. Fits
-should be compared for numerical agreement rather than assumed identical.
+"gauss_newton")`. Both options share the objective and gradient and differ
+only in the Hessian used for optimization and standard errors.
 
 ```{r curvature-calls, eval = FALSE}
+D <- dist_from_cov(S)
 # Generalized Wishart requires an admissible squared-distance response that is
 # coherently related to a centered positive-semidefinite covariance matrix.
 # exact (default): full observed Hessian
-fit <- terradish(admissible_squared_distance ~ forestcover + altitude, surface,
+fit <- terradish(D ~ forest500, surface,
                  measurement_model = generalized_wishart,
-                 nu = effective_marker_df,
+                 nu = 40,
                  curvature = "exact")
 
 # gauss_newton: information-based curvature
-fit <- terradish(admissible_squared_distance ~ forestcover + altitude, surface,
+fit <- terradish(D ~ forest500, surface,
                  measurement_model = generalized_wishart,
-                 nu = effective_marker_df,
+                 nu = 40,
                  curvature = "gauss_newton")
 ```
 
 - **`exact`** uses the full observed Hessian.
 - **`gauss_newton`** drops the two residual-weighted second-derivative terms,
-  leaving the **Gauss-Newton information** curvature. It needs only the
-  first derivatives of conductance and is positive semidefinite when the
-  retained measurement-model curvature is positive semidefinite. It flows
-  unchanged into `vcov()`, `summary()`, and `confint()`, so the standard errors
-  become asymptotic, information-based errors. It approaches the exact Hessian
-  when the omitted residual-weighted terms are negligible; equality is not
-  guaranteed merely because a fit has converged.
+  leaving the **Gauss-Newton information** curvature. It needs only first
+  derivatives of conductance and is positive semidefinite when the retained
+  measurement-model curvature is. It flows unchanged into `vcov()`,
+  `summary()`, and `confint()`, so standard errors become asymptotic,
+  information-based errors. It approaches the exact Hessian when the omitted
+  terms are negligible, not merely because a fit has converged.
 
-**How to choose.** Both are validated for `leastsquares` and the
-`generalized_wishart` measurement model. Use the `exact` default for routine
-work. Reach for `gauss_newton` when the optimizer struggles with an indefinite
-Hessian far from the optimum, or when you want strictly information-based
-standard errors. At a well-behaved fit they may agree closely. Compare them as
+**How to choose.** Both are validated for `leastsquares` and
+`generalized_wishart`. Use the `exact` default for routine work. Reach for
+`gauss_newton` when the optimizer struggles with an indefinite Hessian far
+from the optimum, or when you want strictly information-based standard
+errors. The two may agree closely at a well-behaved fit, but compare them as
 a sensitivity check when curvature choice materially changes uncertainty or
 convergence.
 
-The focused benchmark in `inst/benchmarks/benchmark-curvature-large-landscape.R`
-makes this comparison reproducible. It builds a synthetic heterogeneous raster,
-simulates a `generalized_wishart` squared-distance response from known conductance
-parameters, then fits the same model with `curvature = "exact"` and
-`curvature = "gauss_newton"`.
+The benchmark in `inst/benchmarks/benchmark-curvature-large-landscape.R`
+reproduces this comparison. It simulates a `generalized_wishart`
+squared-distance response from known conductance parameters on a synthetic
+heterogeneous raster, then fits the same model with each curvature option.
 
 ```{r curvature-benchmark-run, eval = FALSE}
 source(system.file("benchmarks", "benchmark-curvature-large-landscape.R",
@@ -233,101 +287,108 @@ bench <- run_curvature_large_landscape_benchmark(CONFIG)
 bench$comparison
 ```
 
-The default case is deliberately small enough to run during review. To repeat
-the same comparison in the large-N solver regime, copy `CONFIG`, increase
-`side`, and set `solver = "amg"` or `solver = "auto"` before calling
-`run_curvature_large_landscape_benchmark()`.
+The default case is small enough to run during review. For the large-N solver
+regime, copy `CONFIG`, increase `side`, and set `solver = "amg"` or
+`solver = "auto"` before calling `run_curvature_large_landscape_benchmark()`.
 
 **How to read the benchmark.** Compare coefficients and likelihoods first,
-then standard errors, Hessian eigenvalues, and elapsed time. Agreement in
-point estimates does not guarantee agreement in curvature. A large difference
-in uncertainty warrants investigation of residuals, conditioning, and model
+then standard errors, Hessian eigenvalues, and elapsed time, because matching
+point estimates do not guarantee matching curvature. A large difference in
+uncertainty warrants checking residuals, conditioning, and model
 misspecification before choosing the faster option.
+
+</details>
 
 ## Information and effective degrees of freedom
 
-For Wishart fits, `nu` is a positive effective degrees-of-freedom value supplied
-by the analyst. It is not estimated from the response and is not automatically
-the marker count. Linkage and shared population history can reduce the
-information represented by many markers. More graph cells alone do not supply
-more independent genetic information.
-
-Holding the response and model fixed, changing `nu` leaves the likelihood
-optimum unchanged in theory and changes interior standard errors in proportion
-to `1 / sqrt(nu)`. Use `terradish_rescale_nu()` to inspect that sensitivity
-without refitting. Boundary inference needs separate care. Choose conductance
-complexity using held-out prediction and report inference across plausible
-`nu` values; see `vignette("model-comparison", package = "terradish")`.
+For Wishart fits, `nu` is an effective degrees-of-freedom value that you
+supply, not automatically the marker count.
+Changing `nu` leaves the optimum unchanged in theory and scales interior
+standard errors in proportion to `1 / sqrt(nu)`, which `terradish_rescale_nu()`
+shows without refitting. See
+[`vignette("wishart-covariance", package = "terradish")`](wishart-covariance.html)
+for choosing `nu` and
+[`vignette("model-comparison", package = "terradish")`](model-comparison.html)
+for reporting inference across plausible values.
 
 ## Cropping and coarse warm starts
 
-Cropping removes routes outside the retained domain and can increase resistance
-between sites even when every site remains inside the crop. The supplied
-release audit found increases of 15–23% with a two-cell buffer and 1–2% with a
-ten-cell buffer. Those are results for that landscape, not universal buffer
-recommendations. Compare progressively wider buffers while retaining the same
-response, sites, formula, and covariate scaling.
+Cropping removes alternative routes outside the retained domain and can
+increase resistance between sites even when every site stays inside the crop.
+In one test landscape, cropping raised resistance by 15 to 23% with a two-cell
+buffer and by 1 to 2% with a ten-cell buffer. Values will differ on your
+landscape, so compare progressively wider buffers with the same response,
+sites, formula, and covariate scaling.
 
 ```{r crop-sensitivity, eval = FALSE}
 # Scale on the original domain once, before cropping.
 buffers <- c(2, 5, 10) * max(terra::res(covariates))
 fits_buffer <- lapply(buffers, function(buffer) {
   cropped_surface <- conductance_surface(
-    covariates, melip.coords, directions = 8, crop_buffer = buffer
+    covariates, coords, directions = 8, crop_buffer = buffer
   )
-  terradish(melip.Fst ~ forestcover + altitude, cropped_surface,
-            measurement_model = mlpe)
+  terradish(S ~ forest500, cropped_surface,
+            measurement_model = wishart_covariance, nu = 40)
 })
 lapply(fits_buffer, coef)
 lapply(fits_buffer, confint)
+
+# crop_to_focal_buffer() crops the raster stack directly, if you prefer to
+# build the graph yourself; it keeps the scale_covariates() metadata.
+cropped <- crop_to_focal_buffer(covariates, coords, buffer = 2000)
+c(full = terra::ncell(covariates), cropped = terra::ncell(cropped))
 ```
 
-**How to read the output.** Compare estimates and intervals across buffers,
-and inspect fitted resistance distances with `terradish_distance()`. Continue
-expanding the domain if the substantive conclusion changes. The small-buffer
-message is a diagnostic prompt, not proof that a larger buffer is adequate.
+**How to read the output.** Compare estimates and intervals across buffers.
+If the coefficient or its interval keeps changing as the buffer widens, keep
+widening until it stabilizes. `terradish_distance()` compares the fitted
+resistance distances directly. Both cropping routes print a message when the
+buffer is less than half the largest distance between sites. Treat it as a
+prompt to run this check, not as proof that a larger buffer is adequate.
 
-Coarse rasters can provide starting values, but the final fit must be refined
-on the original graph. Coarsening changes both routes and covariate summaries.
-The supported coarse-raster workflow therefore requires exact refinement:
+Coarse rasters can provide starting values, but coarsening changes both routes
+and covariate summaries, so the supported workflow requires exact refinement
+on the original graph:
 
 ```{r coarse-warm-start, eval = FALSE}
 fit <- terradish(
-  melip.Fst ~ forestcover + altitude, surface,
-  measurement_model = mlpe,
+  S ~ forest500, surface,
+  measurement_model = wishart_covariance, nu = 40,
   approximation = "coarse_raster",
   approximation_control = list(factor = c(4, 2), exact_refine = TRUE)
 )
 summary(fit)
 ```
 
-Inspect convergence after the final refinement. A converged coarse fit does
-not establish convergence on the original graph. `terradish_grid()` accepts
-only `approximation = "none"`; coarse-only likelihoods are not supported
-for ranking models.
+Inspect convergence after the final refinement, because a converged coarse fit
+does not establish convergence on the original graph. `terradish_grid()`
+accepts only `approximation = "none"`, and coarse-only likelihoods are not
+supported for ranking models.
 
 ---
 
 ## Storing large fitted objects
 
-Fitted conductance and measurement-model closures can retain their construction
-environments, including large graph objects. That is useful for prediction but
-can make `saveRDS()` much larger than the visible coefficient table suggests.
-Use `slim_terradish()` when the durable artifact is intended for inference
+Fitted conductance and measurement-model closures can retain their
+construction environments, including large graph objects. That helps
+prediction but can make `saveRDS()` files much larger than the coefficient
+table suggests. Use `slim_terradish()` when the saved object is for inference
 summaries rather than later prediction:
 
 ```{r slim-fit, eval = FALSE}
+# fit is the unslimmed model you have already fitted above.
 fit_slim <- slim_terradish(fit)
 fit_slim$storage
 
-saveRDS(fit_slim, "terradish-fit-slim.rds")
+saveRDS(fit_slim, file.path(tempdir(), "terradish-fit-slim.rds"))
 
 # Equivalent shorthand at fit time
+D <- dist_from_cov(S)
 fit_slim <- terradish(
-  admissible_squared_distance ~ cov1 + cov2,
+  D ~ forest500,
   surface,
   measurement_model = generalized_wishart,
-  nu = effective_marker_df,
+  nu = 40,
   slim = TRUE
 )
 ```
@@ -335,26 +396,30 @@ fit_slim <- terradish(
 The default removes `submodels` and `leverage`. Coefficients, likelihood,
 Hessian-based summaries, fitted values, diagnostics, and permutation
 simulation remain available. Conductance prediction and most plot types do not,
-because they must reevaluate the removed closures. Slimming is irreversible.
-Keep the original formula, graph, response, and an unslimmed fit whenever
-prediction or model reconstruction may be needed. Add `"response"` to `drop`
-only when the response itself must also be excluded from the archive; doing so
-also removes the strongest stored check for later model comparison.
+because they must reevaluate the removed closures. Slimming is irreversible, so
+keep the formula, graph, response, and an unslimmed fit whenever you may need
+prediction or model reconstruction. Add `"response"` to `drop` only when the
+response must be excluded from the archive, because that also removes the
+strongest stored check for later model comparison.
 
 ---
+
+<details>
+<summary>Quick reference: computational settings</summary>
 
 ## Quick reference
 
 ```{r quick-ref, eval = FALSE}
-# 1. Build the surface as usual
+# 1. Use the pond covariance and landscape from the setup above
+D <- dist_from_cov(S)
 surface <- conductance_surface(covariates, coords, directions = 8)
 
 # 2. Fit at scale: use amg once the raster is too large for the direct solver
 # Generalized Wishart requires an admissible squared-distance response.
-fit <- terradish(admissible_squared_distance ~ cov1 + cov2, surface,
+fit <- terradish(D ~ forest500, surface,
                  conductance_model = loglinear_conductance,
                  measurement_model = generalized_wishart,
-                 nu = effective_marker_df,
+                 nu = 40,
                  solver    = "amg",            # large-N linear solver
                  curvature = "gauss_newton")   # information-based standard errors
 
@@ -362,9 +427,11 @@ summary(fit)                                   # conditional estimates and SEs
 
 # Optional archival copy when prediction from the saved object is unnecessary
 fit_archive <- slim_terradish(fit)
-saveRDS(fit_archive, "fit-archive.rds")
+saveRDS(fit_archive, file.path(tempdir(), "fit-archive.rds"))
 
 ```
+
+</details>
 
 ## Summary of key functions
 
@@ -375,13 +442,18 @@ saveRDS(fit_archive, "fit-archive.rds")
 | `terradish_algorithm()` | One likelihood and gradient evaluation; same `solver` and `curvature` |
 | `crop_to_focal_buffer()` | Crop with an explicit map-unit buffer; check domain sensitivity |
 | `terradish_assess_settings()` | Compare computational settings on the current graph |
+| `terradish_solver_benchmark()` | Time each direct factorization on the current graph |
 | `slim_terradish()` | Remove prediction closures and other optional large components before storage |
 
 ## See also
 
-- **`vignette("getting-started", package = "terradish")`** the core workflow:
-  data in, model fit, interpretation out.
-- **`vignette("wishart-covariance", package = "terradish")`** the distance and
-  covariance Wishart measurement models and the role of `nu`.
-- **`vignette("model-comparison", package = "terradish")`** ranking competing
+- **[`vignette("getting-started", package = "terradish")`](getting-started.html)**: the core workflow,
+  from data to interpretation.
+- **[`vignette("wishart-covariance", package = "terradish")`](wishart-covariance.html)**: the Wishart
+  measurement models and the role of `nu`.
+- **[`vignette("model-comparison", package = "terradish")`](model-comparison.html)**: ranking competing
   models with AIC and likelihood ratio tests.
+- **[`vignette("gaussian-scale-optimization", package = "terradish")`](gaussian-scale-optimization.html)**: Gaussian
+  scale models, which also accept coarse-raster warm starts.
+- **[`vignette("simulation-design", package = "terradish")`](simulation-design.html)**: design sweeps
+  that require many fits on the same graph.

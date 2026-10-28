@@ -41,9 +41,15 @@
 #'
 #' @return A data frame containing model ranks, parameter counts, information
 #'   criterion values, delta values, weights, cumulative weights, and
-#'   log-likelihoods. The \code{converged} column records convergence code 0;
+#'   log-likelihoods. The \code{converged} column is true only when both the
+#'   outer optimizer and final nuisance optimization record code 0. Missing
+#'   convergence diagnostics in older objects are treated as unverified (false);
 #'   \code{boundary} marks active parameter bounds or no resistance structure.
 #'   A warning identifies tables containing nonconverged or boundary fits.
+#'
+#' @section Worked example:
+#' See \code{vignette("model-comparison", package = "terradish")} for
+#' compatible model rankings, coefficient plots, and predictive comparisons.
 #'
 #' @examples
 #' \donttest{
@@ -152,8 +158,8 @@ aic_table <- function(mod_list, AICc = FALSE, BIC = FALSE, mod_names = NULL, ver
     tab[, 3:8] <- round(tab[, 3:8], digits = 4)
   }
 
-  tab$converged <- vapply(mod_list, function(fit)
-    isTRUE(fit$convergence$code == 0L), logical(1))[tab$.fit_index]
+  tab$converged <- vapply(mod_list, .terradish_fit_converged,
+                          logical(1))[tab$.fit_index]
   tab$boundary <- vapply(mod_list, function(fit)
     isTRUE(fit$convergence$boundary) || isTRUE(fit$fit$boundary), logical(1))[tab$.fit_index]
   tab$.fit_index <- NULL

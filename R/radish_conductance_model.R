@@ -295,6 +295,11 @@ assemble_model_matrix <- function(formula, spdat, check_rank = TRUE)
 #' that represent mappings from spatial data (e.g. rasters) to conductance.
 #'
 #' @name terradish_conductance_model_factory
+#' @section Worked examples:
+#' See \code{vignette("getting-started", package = "terradish")} for a
+#' log-linear model, \code{vignette("categorical-conductance", package = "terradish")}
+#' for class contrasts, and \code{vignette("spline-conductance", package = "terradish")}
+#' for nonlinear curves and their plots.
 #' @seealso \code{\link{loglinear_conductance}},
 #'   \code{\link{smooth_loglinear_conductance}}
 terradish_conductance_model_factory <- NULL
@@ -514,6 +519,10 @@ class(loglinear_conductance) <- c("terradish_conductance_model_factory",
 #'   accepts a numeric vector of conductance parameters \code{theta} and
 #'   returns conductance values plus derivative functions used internally by
 #'   the optimizer. Derivatives are with respect to the expanded basis columns.
+#'
+#' @section Worked example:
+#' See \code{vignette("spline-conductance", package = "terradish")} for
+#' fitted conductance curves, genetic-response plots, and model comparison.
 #'
 #' @seealso \code{\link{loglinear_conductance}}, \code{\link{mlpe}},
 #'   \code{\link{conductance_surface}}, \code{\link{terradish}}

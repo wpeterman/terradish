@@ -550,6 +550,11 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   \code{control}, which governs optimization of the conductance parameters.
 #'   The fitted object records the inner optimizer's convergence code and
 #'   iteration count for the final evaluation.
+#'   A failed nuisance warm start is retried from the model's default start,
+#'   retaining any fixed values and custom bounds. Warnings from the failed
+#'   attempt remain visible; the retry is accepted only if it converges.
+#'   Standard MLPE nuisance fits scale the resistance slope internally;
+#'   their convergence criterion is therefore independent of resistance units.
 #' @param slim Logical. If \code{TRUE}, apply \code{\link{slim_terradish}} to
 #'   the returned fit, removing model closures and leverage arrays. Use this for
 #'   durable storage only when later conductance prediction and model
@@ -574,6 +579,11 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   \code{supernodal_max_rhs}, \code{perm}, and \code{solve_backend}; the
 #'   latter can be \code{"matrix"} or the experimental \code{"cholmod_cpp"} and
 #'   \code{"cholmod_cpp_cached"} backends.
+#'   \code{reference = "auto"} grounds a maximum-conductance vertex on
+#'   high-contrast graphs; \code{"last"} retains the original reference.
+#'   This changes the numerical solve while preserving the same graph model.
+#'   Direct solves also reject relative system residuals exceeding
+#'   \code{residual_tolerance = 1e-8}; see \code{\link{terradish_algorithm}}.
 #'   For \code{solver = "auto"}, supported selection entries include
 #'   \code{auto_direct_max_vertices},
 #'   \code{auto_amg_min_vertices}. The legacy \code{auto_direct_max_rhs}
@@ -642,8 +652,8 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'
 #' where \code{theta} are unknown parameters, \code{covariates} is a design
 #' matrix with each row representing a vertex in the graph (cell in the
-#' raster). The conductance of a given edge -- an offdiagonal entry in the
-#' graph Laplacian -- is:
+#' raster). The conductance of a given edge (an off-diagonal entry in the
+#' graph Laplacian) is:
 #'
 #'   \code{edge_conductance[i,j] = vertex_conductance[i] + vertex_conductance[j]}
 #'
@@ -732,13 +742,52 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' retries the default starting point and keeps the better likelihood. Report
 #' starting-value sensitivity when distinct solutions remain plausible.
 #'
-#' @return An object of class \code{terradish} containing the fitted conductance
-#'   parameters, optimized nuisance parameters, log-likelihood, model
-#'   comparison statistics, timing/evaluation diagnostics, and optional
-#'   leverage diagnostics. The nested \code{fit$subproblem} element records the
-#'   convergence code and iteration count from the final nuisance-parameter
-#'   profile. If \code{slim = TRUE}, a \code{storage} element records what was
-#'   removed. See \code{\link{terradish_methods}} for the available S3 methods.
+#' @return An object of class \code{c("terradish", "radish")}, a list. Most
+#'   users need only the methods: \code{summary()} for estimates and intervals,
+#'   \code{coef()} and \code{confint()} for conductance coefficients,
+#'   \code{conductance()} and \code{plot()} for maps and curves, and
+#'   \code{AIC()}, \code{anova()}, or \code{\link{aic_table}} for comparison
+#'   (see \code{\link{terradish_methods}}). The list elements are:
+#'   \item{call, formula}{The matched call and the model formula.}
+#'   \item{dim}{Named vector with the number of graph vertices (raster cells),
+#'     focal sites, and graph edges.}
+#'   \item{convergence}{List describing the conductance optimization:
+#'     \code{code} (0 converged, 1 iteration limit reached, 2 stalled or line
+#'     search failed), \code{message}, \code{iterations},
+#'     \code{max_abs_projected_gradient}, \code{criterion}, \code{boundary}
+#'     (\code{TRUE} when an estimate sits on a bound or no resistance
+#'     structure was detected), and \code{restarted}. Check
+#'     \code{object$convergence$code == 0} before interpreting estimates.}
+#'   \item{fit}{The final graph and likelihood evaluation.
+#'     \code{object$fit$phi} holds the nuisance (measurement-model) estimates
+#'     on the measurement model's internal scale, for example log precision;
+#'     \code{summary()} reports them with intervals. \code{object$fit$fitted}
+#'     is the expected response matrix among focal sites.
+#'     \code{object$fit$subproblem$convergence} is the nuisance optimizer's
+#'     code (0 means converged), which should also be 0 before estimates are
+#'     interpreted.}
+#'   \item{loglik, df, aic}{Maximized log-likelihood, number of estimated
+#'     parameters (conductance coefficients plus nuisance parameters), and
+#'     \eqn{AIC = -2\ell + 2K}.}
+#'   \item{mle}{Conductance estimates (\code{theta}, on the log-conductance
+#'     scale per unit of each covariate as supplied to the graph), and the
+#'     gradient and Hessian of the log-likelihood at the estimate. Elements
+#'     ending in \code{_internal} are on the optimizer's scale.}
+#'   \item{submodels}{The conductance-model and measurement-model functions
+#'     used for the fit; \code{conductance()} and \code{plot()} reuse them.}
+#'   \item{comparison}{Measurement family, \code{nu}, graph fingerprint, and
+#'     response columns that \code{\link{aic_table}} and \code{anova()} use to
+#'     check that fits are comparable.}
+#'   \item{cost, diagnostics, approximation}{Newton steps and function calls,
+#'     solver timing and evaluation diagnostics, and a record of any landmark
+#'     or coarse-raster warm start.}
+#'   \item{gaussian_scale_info, spline_monotonicity}{Metadata for Gaussian
+#'     smoothing and spline conductance terms, or \code{NULL}.}
+#'   \item{leverage}{Leverage arrays for the response (\code{S}) and spatial
+#'     covariates (\code{X}) when \code{leverage = TRUE}, otherwise
+#'     \code{NULL} entries.}
+#'   \item{storage}{Present only when \code{slim = TRUE}; records the model
+#'     closures and leverage arrays that were removed.}
 #'
 #' @examples
 #' \donttest{
@@ -1336,6 +1385,7 @@ terradish <- function(formula,
 #' @param ... Arguments passed through the deprecated \code{radish()}
 #'   compatibility wrapper to \code{\link{terradish}}.
 #' @name legacy_radish_fit_wrapper
+#' @inherit terradish return
 #' @keywords internal
 NULL
 
@@ -1373,6 +1423,10 @@ radish <- function(...)
 #' \code{tau} is log precision and its stored \code{rho} is unconstrained; the
 #' actual shared-site correlation is \eqn{\text{plogis}(\rho)/2}. Consult the
 #' selected measurement-model help page before interpreting \code{phi}.
+#' For a verified numerical zero residual-variance limit in a Wishart fit,
+#' \code{summary()} retains the finite log-scale representation of \code{sigma}
+#' but suppresses its Wald standard error and interval. A zero residual variance
+#' does not imply a zero graph contribution.
 #' Covariance-response residuals are centered on both site dimensions:
 #' \eqn{H(S-\Sigma)H}, where \eqn{H} is the site-centering matrix. Fitted
 #' covariance matrices retain their full \eqn{n\times n} form.
@@ -1380,7 +1434,9 @@ radish <- function(...)
 #' \code{anova()} is a likelihood-ratio test for nested conductance formulas
 #' fitted to the same response, sites, graph domain, conductance-model factory,
 #' measurement model, and pair subset; Wishart fits must also use the same
-#' \code{nu}. The function checks formula-term nesting, but the analyst must
+#' \code{nu}. Both fits must record successful outer and final nuisance
+#' convergence; missing diagnostics require refitting. The function checks
+#' formula-term nesting, but the analyst must
 #' still verify that the full measurement and conductance parameterization is
 #' substantively nested. Its chi-squared reference distribution assumes the
 #' tested parameters are regular interior parameters. It can be unreliable when
@@ -1471,6 +1527,36 @@ NULL
 #'   the fitted conductance surface.
 #' @param ... Additional arguments passed through to generic methods.
 #' @name legacy_radish_methods
+#' @return
+#' \itemize{
+#'   \item \code{print()} returns its input invisibly after printing it.
+#'   \item \code{summary()} returns a list of class \code{summary.terradish}
+#'     and \code{summary.radish}, containing conductance and nuisance-parameter
+#'     estimates, uncertainty tables, convergence diagnostics, log-likelihood,
+#'     and model-comparison statistics. Conductance coefficients are on the
+#'     log-conductance scale; nuisance-parameter uncertainty is conditional on
+#'     the fitted conductance surface.
+#'   \item \code{coef()} returns a named numeric vector of fitted conductance
+#'     coefficients, or an empty vector when they are unidentified.
+#'   \item \code{fitted()} returns a numeric focal-site matrix of expected
+#'     responses, resistance distances, or graph covariances, selected by
+#'     \code{type}.
+#'   \item \code{simulate()} returns a numeric response matrix for
+#'     \code{nsim = 1}, or a three-dimensional array with simulations along
+#'     the third dimension otherwise.
+#'   \item \code{anova()} returns a matrix of class \code{anova}, comparing
+#'     two nested fits by log-likelihood, parameter count, likelihood-ratio
+#'     statistic, and its reference-distribution p-value.
+#'   \item \code{logLik()} returns a numeric scalar of class \code{logLik},
+#'     with parameter-count and focal-site-count attributes.
+#'   \item \code{AIC()} returns a numeric scalar equal to
+#'     \eqn{-2\ell + kK}, where \eqn{K} is the number of estimated parameters.
+#'     Smaller values favor a fit when response and likelihood are comparable.
+#'   \item \code{residuals()} returns a numeric matrix of observed minus
+#'     fitted responses, centered for covariance-response models.
+#' }
+#' See \code{\link{terradish_methods}} for interpretation and comparison
+#' requirements.
 #' @keywords internal
 NULL
 
@@ -1559,6 +1645,13 @@ summary.radish <- function(object, conf.level = 0.95, ...)
     out$phi_vcov <- phi_summary$vcov
     at_lambda <- grepl("^lambda_", rownames(out$phi_table)) & out$phi_table[, 1] == 0
     out$phi_at_bound <- setNames(at_lambda, rownames(out$phi_table))
+    if (isTRUE(x$fit$residual_variance_zero_limit) && "sigma" %in% rownames(out$phi_table)) {
+      out$phi_table["sigma", 2:4] <- NA_real_
+      sigma_index <- match("sigma", rownames(out$phi_table))
+      out$phi_vcov[sigma_index, ] <- out$phi_vcov[, sigma_index] <- NA_real_
+      out$phi_at_bound["sigma"] <- TRUE
+      out$residual_variance_note <- "The residual variance is at its verified numerical zero limit. Sigma is its finite log-scale representation; no Wald uncertainty is reported for this coordinate."
+    }
     if (any(at_lambda)) {
       out$phi_table[at_lambda, 3] <- NA_real_
       out$phi_table[at_lambda, 4] <- qnorm(conf.level) * out$phi_table[at_lambda, 2]
@@ -1626,6 +1719,7 @@ print.summary.radish <- function(x, digits = max(3L, getOption("digits") - 3L), 
   }
   if (!is.null(x$phi_note)) cat(x$phi_note, "\n")
   if (!is.null(x$rho_note)) cat(x$rho_note, "\n")
+  if (!is.null(x$residual_variance_note)) cat(x$residual_variance_note, "\n")
   if (nrow(x$ibe_ratio)) {
     cat("Resistance-distance equivalent of one unit of environmental difference:\n")
     print(x$ibe_ratio, row.names = FALSE)
@@ -1728,6 +1822,9 @@ anova.radish <- function(object, ..., alternative = NULL)
       stop("Supply a second fitted model.", call. = FALSE)
   stopifnot(inherits(object, c("terradish", "radish")) &&
             inherits(alternative, c("terradish", "radish")))
+  if (!.terradish_fit_converged(object) || !.terradish_fit_converged(alternative))
+    stop("Likelihood-ratio tests require converged outer and final nuisance optimizations for both fits; refit objects with missing diagnostics.",
+         call. = FALSE)
   if (.no_structure_boundary(object$fit) || .no_structure_boundary(alternative$fit))
     stop("A no-structure boundary leaves conductance parameters unidentified; this likelihood-ratio test is unavailable.", call. = FALSE)
 

@@ -50,21 +50,25 @@ test_that("anova compares fitted terradish models", {
   surface <- fx$surface
   melip.Fst <- fx$data$melip.Fst
 
-  fit1 <- suppressWarnings(
+  fit1 <- expect_fixture_warnings(
     terradish(melip.Fst ~ altitude,
               data = surface,
               conductance_model = loglinear_conductance,
               measurement_model = leastsquares,
-              control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+              control = NewtonRaphsonControl(maxit = 100, verbose = FALSE)),
+    "^Removed unused spatial covariates: forestcover$"
   )
-  fit2 <- suppressWarnings(
+  fit2 <- (
     terradish(melip.Fst ~ altitude + forestcover,
               data = surface,
               conductance_model = loglinear_conductance,
               measurement_model = leastsquares,
-              control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+              control = NewtonRaphsonControl(maxit = 100, verbose = FALSE))
   )
 
+  # Likelihood-ratio inference requires fitted, rather than two-step, models.
+  expect_true(.terradish_fit_converged(fit1))
+  expect_true(.terradish_fit_converged(fit2))
   tab <- anova(fit1, fit2)
   expect_true(is.matrix(tab) || is.data.frame(tab))
 
@@ -182,8 +186,13 @@ test_that("plot methods return expected objects", {
   expect_true(all(marg_response_data$est <= marg_response_data$upper))
   expect_true(all((marg_response_data$upper - marg_response_data$lower) > 0))
   expect_gt(min(marg_response_data$upper - marg_response_data$lower), 1e-4)
-  expect_equal(marg_response_first$scales$get_scales("y")$name,
+  expect_equal(marg_response_first$labels$y,
                "Predicted genetic distance")
+  # The default y title comes from labs(), not a named scale, so a user's
+  # labs(y = ...) is not silently overridden.
+  expect_true(inherits(marg_response_first$scales$get_scales("y")$name, "waiver"))
+  relabeled <- marg_response_first + ggplot2::labs(y = "Custom label")
+  expect_equal(relabeled$labels$y, "Custom label")
 })
 
 test_that("plot assignment suppresses auto-printing until explicit print", {

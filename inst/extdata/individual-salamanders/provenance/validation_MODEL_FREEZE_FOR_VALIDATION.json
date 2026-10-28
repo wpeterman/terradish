@@ -1,0 +1,162 @@
+[
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/compensatory_500__5000__microsat24__IBR__0.json",
+    "sha256": "5ca9688a3184509ddbaa2af1216241b725d97fa47b06531d005e8fe2ab61c77a"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/compensatory_500__5000__microsat24__IBR__1.json",
+    "sha256": "0f7039fff08cea2c199bd728a63c1394874292ce71be6863244875554cc7e406"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/compensatory_500__5000__microsat24__IBR__2.json",
+    "sha256": "bbeb718e06db23effb054c6d1b4d8266f63f0daf0647c3fe0964c86dd08023db"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/compensatory_500__5000__microsat24__IBR__3.json",
+    "sha256": "be7f95d8e6773cb3106e2f88bf7d02492d5afaccc44315df854b42ebc3e995fa"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/compensatory_500__5000__microsat24__IBR__4.json",
+    "sha256": "388f7f9017552bf7101900573ee05ba11e326a2da98ab4787dd8cf2fcd2fa302"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/compensatory_500__5000__microsat24__uniform__0.json",
+    "sha256": "b8d127fe337ceec5a16ff0a84729a61af6c8ca463de9d2ae955519aebd75ced6"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/compensatory_500__5000__microsat24__uniform__1.json",
+    "sha256": "094671b3fdca10bd8e7044800acc01aed3f3cfc9856c39b1119c0d0c7778002a"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/compensatory_500__5000__microsat24__uniform__2.json",
+    "sha256": "89d2f778021f1ddbd126c46c5ae562584c8b6ca5303fc72c6dac4cca5d6e0d6f"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/compensatory_500__5000__microsat24__uniform__3.json",
+    "sha256": "b27e3ebaccd4ca5bf525904d8a63780ed9cb726c5f47acec635592b8c66a949e"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/compensatory_500__5000__microsat24__uniform__4.json",
+    "sha256": "1025b2126ac05a1e1f4161381890d08f5f8939efc64bbb8c5feab60b62124a9e"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/compensatory_500__5000__SNP2500__IBR__0.json",
+    "sha256": "a76fb3d7ba3dfc97a84969b6c8c209f01013ba24f4a34c7553140b54b271644f"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/compensatory_500__5000__SNP2500__IBR__1.json",
+    "sha256": "83719f0eb859704030a417300be2ec9196524152e4dab80b4b6febf0361b8d64"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/compensatory_500__5000__SNP2500__IBR__2.json",
+    "sha256": "350904296552f050b58db0596d2ebb6729bef9c7ecd237cc1bb00468522e7373"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/compensatory_500__5000__SNP2500__IBR__3.json",
+    "sha256": "0e837204e2ab400d3a17b50ab068ab2ba94e4c51fd78f4f0bd5a6f63b0c5a3e8"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/compensatory_500__5000__SNP2500__IBR__4.json",
+    "sha256": "3095414e733fd001c46f1d285f7881020e73d6cfeaef4a09bb97491a1bcd29eb"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/compensatory_500__5000__SNP2500__uniform__0.json",
+    "sha256": "229847221939cec9395fd2a49c1155b96d4906ae7ef0fffdfc4791e6e22f6f98"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/compensatory_500__5000__SNP2500__uniform__1.json",
+    "sha256": "19f47e1f44958f4d079b7075f7eebaeee0c858f6a7d9b14b6bce600109276009"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/compensatory_500__5000__SNP2500__uniform__2.json",
+    "sha256": "00aa8bfcf2ea78b7bded94dbf612080b135dff1283e0ab6231f4525f75fb1e32"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/compensatory_500__5000__SNP2500__uniform__3.json",
+    "sha256": "48bee8b98e3144aeedf359a571d4fb2e7d0e9270e716437adc6de76f5f8ab4fe"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/compensatory_500__5000__SNP2500__uniform__4.json",
+    "sha256": "6ea3434c30ce76aa82225fd568b5c186e38f6f6b625910e7a7de4d4752f51818"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/control_500__5000__microsat24__IBR__0.json",
+    "sha256": "7479b9ee773e13d632d9a5e83e5e65ed43f1592065e1e773eb8cd5eef5ab4702"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/control_500__5000__microsat24__IBR__1.json",
+    "sha256": "0fa88876a8963ed5b072b3d6cdaf9412a01174d836370b8c9e66566fba508f2a"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/control_500__5000__microsat24__IBR__2.json",
+    "sha256": "226fcd53362466185d7819776f3c9ad7e099ddfadb215718c1d9224f7a28fe72"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/control_500__5000__microsat24__IBR__3.json",
+    "sha256": "2704b73a066b1e3734a6e5e3ac78df510545340e5cabc7aedc1187fe0251cb7c"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/control_500__5000__microsat24__IBR__4.json",
+    "sha256": "4df737ab5eeb07d76f72b8663edbfd1248e9ebe41a61a398932ac65e9038290c"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/control_500__5000__microsat24__uniform__0.json",
+    "sha256": "fb1db5bd0700468fbce53424f86c651f03525918f7056a3d767f8f130df36f56"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/control_500__5000__microsat24__uniform__1.json",
+    "sha256": "71095dc330013761420ffe65da49d43fc394b6ab9df341ccc3721b439ed7b460"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/control_500__5000__microsat24__uniform__2.json",
+    "sha256": "9c9a30f9c07fbecd5b9053b1cd42c4c28817550e2b5443cdd232dd0f11f3fd9e"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/control_500__5000__microsat24__uniform__3.json",
+    "sha256": "6b3b675d391a67501d5561fa75df50f9b025b0e90e13e016844aa2d71594bbbb"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/control_500__5000__microsat24__uniform__4.json",
+    "sha256": "cf7ea1ca8e989006ba8bfb18b80402ee6dd037d4f9ef3571ec49d8f4353faf9e"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/control_500__5000__SNP2500__IBR__0.json",
+    "sha256": "4827d7948aff0d530ad5b242ec2bcb50513c15e8d5143c4ad2f6130274d3c65c"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/control_500__5000__SNP2500__IBR__1.json",
+    "sha256": "f295ceebc246ed924e11550f594b442a9eb24d3191d8d0d4be1ac76567dbc9e7"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/control_500__5000__SNP2500__IBR__2.json",
+    "sha256": "76a8dc1f91963417f6c6ae502c02e6d1a13cb8197f9a11361a79263be2fa5a7b"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/control_500__5000__SNP2500__IBR__3.json",
+    "sha256": "5e475dff8381df9900db9da31ceadc06245f0ab462432354fbf0d3cab3072aec"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/control_500__5000__SNP2500__IBR__4.json",
+    "sha256": "aa8be8864cb7e763bf25e408327807a5bb9ac739fb2571e0d4ba92e798d53299"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/control_500__5000__SNP2500__uniform__0.json",
+    "sha256": "d68e3bd6d4bcd6768c09c0eae4fb3e135863a0018f5b195c3abe19e266341403"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/control_500__5000__SNP2500__uniform__1.json",
+    "sha256": "5c8d0ec150198ed09ed7d1cb7bc6d9a4b0185bf9497f7ccfcffb98048b08445e"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/control_500__5000__SNP2500__uniform__2.json",
+    "sha256": "9e52f42142069dcd1222b29506fe8aa99ab0800210bd444188ffd459f8dba637"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/control_500__5000__SNP2500__uniform__3.json",
+    "sha256": "3d87c253600bceeabcfad97d1b9f73d0131fc94a85bb56133ca6c52e38b6c50a"
+  },
+  {
+    "path": "dev/amphibian_example/terrestrial_individual_candidate_20261023/results/control_500__5000__SNP2500__uniform__4.json",
+    "sha256": "c5e952090a190f0be3dbaa76e6484d34f90b27158216cc2a938a23f6fc1bbd79"
+  }
+]

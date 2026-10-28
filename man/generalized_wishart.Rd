@@ -109,6 +109,15 @@ before evaluating the likelihood. Substantive violations stop the fit. Tiny
 structural deviations within the numerical tolerance are symmetrized and
 set to zero where appropriate. No Euclidean correction is applied.
 }
+\section{Numerical nugget limits}{
+
+Fitting uses the same small-nugget safeguards as
+\code{\link{wishart_covariance}}, retaining supplied bounds and fixed
+parameters. A verified numerical zero residual-variance limit is recorded
+separately from a zero graph contribution; \code{summary()} omits Wald
+uncertainty for its log-scale nugget coordinate.
+}
+
 \section{Effective Wishart information}{
 
 For Wishart likelihoods, \code{nu} scales the log likelihood. Point

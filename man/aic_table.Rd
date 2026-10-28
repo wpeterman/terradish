@@ -37,7 +37,9 @@ is the number of added pairwise covariate columns.}
 \value{
 A data frame containing model ranks, parameter counts, information
   criterion values, delta values, weights, cumulative weights, and
-  log-likelihoods. The \code{converged} column records convergence code 0;
+  log-likelihoods. The \code{converged} column is true only when both the
+  outer optimizer and final nuisance optimization record code 0. Missing
+  convergence diagnostics in older objects are treated as unverified (false);
   \code{boundary} marks active parameter bounds or no resistance structure.
   A warning identifies tables containing nonconverged or boundary fits.
 }
@@ -64,6 +66,12 @@ The function checks response values, model family, fitted dimensions,
 recorded \code{nu}, and retained graph signatures. Older fits without
 signatures require the user to verify the graph domain.
 }
+\section{Worked example}{
+
+See \code{vignette("model-comparison", package = "terradish")} for
+compatible model rankings, coefficient plots, and predictive comparisons.
+}
+
 \examples{
 \donttest{
 library(terra)

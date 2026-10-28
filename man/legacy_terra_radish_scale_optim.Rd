@@ -27,6 +27,31 @@ terra_radish_scale_optim(
   ...
 )
 }
+\value{
+An object of class \code{"terradish_scale_optim"}, a list with:
+\item{par}{The selected scale for each raster layer, in the units
+  \code{scale_fun} uses (map units for both built-in methods).}
+\item{value}{The outer objective at \code{par}.  Lower is better, whichever
+  objective was used.}
+\item{fit}{The fitted \code{terradish} model at \code{par}.  Read its
+  conductance coefficients with \code{coef()} the same way as any other fit;
+  they are on the log-conductance scale.}
+\item{surface}{The conductance surface built from the rasters smoothed at
+  \code{par}, ready to pass to \code{conductance()} or \code{plot()}.}
+\item{evaluations}{A data frame with one row per candidate scale
+  combination: the scale for each layer, the \code{objective} value,
+  \code{aic}, \code{loglik}, and a \code{status} column that records
+  \code{"OK"} or the error for candidates that failed to fit.  Inspect this
+  to see how sharply the objective distinguishes the scales; a flat column
+  means the objective does not identify a smoothing scale within the searched
+  range.}
+\item{search}{The search strategy used, \code{"grid"} or
+  \code{"coordinate"}.}
+\item{objective}{The name of the objective minimized, \code{"aic"} or
+  \code{"logLik"}.}
+\item{iterations, convergence}{Number of outer iterations, and \code{0} if
+  the coordinate search converged (always \code{0} for a grid search).}
+}
 \description{
 Legacy alias retained for backward compatibility with older
 \code{terra_radish_scale_optim()} calls.

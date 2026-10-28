@@ -1,3 +1,11 @@
+.terradish_fit_converged <- function(fit)
+{
+  # Outer stationarity does not establish convergence of the profiled model.
+  # Missing legacy diagnostics cannot certify a successful fit either.
+  isTRUE(fit$convergence$code == 0L) &&
+    isTRUE(fit$fit$subproblem$convergence == 0L)
+}
+
 .terradish_measurement_model <- function(model, subset = NULL)
 {
   if (inherits(model, c("terradish_measurement_model",
@@ -26,6 +34,10 @@
                                          theta = NULL, cores = 1L, dots = list(),
                                          response_matrix = NULL)
 {
+  # An explicit optimizer must be forwarded once. The default still tries
+  # Newton first and falls back to BFGS only when that call raises an error.
+  requested_optimizer <- dots$optimizer
+  dots$optimizer <- NULL
   fit_once <- function(optimizer)
   {
     args <- c(list(formula = formula,
@@ -43,8 +55,8 @@
     tryCatch(eval(call, envir = eval_env), error = identity)
   }
 
-  fit <- fit_once("newton")
-  if (inherits(fit, "error"))
+  fit <- fit_once(if (is.null(requested_optimizer)) "newton" else requested_optimizer)
+  if (is.null(requested_optimizer) && inherits(fit, "error"))
     fit <- fit_once("bfgs")
   if (inherits(fit, "error"))
     stop("Could not optimize terradish model: ", conditionMessage(fit), call. = FALSE)

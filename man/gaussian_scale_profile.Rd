@@ -32,8 +32,15 @@ The interval is the connected likelihood-ratio support region
   check for additional support regions. Limits stop at the original bounds.
   At a boundary the usual chi-square calibration is an approximation.
   Failed optimizations stop the calculation instead of silently dropping
-  profile points. This can be substantially slower than Wald intervals.
+  profile points. Both conductance and final measurement-parameter convergence
+  are required. This can be substantially slower than Wald intervals.
 }
+\section{Worked example}{
+
+See \code{vignette("gaussian-scale-optimization", package = "terradish")}
+for scale profiles, forest-effect plots, and interpretation in map units.
+}
+
 \examples{
 \donttest{
 set.seed(24)

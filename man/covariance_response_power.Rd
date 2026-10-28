@@ -121,7 +121,9 @@ An object of class \code{"terradish_covariance_power"} containing:
 Power and coverage are internal to the assumed response model. Matching
 simulation and fitting values cannot diagnose incorrect information in a
 real data set. Nonconverged fits count as failed fits and non-detections;
-inspect \code{fit_rate} before interpreting power or coverage.
+both outer and final nuisance optimization must record code 0. Missing
+convergence diagnostics also count as failed fits.
+Inspect \code{fit_rate} before interpreting power or coverage.
 }
 \description{
 Runs a fast simulation study for covariance-response \code{terradish} fits.

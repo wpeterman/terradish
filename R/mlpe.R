@@ -39,10 +39,29 @@
 #' model-based standard errors understated replicate variation about 1.7-fold.
 #' Use spatial CV to assess out-of-sample support for conductance terms.
 #'
-#' Summaries report shared-site correlation on its natural scale. Near zero,
-#' the stored logit parameter is poorly identified; its standard error is
-#' reported as unavailable and a boundary note is shown. This boundary differs
+#' With the standard nuisance bounds, fitting profiles the regression
+#' coefficients and residual precision analytically at each shared-site
+#' correlation, then searches the correlation before Newton refinement.
+#' The resistance predictor is centered and scaled internally so changing
+#' its units does not change the nuisance optimum or convergence criterion.
+#' Stored coefficients remain in the original units. Fixed predictive
+#' parameters and custom nuisance bounds use their supplied constraints.
+#' A profile reaching the upper numerical correlation endpoint is rejected
+#' because a regular finite nuisance optimum has not been established.
+#'
+#' \code{summary()} reports \code{rho} on its internal logit scale, with a
+#' Wald interval on that scale. Convert an estimate or interval endpoint with
+#' \code{plogis(rho) / 2} to obtain the shared-site correlation, which lies
+#' between 0 and 0.5. A value near 0.5 means site identity explains most of
+#' the residual variation. When the correlation approaches zero, the logit
+#' parameter is poorly identified, so \code{summary()} reports \code{rho} as 0
+#' with no standard error and prints a boundary note. This boundary differs
 #' from a zero resistance coefficient, which leaves conductance unidentified.
+#'
+#' To read the other nuisance parameters, \code{alpha} is the expected
+#' genetic distance at zero resistance distance, \code{beta} is the increase
+#' in genetic distance per unit of resistance distance, and the residual
+#' standard deviation is \code{exp(-tau / 2)}.
 #'
 #' The nuisance parameters are:
 #' \describe{
@@ -73,6 +92,10 @@
 #' relationships between distance matrices: estimating gene flow with distance.
 #' Journal of Agricultural, Biological, and Environmental Statistics
 #' 7(3):361-372.
+#'
+#' @section Worked example:
+#' \code{vignette("mlpe-pairwise-distance", package = "terradish")} fits and
+#' interprets MLPE models for a pairwise \eqn{F_{ST}} matrix.
 #'
 #' @seealso \code{\link{leastsquares}}, \code{\link{mlpe_covariates}},
 #'   \code{\link{generalized_wishart}}, \code{\link{terradish}}
@@ -127,8 +150,7 @@ mlpe <- function(E, S, phi, nu = NULL, gradient = TRUE, hessian = TRUE, partial 
 
   if (missing(phi)) #return starting values and boundaries for optimization of phi
   {
-    ls_start <- leastsquares(E = E, S = S, nonnegative = nonnegative)$phi
-    phi <- c(ls_start, "rho" = qlogis(0.2))
+    phi <- .mlpe_initial_values(E, S, nonnegative)
 
     return(list(phi   = phi, 
                 lower = if (nonnegative) c(-Inf, 0, -Inf, -Inf) 
@@ -158,7 +180,7 @@ mlpe <- function(E, S, phi, nu = NULL, gradient = TRUE, hessian = TRUE, partial 
   Ind <- which(lower.tri(R), arr.ind = TRUE)
 
   unos   <- matrix(1, length(Sl), 1)
-  U      <- sparseMatrix(i = rep(seq_along(Sl), 2), j = c(Ind), x = c(unos))
+  U      <- Matrix::sparseMatrix(i = rep(seq_along(Sl), 2), j = c(Ind), x = c(unos))
 
   correlation <- .mlpe_correlation_operator(U, phi["rho"])
   SigmaInv <- correlation$inverse
@@ -187,7 +209,7 @@ mlpe <- function(E, S, phi, nu = NULL, gradient = TRUE, hessian = TRUE, partial 
       rownames(ddPhi) <- colnames(ddEdPhi) <- 
         rownames(ddPhidS) <- names(phi)
 
-    drho_Si_e  <- t(U) %*% Si_e
+    drho_Si_e  <- Matrix::t(U) %*% Si_e
     drho_Si_e  <- as.matrix(2*Si_e - U %*% drho_Si_e)
     drho_trans <- correlation$derivative
 
@@ -388,10 +410,10 @@ class(mlpe) <- c("terradish_measurement_model",
   else
   {
     Ind <- which(lower.tri(diag(n)), arr.ind = TRUE)
-    U <- sparseMatrix(i = rep(seq_len(nrow(Ind)), 2),
+    U <- Matrix::sparseMatrix(i = rep(seq_len(nrow(Ind)), 2),
                       j = c(Ind),
                       x = rep(1, nrow(Ind) * 2))
-    eigen(as.matrix(t(U) %*% U))
+    eigen(as.matrix(Matrix::t(U) %*% U))
   }
 
   assign(key, eig, envir = .mlpe_eigen_cache)

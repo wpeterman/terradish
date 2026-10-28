@@ -80,10 +80,29 @@ comparison does not validate the correlation model: in package validation,
 model-based standard errors understated replicate variation about 1.7-fold.
 Use spatial CV to assess out-of-sample support for conductance terms.
 
-Summaries report shared-site correlation on its natural scale. Near zero,
-the stored logit parameter is poorly identified; its standard error is
-reported as unavailable and a boundary note is shown. This boundary differs
+With the standard nuisance bounds, fitting profiles the regression
+coefficients and residual precision analytically at each shared-site
+correlation, then searches the correlation before Newton refinement.
+The resistance predictor is centered and scaled internally so changing
+its units does not change the nuisance optimum or convergence criterion.
+Stored coefficients remain in the original units. Fixed predictive
+parameters and custom nuisance bounds use their supplied constraints.
+A profile reaching the upper numerical correlation endpoint is rejected
+because a regular finite nuisance optimum has not been established.
+
+\code{summary()} reports \code{rho} on its internal logit scale, with a
+Wald interval on that scale. Convert an estimate or interval endpoint with
+\code{plogis(rho) / 2} to obtain the shared-site correlation, which lies
+between 0 and 0.5. A value near 0.5 means site identity explains most of
+the residual variation. When the correlation approaches zero, the logit
+parameter is poorly identified, so \code{summary()} reports \code{rho} as 0
+with no standard error and prints a boundary note. This boundary differs
 from a zero resistance coefficient, which leaves conductance unidentified.
+
+To read the other nuisance parameters, \code{alpha} is the expected
+genetic distance at zero resistance distance, \code{beta} is the increase
+in genetic distance per unit of resistance distance, and the residual
+standard deviation is \code{exp(-tau / 2)}.
 
 The nuisance parameters are:
 \describe{
@@ -114,6 +133,12 @@ When the fitted internal correlation logit is below -8,
   Wald uncertainty. The parameter remains in the degrees of freedom because
   it was estimated; fixing it in advance would define a different model.
 }
+\section{Worked example}{
+
+\code{vignette("mlpe-pairwise-distance", package = "terradish")} fits and
+interprets MLPE models for a pairwise \eqn{F_{ST}} matrix.
+}
+
 \examples{
 library(terra)
 

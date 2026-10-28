@@ -9,7 +9,7 @@ test_that("gaussian scale-aware conductance matches numerical derivatives for in
   factory <- gaussian_smoothed_loglinear_conductance(
     surface,
     sigma_lower = 0.2,
-    sigma_upper = 5
+    sigma_upper = 1
   )
   conductance_model <- factory(~ altitude * forestcover + I(altitude^2), surface$x)
   theta <- attr(conductance_model, "default")
@@ -18,7 +18,7 @@ test_that("gaussian scale-aware conductance matches numerical derivatives for in
     forestcover = -0.10,
     `altitude:forestcover` = 0.04,
     `I(altitude^2)` = 0.03,
-    `sigma.altitude` = 1.2,
+    `sigma.altitude` = 0.9,
     `sigma.forestcover` = 0.8
   )[names(theta)]
 
@@ -75,19 +75,19 @@ test_that("gaussian scale-aware conductance fits jointly with bounded sigma", {
   factory <- gaussian_smoothed_loglinear_conductance(
     surface,
     sigma_lower = 0.5,
-    sigma_upper = 2
+    sigma_upper = 1
   )
   conductance_model <- factory(~ altitude + I(altitude^2), surface$x)
   info <- attr(conductance_model, "gaussian_scale_info")
   expect_equal(info$lower[["altitude"]], 0.5)
-  expect_equal(info$upper[["altitude"]], 2)
+  expect_equal(info$upper[["altitude"]], 1)
   expect_equal(
     attr(conductance_model, "lower")[["sigma.altitude"]],
     0.5 / info$conversion[["altitude"]]
   )
   expect_equal(
     attr(conductance_model, "upper")[["sigma.altitude"]],
-    2 / info$conversion[["altitude"]]
+    1 / info$conversion[["altitude"]]
   )
 
   warnings <- character()
@@ -113,7 +113,7 @@ test_that("gaussian scale-aware conductance fits jointly with bounded sigma", {
   expect_true(all(c("altitude", "I(altitude^2)", "sigma.altitude") %in%
                     names(coef(fit))))
   expect_gte(unname(coef(fit)[["sigma.altitude"]]), 0.5)
-  expect_lte(unname(coef(fit)[["sigma.altitude"]]), 2)
+  expect_lte(unname(coef(fit)[["sigma.altitude"]]), 1)
   expect_null(fit$leverage$S)
 
   cond <- conductance(surface, fit)
@@ -156,7 +156,7 @@ test_that("gaussian sigma conversion factor keeps map-unit reporting", {
       conductance_model = gaussian_smoothed_loglinear_conductance(
         surface,
         sigma_lower = 0.5,
-        sigma_upper = 2,
+        sigma_upper = 1,
         sigma_conversion_factor = 0.25
       ),
       measurement_model = leastsquares,
@@ -192,7 +192,7 @@ test_that("gaussian marginal plots work on the fitted smoothed covariate scale",
       conductance_model = gaussian_smoothed_loglinear_conductance(
         surface,
         sigma_lower = 0.5,
-        sigma_upper = 2
+        sigma_upper = 1
       ),
       measurement_model = leastsquares,
       optimizer = "bfgs",
@@ -214,7 +214,7 @@ test_that("gaussian marginal plots work on the fitted smoothed covariate scale",
   expect_true(inherits(marg_response, "ggplot") || is.list(marg_response))
   marg_response_first <- if (inherits(marg_response, "ggplot")) marg_response else marg_response[[1]]
   marg_response_data <- if (inherits(marg_response, "ggplot")) marg_response$data else do.call(rbind, lapply(marg_response, function(p) p$data))
-  expect_equal(marg_response_first$scales$get_scales("y")$name,
+  expect_equal(marg_response_first$labels$y,
                "Predicted genetic distance")
   expect_true(all(is.finite(marg_response_data$est)))
 
@@ -276,7 +276,7 @@ test_that("gaussian scale-aware conductance rejects non-finite conductance value
   factory <- gaussian_smoothed_loglinear_conductance(
     surface,
     sigma_lower = 0.5,
-    sigma_upper = 2
+    sigma_upper = 1
   )
   conductance_model <- factory(~ forestcover, surface$x)
   theta <- attr(conductance_model, "default")
@@ -299,7 +299,7 @@ test_that("gaussian scale-aware conductance validates sigma starts and supports 
   factory <- gaussian_smoothed_loglinear_conductance(
     surface,
     sigma_lower = 0.5,
-    sigma_upper = 2
+    sigma_upper = 1
   )
 
   expect_error(
@@ -333,4 +333,14 @@ test_that("gaussian scale-aware conductance validates sigma starts and supports 
   expect_true(isTRUE(fit_coarse$approximation$used))
   expect_equal(fit_coarse$approximation$type, "coarse_raster")
   expect_true(all(c("altitude", "sigma.altitude") %in% names(coef(fit_coarse))))
+})
+
+
+test_that("Gaussian bounds warn when kernel support is exceeded", {
+  dat <- melip_fixture(1:6)
+  graph <- conductance_surface(dat$covariates, dat$coords, saveStack = TRUE)
+  factory <- gaussian_smoothed_loglinear_conductance(graph,
+    sigma_lower = .2, sigma_upper = 5)
+  expect_warning(factory(~ altitude + forestcover, graph$x),
+                 "exceeds the three-sigma support")
 })

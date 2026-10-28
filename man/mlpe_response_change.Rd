@@ -56,6 +56,11 @@ The reported contrast is a conditional association under the fitted MLPE
 model. It is not a causal effect or proof that IBE has been separated from
 IBR or other spatially correlated predictors.
 }
+\section{Worked examples}{
+
+\code{vignette("ibe-ibr-workflow", package = "terradish")}.
+}
+
 \examples{
 \donttest{
 data(melip)

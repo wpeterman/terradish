@@ -128,7 +128,7 @@ remotes::install_github("wpeterman/terradish@experimental")
 
 ## Vignettes and attribution
 
-Start with `vignette("getting-started", package = "terradish")`. Other guides cover comparison, IBE and IBR, Wishart covariance, splines, Gaussian scales, large landscapes, and simulation design. Open the collection with `browseVignettes("terradish")`.
+Start with `vignette("getting-started", package = "terradish")`, or with `vignette("mlpe-pairwise-distance", package = "terradish")` if your data are a pairwise genetic distance matrix such as FST. Other guides cover comparison, IBE and IBR, Wishart covariance, splines, Gaussian scales, large landscapes, and simulation design. Open the collection with `browseVignettes("terradish")`.
 
 Nate Pope developed the sparse graph optimization, reverse-mode derivatives, MLPE, and generalized Wishart foundations in [radish](https://github.com/nspope/radish). terradish extends that framework with terra-native workflows and the supported features above. Selected deprecated `radish*` wrappers remain; full compatibility with every historical entry point is not promised.
 

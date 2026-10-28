@@ -100,11 +100,8 @@ degrees of freedom \eqn{\nu}. Adding a constant to every entry of \code{S}
 or centering it across sites does not change this objective. This is the
 same objective as \code{generalized_wishart(dist_from_cov(S))}; the nugget
 contributes \eqn{2\exp(\sigma)} to the expected squared distances.
-
-The former full-rank likelihood included the arbitrary site-mean direction.
-It has been removed because centered genetic covariance contains no
-information in that direction. The contrast form retains the interpretable
-comparisons among sites and agrees with covariance-derived distances.
+Working on contrasts discards only the overall site-mean direction, which
+carries no information in a centered genetic covariance.
 
 \strong{Preparing the response.} Use a coherent covariance construction,
 such as \code{diagonal = "gower"} for grouped data in landgraph. A
@@ -113,7 +110,23 @@ Wishart fitting, even when the matrix happens to be positive definite.
 Per-locus standardization up-weights rare variants; filter by minor-allele
 frequency and assess sensitivity. Unequal group sizes create unequal
 sampling variance that a common diagonal nugget does not automatically fix.
+
+During fitting, \code{\link{terradish}} checks very small nugget estimates
+for false convergence on the log scale. Improving finite-variance starts
+retain the supplied bounds. An unrestricted nugget can instead be represented
+at a verified numerical zero limit: its finite log value gives a positive
+variance below floating-point covariance precision, and the one-sided
+variance gradient must satisfy the stopping tolerance. This does not change
+the likelihood or override fixed parameters. The fitted object records
+\code{fit$residual_variance_zero_limit}; \code{summary()} omits Wald
+uncertainty for \code{sigma} at that limit.
 }
+\section{Worked examples}{
+
+\code{vignette("wishart-covariance", package = "terradish")},
+\code{vignette("individual-salamanders", package = "terradish")}.
+}
+
 \section{Effective Wishart information}{
 
 For Wishart likelihoods, \code{nu} scales the log likelihood. Point

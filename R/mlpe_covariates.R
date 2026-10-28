@@ -155,6 +155,11 @@ pairwise_endpoint_covariates <- function(x,
 #' @seealso \code{\link{mlpe}}, \code{\link{pairwise_endpoint_covariates}},
 #'   \code{\link{terradish_cv_folds}}
 #'
+#' @section Worked example:
+#' See \code{vignette("ibe-ibr-workflow", package = "terradish")} for
+#' paired environmental differences, genetic-response contrasts, and their
+#' distinction from covariance kernels.
+#'
 #' @references
 #' Clarke RT, Rothery P, Raybould AF. 2002. Confidence limits for regression
 #' relationships between distance matrices: estimating gene flow with distance.

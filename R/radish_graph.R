@@ -501,6 +501,7 @@ conductance.terradish_graph <- function(x, fit, quantile = 0.95,
 #'   clamp when \code{support = "focal"}.
 #' @param ... Additional arguments passed to methods.
 #' @name legacy_radish_graph_methods
+#' @inherit conductance.terradish_graph return
 #' @keywords internal
 NULL
 

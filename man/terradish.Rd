@@ -116,6 +116,11 @@ entries include \code{factorization}, \code{supernodal_min_vertices},
 \code{supernodal_max_rhs}, \code{perm}, and \code{solve_backend}; the
 latter can be \code{"matrix"} or the experimental \code{"cholmod_cpp"} and
 \code{"cholmod_cpp_cached"} backends.
+\code{reference = "auto"} grounds a maximum-conductance vertex on
+high-contrast graphs; \code{"last"} retains the original reference.
+This changes the numerical solve while preserving the same graph model.
+Direct solves also reject relative system residuals exceeding
+\code{residual_tolerance = 1e-8}; see \code{\link{terradish_algorithm}}.
 For \code{solver = "auto"}, supported selection entries include
 \code{auto_direct_max_vertices},
 \code{auto_amg_min_vertices}. The legacy \code{auto_direct_max_rhs}
@@ -171,7 +176,12 @@ guarded and the approximation stage is skipped.}
 for the inner nuisance-parameter profile. This is separate from
 \code{control}, which governs optimization of the conductance parameters.
 The fitted object records the inner optimizer's convergence code and
-iteration count for the final evaluation.}
+iteration count for the final evaluation.
+A failed nuisance warm start is retried from the model's default start,
+retaining any fixed values and custom bounds. Warnings from the failed
+attempt remain visible; the retry is accepted only if it converges.
+Standard MLPE nuisance fits scale the resistance slope internally;
+their convergence criterion is therefore independent of resistance units.}
 
 \item{slim}{Logical. If \code{TRUE}, apply \code{\link{slim_terradish}} to
 the returned fit, removing model closures and leverage arrays. Use this for
@@ -179,13 +189,52 @@ durable storage only when later conductance prediction and model
 reevaluation are unnecessary.}
 }
 \value{
-An object of class \code{terradish} containing the fitted conductance
-  parameters, optimized nuisance parameters, log-likelihood, model
-  comparison statistics, timing/evaluation diagnostics, and optional
-  leverage diagnostics. The nested \code{fit$subproblem} element records the
-  convergence code and iteration count from the final nuisance-parameter
-  profile. If \code{slim = TRUE}, a \code{storage} element records what was
-  removed. See \code{\link{terradish_methods}} for the available S3 methods.
+An object of class \code{c("terradish", "radish")}, a list. Most
+  users need only the methods: \code{summary()} for estimates and intervals,
+  \code{coef()} and \code{confint()} for conductance coefficients,
+  \code{conductance()} and \code{plot()} for maps and curves, and
+  \code{AIC()}, \code{anova()}, or \code{\link{aic_table}} for comparison
+  (see \code{\link{terradish_methods}}). The list elements are:
+  \item{call, formula}{The matched call and the model formula.}
+  \item{dim}{Named vector with the number of graph vertices (raster cells),
+    focal sites, and graph edges.}
+  \item{convergence}{List describing the conductance optimization:
+    \code{code} (0 converged, 1 iteration limit reached, 2 stalled or line
+    search failed), \code{message}, \code{iterations},
+    \code{max_abs_projected_gradient}, \code{criterion}, \code{boundary}
+    (\code{TRUE} when an estimate sits on a bound or no resistance
+    structure was detected), and \code{restarted}. Check
+    \code{object$convergence$code == 0} before interpreting estimates.}
+  \item{fit}{The final graph and likelihood evaluation.
+    \code{object$fit$phi} holds the nuisance (measurement-model) estimates
+    on the measurement model's internal scale, for example log precision;
+    \code{summary()} reports them with intervals. \code{object$fit$fitted}
+    is the expected response matrix among focal sites.
+    \code{object$fit$subproblem$convergence} is the nuisance optimizer's
+    code (0 means converged), which should also be 0 before estimates are
+    interpreted.}
+  \item{loglik, df, aic}{Maximized log-likelihood, number of estimated
+    parameters (conductance coefficients plus nuisance parameters), and
+    \eqn{AIC = -2\ell + 2K}.}
+  \item{mle}{Conductance estimates (\code{theta}, on the log-conductance
+    scale per unit of each covariate as supplied to the graph), and the
+    gradient and Hessian of the log-likelihood at the estimate. Elements
+    ending in \code{_internal} are on the optimizer's scale.}
+  \item{submodels}{The conductance-model and measurement-model functions
+    used for the fit; \code{conductance()} and \code{plot()} reuse them.}
+  \item{comparison}{Measurement family, \code{nu}, graph fingerprint, and
+    response columns that \code{\link{aic_table}} and \code{anova()} use to
+    check that fits are comparable.}
+  \item{cost, diagnostics, approximation}{Newton steps and function calls,
+    solver timing and evaluation diagnostics, and a record of any landmark
+    or coarse-raster warm start.}
+  \item{gaussian_scale_info, spline_monotonicity}{Metadata for Gaussian
+    smoothing and spline conductance terms, or \code{NULL}.}
+  \item{leverage}{Leverage arrays for the response (\code{S}) and spatial
+    covariates (\code{X}) when \code{leverage = TRUE}, otherwise
+    \code{NULL} entries.}
+  \item{storage}{Present only when \code{slim = TRUE}; records the model
+    closures and leverage arrays that were removed.}
 }
 \description{
 Uses maximum likelihood to fit a parameterized conductance surface to genetic data,
@@ -212,8 +261,8 @@ For example, a log-linear choice of conductance model is:
 
 where \code{theta} are unknown parameters, \code{covariates} is a design
 matrix with each row representing a vertex in the graph (cell in the
-raster). The conductance of a given edge -- an offdiagonal entry in the
-graph Laplacian -- is:
+raster). The conductance of a given edge (an off-diagonal entry in the
+graph Laplacian) is:
 
   \code{edge_conductance[i,j] = vertex_conductance[i] + vertex_conductance[j]}
 

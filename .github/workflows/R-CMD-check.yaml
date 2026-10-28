@@ -52,7 +52,7 @@ jobs:
           build_args: 'c("--no-manual", "--compact-vignettes=gs+qpdf")'
           upload-results: true
 
-      - name: Rebuild full computational vignette sources
+      - name: Rebuild full executable vignette sources
         if: matrix.config.os == 'ubuntu-latest' && matrix.config.r == 'release'
         run: |
           Rscript -e 'pkgload::load_all("."); for (source in list.files("inst/vignette-source", pattern = "[.]Rmd$", full.names = TRUE)) rmarkdown::render(source, output_dir = tempdir(), quiet = TRUE)'

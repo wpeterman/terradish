@@ -71,6 +71,37 @@ tables?}
 
 \item{k}{Penalty multiplier supplied to \code{AIC()}.}
 }
+\value{
+\itemize{
+  \item \code{print()} returns its input invisibly after printing it.
+  \item \code{summary()} returns a list of class \code{summary.terradish}
+    and \code{summary.radish}, containing conductance and nuisance-parameter
+    estimates, uncertainty tables, convergence diagnostics, log-likelihood,
+    and model-comparison statistics. Conductance coefficients are on the
+    log-conductance scale; nuisance-parameter uncertainty is conditional on
+    the fitted conductance surface.
+  \item \code{coef()} returns a named numeric vector of fitted conductance
+    coefficients, or an empty vector when they are unidentified.
+  \item \code{fitted()} returns a numeric focal-site matrix of expected
+    responses, resistance distances, or graph covariances, selected by
+    \code{type}.
+  \item \code{simulate()} returns a numeric response matrix for
+    \code{nsim = 1}, or a three-dimensional array with simulations along
+    the third dimension otherwise.
+  \item \code{anova()} returns a matrix of class \code{anova}, comparing
+    two nested fits by log-likelihood, parameter count, likelihood-ratio
+    statistic, and its reference-distribution p-value.
+  \item \code{logLik()} returns a numeric scalar of class \code{logLik},
+    with parameter-count and focal-site-count attributes.
+  \item \code{AIC()} returns a numeric scalar equal to
+    \eqn{-2\ell + kK}, where \eqn{K} is the number of estimated parameters.
+    Smaller values favor a fit when response and likelihood are comparable.
+  \item \code{residuals()} returns a numeric matrix of observed minus
+    fitted responses, centered for covariance-response models.
+}
+See \code{\link{terradish_methods}} for interpretation and comparison
+requirements.
+}
 \description{
 Deprecated S3 methods retained for legacy objects that still dispatch on the
 older \code{"radish"} class names.

@@ -1,8 +1,8 @@
 Package: terradish
 Type: Package
 Title: Fast Gradient-Based Optimization of Resistance Surfaces
-Version: 1.0.0
-Date: 2026-10-07
+Version: 1.1.0
+Date: 2026-10-28
 Language: en-US
 Authors@R: c(
   person(
@@ -30,7 +30,13 @@ Description: Maximum likelihood estimation of landscape conductance surfaces
   available in both. Provides exact sparse and iterative solvers for
   large rasters, fixed-domain spatial cross-validation for comparing conductance
   formulas, and simulation tools for study design. Works with 'terra'
-  objects.
+  objects. Fitting one parameterized conductance surface to genetic data,
+  rather than regressing on separate resistance distances, follows Peterman
+  and Pope (2021) <doi:10.1111/mec.15716>. Background on population-effects
+  models and circuit-based covariance models is provided by Clarke, Rothery
+  and Raybould (2002)
+  <doi:10.1198/108571102320> and Hanks and Hooten (2013)
+  <doi:10.1080/01621459.2012.724647>, respectively.
 URL: https://github.com/wpeterman/terradish,
   https://doi.org/10.5281/zenodo.21225711
 BugReports: https://github.com/wpeterman/terradish/issues

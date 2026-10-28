@@ -1,6 +1,33 @@
 # Simulation-based power regressions run in CI with NOT_CRAN=true.
 skip_on_cran()
 
+test_that("power summaries exclude failed outer and nuisance fits from selection", {
+  good <- structure(list(mle = list(theta = c(x = .2)), loglik = -10,
+    aic = 24, df = 2, convergence = list(code = 0L),
+    fit = list(subproblem = list(convergence = 0L)),
+    submodels = list(f = function(theta) list(conductance = 1:3))), class = "terradish")
+  row <- function(fit, label) .covariance_power_result_row(
+    "test", "spacefill", 6, 1, 1, label, "OK", 0, 6, 15, fit, 1:3, .8)
+  for (part in c("outer", "nuisance", "missing")) {
+    bad <- good
+    # A higher apparent likelihood must not make an incomplete fit selectable.
+    bad$loglik <- 100; bad$aic <- -196
+    if (part == "outer") bad$convergence$code <- 1L
+    if (part == "nuisance") bad$fit$subproblem$convergence <- 2L
+    if (part == "missing") bad$fit$subproblem <- NULL
+    result <- row(bad, "bad")
+    expect_false(result$fit_ok)
+    expect_match(result$status, "^NONCONVERGED:")
+    expect_true(all(is.na(result[c("loglik", "AIC", "AICc")])))
+    expect_false(result$conductance_recovered)
+    ranked <- .covariance_power_mark_selection(rbind(row(good, "good"), result))
+    expect_identical(ranked$selected_AIC, c(TRUE, FALSE))
+    expect_identical(ranked$selected_AICc, c(TRUE, FALSE))
+  }
+  expect_true(row(good, "good")$fit_ok)
+  expect_true(row(good, "good")$conductance_recovered)
+})
+
 test_that("covariance_response_power summarizes spline recovery scenarios", {
   dat <- melip_fixture(keep = 1:7)
   surface <- conductance_surface(dat$covariates, dat$coords, directions = 8)
@@ -48,7 +75,7 @@ test_that("covariance_response_power accepts Gaussian theta on external scale", 
     surface,
     scale_vars = "altitude",
     sigma_lower = 0.5,
-    sigma_upper = 4,
+    sigma_upper = 1,
     sigma_conversion_factor = 2
   )
   gaussian_model <- gaussian_factory(~ altitude, surface$x)

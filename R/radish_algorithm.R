@@ -221,6 +221,9 @@
   list(
     factorization = "auto",
     solve_backend = "matrix",
+    reference = "auto",
+    residual_tolerance = 1e-8,
+    refinement_steps = 3L,
     supernodal_min_vertices = 50000L,
     supernodal_max_rhs = 64L,
     perm = TRUE
@@ -345,10 +348,39 @@
 
   if (solver == "direct")
   {
-    Qn <- .graph_reduced_laplacian(s, conductance)
+    if (!is.numeric(control$residual_tolerance) || length(control$residual_tolerance) != 1L ||
+        is.na(control$residual_tolerance) || control$residual_tolerance <= 0)
+      stop("`solver_control$residual_tolerance` must be positive (or Inf).", call. = FALSE)
+    if (!is.numeric(control$refinement_steps) || length(control$refinement_steps) != 1L ||
+        !is.finite(control$refinement_steps) || control$refinement_steps < 0 ||
+        control$refinement_steps != as.integer(control$refinement_steps))
+      stop("`solver_control$refinement_steps` must be a nonnegative integer.", call. = FALSE)
+    # Ground a vertex in the high-conductance region on stiff graphs. A
+    # low-conductance reference can leave a large, nearly constant potential
+    # on the stiff region and lose its small voltage differences. This changes
+    # only the gauge of the same Laplacian system, not graph edge weights.
+    reference_mode <- match.arg(control$reference, c("auto", "last", "max_conductance"))
+    n <- length(conductance)
+    valid_conductance <- all(is.finite(conductance) & conductance > 0)
+    reference <- if (valid_conductance && (reference_mode == "max_conductance" ||
+                     (reference_mode == "auto" && diff(range(log(conductance))) > log(1e6))))
+      which.max(conductance) else n
+    reference_permutation <- NULL
+    if (reference == n)
+      Qn <- .graph_reduced_laplacian(s, conductance)
+    else
+    {
+      reference_permutation <- c(setdiff(seq_len(n), reference), reference)
+      inverse <- order(reference_permutation)
+      pairs <- .graph_edge_pairs(s, n)
+      pairs <- matrix(inverse[pairs], ncol = 2)
+      pairs <- cbind(pmin(pairs[, 1], pairs[, 2]), pmax(pairs[, 1], pairs[, 2]))
+      Qn <- forceSymmetric(assemble_reduced_laplacian(conductance[reference_permutation], pairs))
+    }
     factorization <- .terradish_resolve_direct_factorization(control, resolution$n_vertices, resolution$n_rhs)
     solve_backend <- .terradish_resolve_direct_solve_backend(control)
     signature <- .terradish_direct_signature(control, factorization, solve_backend)
+    signature$reference <- as.integer(reference)
 
     if (identical(solve_backend, "cholmod_cpp_cached"))
     {
@@ -377,6 +409,9 @@
                   auto_reason = resolution$reason,
                   n_vertices = resolution$n_vertices,
                   n_rhs = resolution$n_rhs,
+                  reference_permutation = reference_permutation,
+                  reference_vertex = reference,
+                  system_matrix = Qn,
                   factor = NULL,
                   handle = handle,
                   factorization = factorization,
@@ -391,7 +426,8 @@
       identical(solver_reuse_state$type, "direct") &&
       identical(solver_reuse_state$signature, signature) &&
       !is.null(solver_reuse_state$factor)
-    template <- if (can_reuse) solver_reuse_state$factor else .choleski_template(s, factorization)
+    template <- if (can_reuse) solver_reuse_state$factor else
+      if (reference == n) .choleski_template(s, factorization) else NULL
 
     setup_start <- proc.time()[["elapsed"]]
     factor <- .terradish_with_solver_warning_guard(
@@ -414,6 +450,9 @@
                 auto_reason = resolution$reason,
                 n_vertices = resolution$n_vertices,
                 n_rhs = resolution$n_rhs,
+                reference_permutation = reference_permutation,
+                reference_vertex = reference,
+                system_matrix = Qn,
                 factor = factor,
                 factorization = factorization,
                 solve_backend = solve_backend,
@@ -502,6 +541,14 @@
 
   if (solver_state$type == "direct")
   {
+    permutation <- solver_state$reference_permutation
+    if (!is.null(permutation))
+    {
+      # Every reduced RHS corresponds to a zero-sum full-graph RHS. Supply
+      # its omitted row before grounding a different vertex.
+      rhs <- rbind(as.matrix(rhs), -colSums(rhs))
+      rhs <- rhs[utils::head(permutation, -1L), , drop = FALSE]
+    }
     solve_backend <- if (is.null(solver_state$solve_backend))
       "matrix"
     else
@@ -529,10 +576,46 @@
       solve_time <- proc.time()[["elapsed"]] - solve_start
     }
 
+    relative_residual <- NA_real_
+    refinement_steps <- 0L
+    if (!is.null(solver_state$system_matrix))
+    {
+      denominator <- pmax(1, apply(abs(as.matrix(rhs)), 2, max))
+      tolerance <- solver_state$control$residual_tolerance
+      repeat
+      {
+        residual <- as.matrix(solver_state$system_matrix %*% solution - rhs)
+        relative_residual <- max(apply(abs(residual), 2, max) / denominator)
+        if (is.finite(relative_residual) && relative_residual <= tolerance)
+          break
+        if (!is.finite(relative_residual) || refinement_steps >= solver_state$control$refinement_steps)
+          stop("Direct graph solve did not meet residual tolerance (", signif(relative_residual, 4),
+               " > ", signif(tolerance, 4), "). Reduce conductance contrast or inspect graph conditioning.",
+               call. = FALSE)
+        refine_start <- proc.time()[["elapsed"]]
+        correction <- switch(solve_backend,
+          cholmod_cpp_cached = cholmod_direct_solve(solver_state$handle, -residual)$solution,
+          cholmod_cpp = cholmod_factor_solve(solver_state$factor, -residual)$solution,
+          matrix = solve(solver_state$factor, -residual))
+        solution <- solution + correction
+        solve_time <- solve_time + proc.time()[["elapsed"]] - refine_start
+        refinement_steps <- refinement_steps + 1L
+      }
+    }
+    if (!is.null(permutation))
+    {
+      solution <- rbind(as.matrix(solution), 0)[order(permutation), , drop = FALSE]
+      solution <- sweep(solution[-nrow(solution), , drop = FALSE],
+                         2, solution[nrow(solution), ], "-")
+    }
     return(list(solution = solution,
                 info = c(list(type = "direct",
                               factorization = solver_state$factorization,
                               solve_backend = solve_backend,
+                              reference_vertex = solver_state$reference_vertex,
+                              relative_residual = relative_residual,
+                              residual_tolerance = solver_state$control$residual_tolerance,
+                              refinement_steps = refinement_steps,
                               reused_factor_template = isTRUE(solver_state$reused_factor_template),
                               setup_time = solver_state$setup_time,
                               solve_time = solve_time),
@@ -693,6 +776,20 @@
 #'   \code{reuse_preconditioner_max_age} can be set to a finite nonnegative
 #'   value to periodically rebuild the AMG hierarchy instead of reusing it
 #'   indefinitely.
+#'   Direct solvers also accept \code{reference = "auto"} (default), which
+#'   grounds a maximum-conductance vertex when the conductance ratio exceeds
+#'   one million, or \code{"last"} and \code{"max_conductance"}. This changes
+#'   the numerical reference potential while preserving the graph and model.
+#'   It improves some stiff solves but cannot guarantee accuracy at arbitrary
+#'   conductance contrasts.
+#'   Direct solves check the maximum absolute residual in each right-hand
+#'   side, divided by its maximum absolute input or one, whichever is larger.
+#'   \code{residual_tolerance = 1e-8} rejects unresolved systems by default;
+#'   \code{Inf} disables this check for diagnosis. A small residual is
+#'   necessary but does not guarantee small forward error on an ill-conditioned
+#'   graph.
+#'   Before rejection, \code{refinement_steps = 3} permits up to three
+#'   correction solves using the same factorization and the current residual.
 #'   Direct supernodal factorizations can benefit from a threaded BLAS, but the
 #'   relevant thread counts are controlled by the external R/BLAS build rather
 #'   than by \code{terradish_algorithm()}.
@@ -951,6 +1048,7 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
          phi_sensitivity = if(!objective || !hessian) NULL else phi_sensitivity,
          boundary      = if(!objective) NULL else subproblem$boundary,
          no_structure_boundary = if(!objective) NULL else subproblem$no_structure_boundary,
+         residual_variance_zero_limit = if(!objective) NULL else subproblem$fit$residual_variance_zero_limit,
          rho_boundary = if(!objective) NULL else subproblem$fit$rho_boundary,
          fitted        = if(!objective) NULL else subproblem$fit$fitted,
          gradient      = if(!gradient) NULL else grad * (1 - subproblem$no_structure_boundary),
@@ -1002,6 +1100,7 @@ terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, object
 #'   \code{radish_algorithm()} compatibility wrapper to
 #'   \code{\link{terradish_algorithm}}.
 #' @name legacy_radish_algorithm_wrapper
+#' @inherit terradish_algorithm return
 #' @keywords internal
 NULL
 

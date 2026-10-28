@@ -1,1043 +1,334 @@
 ---
-title: "Spline Conductance Models in terradish"
+title: "Spline Conductance Models"
 author: "Bill Peterman"
 output:
   rmarkdown::html_vignette:
     number_sections: true
     toc: true
+    self_contained: true
+    mathjax: null
+    pandoc_args: ["--mathml"]
 vignette: >
-  %\VignetteIndexEntry{Spline Conductance Models in terradish}
+  %\VignetteIndexEntry{Spline Conductance Models}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
 ```{r setup, include = FALSE}
-knitr::opts_chunk$set(
-  collapse  = TRUE,
-  comment   = "#>",
-  fig.width  = 7,
-  fig.height = 5,
-  warning   = FALSE,
-  message   = FALSE,
-  # Evaluate fits during ordinary builds so the source tarball includes
-  # the complete rendered guide and its figures.
-  eval = TRUE
-)
-
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
+  fig.width = 6, fig.height = 4.5, warning = FALSE, message = FALSE, error = FALSE)
 ```
 
-## Why splines for conductance?
+**Goal.** Decide whether a bend in the forest association is useful or just extra flexibility, reading the fitted curve and predictive comparison together.
 
-The default `terradish` conductance model is **log-linear**:
+[`vignette("data-generation", package = "terradish")`](data-generation.html)
+explains the landscapes, SLiM histories, sampling, and matched markers used
+in these examples.
 
-$$C_i = \exp(\theta_1 x_{i1} + \theta_2 x_{i2} + \cdots)$$
+## Shape and spatial context are different questions
 
-This model represents a monotone fitted association for each landscape covariate: does relative conductance go up or down as the covariate increases, conditional on the other predictors? That constrained form is useful when a monotone relationship is scientifically defensible.
+Gaussian smoothing sets the spatial context of a raster covariate. A
+spline sets the **shape** of its association with conductance. Start with
+[`vignette("getting-started", package = "terradish")`](getting-started.html)
+and [`vignette("gaussian-scale-optimization", package = "terradish")`](gaussian-scale-optimization.html)
+for the shared Ohio pond response and its spatial context.
 
-But ecological responses to landscape features are often more complex. Consider:
+A forest association can rise steadily, level off, or change direction,
+and a spline lets the data estimate such a curve. Here you hold context at
+the simulated 500 m and ask whether a flexible shape improves on a
+log-linear association. The simulated log-conductance is linear in that
+context, so a spline should approximate it but need not improve
+prediction, a check against reading a nonlinear ecological story into a
+flexible curve.
 
-- **Elevation**: A prior hypothesis may predict the strongest connectivity at intermediate elevations rather than at either extreme.
-- **Slope**: A prior hypothesis may predict little change until terrain passes a threshold.
-- **Temperature**: Many ectotherms have a thermal optimum; conductance may be highest at intermediate temperatures and fall off steeply in both directions.
-- **Canopy density**: A prior hypothesis may predict lower connectivity at both low and high canopy density.
+For a log-linear model, $\log C_i=\theta x_i$. For a spline,
 
-None of these shapes can be captured by a single linear term on the log scale. A negative coefficient gives a declining fitted conductance association; a positive coefficient gives an increasing association. There is no room for an interior optimum.
+$$\log C_i=\sum_{b=1}^{q}\beta_b B_b(x_i),$$
 
-`smooth_loglinear_conductance()` extends the log-linear model by expanding selected covariates into **spline basis functions**. The model structure is still:
+where $B_b$ are basis functions and $q$ is the chosen number of basis
+coefficients. The coefficients jointly describe one curve, so their
+individual signs lack the meaning of a single log-linear slope. These are
+**unpenalized regression splines**. The fit estimates no smoothing
+penalty, so you set their complexity explicitly.
 
-$$C_i = \exp(B_i \boldsymbol{\theta})$$
+## Use the same genotypes and fixed context
 
-where $B_i$ is a row of the **expanded design matrix** for raster cell $i$. For covariates not wrapped in `s()`, $B_i$ contains the raw value. For covariates wrapped in `s()`, $B_i$ contains several basis-function evaluations instead of one raw value. The optimizer still sees an ordinary log-linear model; the splines live entirely inside the design matrix, which is computed once and then treated as fixed. These are **unpenalized**
-regression splines with a chosen number of coefficients, not smooths whose
-complexity is estimated by a smoothing penalty. Knots, boundary knots, and
-column-centering offsets are retained from training. Plotting and new-surface
-prediction reuse that basis rather than selecting new knots. Centering removes
-an arbitrary constant conductance multiplier; it does not change the fitted
-shape.
-
-------------------------------------------------------------------------
-
-## What are spline basis functions?
-
-A spline is a piecewise polynomial function that is constrained to be smooth (continuous and differentiable) at the join points, called **knots**. Instead of estimating a single slope for altitude, we estimate a weighted combination of several basis functions, each capturing part of the altitude range.
-
-The figure below shows centered natural spline and B-spline basis functions for a covariate that runs from $-2$ to 2 (as after `scale_covariates()`):
-
-```{r basis-demo, fig.cap = "***Natural spline (ns) and B-spline (bs) basis functions for a standardized covariate.*** Each colored line is one basis column. The fitted conductance association is a weighted combination of all basis functions in a panel.", fig.height = 5}
-library(splines)
-library(terradish)
-
-x_seq <- seq(-2, 2, length.out = 300)
-
-# Natural spline basis with df = 4
-B_ns <- scale(ns(x_seq, df = 4), center = TRUE, scale = FALSE)
-
-# B-spline basis with k = 4 columns, degree 3 (cubic)
-B_bs <- scale(bs(x_seq, df = 4, degree = 3), center = TRUE, scale = FALSE)
-
-par(mfrow = c(1, 2), mar = c(4, 4, 3, 1))
-
-matplot(x_seq, B_ns, type = "l", lty = 1, lwd = 2,
-        col = c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3"),
-        xlab = "Standardized covariate", ylab = "Basis value",
-        main = "Natural spline (ns, df = 4)",
-        ylim = c(-0.4, 1))
-abline(h = 0, col = "grey70", lty = 2)
-legend("topleft", legend = paste0("basis ", 1:4),
-       col = c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3"),
-       lty = 1, lwd = 2, bty = "n", cex = 0.8)
-
-matplot(x_seq, B_bs, type = "l", lty = 1, lwd = 2,
-        col = c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3"),
-        xlab = "Standardized covariate", ylab = "Basis value",
-        main = "B-spline (bs, df = 4, degree = 3)",
-        ylim = c(-0.4, 1))
-abline(h = 0, col = "grey70", lty = 2)
-legend("topleft", legend = paste0("basis ", 1:4),
-       col = c("#E41A1C", "#377EB8", "#4DAF4A", "#984EA3"),
-       lty = 1, lwd = 2, bty = "n", cex = 0.8)
-```
-
-Each basis column covers a different part of the covariate range. The optimizer assigns a coefficient to each column; the weighted sum of all columns defines the shape of the association. A hump in the middle of the covariate range is captured by upweighting the middle basis columns relative to the edge ones.
-
-### Natural splines vs. B-splines
-
-Both produce smooth curves, but they differ in behavior outside the observed data range:
-
-| Property | Natural spline (`ns`) | B-spline (`bs`) |
-|------------------------|------------------------|------------------------|
-| Behavior at edges | **Linear** beyond boundary knots | Polynomial (degree-dependent); can extrapolate wildly |
-| Partition of unity | No | Yes (basis sums to 1 everywhere) |
-| Parameter count for `df = k` | `k` columns | `k` columns (knots placed to give `k`) |
-| Default degree | N/A (cubic, fixed) | Cubic (`degree = 3`); user-adjustable |
-| Best for | General use; safe extrapolation | When you know the curve may be non-linear at the edges too |
-
-For most landscape-genetics applications, **natural splines are likely the safer default**. The landscape feature you observe at sampling sites is what matters; extrapolation is usually not meaningful for raster-based conductance models because the graph only covers cells with observed covariate values. Still, B-splines are useful when you have strong prior knowledge that the edge behavior is non-linear, or when you want finer control over the spline degree.
-
-### How many basis functions (df / k)?
-
-More basis functions allow more flexible shapes but require more parameters to estimate. With sparse spatial genetic data, overfitting is a real risk. Guidelines:
-
-- **df = 3 or 4** is a good starting point for most covariates. This allows a single hump, valley, or threshold-like shape.
-- **df = 2** is a low-flexibility nonlinear curve; it adds one parameter over the linear model and can represent simple curvature.
-- **df of 6 or more** should be reserved for cases where both the data and a clear ecological hypothesis support it; compare against simpler predeclared models with held-out prediction.
-- Use common cross-validation folds for the candidate shapes. AICc is a
-  secondary diagnostic under its focal-site sample-size convention; it does
-  not make all site pairs independent or calibrate an uncertain Wishart `nu`.
-
-------------------------------------------------------------------------
-
-## Data preparation
-
-The rest of this vignette uses a 20-site teaching subset of the bundled
-*Melipona* bee example. We aggregate the rasters by a factor of four so the
-many candidate fits remain practical to reproduce. Model rankings from this
-subset are illustrative and should not be treated as results for the full
-37-site, original-resolution study.
-
-```{r load-data}
+```{r data}
 library(terradish)
 library(terra)
-
-data(melip)
-melip.altitude    <- terra::unwrap(melip.altitude)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords      <- terra::unwrap(melip.coords)
-
-cat("Number of sampling sites:", nrow(melip.coords), "\n")
-cat("Dimension of Fst matrix: ", dim(melip.Fst), "\n")
-```
-
-Scale the raster covariates. This step is important for spline models because: (1) it brings both layers to a comparable scale so spline knots are placed sensibly relative to the data density, and (2) it helps the optimizer converge from a common starting point.
-
-```{r prepare-covariates}
-covariates <- c(melip.altitude, melip.forestcover)
-names(covariates) <- c("altitude", "forestcover")
-
-# Coarsen both covariates and retain sites in distinct focal cells.
-covariates <- terra::aggregate(covariates, fact = 4, na.rm = TRUE)
-site_cells <- terra::cellFromXY(covariates, terra::crds(melip.coords))
-keep <- which(!is.na(site_cells) & !duplicated(site_cells))[1:20]
-melip.Fst <- melip.Fst[keep, keep, drop = FALSE]
-melip.coords <- melip.coords[keep]
-
-# Center and scale each layer to mean 0, sd 1
-covariates <- scale_covariates(covariates)
-
-# Build the conductance surface graph
-# saveStack = TRUE is required for conductance() and plot(type = "surface")
-surface <- conductance_surface(
-  covariates,
-  melip.coords,
-  directions = 8,
-  saveStack  = TRUE
-)
-
-cat("Graph vertices:", nrow(surface$x), "\n")
-head(surface$x)
-```
-
-------------------------------------------------------------------------
-
-## Checking settings before spline fitting
-
-`terradish_assess_settings()` is worth calling before fitting spline conductance models for an additional reason beyond raw graph size: **spline formulas expand the conductance parameter count**. A formula with `s(altitude, df = 4)` has four basis coefficients for altitude alone, plus any other terms. With enough parameters, Newton-Raphson can become slower than BFGS per iteration. The assessment handles this automatically; it probes the expanded model, not the raw formula, and reports the smooth-term expansion in the `$profile` and in its notes.
-
-```{r assess-spline, eval = FALSE}
-# Assessment for the altitude natural-spline model (df = 4)
-# Uses the same surface built above (saveStack = TRUE required for solver probes)
-assessment_spline <- terradish_assess_settings(
-  melip.Fst ~ forestcover + s(altitude, df = 4),
-  data              = surface,
-  conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe,
-  probe_maxit       = 2,
-  verbose           = TRUE
-)
-
-assessment_spline
-```
-
-The printed summary will include a note such as:
-
-```
-Notes:
-  - Smooth conductance formula expanded to 5 conductance parameters across
-    1 smooth term (4 spline basis columns).
-```
-
-This confirms that the formula was evaluated on the expanded design matrix (one linear forest-cover column plus four altitude basis columns = five parameters total), and that probes were run with that full parameter count.
-
-Spline expansions can make extreme starting values more risky because the expanded linear predictor is exponentiated into conductance. If a spline fit stops with a `CHOLMOD` warning or a `non-positive-definite reduced Laplacian` message, first scale the input rasters, restart with coefficients closer to zero, and check the retained graph cells for missing or infinite covariate values. During diagnosis, rerun `terradish_assess_settings(..., verbose = TRUE)` and consider `solver = "auto"` or `solver = "amg"` to separate direct-solver factorization problems from the conductance specification.
-
-### Passing `$recommended` to each candidate fit
-
-When the assessment recommends a non-default optimizer (e.g. `bfgs` instead of `newton` because the parameter count after expansion is high), apply it to all candidate models to keep comparisons fair:
-
-```{r assess-spline-use, eval = FALSE}
-# Extract recommended optimizer and control once
-rec <- assessment_spline$recommended
-
-fit_ns_assessed <- terradish(
-  melip.Fst ~ forestcover + s(altitude, df = 4),
-  data              = surface,
-  conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer         = rec$optimizer,
-  control           = rec$control,
-  solver            = rec$solver,
-  solver_control    = rec$solver_control
-)
-```
-
-For this vignette we run a lightweight assessment (`probe_maxit = 1`) and reuse its recommendations across the candidate fits so the workflow is exercised in real code while staying fast.
-
-------------------------------------------------------------------------
-
-## Model fitting: from linear to spline
-
-We fit four candidate models, moving from most constrained to most flexible:
-
-1.  **Linear baseline**: one parameter per covariate, standard log-linear
-2.  **Altitude spline (ns)**: altitude enters as a natural spline; forest cover remains linear
-3.  **Both splines (ns)**: both covariates enter as natural splines
-4.  **Altitude spline (bs)**: altitude as a B-spline; forest cover linear (for comparison with model 2)
-
-The coarsened demonstration graph keeps these repeated fits practical. For an applied analysis, use a scientifically justified raster resolution and allow the optimizer to converge.
-
-```{r fit-models}
-assessment_spline_light <- terradish_assess_settings(
-  melip.Fst ~ forestcover + s(altitude, df = 4),
-  data              = surface,
-  conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe,
-  probe_maxit       = 1,
-  verbose           = FALSE
-)
-rec <- assessment_spline_light$recommended
-
-# 1. Log-linear baseline (one parameter per covariate)
-fit_linear <- terradish(
-  melip.Fst ~ altitude + forestcover,
-  data              = surface,
-  conductance_model = loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer         = rec$optimizer,
-  control           = rec$control,
-  solver            = rec$solver,
-  solver_control    = rec$solver_control,
-  approximation     = rec$approximation,
-  approximation_control = rec$approximation_control
-)
-
-# 2. Natural spline on altitude, linear forest cover (df = 4)
-fit_ns_alt <- terradish(
-  melip.Fst ~ forestcover + s(altitude, df = 4),
-  data              = surface,
-  conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer         = rec$optimizer,
-  control           = rec$control,
-  solver            = rec$solver,
-  solver_control    = rec$solver_control,
-  approximation     = rec$approximation,
-  approximation_control = rec$approximation_control
-)
-
-# 3. Natural splines on both covariates (df = 4 each)
-fit_ns_both <- terradish(
-  melip.Fst ~ s(altitude, df = 4) + s(forestcover, df = 4),
-  data              = surface,
-  conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer         = rec$optimizer,
-  control           = rec$control,
-  solver            = rec$solver,
-  solver_control    = rec$solver_control,
-  approximation     = rec$approximation,
-  approximation_control = rec$approximation_control
-)
-
-# 4. Cubic B-spline on altitude, linear forest cover (k = 4 columns, degree 3)
-fit_bs_alt <- terradish(
-  melip.Fst ~ forestcover + s(altitude, k = 4, basis = "bs", degree = 3),
-  data              = surface,
-  conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer         = rec$optimizer,
-  control           = rec$control,
-  solver            = rec$solver,
-  solver_control    = rec$solver_control,
-  approximation     = rec$approximation,
-  approximation_control = rec$approximation_control
-)
-```
-
-------------------------------------------------------------------------
-
-## Inspecting the design matrix
-
-Before examining fits, it is instructive to look at what `smooth_loglinear_conductance()` produces:
-
-```{r inspect-design}
-# Build the smooth model object for the altitude-spline specification
-smooth_spec <- smooth_loglinear_conductance(
-  ~ forestcover + s(altitude, df = 4),
-  surface$x
-)
-
-# Starting parameter vector (one entry per design column)
-cat("Parameter names:\n")
-names(attr(smooth_spec, "default"))
-
-# Smooth term details
-cat("\nSmooth term metadata:\n")
-str(attr(smooth_spec, "smooth_loglinear_info"))
-```
-
-The `s(altitude).*` parameters are the basis coefficients for altitude. Taken individually they are not interpretable. What matters is their combined association on the conductance surface, which is best visualized through marginal plots.
-
-------------------------------------------------------------------------
-
-## Estimated conductance parameters
-
-```{r show-coefs}
-cat("--- Linear baseline ---\n")
-print(round(coef(fit_linear), 4))
-
-cat("\n--- Altitude ns spline ---\n")
-print(round(coef(fit_ns_alt), 4))
-
-cat("\n--- Both ns splines ---\n")
-print(round(coef(fit_ns_both), 4))
-
-cat("\n--- Altitude bs spline ---\n")
-print(round(coef(fit_bs_alt), 4))
-```
-
-The spline coefficients for `s(altitude)` are not directly comparable to the single altitude coefficient in the linear model. The linear model summarizes the conditional altitude association with one number. The spline model allows the fitted association to change direction across the altitude range. The marginal plots in the next sections show the implied shape.
-
-------------------------------------------------------------------------
-
-## Model comparison
-
-Predeclare a small candidate set and compare held-out scores on common folds.
-AIC and AICc can over-select flexible conductance models, especially when
-Wishart `nu` overstates effective information. The following table remains a
-useful in-sample diagnostic, but it should not determine spline complexity:
-
-```{r aic-table}
-aic_table(
-  list(fit_linear, fit_ns_alt, fit_bs_alt, fit_ns_both),
-  mod_names = c(
-    "Linear",
-    "Altitude ns (df=4)",
-    "Altitude bs (k=4)",
-    "Both ns (df=4 each)"
-  ),
-  AICc = TRUE
-)
-```
-
-Interpret this table as a first-pass diagnostic, not a definitive verdict:
-
-- **$\Delta\mathrm{AICc}$ below about 2**: a common heuristic for similar relative support within this declared candidate set, not proof of equivalence.
-- **Larger $\Delta\mathrm{AICc}$**: progressively less support relative to the top-ranked model. Interpret the magnitude together with model complexity, stability, and the predeclared scientific hypotheses.
-
-An AICc improvement should be evaluated alongside the stability and scientific plausibility of the marginal association. A spline with a lower AICc but an implausible shape (oscillating wildly, extreme at the edges) should be treated with skepticism.
-
-------------------------------------------------------------------------
-
-### Cross-validation and monotonicity
-
-```{r spline-cv, eval = FALSE}
-# Center a local distance projection on the sampled Brazilian sites.
-lonlat <- terra::crds(terra::project(melip.coords, "EPSG:4326"))
-local_crs <- sprintf("+proj=aeqd +lat_0=%f +lon_0=%f +datum=WGS84 +units=m",
-                     mean(lonlat[, 2]), mean(lonlat[, 1]))
-coords_projected <- terra::project(melip.coords, local_crs)
-folds <- terradish_folds(coords_projected, k = 5, seed = 42)
-cv_shape <- terradish_cv_folds(
-  data = surface,
-  formulas = list(linear = melip.Fst ~ forestcover + altitude,
-    spline = melip.Fst ~ forestcover + s(altitude, df = 4)),
-  folds = folds, model = mlpe, nuisance = "fixed",
-  conductance_model = list(linear = loglinear_conductance,
-                           spline = smooth_loglinear_conductance)
-)
-cv_shape$summary
-```
-
-**How to read the output.** Compare paired score differences on common
-successful folds. Prefer the simpler shape when the difference is small
-relative to its fold-to-fold uncertainty, and inspect failures before ranking.
-See `vignette("model-comparison", package = "terradish")` for repeated folds
-and the distinction between fixed and reprofiled nuisance parameters.
-
-```{r monotonicity}
-summary(fit_ns_alt)$spline_monotonicity
-```
-
-The monotonicity table checks the derivative of each fitted smooth over its
-focal-site covariate range. It reports direction and derivative sign changes;
-it is a shape diagnostic, not a hypothesis test or evidence of an ecological
-threshold. Even a predictively useful spline can reflect how a population
-process maps onto the graph rather than a direct ecological response to the
-covariate. Inspect the conditional curve and its uncertainty.
-
-------------------------------------------------------------------------
-
-## Marginal conductance associations
-
-Marginal plots vary one covariate while averaging over the observed values of the other model covariates. For spline models this is the primary diagnostic tool because the basis coefficients are not individually interpretable.
-
-### Natural vs. B-spline altitude association
-
-Use `marginal_covariates = "altitude"` to extract only the altitude panel from each model, then combine the ggplot objects side-by-side with `patchwork`, if it is installed:
-
-```{r marginal-ns-vs-bs, fig.cap = "***Altitude marginal association on the conductance scale.*** Left: natural spline (ns). Right: B-spline (bs). Both use df/k = 4 and degree 3.", fig.height = 4.5}
 library(ggplot2)
-
-p_ns <- plot(fit_ns_alt, type = "marginal", data = surface, n = 80,
-             marginal_covariates = "altitude") +
-  ggtitle("Altitude: ns (df = 4)")
-
-p_bs <- plot(fit_bs_alt, type = "marginal", data = surface, n = 80,
-             marginal_covariates = "altitude") +
-  ggtitle("Altitude: bs (k = 4)")
-
-# patchwork is optional; fall back to one panel per page without it
-if (requireNamespace("patchwork", quietly = TRUE)) {
-  library(patchwork)
-  p_ns | p_bs
-} else {
-  print(p_ns)
-  print(p_bs)
-}
+data(ohio_ponds)
+ponds <- ohio_ponds$ponds
+g <- factor(ohio_ponds$samples$pond, levels = ponds$pond)
+N <- 2 * as.numeric(table(g))
+S <- cov_from_biallelic(rowsum(ohio_ponds$snp, g, reorder = FALSE)[ohio_ponds$ponds$pond, , drop = FALSE], N) / N[1]
+x <- c(unwrap(ohio_ponds$covariates), unwrap(ohio_ponds$forest500))
+surface <- conductance_surface(scale_covariates(x), ponds[c("x", "y")], directions = 8)
 ```
 
-Broad agreement between spline families is a useful stability check, but it does not prove that a shape is genuine. Large discrepancies between natural and B-spline estimates at the same df/k indicate sensitivity to the basis choice; a simpler model or more constrained candidate set may be preferable.
+All cells and all 24 ponds remain in the graph, and forest context is
+standardized over the whole landscape. Fixing 500 m uses the known
+simulated scale, which a field study must instead justify or estimate.
 
-### All four model marginal associations (altitude)
+## See how basis functions build a curve
 
-Setting `marginal_covariates = "altitude"` keeps only the altitude panel from each model (which may otherwise also show forest cover). This makes it easy to arrange all four altitude curves in a single 2-by-2 grid for direct comparison:
-
-```{r marginal-all, fig.cap = "***Altitude marginal association across all four candidate models.*** The linear model constrains the association to a straight line (on the log-conductance scale). Both spline models can represent non-monotone shapes.", fig.height = 6}
-p_lin   <- plot(fit_linear,  type = "marginal", data = surface, n = 80,
-                marginal_covariates = "altitude") +
-  ggtitle("Linear baseline")
-
-p_ns_a  <- plot(fit_ns_alt,  type = "marginal", data = surface, n = 80,
-                marginal_covariates = "altitude") +
-  ggtitle("Altitude ns (df = 4)")
-
-p_ns_b  <- plot(fit_ns_both, type = "marginal", data = surface, n = 80,
-                marginal_covariates = "altitude") +
-  ggtitle("Both ns (df = 4): altitude panel")
-
-p_bs_a  <- plot(fit_bs_alt,  type = "marginal", data = surface, n = 80,
-                marginal_covariates = "altitude") +
-  ggtitle("Altitude bs (k = 4)")
-
-(p_lin | p_ns_a) / (p_ns_b | p_bs_a)
+```{r basis, fig.cap = "***Three centered natural-spline basis functions.*** The horizontal axis is the standardized 500 m forest context. The fitted log-conductance curve is a weighted sum of these columns."}
+grid <- seq(min(surface$x$forest500), max(surface$x$forest500), length.out = 200)
+B <- splines::ns(grid, df = 3)
+B <- sweep(B, 2, colMeans(B))
+basis_data <- data.frame(x = rep(grid, 3), value = as.vector(B),
+                         basis = factor(rep(1:3, each = length(grid))))
+ggplot(basis_data, aes(x, value, color = basis)) + geom_line() +
+  geom_hline(yintercept = 0, linetype = 2) + theme_bw() +
+  labs(x = "Forest context (standardized)", y = "Centered basis value")
 ```
 
-### Response-scale marginal associations
+**How to read the plot.** Each column bends over part of the covariate
+range, and their weighted sum forms the fitted shape. The fit itself
+defines and stores its basis (knots, boundary knots, and centering
+offsets) on the full training raster, not this display grid, and
+prediction reuses that definition rather than placing new knots.
 
-The `type = "marginal_response"` plot maps the same fitted association to the **response scale**. For the MLPE fits in this vignette, that scale is pairwise genetic distance. The plot includes approximate predictive uncertainty bands and can be easier to interpret than log conductance.
+Natural splines are cubic within the boundary knots and linear beyond
+them, while B-splines can behave polynomially outside their boundary
+range. Neither makes unsupported extrapolation safe. `df` sets the number
+of conductance coefficients for the smooth term, not an effective marker
+count or an automatically selected ecological complexity.
 
-Comparing the ns and bs altitude response-scale associations side-by-side gives an additional stability check. Agreement does not establish causality or a unique ecological mechanism; divergence indicates sensitivity to the spline basis.
+## Fit linear and spline candidates with starting checks
 
-```{r marginal-response, fig.cap = "***Marginal response-scale associations from the altitude natural-spline model.*** Shaded bands are approximate pointwise 95% predictive intervals. Left: natural spline. Right: B-spline.", fig.height = 4.5}
-p_resp_ns <- plot(fit_ns_alt, type = "marginal_response", data = surface,
-                  n = 80, marginal_covariates = "altitude") +
-  ggtitle("ns (df = 4): response scale")
+```{r fits}
+control <- NewtonRaphsonControl(maxit = 200, ctol = 1e-8, ftol = 1e-8)
+fit_linear <- terradish(S ~ forest500, surface,
+  measurement_model = wishart_covariance, nu = 40,
+  optimizer = "bfgs", control = control)
 
-p_resp_bs <- plot(fit_bs_alt, type = "marginal_response", data = surface,
-                  n = 80, marginal_covariates = "altitude") +
-  ggtitle("bs (k = 4): response scale")
-
-p_resp_ns | p_resp_bs
+# Three basis coefficients are estimated jointly. Preserve every start's status.
+defaults <- attr(smooth_loglinear_conductance(~ s(forest500, df = 3), surface$x),
+                 "default")
+spline_fits <- lapply(c(-0.5, 0, 0.5), function(start) {
+  theta <- defaults
+  theta[] <- start
+  tryCatch(terradish(S ~ s(forest500, df = 3), surface,
+    conductance_model = smooth_loglinear_conductance,
+    measurement_model = wishart_covariance, nu = 40, theta = theta,
+    optimizer = "bfgs", control = control), error = identity)
+})
+valid <- vapply(spline_fits, function(z) !inherits(z, "error") &&
+  isTRUE(z$convergence$code == 0) && isTRUE(z$fit$subproblem$convergence == 0), logical(1))
+likelihood <- vapply(spline_fits, function(z)
+  if (inherits(z, "error")) NA_real_ else as.numeric(logLik(z)), numeric(1))
+data.frame(start = c(-0.5, 0, 0.5), valid, logLik = likelihood)
+if (!any(valid)) stop("No converged spline candidate")
+eligible <- which(valid)
+fit_spline <- spline_fits[[eligible[which.max(likelihood[valid])]]]
+summary(fit_spline)
 ```
 
-### Robust tails with focal-support clamping
+**How to read the output.** Require convergence at both levels of
+fitting, and compare the likelihoods reached from several modest starts.
+The spline has three conductance coefficients to the linear model's one,
+read together as one curve. The measurement parameters keep their usual
+meaning (see the table).
 
-Spline models are especially sensitive to sparse support at covariate tails. To keep spline marginals and predicted conductance maps anchored to focal-site support, use `support = "focal"` with quantile bounds:
+| Quantity | Where it appears | Interpretation |
+|---|---|---|
+| `df = 3` | Natural-spline basis | Three unpenalized conductance coefficients |
+| $\beta_b$ | Weighted basis sum in log-conductance | Joint curve parameters, not individual ecological slopes |
+| 500 m context | Precomputed forest raster | Spatial averaging held fixed for the shape comparison |
+| `tau` and measurement `sigma` | Covariance likelihood | Graph weight and log additional diagonal variance |
+| `nu = 40` | Likelihood and curvature | Assumed information, held equal across candidates |
 
-```{r spline-support-clamp}
-plot(
-  fit_ns_alt,
-  type = "marginal",
-  data = surface,
-  n = 80,
-  support = "focal",
-  support_probs = c(0.01, 0.99),
-  clamp_covariates = "altitude"
-)
+## Interpret the fitted association and its support
 
-cond_ns_alt_focal <- conductance(
-  surface,
-  fit_ns_alt,
-  support = "focal",
-  support_probs = c(0.01, 0.99),
-  clamp_covariates = c("altitude", "forestcover")
-)
+```{r marginal, fig.cap = "***Spline association on the relative-conductance scale.*** The curve combines all basis coefficients. Its model interval describes coefficient uncertainty; it does not validate nonlinear habitat mechanisms."}
+plot(fit_spline, type = "marginal", data = surface) +
+  labs(x = "Forest fraction after 500 m smoothing",
+       y = "Relative conductance") +
+  theme(plot.margin = margin(6, 18, 6, 6))
 ```
 
-------------------------------------------------------------------------
-
-Clamping replaces covariate values outside the requested focal-cell
-quantiles with the nearest limit. The fitted spline basis and centering remain
-fixed. Unclamped `conductance()` and marginal plots use the same centered
-prediction basis, so they should agree on the relative conductance scale.
-Clamping changes predictions, not the likelihood or the estimated shape.
-
-## Observed genetic distance versus fitted resistance
-
-```{r obs-vs-fitted, fig.cap = "***Observed pairwise Fst versus fitted resistance for all candidate models.*** Each point is a pair of sampling sites. The blue line is a descriptive least-squares regression.", fig.height = 5}
-p_fit_linear <- plot(fit_linear,  type = "fit", main = "Linear baseline")
-p_fit_ns_alt <- plot(fit_ns_alt,  type = "fit", main = "Altitude ns (df = 4)")
-p_fit_ns_both <- plot(fit_ns_both, type = "fit", main = "Both ns (df = 4)")
-p_fit_bs_alt <- plot(fit_bs_alt,  type = "fit", main = "Altitude bs (k = 4)")
-
-(p_fit_linear | p_fit_ns_alt) / (p_fit_ns_both | p_fit_bs_alt)
-```
-
-All four panels use the same data and MLPE correlation structure. Their horizontal axes show resistance, whose scale can differ across fitted conductance models. The blue regression lines summarize the plotted relationship; they do not account for dependence among pairs. Curvature or other systematic departures warrant checking the conductance formula, measurement model, and response construction. Use likelihood diagnostics and cross-validation for model comparison.
-
-------------------------------------------------------------------------
-
-## Estimated conductance surfaces
-
-The conductance surface shows the per-cell conductance value across the landscape. `conductance()` returns a three-layer SpatRaster with a point estimate and pointwise 95% confidence bounds from the delta method. These bounds reflect uncertainty in $\theta$ conditional on the fitted model; they do not include nuisance-parameter or model-selection uncertainty.
-
-### Altitude natural-spline model
-
-```{r surface-ns-alt, fig.cap = "***Estimated conductance surface from the altitude natural-spline model.*** The three panels show the point estimate and 95% CI bounds. Red points are sampling sites.", fig.height = 4}
-cond_ns_alt <- conductance(surface, fit_ns_alt)
-
-plot(cond_ns_alt,
-     main = c("ns(altitude): estimate",
-              "ns(altitude): lower 95%",
-              "ns(altitude): upper 95%"))
-points(melip.coords, pch = 19, cex = 0.6, col = "red")
-```
-
-### Comparison: linear vs. altitude spline
-
-```{r surface-compare, fig.cap = "***Point-estimate conductance surfaces: linear model (left) vs. altitude natural-spline model (right).*** Differences in surface texture reflect the non-linear altitude association represented by the spline.", fig.height = 4}
-cond_linear <- conductance(surface, fit_linear)
-
-par(mfrow = c(1, 2))
-plot(cond_linear[[1]], main = "Linear baseline")
-points(melip.coords, pch = 19, cex = 0.6, col = "red")
-
-plot(cond_ns_alt[[1]], main = "Altitude ns (df = 4)")
-points(melip.coords, pch = 19, cex = 0.6, col = "red")
-```
-
-Differences between the two surfaces are most informative at intermediate elevations where the spline association departs most from the linear extrapolation.
-
-------------------------------------------------------------------------
-
-## Natural splines: varying degrees of freedom
-
-A key modeling decision is how many basis functions to use. More degrees of freedom allow more flexibility and require more parameters. This section illustrates the consequence of degrees of freedom for the fitted altitude curve using natural splines.
-
-```{r ns-df-comparison, fig.cap = "***Natural spline altitude association for df = 2, 3, 4, and 6.*** Higher df allows more shape complexity. Compare the smoothness and ecological plausibility of each curve before selecting a value.", fig.height = 6}
-fit_ns2 <- terradish(
-  melip.Fst ~ forestcover + s(altitude, df = 2),
-  data              = surface,
-  conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer         = rec$optimizer,
-  control           = rec$control,
-  solver            = rec$solver,
-  solver_control    = rec$solver_control,
-  approximation     = rec$approximation,
-  approximation_control = rec$approximation_control
-)
-
-fit_ns3 <- terradish(
-  melip.Fst ~ forestcover + s(altitude, df = 3),
-  data              = surface,
-  conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer         = rec$optimizer,
-  control           = rec$control,
-  solver            = rec$solver,
-  solver_control    = rec$solver_control,
-  approximation     = rec$approximation,
-  approximation_control = rec$approximation_control
-)
-
-fit_ns6 <- terradish(
-  melip.Fst ~ forestcover + s(altitude, df = 6),
-  data              = surface,
-  conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer         = rec$optimizer,
-  control           = rec$control,
-  solver            = rec$solver,
-  solver_control    = rec$solver_control,
-  approximation     = rec$approximation,
-  approximation_control = rec$approximation_control
-)
-
-# Use marginal_covariates = "altitude" to pull only the altitude panel from
-# each fit, then tile the four ggplot objects with patchwork.
-p2 <- plot(fit_ns2,    type = "marginal", data = surface, n = 80,
-           marginal_covariates = "altitude") +
-  ggtitle("ns, df = 2 (quadratic-like)")
-
-p3 <- plot(fit_ns3,    type = "marginal", data = surface, n = 80,
-           marginal_covariates = "altitude") +
-  ggtitle("ns, df = 3")
-
-p4 <- plot(fit_ns_alt, type = "marginal", data = surface, n = 80,
-           marginal_covariates = "altitude") +
-  ggtitle("ns, df = 4")
-
-p6 <- plot(fit_ns6,    type = "marginal", data = surface, n = 80,
-           marginal_covariates = "altitude") +
-  ggtitle("ns, df = 6")
-
-if (requireNamespace("patchwork", quietly = TRUE)) {
-  library(patchwork)
-  (p2 | p3) / (p4 | p6)
-} else {
-  for (p in list(p2, p3, p4, p6)) print(p)
-}
-```
-
-```{r ns-df-aic}
-aic_table(
-  list(fit_linear, fit_ns2, fit_ns3, fit_ns_alt, fit_ns6),
-  mod_names = c("Linear", "ns df=2", "ns df=3", "ns df=4", "ns df=6"),
-  AICc = TRUE
-)
-```
-
-**Reading the df comparison.** Compare these predeclared shapes using the
-same held-out folds. An AICc improvement alone does not justify extra
-coefficients. Inspect monotonicity, uncertainty, boundary behavior, and the
-stability of the selected shape across folds.
-
-------------------------------------------------------------------------
-
-## B-spline degree exploration
-
-B-splines allow control over the polynomial degree separately from the number of basis columns. Degree 1 is piecewise linear, degree 2 is quadratic, and degree 3 (the default) is cubic. Higher degrees produce smoother but more globally coupled curves.
-
-```{r bs-degree-comparison, fig.cap = "***B-spline altitude association for degree 1, 2, and 3 (k = 4 basis columns each).*** Degree 1 is piecewise linear; degree 3 is cubic. Smoother curves do not always fit better.", fig.height = 4}
-fit_bs1 <- terradish(
-  melip.Fst ~ forestcover + s(altitude, k = 4, basis = "bs", degree = 1),
-  data              = surface,
-  conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer         = rec$optimizer,
-  control           = rec$control,
-  solver            = rec$solver,
-  solver_control    = rec$solver_control,
-  approximation     = rec$approximation,
-  approximation_control = rec$approximation_control
-)
-
-fit_bs2 <- terradish(
-  melip.Fst ~ forestcover + s(altitude, k = 4, basis = "bs", degree = 2),
-  data              = surface,
-  conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer         = rec$optimizer,
-  control           = rec$control,
-  solver            = rec$solver,
-  solver_control    = rec$solver_control,
-  approximation     = rec$approximation,
-  approximation_control = rec$approximation_control
-)
-
-pd1 <- plot(fit_bs1,    type = "marginal", data = surface, n = 80,
-            marginal_covariates = "altitude") +
-  ggtitle("bs, degree = 1 (piecewise linear)")
-
-pd2 <- plot(fit_bs2,    type = "marginal", data = surface, n = 80,
-            marginal_covariates = "altitude") +
-  ggtitle("bs, degree = 2 (quadratic)")
-
-pd3 <- plot(fit_bs_alt, type = "marginal", data = surface, n = 80,
-            marginal_covariates = "altitude") +
-  ggtitle("bs, degree = 3 (cubic)")
-
-pd1 | pd2 | pd3
-```
-
-For most conductance problems, degree 3 (cubic) B-splines are a good default when you choose B-splines. They produce smooth second derivatives, which can represent gradual changes in fitted conductance. Use degree 1 when the predeclared candidate set includes abrupt thresholds rather than smooth transitions.
-
-------------------------------------------------------------------------
-
-## Mixing linear and spline terms
-
-You can freely mix linear terms and spline terms in the same formula. This is often the most useful specification: use a spline for the covariate you have prior reason to believe has a non-linear association, and keep all others linear to avoid over-parameterization.
-
-```{r mixed-terms}
-# Forest cover linear, altitude as natural spline
-fit_mixed <- terradish(
-  melip.Fst ~ forestcover + s(altitude, df = 3),
-  data              = surface,
-  conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer         = rec$optimizer,
-  control           = rec$control,
-  solver            = rec$solver,
-  solver_control    = rec$solver_control,
-  approximation     = rec$approximation,
-  approximation_control = rec$approximation_control
-)
-
-coef(fit_mixed)
-```
-
-The `forestcover` coefficient is interpreted as in the linear model: its sign indicates the direction of the fitted conditional association with conductance, and its magnitude is on the log-conductance scale. The `s(altitude).*` coefficients together define the altitude shape. Neither interpretation is a causal effect or direct movement estimate.
-
-When a model contains both linear and spline terms, the default marginal plot produces one panel per covariate. Use `marginal_covariates` to view a single panel in isolation, or to place the two panels side-by-side rather than stacked:
-
-```{r mixed-marginal, fig.cap = "***Marginal associations from the mixed model (linear forest cover + altitude natural spline, df = 3).*** Left: the linear forest-cover association (log-conductance scale). Right: the non-linear altitude association (smooth curve).", fig.height = 4}
-p_fc  <- plot(fit_mixed, type = "marginal", data = surface, n = 80,
-              marginal_covariates = "forestcover") +
-  ggtitle("Forest cover (linear term)")
-
-p_alt <- plot(fit_mixed, type = "marginal", data = surface, n = 80,
-              marginal_covariates = "altitude") +
-  ggtitle("Altitude: ns (df = 3)")
-
-p_fc | p_alt
-```
-
-------------------------------------------------------------------------
-
-## Summary table: all models
-
-```{r final-aic}
-aic_table(
-  list(fit_linear, fit_ns2, fit_ns3, fit_ns_alt, fit_ns6,
-       fit_bs_alt, fit_ns_both, fit_mixed),
-  mod_names = c(
-    "Linear",
-    "Altitude ns (df=2)",
-    "Altitude ns (df=3)",
-    "Altitude ns (df=4)",
-    "Altitude ns (df=6)",
-    "Altitude bs (k=4, deg=3)",
-    "Both ns (df=4 each)",
-    "Altitude ns (df=3) + linear forestcover"
-  ),
-  AICc = TRUE
-)
-```
-
-------------------------------------------------------------------------
-
-## Practical recommendations
-
-### When to use spline conductance
-
-Use `smooth_loglinear_conductance()` when:
-
-1.  **There is a prior ecological reason** to expect a non-linear landscape association, e.g. an intermediate optimum, a threshold, or a well-documented hump-shaped response in the literature.
-2.  **The linear model's marginal association is implausible**: e.g. a strong negative altitude coefficient that would predict near-zero conductance at high elevations where sampling actually occurs.
-3.  **The design can support the extra parameters.** Pairwise observations are dependent, so do not justify spline complexity by counting all site pairs as independent replicates. Evaluate held-out prediction, stability, focal-site support, and simulation under plausible scenarios.
-
-### When to stay with the linear model
-
-- Designs with sparse focal-site or covariate support relative to the proposed spline complexity.
-- No prior hypothesis about a non-linear association; treat splines as exploratory rather than confirmatory.
-- The spline and linear models give similar held-out scores; parsimony favors the simpler model.
-
-### Suggested workflow
-
-```{r workflow, eval = FALSE}
-# Step 1: Fit a linear baseline: this is your reference
-assessment <- terradish_assess_settings(
-  S ~ covar2 + s(covar1, df = 3),
-  data              = surface,
-  conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe,
-  probe_maxit       = 1,
-  verbose           = FALSE
-)
-rec <- assessment$recommended
-
-fit_linear <- terradish(
-  S ~ covar1 + covar2,
-  data              = surface,
-  conductance_model = loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer         = rec$optimizer,
-  control           = rec$control,
-  solver            = rec$solver,
-  solver_control    = rec$solver_control,
-  approximation     = rec$approximation,
-  approximation_control = rec$approximation_control
-)
-
-# Step 2: Inspect the linear marginal associations.
-# Which covariate might plausibly have a non-linear association?
-# Use marginal_covariates to view one covariate at a time.
-plot(fit_linear, type = "marginal", data = surface,
-     marginal_covariates = "covar1")
-
-# Step 3: Add one spline term with small df first
-fit_spline <- terradish(
-  S ~ covar2 + s(covar1, df = 3),
-  data              = surface,
-  conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer         = rec$optimizer,
-  control           = rec$control,
-  solver            = rec$solver,
-  solver_control    = rec$solver_control,
-  approximation     = rec$approximation,
-  approximation_control = rec$approximation_control
-)
-
-# Step 4: Compare the predeclared shapes on the same folds.
-folds <- terradish_folds(coords_projected, k = 5, seed = 42)
-cv <- terradish_cv_folds(
-  surface,
-  formulas = list(linear = S ~ covar2 + covar1,
-                  spline = S ~ covar2 + s(covar1, df = 3)),
-  folds = folds, model = mlpe, nuisance = "fixed",
-  conductance_model = list(linear = loglinear_conductance,
-                           spline = smooth_loglinear_conductance)
-)
-cv$summary
-
-# Step 5: Inspect the fitted shape and its derivative sign changes.
+**How to read the curve.** Conductance stays low and nearly flat across
+intermediate forest, then climbs steeply above about 0.8 forest. The
+log-linear generating model also bends upward on this scale, because
+conductance is the exponential of a straight line, so a bend alone is not
+evidence of a threshold. The horizontal axis is back-transformed to forest
+fraction. The gray band is a 95% interval at each forest value and widens
+where few ponds were sampled.
+
+```{r focal-support}
+focal_values <- surface$x$forest500[as.integer(surface$demes)]
+rbind(domain = range(surface$x$forest500), focal = range(focal_values))
 summary(fit_spline)$spline_monotonicity
-plot(fit_spline, type = "marginal", data = surface)
-
-# Step 6: Prefer the simpler model if predictive differences are inconclusive.
-# Add larger-df models only as a declared sensitivity analysis, not an AIC search.
-
-# Step 7: Visualize the selected model
-best_fit <- fit_spline  # choose after reviewing CV, convergence, and shape
-plot(best_fit, type = "fit",             data = surface)
-plot(best_fit, type = "surface",         data = surface)
-plot(best_fit, type = "marginal",        data = surface)
-plot(best_fit, type = "marginal_response", data = surface)
 ```
 
-### Checking for overfitting
+**How to read these outputs.** Values are in SD units of smoothed forest.
+Ponds sit between
+`r round(min(focal_values), 1)` and `r round(max(focal_values), 1)` SD,
+while the landscape spans
+`r round(min(surface$x$forest500), 1)` to
+`r round(max(surface$x$forest500), 1)` SD, so the curve beyond the pond
+range rests on paths through the landscape rather than on sampled ponds.
+The monotonicity row reports whether the curve only rises or only falls
+across the pond range (`monotone`, `direction`) and how often its slope
+changes sign. Here it only increases. To keep predictions inside the
+sampled range, set `support = "focal"` in `plot()` or `conductance()`.
+This clamps the display without refitting the model.
 
-Even when AICc improves, inspect these warning signs:
-
-- **Wild oscillation** in the marginal curve, especially with sign reversals at the edges of the covariate range.
-- **Very large basis coefficients** relative to their standard errors.
-- **Near-singular design matrix** or optimizer warnings about convergence.
-- **Large discrepancy between ns and bs** at the same df/k: if the two spline families give qualitatively different shapes, neither has strong support.
-
-```{r overfit-check, eval = FALSE}
-# Quick eigenvalue check: are estimated parameters degenerate?
-hess <- fit_ns_alt$fit$hessian
-ev <- eigen(hess, symmetric = TRUE, only.values = TRUE)$values
-min(ev)   # Should be clearly positive; near-zero values indicate numerical problems
-
-# Compare ns and bs marginal shapes side by side
-par(mfrow = c(1, 2))
-plot(fit_ns_alt, type = "marginal", data = surface, main = "ns")
-plot(fit_bs_alt, type = "marginal", data = surface, main = "bs")
+```{r constrained-curve, fig.cap = "***Association viewed with focal-support clamping.*** This changes the evaluation range used for display; it does not alter the fitted genetic model or its selection score."}
+plot(fit_spline, type = "marginal", data = surface, support = "focal") +
+  labs(x = "Forest fraction after 500 m smoothing",
+       y = "Relative conductance") +
+  theme(plot.margin = margin(6, 18, 6, 6))
 ```
 
-------------------------------------------------------------------------
+## View the genetic-response curve
 
-## Recoverability example
-
-The package includes an example script that simulates a covariance response from a known non-linear conductance surface and then checks whether spline models recover it:
-
-```{r recovery-path}
-script_path <- system.file("examples", "spline-recovery-melip.R",
-                           package = "terradish")
-stopifnot(file.exists(script_path))
-basename(script_path)
+```{r spline-response, fig.cap = "Spline forest association on the mean fitted covariance scale. Each forest value is applied across the graph, retaining the other covariates and pond locations."}
+plot(fit_spline, type = "marginal_response", data = surface,
+     marginal_covariates = "forest500", n = 25) +
+  labs(x = "Forest fraction after 500 m smoothing",
+       y = "Mean fitted genetic covariance")
 ```
 
-Run it interactively:
+**How to read this curve.** As in Getting Started, each point sets forest
+to one value in every cell and averages the fitted covariance among ponds,
+including each pond's variance. More forest raises conductance and shrinks the graph's contribution to
+covariance, so the average falls as forest rises. With forest as the only
+predictor, this is the conductance curve above, inverted and rescaled. The
+band is an approximate interval for that average, not for any pond pair,
+and its normal approximation can dip below zero where data are sparse.
 
-```{r recovery-script, eval = FALSE}
-source(system.file("examples", "spline-recovery-melip.R",
-                   package = "terradish"))
+```{r spline-map, fig.cap = "Spline conductance estimate and pointwise model bounds over the full landscape. Colors use a shared logarithmic scale, with legend labels in conductance units."}
+maps <- plot(fit_spline, type = "surface", data = surface)
+C <- conductance(surface, fit_spline)
+map_limits <- range(terra::values(C), na.rm = TRUE)
 
-# Simulate a hump-shaped altitude response and check recovery
-recovery <- run_spline_recovery_example()
-recovery$model_comparison   # AICc table
-recovery$parameter_recovery # true vs estimated theta
-
-# Full melip worked example
-melip_spline <- fit_melip_spline_example()
-melip_spline$model_comparison
+# A shared log color scale reveals gradients without changing the fitted
+# conductance values or clipping the confidence bounds.
+for (p in maps) {
+  print(p + scale_fill_viridis_c(
+    trans = "log10", limits = map_limits,
+    breaks = c(0.01, 0.1, 0.5, 1, 2, 5, 10, 20),
+    name = "Conductance\n(log color scale)"
+  ))
+}
 ```
 
-This script assesses recoverability for a specified generating scenario on a particular landscape and sampling design. It cannot verify identifiability for all parameter values or guarantee recovery in the real analysis.
+**How to read the maps.** The estimate shows where the spline assigns
+high or low conductance, on a log color scale shared by all three panels.
+Wide bounds where forest values have few sampled ponds call for caution,
+even where the estimate looks smooth.
 
-------------------------------------------------------------------------
+## Ask whether flexibility earns its extra parameters
 
-## Quick-reference: the full spline workflow
+```{r comparison}
+aic_table(list(fit_linear, fit_spline), mod_names = c("linear", "spline_df3"))
+cv <- terradish_cv_folds(surface,
+  list(linear = S ~ forest500, spline_df3 = S ~ s(forest500, df = 3)),
+  folds = ponds$fold, model = wishart_covariance, nu = 40,
+  conductance_model = list(linear = loglinear_conductance,
+                           spline_df3 = smooth_loglinear_conductance),
+  nuisance = "fixed", optimizer = "bfgs", keep_fits = "none", control = control)
+cv$results[, c("model", "fold", "loglik", "loglik_gain", "error")]
+cv$summary
+```
 
-```{r quickref, eval = FALSE}
+**How to read the comparison.** Flexible curves can raise the full-data
+likelihood even when the true shape is linear, and the AIC penalty counts
+their added coefficients. Spatial validation then asks whether the
+association transfers to whole held-out ponds, with measurement parameters
+fixed at training values. A spline that fits better
+but predicts worse favors the simpler association for this purpose.
+
+Here the spline's AIC advantage is less than one unit, while its summed
+held-out score is about
+`r round(cv$summary$total_loglik[cv$summary$model == "linear"] - cv$summary$total_loglik[cv$summary$model == "spline_df3"])`
+units below the linear model, and in block 2 it even loses to uniform
+conductance. In `cv$summary`, the spline trails linear by about
+`r sprintf("%.2f", abs(cv$summary$mean_difference[cv$summary$model == "spline_df3"]))`
+units per block (standard error
+`r sprintf("%.2f", cv$summary$se_difference[cv$summary$model == "spline_df3"])`),
+just over one standard error, so `within_one_se` is `FALSE`. The curve
+rises like the simulated association, but the extra flexibility does not
+improve prediction, so prefer the linear model.
+
+## What to take to your own study
+
+A mixed formula such as `S ~ s(forest500, df = 3) + slope` adds a linear
+conditional slope association, and smoothing both variables adds more
+basis coefficients. A larger `df` can represent sharper bends but can also
+fit noise with only 24 ponds. Choose a small, scientifically motivated
+candidate set. If you select context or spline complexity with genetic
+data, do so inside training blocks before claiming predictive performance
+for the selection procedure.
+
+Natural splines are the default. Request B-splines in the formula, for
+example `s(forest500, df = 3, basis = "bs")`. Do not read automatic knot
+locations as biological breakpoints. Splines use a fixed spatial context,
+so to estimate the smoothing scale, use a log-linear term in the Gaussian
+scale model instead.
+
+<details>
+<summary>Quick reference: expand for the complete copyable workflow</summary>
+
+## Quick reference: shape at a fixed context
+
+```{r quick-reference, eval = FALSE}
 library(terradish)
 library(terra)
+data(ohio_ponds)
+g <- factor(ohio_ponds$samples$pond, levels = ohio_ponds$ponds$pond)
+N <- 2 * as.numeric(table(g))
+S <- cov_from_biallelic(rowsum(ohio_ponds$snp, g, reorder = FALSE)[ohio_ponds$ponds$pond, , drop = FALSE], N) / N[1]
+x <- c(unwrap(ohio_ponds$covariates), unwrap(ohio_ponds$forest500))
+graph <- conductance_surface(scale_covariates(x), ohio_ponds$ponds[c("x", "y")])
+ctl <- NewtonRaphsonControl(maxit = 200, ctol = 1e-8, ftol = 1e-8)
 
-# ---- 1. Prepare the landscape ----
-data(melip)
-melip.altitude    <- terra::unwrap(melip.altitude)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords      <- terra::unwrap(melip.coords)
-
-covariates <- c(melip.altitude, melip.forestcover)
-names(covariates) <- c("altitude", "forestcover")
-covariates <- scale_covariates(covariates)   # Always scale before fitting
-surface <- conductance_surface(covariates, melip.coords,
-                               directions = 8, saveStack = TRUE)
-
-# ---- 2. Assess once and reuse recommended settings ----
-assessment <- terradish_assess_settings(
-  melip.Fst ~ forestcover + s(altitude, df = 4),
-  data              = surface,
+# 1. Spatial context is fixed; the spline estimates response shape.
+fit <- terradish(S ~ s(forest500, df = 3), graph,
   conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe,
-  probe_maxit       = 1,
-  verbose           = FALSE
-)
-rec <- assessment$recommended
+  measurement_model = wishart_covariance, nu = 40, optimizer = "bfgs", control = ctl)
+summary(fit)   # check Convergence; spline monotonicity is reported at the end
 
-# ---- 3. Fit candidate models ----
-# Linear baseline
-fit_lin <- terradish(
-  melip.Fst ~ altitude + forestcover,
-  data = surface, conductance_model = loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer = rec$optimizer,
-  control = rec$control,
-  solver = rec$solver,
-  solver_control = rec$solver_control,
-  approximation = rec$approximation,
-  approximation_control = rec$approximation_control
-)
+# 2. Interpret the whole curve, including its supported range.
+plot(fit, type = "marginal", data = graph)
+plot(fit, type = "marginal", data = graph, support = "focal")
 
-# Natural spline on altitude (df = 4)
-fit_ns <- terradish(
-  melip.Fst ~ forestcover + s(altitude, df = 4),
-  data = surface, conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer = rec$optimizer,
-  control = rec$control,
-  solver = rec$solver,
-  solver_control = rec$solver_control,
-  approximation = rec$approximation,
-  approximation_control = rec$approximation_control
-)
-
-# B-spline on altitude (k = 4, cubic)
-fit_bs <- terradish(
-  melip.Fst ~ forestcover + s(altitude, k = 4, basis = "bs", degree = 3),
-  data = surface, conductance_model = smooth_loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer = rec$optimizer,
-  control = rec$control,
-  solver = rec$solver,
-  solver_control = rec$solver_control,
-  approximation = rec$approximation,
-  approximation_control = rec$approximation_control
-)
-
-# ---- 4. Compare ----
-aic_table(list(fit_lin, fit_ns, fit_bs),
-          mod_names = c("Linear", "ns df=4", "bs k=4"),
-          AICc = TRUE)
-
-# ---- 5. Visualize the best model ----
-best <- fit_ns   # replace with whichever model won
-
-plot(best, type = "fit")                       # Observed vs fitted
-plot(best, type = "surface",  data = surface)  # Conductance raster + CI
-
-# Marginal plots: all covariates together, or one at a time
-plot(best, type = "marginal", data = surface)
-plot(best, type = "marginal", data = surface,
-     marginal_covariates = "altitude")          # altitude panel only
-
-# Side-by-side comparison of two models' altitude associations. patchwork is
-# optional; install it for the `|` and `/` layout operators used here.
-library(patchwork)
-p1 <- plot(fit_lin,  type = "marginal", data = surface,
-           marginal_covariates = "altitude") + ggtitle("Linear")
-p2 <- plot(fit_ns,   type = "marginal", data = surface,
-           marginal_covariates = "altitude") + ggtitle("ns df=4")
-p1 | p2
-
-plot(best, type = "marginal_response",         # Response-scale associations
-     data = surface, marginal_covariates = "altitude")
-
-# Extract the conductance surface as a SpatRaster
-cond_raster <- conductance(surface, best)
-# Layer names: "est", "lower95", "upper95"
-plot(cond_raster)
+# 3. Compare prediction with a simpler log-linear shape.
+cv <- terradish_cv_folds(graph,
+  list(linear = S ~ forest500, spline = S ~ s(forest500, df = 3)),
+  ohio_ponds$ponds$fold, model = wishart_covariance, nu = 40,
+  conductance_model = list(linear = loglinear_conductance,
+                           spline = smooth_loglinear_conductance),
+  nuisance = "fixed", optimizer = "bfgs", control = ctl)
+cv$summary
 ```
+
+</details>
 
 ## Summary of key functions
 
 | Function | Purpose |
-|--------------------------------------|----------------------------------|
-| `smooth_loglinear_conductance()` | Conductance model with `s()` spline terms |
-| `terradish_assess_settings()` | Recommend solver and optimizer settings once, reuse for every candidate |
-| `terradish()` | Fit each linear and spline candidate |
-| `aic_table()` | Rank comparable candidates using the stated AICc convention |
-| `plot(type = "marginal")` | The fitted conditional association on the conductance scale |
-| `plot(type = "marginal_response")` | The corresponding curve on the MLPE genetic-distance scale |
-| `conductance()` | Extract the fitted surface with confidence intervals |
+|---|---|
+| `smooth_loglinear_conductance()` | Expand specified smooth terms into a stored spline basis |
+| `terradish()` | Fit basis coefficients and measurement parameters |
+| `summary()` | Read estimates, convergence, and spline support diagnostics |
+| `plot(..., type = "marginal")` | Interpret the combined conductance association |
+| `aic_table()` | Compare compatible fits while counting spline parameters |
+| `terradish_cv_folds()` | Evaluate shape candidates on common held-out ponds |
 
 ## See also
 
-- **`vignette("getting-started", package = "terradish")`**, the log-linear baseline these models extend.
-- **`vignette("model-comparison", package = "terradish")`**, AICc, likelihood ratio tests, and cross-validation for choosing among candidates.
-- **`vignette("gaussian-scale-optimization", package = "terradish")`**, Gaussian raster smoothing rather than flexibility in the covariate-response shape.
+- [`vignette("getting-started", package = "terradish")`](getting-started.html): genotype
+  construction and fixed-context fitting.
+- [`vignette("gaussian-scale-optimization", package = "terradish")`](gaussian-scale-optimization.html):
+  estimate the spatial context of a continuous raster.
+- [`vignette("model-comparison", package = "terradish")`](model-comparison.html): multivariate
+  candidates, information sensitivity, and predictive selection.
+- [`vignette("categorical-conductance", package = "terradish")`](categorical-conductance.html):
+  factors for class contrasts rather than smooth gradients.
+- [`vignette("individual-salamanders", package = "terradish")`](individual-salamanders.html):
+  a hump-shaped (quadratic) resistance response with individual genotypes.
+- [`vignette("data-generation", package = "terradish")`](data-generation.html):
+  how the pond landscape and genetic history were simulated.

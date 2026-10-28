@@ -12,6 +12,21 @@ radish_algorithm(...)
 \code{radish_algorithm()} compatibility wrapper to
 \code{\link{terradish_algorithm}}.}
 }
+\value{
+A list containing at a minimum:
+ \item{covariance}{rows/columns of the generalized inverse of the graph Laplacian for a subset of target vertices}
+Additionally, if 'objective == TRUE':
+ \item{objective}{(if 'objective') the negative loglikelihood}
+ \item{phi}{(if 'objective') fitted values of the nuisance parameters of 'g'}
+ \item{subproblem}{(if 'objective') convergence code and iteration count
+   for the nuisance-parameter profile}
+ \item{boundary}{(if 'objective') is the solution on the boundary (e.g. no genetic structure)?}
+ \item{fitted}{(if 'objective') matrix of expected genetic distances among target vertices}
+ \item{gradient}{(if 'gradient') gradient of negative loglikelihood with respect to theta}
+ \item{hessian}{(if 'hessian') Hessian matrix of the negative loglikelihood with respect to theta}
+ \item{partial_X}{(if 'partial') Jacobian of the gradient with respect to the spatial covariates}
+ \item{partial_S}{(if 'partial') Jacobian of the gradient with respect to the observed genetic distances}
+}
 \description{
 Deprecated compatibility wrapper retained for legacy code that still calls
 \code{radish_algorithm()} directly.

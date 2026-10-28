@@ -158,7 +158,7 @@ test_that("plot methods handle covariance responses and smooth conductance", {
   expect_true(inherits(marginal_response_plot, "ggplot") || is.list(marginal_response_plot))
   marginal_response_first <- if (inherits(marginal_response_plot, "ggplot")) marginal_response_plot else marginal_response_plot[[1]]
   marginal_response_data <- if (inherits(marginal_response_plot, "ggplot")) marginal_response_plot$data else do.call(rbind, lapply(marginal_response_plot, function(p) p$data))
-  expect_equal(marginal_response_first$scales$get_scales("y")$name,
+  expect_equal(marginal_response_first$labels$y,
                "Predicted genetic covariance")
   expect_true("altitude (original scale)" %in%
                 unique(as.character(marginal_response_data$covariate)))

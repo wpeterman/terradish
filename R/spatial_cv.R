@@ -169,11 +169,26 @@ terradish_folds <- function(pts, k = 5L,
 .terradish_cv_prediction_theta <- function(fit, nuisance) {
   theta <- fit$mle$theta_internal
   if (length(theta)) return(theta)
+  # A uniform fit intentionally estimates no conductance coefficients. Its
+  # intercept-only factory still needs a zero coefficient to produce C = 1.
+  if (identical(fit$convergence$criterion, "no_conductance_parameters")) {
+    theta <- attr(fit$submodels$f_internal, "default", exact = TRUE)
+    theta[] <- 0
+    return(theta)
+  }
   # With beta/tau fixed at zero, predictions do not depend on conductance.
   # A valid factory default supplies the otherwise unidentified coefficients.
   if (nuisance == "fixed" && .no_structure_boundary(fit$fit))
     return(attr(fit$submodels$f_internal, "default", exact = TRUE))
   stop("The training fit produced no conductance coefficients.", call. = FALSE)
+}
+
+.cv_covariate_fingerprint <- function(x) {
+  # Category counts cannot describe where the classes occur. Preserve factor
+  # locations, levels and contrasts, while keeping numeric checkpoint identity.
+  if (is.data.frame(x) && any(vapply(x, is.factor, logical(1))))
+    return(list(factor_covariates = .cv_prediction_metadata(x)))
+  colSums(x)
 }
 
 .cv_prediction_metadata <- function(x) {
@@ -245,7 +260,9 @@ terradish_folds <- function(pts, k = 5L,
 #'   serial to avoid nested parallel clusters.
 #' @param measurement_control Optional \code{\link{NewtonRaphsonControl}} object
 #'   for profiling nuisance parameters.
-#' @param ... Additional arguments passed to \code{\link{terradish}}.
+#' @param ... Additional arguments passed to \code{\link{terradish}}. An
+#'   explicit \code{optimizer} is used for each training fit. Otherwise the
+#'   training call tries Newton and retries with BFGS if Newton raises an error.
 #'
 #' @details
 #' The graph domain and raster covariates remain fixed. Only the focal-site
@@ -264,8 +281,14 @@ terradish_folds <- function(pts, k = 5L,
 #'
 #' Checkpoints include a signature of the response, graph, focal cells,
 #' covariates, model definitions, formulas, \code{nu}, and fold assignments.
+#' For factor covariates the signature retains class placement, levels, and
+#' contrasts. Uniform \code{~1} formulas are scored with unit conductance.
 #' A mismatched signature stops resumption. Nonconverged fits and failed scores
-#' count as failed folds. With fixed nuisance parameters, no-structure boundary
+#' count as failed folds. Training fits must record code 0 for both outer and
+#' final nuisance optimization; missing diagnostics also fail the fold.
+#' Checkpoints predating this convergence requirement are incompatible and
+#' must be recomputed (use a new checkpoint or \code{resume = FALSE}).
+#' With fixed nuisance parameters, no-structure boundary
 #' fits remain scoreable because predictions do not depend on conductance.
 #' A failed uniform-baseline score is recorded separately: model scores remain
 #' usable, but baseline gains are unavailable for that fold.
@@ -289,6 +312,11 @@ terradish_folds <- function(pts, k = 5L,
 #'   the standard error of their mean, and a one-standard-error flag.
 #'   Repeated runs also report the SD of repeat totals over common folds.
 #'   Optional retained fits are stored in \code{fits}.
+#'
+#' @section Worked examples:
+#' See \code{vignette("model-comparison", package = "terradish")} for pond
+#' comparisons and \code{vignette("individual-salamanders", package = "terradish")}
+#' for individual sampling, matched markers, and spatial prediction plots.
 #'
 #' @examples
 #' \donttest{
@@ -387,14 +415,21 @@ terradish_cv_folds <- function(data, formulas, folds, model = "mlpe", nu = NULL,
   baseline_formula <- reformulate(baseline_variable, response = "gd_mat")
   signature <- .cv_signature(list(response = gd_full,
     graph = c(vertices = nrow(data$x), edges = ncol(data$adj)), focal = data$demes,
-    covariates = colnames(data$x), sums = colSums(data$x), formulas = formula_labels,
+    covariates = colnames(data$x), sums = .cv_covariate_fingerprint(data$x), formulas = formula_labels,
     conductance = lapply(seq_along(factories), function(i) {
       factory <- factories[[i]]
       rhs <- attr(terms(formulas[[i]]), "term.labels")
       fitted_model <- factory(if (length(rhs)) reformulate(rhs) else ~1, data$x)
       list(factory = .cv_function_identity(factory), model = .cv_function_identity(fitted_model))
     }), measurement = lapply(models, .cv_function_identity), nu = nu, folds = repeats))
+  # Distinguish explicit optimizer calls without changing prior signatures
+  # for calls that leave the training optimizer unspecified.
+  if (!is.null(dots$optimizer))
+    signature <- .cv_signature(list(signature = signature,
+                                   requested_optimizer = dots$optimizer))
   checkpoint_meta <- list(
+    # Old score-only checkpoints cannot establish final training convergence.
+    convergence_contract = "outer_and_final_nuisance_v1",
     signature = signature,
     folds = repeats,
     formulas = formula_labels,
@@ -449,8 +484,8 @@ terradish_cv_folds <- function(data, formulas, folds, model = "mlpe", nu = NULL,
           response_matrix = gd_mat),
         error = identity
       )
-      if (!inherits(fit, "error") && !isTRUE(fit$convergence$code == 0))
-        fit <- simpleError("The training fit did not converge.")
+      if (!inherits(fit, "error") && !.terradish_fit_converged(fit))
+        fit <- simpleError("The training fit did not converge or lacks outer or final nuisance convergence diagnostics.")
       if (!inherits(fit, "error")) {
         prediction_theta <- tryCatch(.terradish_cv_prediction_theta(fit, nuisance),
                                      error = identity)

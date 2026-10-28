@@ -1,743 +1,510 @@
 ---
 title: "Model Comparison and Selection in terradish"
 author: "Bill Peterman"
-output: 
+output:
   rmarkdown::html_vignette:
     number_sections: true
     toc: true
+    self_contained: true
+    mathjax: null
+    pandoc_args: ["--mathml"]
 vignette: >
   %\VignetteIndexEntry{Model Comparison and Selection in terradish}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
 
-```{r setup, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment  = "#>",
-  fig.width  = 6,
-  fig.height = 4.5,
-  warning  = FALSE,
-  message  = FALSE,
-  # Evaluate fits during ordinary builds so the source tarball includes
-  # the complete rendered guide and its figures.
-  eval = TRUE
-)
+The displayed results and figures in this guide were computed from the
+executable R Markdown source shipped with the package. Routine package
+checks use these precomputed results to keep the CRAN check time modest.
+To rerun every code chunk, copy `system.file("vignette-source", "model-comparison.Rmd", package = "terradish")` to a writable directory and render that copy with `rmarkdown::render()`.
 
-```
+---
 
-## Overview
 
-Once you can fit a `terradish` model (see
-`vignette("getting-started", package = "terradish")`), the natural next
-questions are:
 
-1.  Does forest cover have conditional likelihood support after
-    accounting for the other predictors, or could the apparent
-    association be noise? (**hypothesis testing**)
-2.  Is a model with both altitude and forest cover better than one with
-    only altitude? (**model selection**)
-3.  How well does the model predict genetic structure at sites not used
-    for fitting? (**cross-validation**)
 
-This vignette walks through all three.
+**Goal.** Decide whether extra terrain variables are useful, using a candidate table, information criteria, and held-out scores.
 
-------------------------------------------------------------------------
+[`vignette("data-generation", package = "terradish")`](data-generation.html)
+explains the landscapes, SLiM histories, sampling, and matched markers used
+in these examples.
 
-## Set up: data and baseline model
+## What evidence should choose a model?
 
-```{r load-and-fit}
+A larger model can fit the observed genetic data better yet predict new
+ponds less well. Here you compare prespecified landscape hypotheses with
+information criteria, a nested likelihood-ratio test, and whole-pond
+spatial validation. Start with
+[`vignette("getting-started", package = "terradish")`](getting-started.html)
+for raw genotypes, response construction, and measurement parameters.
+
+In the Ohio pond simulation, forest context at 500 m affects gene flow,
+while slope and elevation have no direct effect. They are realistic
+candidates on the same terrain, and their spatial association with forest
+can still produce apparent fitted effects. In an empirical study the
+mechanism would be unknown, so competing hypotheses and validation matter
+more than recovering a familiar coefficient sign.
+
+Keep the comparison contract fixed: observed response, sampling units and
+order, likelihood family, graph domain and adjacency, and assumed Wishart
+information. Do not mix SNP and microsatellite likelihoods, or covariance
+and distance representations, in one information-criterion table.
+
+## Prepare one response and one landscape
+
+
+``` r
 library(terradish)
 library(terra)
+library(ggplot2)
+data(ohio_ponds)
+ponds <- ohio_ponds$ponds
+g <- factor(ohio_ponds$samples$pond, levels = ponds$pond)
+N <- 2 * as.numeric(table(g))
+S <- cov_from_biallelic(rowsum(ohio_ponds$snp, g, reorder = FALSE)[ohio_ponds$ponds$pond, , drop = FALSE], N) / N[1]
+x <- c(unwrap(ohio_ponds$covariates), unwrap(ohio_ponds$forest500))
+surface <- conductance_surface(scale_covariates(x), ponds[c("x", "y")], directions = 8)
 
-data(melip)
-melip.altitude    <- terra::unwrap(melip.altitude)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords      <- terra::unwrap(melip.coords)
-
-# Keep live fits small. Select 12 sites in distinct cells of the coarsened
-# raster so each response row still maps to a unique focal cell.
-melip.altitude <- terra::aggregate(melip.altitude, fact = 4,
-                                   fun = mean, na.rm = TRUE)
-melip.forestcover <- terra::aggregate(melip.forestcover, fact = 4,
-                                      fun = mean, na.rm = TRUE)
-site_cells <- terra::cellFromXY(melip.altitude, terra::crds(melip.coords))
-keep <- which(!is.na(site_cells) & !duplicated(site_cells))[1:12]
-melip.Fst <- melip.Fst[keep, keep, drop = FALSE]
-melip.coords <- melip.coords[keep]
-
-covariates <- c(melip.altitude, melip.forestcover)
-names(covariates) <- c("altitude", "forestcover")
-covariates <- scale_covariates(covariates)
-
-surface <- conductance_surface(
-  covariates,
-  melip.coords,
-  directions = 8,
-  saveStack = TRUE
-)
-
-# Lightweight one-time assessment: reuse recommendations for all fits below.
-assessment <- terradish_assess_settings(
-  melip.Fst ~ forestcover + altitude,
-  data              = surface,
-  conductance_model = loglinear_conductance,
-  measurement_model = mlpe,
-  probe_maxit       = 1,
-  verbose           = FALSE
-)
-rec <- assessment$recommended
-
-# Full model: both covariates
-fit_full <- terradish(
-  melip.Fst ~ forestcover + altitude,
-  data              = surface,
-  conductance_model = loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer         = rec$optimizer,
-  control           = rec$control,
-  solver            = rec$solver,
-  solver_control    = rec$solver_control,
-  approximation     = rec$approximation,
-  approximation_control = rec$approximation_control
-)
+# Correlation describes the full raster domain, not independent sampled ponds.
+round(cor(surface$x[c("forest500", "slope", "elevation")]), 2)
+#>           forest500 slope elevation
+#> forest500      1.00  0.33      0.39
+#> slope          0.33  1.00      0.00
+#> elevation      0.39  0.00      1.00
 ```
 
-The live results below come from this 12-site, coarsened teaching subset.
-They demonstrate comparison methods, not inference for the original
-37-site landscape. Refit the declared candidate set on the full data for a
-substantive analysis.
+**How to read the output.** All three covariates are standardized over the
+whole landscape, so each coefficient is the change in log conductance per
+one SD, holding the other included terms fixed. Forest is correlated with
+slope (0.33) and elevation (0.39), so either can absorb part of the forest
+signal. Correlation among thousands of raster cells does not add
+independent genetic information.
 
-### A note on computational settings
+## Declare the biological candidates
 
-When fitting many candidate models (as this vignette does), it pays to
-profile the graph and identify the fastest optimizer/solver combination
-**once**, then reuse those settings for all fits.
-`terradish_assess_settings()` does this in a few short probe iterations:
+Each extension keeps the active forest hypothesis:
 
-```{r assess-for-comparison, eval = FALSE}
-assessment <- terradish_assess_settings(
-  melip.Fst ~ forestcover + altitude,
-  data              = surface,
-  conductance_model = loglinear_conductance,
-  measurement_model = mlpe,
-  probe_maxit       = 2,
-  verbose           = FALSE
-)
+| Candidate | Landscape hypothesis | Conductance parameters |
+|---|---|---|
+| `uniform` | Uniform graph with spatial separation | None |
+| `forest` | Forest context alone | One |
+| `forest_slope` | Forest plus an additional slope association | Two |
+| `full` | Forest, slope, and elevation associations | Three |
 
-# One-line summary: did the assessment differ from defaults?
-cat(assessment$comparison$summary, "\n")
+The measurement model adds its graph weight and log diagonal variance to
+every candidate, so `K` in a comparison table exceeds the number of
+covariates. Here `nu = 40` is an information assumption, not 2,500
+independent SNPs.
 
-# Extract recommended settings and reuse for every model in this vignette
-rec <- assessment$recommended
+<details>
+<summary>Fit the candidates and inspect all starting attempts (code and output)</summary>
+
+
+``` r
+formulas <- list(uniform = S ~ 1, forest = S ~ forest500,
+                 forest_slope = S ~ forest500 + slope,
+                 full = S ~ forest500 + slope + elevation)
+control <- NewtonRaphsonControl(maxit = 200, ctol = 1e-8, ftol = 1e-8)
+
+# Retain every starting attempt, including errors and nonconverged fits.
+attempts <- list()
+fit_candidate <- function(formula, label) {
+  labels <- attr(terms(formula), "term.labels")
+  rhs <- if (length(labels)) reformulate(labels) else ~ 1
+  defaults <- attr(loglinear_conductance(rhs, surface$x), "default")
+  starts <- if (length(attr(terms(formula), "term.labels"))) c(-0.5, 0, 0.5) else 0
+  valid_fits <- list()
+  for (start in starts) {
+    theta <- defaults
+    theta[] <- start
+    fit <- tryCatch(terradish(formula, surface,
+      measurement_model = wishart_covariance, nu = 40, theta = theta,
+      optimizer = "bfgs", control = control), error = identity)
+    valid <- !inherits(fit, "error") && isTRUE(fit$convergence$code == 0) &&
+      isTRUE(fit$fit$subproblem$convergence == 0) && is.finite(as.numeric(logLik(fit)))
+    attempts[[length(attempts) + 1L]] <<- data.frame(model = label, start,
+      valid, logLik = if (inherits(fit, "error")) NA_real_ else as.numeric(logLik(fit)),
+      diagnostic = if (inherits(fit, "error")) conditionMessage(fit) else
+        paste("outer", fit$convergence$code, "nuisance", fit$fit$subproblem$convergence))
+    if (valid) valid_fits[[length(valid_fits) + 1L]] <- fit
+  }
+  if (!length(valid_fits)) stop("No converged fit for ", label)
+  valid_fits[[which.max(vapply(valid_fits, function(z) as.numeric(logLik(z)), numeric(1)))]]
+}
+fits <- Map(fit_candidate, formulas, names(formulas))
+do.call(rbind, attempts)
+#>           model start valid   logLik         diagnostic
+#> 1       uniform   0.0  TRUE 103.7619 outer 0 nuisance 0
+#> 2        forest  -0.5  TRUE 141.3124 outer 0 nuisance 0
+#> 3        forest   0.0  TRUE 141.3124 outer 0 nuisance 0
+#> 4        forest   0.5  TRUE 141.3124 outer 0 nuisance 0
+#> 5  forest_slope  -0.5  TRUE 141.5479 outer 0 nuisance 0
+#> 6  forest_slope   0.0  TRUE 141.5479 outer 0 nuisance 0
+#> 7  forest_slope   0.5  TRUE 141.5479 outer 0 nuisance 0
+#> 8          full  -0.5  TRUE 141.5550 outer 0 nuisance 0
+#> 9          full   0.0  TRUE 141.5550 outer 0 nuisance 0
+#> 10         full   0.5  TRUE 141.5550 outer 0 nuisance 0
 ```
 
-Then pass `rec$optimizer`, `rec$control`, `rec$solver`, and
-`rec$solver_control` to each `terradish()` call below. For the small
-*Melipona* graph the defaults are fine; the pattern becomes important
-for large landscapes where each function evaluation is expensive. See
-`vignette("getting-started", package = "terradish")` for a full
-explanation of the output and all available probe options.
+**How to read the output.** Compare optima only after both conductance
+and nuisance fitting converge. Agreement across starts shows numerical
+stability only. Failed attempts stay in the table but are never used as
+optima. If valid starts disagree materially,
+investigate the likelihood surface before interpreting. Do not change
+stopping thresholds to make an unresolved fit appear converged.
 
-------------------------------------------------------------------------
+</details>
 
-## Hypothesis testing with likelihood ratio tests
+## Read information criteria with their assumptions
 
-A **likelihood ratio test (LRT)** asks whether adding a covariate
-improves the model fit enough to reject the reduced model under its
-assumptions. The test statistic is:
 
-$$\mathrm{LR} = 2\left(\ell_{\mathrm{larger}} - \ell_{\mathrm{smaller}}\right).$$
-
-Here each $\ell$ is the maximized log-likelihood for that model.
-
-For nested models under the usual regularity conditions, including null
-parameters in the interior of their allowed ranges, the reference distribution
-is $\chi^2_q$, where $q$ is the difference in the number of estimated
-parameters. Boundary parameters require a different reference distribution,
-as discussed below; adding sites alone does not guarantee calibration.
-
-`terradish` provides `anova()` for this:
-
-```{r lrt}
-# Reduced model: only forest cover, no altitude
-fit_fc_only <- terradish(
-  melip.Fst ~ forestcover,
-  data              = surface,
-  conductance_model = loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer         = rec$optimizer,
-  control           = rec$control,
-  solver            = rec$solver,
-  solver_control    = rec$solver_control,
-  approximation     = rec$approximation,
-  approximation_control = rec$approximation_control
-)
-
-anova(fit_full, fit_fc_only)
+``` r
+ranking <- aic_table(fits, mod_names = names(fits))
+ranking
+#>          model K       AIC Delta_AIC AIC_wt Cum.wt   loglik converged boundary
+#> 2       forest 3 -276.6249    0.0000 0.6105 0.6105 141.3124      TRUE    FALSE
+#> 3 forest_slope 4 -275.0958    1.5291 0.2842 0.8947 141.5479      TRUE    FALSE
+#> 4         full 5 -273.1100    3.5149 0.1053 1.0000 141.5550      TRUE    FALSE
+#> 1      uniform 2 -203.5238   73.1011 0.0000 1.0000 103.7619      TRUE    FALSE
+aic_table(fits, mod_names = names(fits), AICc = TRUE)
+#>          model K       AIC      AICc Delta_AICc AICc_wt Cum.wt   loglik
+#> 2       forest 3 -276.6249 -275.4249     0.0000  0.7378 0.7378 141.3124
+#> 3 forest_slope 4 -275.0958 -272.9905     2.4344  0.2184 0.9562 141.5479
+#> 4         full 5 -273.1100 -269.7766     5.6483  0.0438 1.0000 141.5550
+#> 1      uniform 2 -203.5238 -202.9524    72.4725  0.0000 1.0000 103.7619
+#>   converged boundary
+#> 2      TRUE    FALSE
+#> 3      TRUE    FALSE
+#> 4      TRUE    FALSE
+#> 1      TRUE    FALSE
+aic_table(fits, mod_names = names(fits), BIC = TRUE)
+#>          model K       AIC       BIC Delta_BIC BIC_wt Cum.wt   loglik converged
+#> 2       forest 3 -276.6249 -273.0907    0.0000 0.7625 0.7625 141.3124      TRUE
+#> 3 forest_slope 4 -275.0958 -270.3836    2.7072 0.1970 0.9595 141.5479      TRUE
+#> 4         full 5 -273.1100 -267.2197    5.8710 0.0405 1.0000 141.5550      TRUE
+#> 1      uniform 2 -203.5238 -201.1677   71.9230 0.0000 1.0000 103.7619      TRUE
+#>   boundary
+#> 2    FALSE
+#> 3    FALSE
+#> 4    FALSE
+#> 1    FALSE
 ```
 
-A small p-value means that removing altitude worsens the likelihood more
-than expected under the reduced model and its asymptotic reference
-distribution. This result supports a conditional association between
-altitude and genetic structure through the fitted conductance surface.
-It does not by itself establish a causal effect, movement mechanism, or
-absolute permeability.
+**How to read the tables.** AIC is $-2\ell+2K$, so lower is better and
+each extra parameter costs 2 units. `Delta_AIC` is the distance from the
+best model, and `AIC_wt` is relative support within this candidate set,
+not the probability that a model is the true mechanism. Models within 2
+units of the best have comparable support. Here `forest` leads (weight
+0.61), `forest_slope` is close (1.5 units), `full` trails (3.5 units), and
+`uniform` has no support. `converged` is `TRUE` only when both optimizers
+finished, and `boundary` flags estimates at a limit.
 
-### Testing against the null model of isolation by distance (IBD)
+AICc and BIC use the 24 ponds, not the 276 pairs or 2,500 SNPs, as the
+sample size. Under both, `forest_slope` falls more than 2 units behind
+`forest`. Neither corrects for an uncertain `nu`, so check prediction too.
 
-The formula `~ 1` fits a null conductance surface where all cells have
-equal conductance. Resistance still combines all routes through the
-graph; it is neither shortest-path distance nor necessarily proportional
-to Euclidean distance. This uniform-surface model is the graph-based IBD
-baseline:
+<details>
+<summary>Optional: how assumed information changes a ranking</summary>
 
-```{r ibd-test}
-fit_ibd <- terradish(
-  melip.Fst ~ 1,
-  data              = surface,
-  conductance_model = loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer         = rec$optimizer,
-  control           = rec$control,
-  solver            = rec$solver,
-  solver_control    = rec$solver_control,
-  approximation     = rec$approximation,
-  approximation_control = rec$approximation_control
-)
 
-# Is the full model significantly better than pure IBD?
-anova(fit_full, fit_ibd)
-```
-
-### Testing for an interaction
-
-An interaction term asks whether the fitted association between altitude
-and conductance depends on forest cover (or vice versa):
-
-```{r interaction-test}
-fit_interaction <- terradish(
-  melip.Fst ~ forestcover * altitude,
-  data              = surface,
-  conductance_model = loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer         = rec$optimizer,
-  control           = rec$control,
-  solver            = rec$solver,
-  solver_control    = rec$solver_control,
-  approximation     = rec$approximation,
-  approximation_control = rec$approximation_control
-)
-
-# Is the interaction term worth keeping?
-anova(fit_full, fit_interaction)
-```
-
-> **Tip:** Always compare nested models (smaller vs. larger). The model
-> with fewer parameters must be a special case of the model with more
-> parameters. `anova()` rejects different measurement models and obvious
-> formula non-nesting, but the analyst must still verify substantive
-> nesting and whether boundary parameters invalidate the usual
-> chi-squared reference distribution. The response, site order, graph,
-> pairwise design, basis definition, and supplied Wishart `nu` must
-> agree. A linear term is not automatically nested in an arbitrary
-> spline basis, and a fitted Gaussian scale changes the model dimension.
-> For Wishart fits, the LRT magnitude depends on `nu`; interpret it
-> descriptively at the declared value and report sensitivity rather than
-> treating nominal marker counts as calibrated replication.
-
-------------------------------------------------------------------------
-
-## Information criteria: AIC, AICc, and BIC
-
-Likelihood ratio tests require nested models. When comparing non-nested
-models (e.g. altitude-only vs. forest-cover-only), use an information
-criterion or held-out prediction instead.
-
-```{r fit-all-candidates}
-fit_altitude_only <- terradish(
-  melip.Fst ~ altitude,
-  data              = surface,
-  conductance_model = loglinear_conductance,
-  measurement_model = mlpe,
-  optimizer         = rec$optimizer,
-  control           = rec$control,
-  solver            = rec$solver,
-  solver_control    = rec$solver_control,
-  approximation     = rec$approximation,
-  approximation_control = rec$approximation_control
-)
-```
-
-`aic_table()` ranks fitted `terradish` models only when they use the
-same response, focal sites, graph domain, measurement-model family, and
-pair subset. Wishart fits must also use the same supplied `nu`.
-Cross-family comparisons, such as MLPE versus Wishart, do not have a
-common likelihood basis and are rejected.
-
-```{r aic-table}
-aic_table(
-  list(fit_ibd, fit_altitude_only, fit_fc_only, fit_full, fit_interaction),
-  mod_names = c("IBD", "Altitude only", "Forestcover only",
-                "Full (A + FC)", "Interaction (A * FC)")
-)
-```
-
-**How to read the table:**
-
-- **loglik**: larger values indicate higher maximized log-likelihood.
-- **K**: number of estimated parameters; more complex models have
-  larger K.
-- **AIC**: balances fit and complexity. Smaller is better.
-- **Delta_AIC**: difference from the best model's AIC. Values below about 2
-  are a common heuristic for similar support within the declared
-  candidate set, not proof that the models are equivalent.
-
-### Effective information and over-selection
-
-Wishart AIC can select unnecessary conductance terms when nominal `nu`
-overstates effective information. AICc does not repair an incorrectly
-scaled likelihood. Use the same predeclared candidates in
-cross-validation and compare inference over plausible effective degrees
-of freedom:
-
-```{r nu-sensitivity, eval = FALSE}
-# fit_wishart is a converged Wishart fit at the declared primary nu.
-sensitivity <- lapply(c(10, 30, 100), function(value) {
-  terradish_rescale_nu(fit_wishart, nu = value)
+``` r
+information_sensitivity <- lapply(c(20, 40, 80, 2500), function(nu) {
+  scaled_fits <- lapply(fits, terradish_rescale_nu, nu = nu)
+  tab <- aic_table(scaled_fits, mod_names = names(fits))
+  data.frame(nu, tab[, c("model", "K", "AIC", "Delta_AIC")])
 })
-lapply(sensitivity, confint)
+do.call(rbind, information_sensitivity)
+#>      nu        model K         AIC Delta_AIC
+#> 2    20       forest 3   -135.3124    0.0000
+#> 3    20 forest_slope 4   -133.5479    1.7646
+#> 4    20         full 5   -131.5550    3.7575
+#> 1    20      uniform 2    -99.7619   35.5505
+#> 21   40       forest 3   -276.6249    0.0000
+#> 31   40 forest_slope 4   -275.0958    1.5291
+#> 41   40         full 5   -273.1100    3.5149
+#> 11   40      uniform 2   -203.5238   73.1011
+#> 22   80       forest 3   -559.2498    0.0000
+#> 32   80 forest_slope 4   -558.1916    1.0582
+#> 42   80         full 5   -556.2199    3.0298
+#> 12   80      uniform 2   -411.0477  148.2021
+#> 33 2500 forest_slope 4 -17685.4860    0.0000
+#> 43 2500         full 5 -17684.3732    1.1127
+#> 23 2500       forest 3 -17658.0557   27.4303
+#> 13 2500      uniform 2 -12966.2394 4719.2466
 ```
 
-**How to read the output.** Rescaling changes uncertainty and
-likelihood-based comparisons without changing the fitted coefficients.
-If conclusions depend on a high `nu`, report that dependence. Rescale
-every candidate to the same value before comparing their information
-criteria.
+Rescaling `nu` leaves the coefficients unchanged but multiplies every
+log-likelihood, so larger `nu` makes small likelihood gains outweigh the
+complexity penalty. The `nu = 2500` rows, which treat every linked SNP as
+independent, favor extra terms for that reason alone, so the SNP count is
+not a safe default.
 
-### When to use AICc
+</details>
 
-AIC can over-fit when the effective sample size is small relative to the
-number of parameters. `terradish` provides an AICc calculation that uses
-the number of focal sampling sites as `n`:
+## Use a likelihood-ratio test only for a nested question
 
-```{r aicc-table}
-aic_table(
-  list(fit_ibd, fit_altitude_only, fit_fc_only, fit_full, fit_interaction),
-  mod_names = c("IBD", "Altitude only", "Forestcover only",
-                "Full", "Interaction"),
-  AICc = TRUE
-)
+The forest-only model is nested in the full model, because setting the
+slope and elevation coefficients to zero recovers it. A likelihood-ratio
+test can therefore ask whether those two terms together add support.
+
+
+``` r
+anova(fits$forest, fits$full)
+#> Likelihood ratio test: chi-square (2 df)
+#> Null: ~ forest500
+#> Alt: ~ forest500 + slope + elevation
+#>      logLik Df   ChiSq Df(ChiSq) Pr(>Chi)
+#> Null 141.31  3
+#> Alt  141.56  5 0.48508         2   0.7846
 ```
 
-The focal-site convention recognizes that pairwise genetic observations
-are dependent, but it is still an approximation. Report the convention
-and use the result as one part of the evidence. A common rule of thumb
-is to prefer AICc when `n / K < 40`, where `K` includes all estimated
-parameters. Predeclare and report the candidate model set and any search
-over Gaussian smoothing scale; an optimized scale is an estimated
-parameter.
+**How to read the output.** `ChiSq` is twice the log-likelihood gain
+(0.49), on 2 degrees of freedom because the full model estimates two more
+parameters (`Df` 5 versus 3). With p = 0.78, the extra terms add nothing
+detectable, so keep the forest-only model. The statistic scales with
+`nu`, so a larger assumed `nu` would shrink this p-value without changing
+the fit. Report the `nu` you used. Use the test only for nested models
+fitted to the same response, likelihood, and `nu`, because `anova()` stops
+with an error otherwise.
 
-### BIC for stricter parsimony
+## Inspect conditional associations
 
-BIC penalizes complexity more heavily than AIC and tends to favor
-simpler models. As with AICc, the BIC sample size is the number of focal
-sites (individuals or populations), not the number of pairwise
-observations. Pairs that share a site are not independent, so counting
-pairs would overstate the information in the data. Treat BIC values as
-one input among several rather than a single definitive arbiter of model
-choice:
 
-```{r bic-table}
-aic_table(
-  list(fit_ibd, fit_altitude_only, fit_fc_only, fit_full, fit_interaction),
-  mod_names = c("IBD", "Altitude only", "Forestcover only",
-                "Full", "Interaction"),
-  BIC = TRUE
-)
+``` r
+interval <- confint(fits$full)
+coefficients <- data.frame(variable = names(coef(fits$full)),
+  estimate = as.numeric(coef(fits$full)), lower = interval[, 1], upper = interval[, 2])
+ggplot(coefficients, aes(variable, estimate)) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_pointrange(aes(ymin = lower, ymax = upper)) +
+  coord_flip() + theme_bw() + labs(x = NULL, y = "Log conductance per covariate SD")
 ```
 
-------------------------------------------------------------------------
+![***Full-model conditional conductance coefficients.*** Points are estimates; segments are 95% model intervals. All covariates are on a one-SD scale over the same landscape.](precomputed/model-comparison-coefficient-plot-1.png)
 
-## Visualizing the likelihood surface
+**How to read the plot.** Exponentiate a coefficient to get the relative
+conductance ratio for a one-SD contrast, holding the other covariates
+constant. Each association depends on the covariates included, their
+spatial support, and the response. Correlation and finite genetic history
+can give slope and elevation nonzero estimates even without simulated
+effects. An association is not evidence that habitat caused the genetic
+pattern.
 
-When a model has only one or two conductance parameters, it is
-informative to map how the log-likelihood changes across parameter
-space. This reveals:
+A marginal conductance plot shows each association as a curve, averaging
+over the observed values of the other predictors:
 
-- How sharp (or flat) the optimum is.
-- Whether there are multiple local optima.
-- Whether the estimates are well-determined or poorly constrained.
 
-`terradish_grid()` evaluates the model at every point on a parameter
-grid:
-
-```{r likelihood-grid}
-# Define a small 5 x 5 grid of (forestcover, altitude) combinations
-theta_grid <- as.matrix(
-  expand.grid(
-    forestcover = seq(-1, 1, length.out = 5),
-    altitude    = seq(-1, 1, length.out = 5)
-  )
-)
-
-grid_result <- terradish_grid(
-  theta     = theta_grid,
-  formula   = melip.Fst ~ forestcover + altitude,
-  data      = surface,
-  conductance_model = loglinear_conductance,
-  measurement_model = mlpe
-)
+``` r
+plot(fits$full, type = "marginal", data = surface)
 ```
 
-This coarse grid illustrates the method. For inference about peak location or
-multiple optima, increase the resolution around regions of interest and check
-that the conclusions persist.
+![Marginal conductance associations in the full model. Each curve changes one predictor; bands show 95% pointwise model intervals.](precomputed/model-comparison-full-marginal-1.png)
 
-Plot the result as a heat map with contours:
+![Marginal conductance associations in the full model. Each curve changes one predictor; bands show 95% pointwise model intervals.](precomputed/model-comparison-full-marginal-2.png)
 
-```{r plot-likelihood-surface, fig.cap = "***Log-likelihood surface. Red dot marks the MLE.***"}
-# Build a data frame for plotting
-grid_df <- data.frame(
-  forestcover = theta_grid[, "forestcover"],
-  altitude    = theta_grid[, "altitude"],
-  loglik      = grid_result$loglik
-)
+![Marginal conductance associations in the full model. Each curve changes one predictor; bands show 95% pointwise model intervals.](precomputed/model-comparison-full-marginal-3.png)
 
-# Base-R image plot (no ggplot2 dependency)
-loglik_mat <- matrix(
-  grid_df$loglik,
-  nrow = length(unique(grid_df$forestcover)),
-  ncol = length(unique(grid_df$altitude))
-)
+**How to read these panels.** An upward curve indicates increasing
+conductance. Check the axis labels for original versus standardized units.
+These are associations within the full model, not separate
+single-predictor fits, and wide bands or sparse rug marks flag ranges
+needing caution. Set `marginal_covariates = "forest500"` to show only
+forest, or `support = "focal"` to evaluate only values at sampled cells.
+Neither refits the model. Getting Started demonstrates the corresponding
+`type = "marginal_response"` genetic-response curve.
 
-image(
-  x    = sort(unique(grid_df$forestcover)),
-  y    = sort(unique(grid_df$altitude)),
-  z    = loglik_mat,
-  xlab = expression(theta[forestcover]),
-  ylab = expression(theta[altitude]),
-  main = "Log-likelihood surface",
-  col  = hcl.colors(64, "Blues", rev = TRUE)
-)
-contour(
-  x    = sort(unique(grid_df$forestcover)),
-  y    = sort(unique(grid_df$altitude)),
-  z    = loglik_mat,
-  add  = TRUE
-)
-points(coef(fit_full)["forestcover"],
-       coef(fit_full)["altitude"],
-       pch = 19, col = "red", cex = 1.5)
-legend("topright", legend = "MLE", pch = 19, col = "red", bty = "n")
+
+``` r
+maps <- plot(fits$full, type = "surface", data = surface)
+C <- conductance(surface, fits$full)
+map_limits <- range(terra::values(C), na.rm = TRUE)
+
+# Change only the color mapping. Retain every cell and the same limits in
+# the estimate and both interval panels so their colors remain comparable.
+for (p in maps) {
+  print(p + scale_fill_viridis_c(
+    trans = "log10", limits = map_limits,
+    breaks = c(0.01, 0.1, 0.5, 1, 2, 5, 10, 20),
+    name = "Conductance\n(log color scale)"
+  ))
+}
 ```
 
-A well-behaved likelihood surface has a single, sharp peak at the MLE. A
-flat or elongated surface signals that the parameters are poorly
-identified, often because the covariates are highly correlated or the
-signal-to-noise ratio in the genetic data is low.
+![Full-model conductance estimate and pointwise bounds. Colors use a shared logarithmic scale, with legend labels in conductance units. All three landscape predictors contribute to this single surface.](precomputed/model-comparison-full-surface-1.png)
 
-For large rasters, a full likelihood grid can become expensive. If the
-surface was created with `saveStack = TRUE`, `terradish_grid()` can
-screen a grid on an aggregated raster:
+![Full-model conductance estimate and pointwise bounds. Colors use a shared logarithmic scale, with legend labels in conductance units. All three landscape predictors contribute to this single surface.](precomputed/model-comparison-full-surface-2.png)
 
-```{r likelihood-grid-coarse, eval=FALSE}
-grid_coarse <- terradish_grid(
-  theta = theta_grid,
-  formula = melip.Fst ~ forestcover + altitude,
-  data = surface,
-  conductance_model = loglinear_conductance,
-  measurement_model = mlpe,
-  approximation = "coarse_raster",
-  approximation_control = list(factor = 2L)
-)
+![Full-model conductance estimate and pointwise bounds. Colors use a shared logarithmic scale, with legend labels in conductance units. All three landscape predictors contribute to this single surface.](precomputed/model-comparison-full-surface-3.png)
+
+The map combines forest, slope, and elevation in one surface, not three
+independent resistance surfaces. Its intervals describe coefficient
+uncertainty, not all uncertainty in the ecological interpretation. As in
+Getting Started, the three panels share one logarithmic color scale.
+
+## Compare spatial prediction
+
+The provided blocks contain whole ponds, were fixed before fitting, and
+have no known immediate pedigree relationships across blocks (the Gaussian
+guide shows the check). The complete landscape and the globally
+ascertained panel stay fixed, so this tests transfer to held-out ponds
+within the same observed domain.
+
+
+``` r
+cv <- terradish_cv_folds(surface, formulas, folds = ponds$fold,
+  model = wishart_covariance, nu = 40, nuisance = "fixed",
+  optimizer = "bfgs", keep_fits = "none", control = control)
+cv$results[, c("model", "fold", "loglik", "loglik_gain", "error")]
+#>           model fold     loglik loglik_gain error
+#> 1       uniform    3  58.752411    0.000000
+#> 2       uniform    1  68.908763    0.000000
+#> 3       uniform    2 -33.318439    0.000000
+#> 4        forest    3  63.474314    4.721903
+#> 5        forest    1  83.096136   14.187373
+#> 6        forest    2  -6.286712   27.031727
+#> 7  forest_slope    3  63.829375    5.076963
+#> 8  forest_slope    1  83.046425   14.137662
+#> 9  forest_slope    2  -5.842750   27.475689
+#> 10         full    3  54.949998   -3.802414
+#> 11         full    1  83.067260   14.158497
+#> 12         full    2  -5.127193   28.191246
+cv$summary
+#>          model folds failed n_folds_ok total_loglik common_folds_total
+#> 1 forest_slope     3      0          3    141.03305          141.03305
+#> 2       forest     3      0          3    140.28374          140.28374
+#> 3         full     3      0          3    132.89006          132.89006
+#> 4      uniform     3      0          3     94.34274           94.34274
+#>   n_common_folds between_repeat_sd mean_loglik total_loglik_gain
+#> 1              3                NA    47.01102          46.69031
+#> 2              3                NA    46.76125          45.94100
+#> 3              3                NA    44.29669          38.54733
+#> 4              3                NA    31.44758           0.00000
+#>   mean_loglik_gain se_difference mean_difference within_one_se
+#> 1         15.56344     0.0000000       0.0000000          TRUE
+#> 2         15.31367     0.1519243      -0.2497704         FALSE
+#> 3         12.84911     3.0890415      -2.7143281          TRUE
+#> 4          0.00000     6.5051353     -15.5634379         FALSE
 ```
 
-This is a screening tool rather than an exact replacement for the full
-grid: the log-likelihoods are evaluated on the aggregated graph. Use it
-to locate interesting regions of parameter space, then rerun a smaller
-grid or a final optimization on the full-resolution graph.
+**How to read these outputs.** First confirm that `error` is empty and
+`n_folds_ok` is 3 for every model, because a failed block leaves a
+model's total as `NA`. Each model is fitted to two blocks and scored on
+the third, with measurement parameters fixed at their training values.
+Larger held-out log-likelihood is better, and `loglik_gain` is the
+improvement over uniform conductance in the same block. In `cv$summary`,
+`mean_difference` is a model's average per-block shortfall from the top
+model, `se_difference` is its standard error, and `within_one_se` is
+`TRUE` when the shortfall is smaller than that error.
 
-------------------------------------------------------------------------
+With three blocks these standard errors are unstable. Here `forest` trails
+`forest_slope` by only 0.25 per block, but so consistently that it is
+flagged `FALSE`, while `full` trails by 2.7 yet is flagged `TRUE` because
+one poor block inflates its error. Read the per-block scores, and prefer
+the simpler model unless the larger one wins clearly in most blocks. By
+that rule `forest` and `forest_slope` predict equally well, and both beat
+`full` and `uniform`.
 
-## Confidence intervals on the conductance surface
 
-`plot(fit, type = "surface", data = surface)` renders the fitted
-conductance alongside its asymptotic lower and upper confidence interval
-bounds in a single three-panel figure. Uncertainty in $\theta$ is propagated
-through the log-linear model via the delta method, and all panels share
-the same color scale:
-
-```{r ci-conductance, fig.cap = "***Fitted conductance with 95% confidence bounds.***"}
-plot(fit_full, type = "surface", data = surface)
+``` r
+# Order candidates from simplest to most complex so lines connect neighbors.
+cv_plot <- transform(cv$results, model = factor(model, levels = names(formulas)))
+ggplot(cv_plot, aes(model, loglik_gain, group = fold, color = fold)) +
+  geom_hline(yintercept = 0, linetype = 2) + geom_line() + geom_point(size = 2) +
+  theme_bw() + labs(x = "Landscape candidate", y = "Held-out log-likelihood gain")
 ```
 
-Wide intervals in a region mean that the available genetic data provide
-little constraint on conductance there, either because few sampling
-sites are nearby or because the genetic signal is weak.
+![***Held-out prediction by candidate and spatial block.*** Zero is the uniform-conductance score for that block. Connected points help compare candidates on the same held-out genetic response.](precomputed/model-comparison-cv-plot-1.png)
 
-## Marginal associations on conductance
+**How to read the plot.** Each line follows one held-out block across the
+candidates. Forest plus slope has a total held-out score only
+0.75
+above forest alone, while the full model loses ground sharply in block 3.
+Slope had no generating effect, so a gain this small is not evidence for
+a slope mechanism. AIC and blocked prediction answer different questions
+(fit with a complexity penalty versus transfer to new ponds); here both
+favor a forest model.
 
-`plot(fit, type = "marginal", data = surface)` sweeps each covariate
-across its observed range while averaging over all other covariates. The
-shaded ribbon is a 95% pointwise confidence band from the delta method.
-Because we used `scale_covariates()` to prepare the rasters, x-axes are
-automatically back-transformed to the original measurement units:
+## Put the evidence together
 
-```{r marginal-conductance, fig.cap = "***Marginal association of each covariate with conductance.***"}
-plot(fit_full, type = "marginal", data = surface)
-```
+| Evidence | Question | Main limitation |
+|---|---|---|
+| Starting-value checks | Is the fitted optimum numerically reproducible? | Does not validate the mechanism |
+| AIC and its alternatives | Which candidate balances fit and complexity? | Conditional on response, model, and effective information |
+| Nested likelihood-ratio test | Do specified extra terms improve likelihood? | Requires regularity and a valid nesting argument |
+| Spatial prediction | Do training associations transfer to held-out ponds? | Conditional on graph, blocks, panel ascertainment, and scoring rule |
+| Simulation truth | Can a workflow recover a declared mechanism? | One simplified simulation is not field validation |
 
-A rising curve means that higher covariate values are associated with
-higher fitted conductance, conditional on the other predictors and the
-model. A declining curve indicates the opposite fitted association.
-These curves do not directly measure permeability, movement, habitat
-suitability, or a causal barrier effect. Flat or wide-interval curves
-suggest that the covariate adds little constraint beyond the other
-predictors already in the model.
+Keep your candidate set small and biologically motivated. Choosing
+variables, smoothing scales, or spline sizes on all the data and then
+scoring them on the same blocks inflates the scores, so make those choices
+inside each training set.
 
-### Handling weakly supported tails
+<details>
+<summary>Quick reference: expand for the complete copyable workflow</summary>
 
-When focal sites sparsely cover a covariate tail, unconstrained
-marginals can show unstable extremes that dominate interpretation. Use
-focal-support clamping to inspect predictions within sampled covariate
-ranges. This display choice does not alter the fitted likelihood or
-model comparison:
+## Quick reference: a complete candidate comparison
 
-```{r support-clamp-marginal, eval = FALSE}
-plot(
-  fit_full,
-  type = "marginal",
-  data = surface,
-  support = "focal",
-  support_probs = c(0.01, 0.99),
-  clamp_covariates = c("altitude", "forestcover")
-)
-```
 
-The same options are available in `conductance()` when producing raster
-surfaces for map comparison:
-
-```{r support-clamp-conductance, eval = FALSE}
-cond_full_focal <- conductance(
-  surface,
-  fit_full,
-  support = "focal",
-  support_probs = c(0.01, 0.99),
-  clamp_covariates = c("altitude", "forestcover")
-)
-```
-
-------------------------------------------------------------------------
-
-## Cross-validation
-
-### Spatially blocked, fixed-domain cross-validation
-
-Random splits ask whether a model predicts sites withheld throughout the
-sampled landscape. They do not directly ask whether the fitted
-association transfers across space. For that question, construct spatial
-folds and use `terradish_cv_folds()`.
-
-The fixed-domain method builds the graph once, then changes only which
-focal sites contribute to the training and test responses. Unsampled
-raster cells, graph edges, and raster covariates remain available in
-every fold. This matches the prediction target of transferring to
-held-out sites within the observed landscape.
-
-Use ecological blocks when the study design supplies them. Watersheds,
-barrier units, or sampling campaigns can be more defensible than an
-automated partition. When such blocks are unavailable,
-`terradish_folds()` provides a reproducible k-means partition of
-unscaled projected coordinates:
-
-```{r cv-spatial-folds, eval = FALSE}
-# melip.coords is geographic, so project it before measuring planar separation.
-# Center a local distance projection on the sampled Brazilian sites.
-lonlat <- terra::crds(terra::project(melip.coords, "EPSG:4326"))
-local_crs <- sprintf("+proj=aeqd +lat_0=%f +lon_0=%f +datum=WGS84 +units=m",
-                     mean(lonlat[, 2]), mean(lonlat[, 1]))
-coords_projected <- terra::project(melip.coords, local_crs)
-folds_spatial <- terradish_folds(
-  coords_projected,
-  k = 5,
-  method = "spatial_kmeans",
-  seed = 42
-)
-
-cv_spatial <- terradish_cv_folds(
-  data = surface,
-  formulas = list(
-    "Forest cover" = melip.Fst ~ forestcover,
-    "Forest cover + altitude" = melip.Fst ~ forestcover + altitude
-  ),
-  folds = folds_spatial,
-  model = mlpe,
-  nuisance = "fixed",
-  keep_fits = "slim",
-  checkpoint = file.path(tempdir(), "terradish-spatial-cv.rds")
-)
-
-cv_spatial$summary
-cv_spatial$results
-```
-
-With `nuisance = "fixed"`, all measurement-model coefficients are
-learned from training sites and used unchanged to score held-out sites.
-This tests prediction from the trained model. A separately fitted
-uniform-conductance baseline provides `loglik_gain`; positive gain
-favors the trained landscape surface over that baseline on the same
-held-out response.
-
-The default `nuisance = "reprofile"` instead optimizes nuisance
-coefficients using each test response, separately for the trained
-surface and baseline. That asks whether the learned surface retains
-useful structure after local recalibration. It is a different prediction
-target. Declare the mode and do not compare scores across modes.
-
-### Different models and repeated folds
-
-Each formula can have its own conductance or measurement-model factory.
-For example, compare a linear forest-cover term with a fixed-degree
-spline using the same response and folds:
-
-```{r cv-repeats, eval = FALSE}
-folds_repeated <- lapply(c(42, 91, 137), function(seed) {
-  terradish_folds(coords_projected, k = 5, seed = seed)
-})
-cv_shape <- terradish_cv_folds(
-  data = surface,
-  formulas = list(linear = melip.Fst ~ forestcover,
-                  spline = melip.Fst ~ s(forestcover, df = 3)),
-  folds = folds_repeated,
-  model = mlpe,
-  conductance_model = list(linear = loglinear_conductance,
-                           spline = smooth_loglinear_conductance),
-  nuisance = "fixed"
-)
-cv_shape$summary
-cv_shape$results
-```
-
-**How to read the output.** Inspect convergence and score failures
-first. Rankings use folds on which every candidate succeeded.
-`mean_difference` and `se_difference` describe paired score differences
-against the best candidate on those common folds; `within_one_se` flags
-a difference no larger than its estimated standard error. Prefer a
-simpler model when its predictive performance is indistinguishable under
-the declared design. Overlapping training sets and repeated partitions
-make these standard errors descriptive, not independent-replicate
-hypothesis tests. Repeats expose split sensitivity; they do not create
-new independent sites.
-
-Checkpoint files retain completed fits and scores. Resume only the
-identical response, graph, formulas, model settings, and folds; changed
-inputs are rejected. Keep failed baseline scores separate from failed
-trained-model scores: a valid held-out score can exist even when its
-baseline gain is unavailable.
-
-The comparison boundary remains strict. Raw held-out log-likelihood and
-`loglik_gain` are meaningful only when candidates use the same response
-representation, measurement likelihood, folds, graph domain, and Wishart
-degrees of freedom. A gain from MLPE is not on a common scale with a
-gain from the generalized-Wishart or covariance-Wishart likelihood.
-Spatial cross-validation strengthens evidence for transfer under the
-declared blocking design. It does not establish a causal landscape
-effect or prediction beyond the observed landscape domain.
-
-## Combining the evidence
-
-A complete analysis typically uses all three approaches together:
-
-| Tool | Answers | When to use |
-|----|----|----|
-| `anova()` | Does a larger model have incremental likelihood support? | Nested models within one measurement family |
-| `aic_table()` | Which declared candidate has the strongest relative support? | Models satisfying the full comparison contract |
-| `terradish_cv_folds()` | Which candidate transfers best across declared spatial blocks? | Fixed-domain prediction under identical folds and one likelihood family |
-| `mlpe_response_change()` | How large is an MLPE pairwise-covariate association on the response scale? | IBE terms fitted with `mlpe_covariates()` |
-
-Use cross-validation to assess conductance terms and shape, then use
-`nu` sensitivity to describe the uncertainty of Wishart inference. Treat
-an LRT at a fixed `nu` as conditional, descriptive evidence. Information
-criteria add a view of in-sample fit and complexity, but agreement among
-these summaries does not validate the underlying effective sample size.
-None establishes causality, observed movement, absolute permeability, or
-unique attribution to a landscape mechanism.
-
-------------------------------------------------------------------------
-
-## Quick reference: the full comparison workflow
-
-```{r qref-mc, eval = FALSE}
+``` r
 library(terradish)
+library(terra)
+data(ohio_ponds)
+g <- factor(ohio_ponds$samples$pond, levels = ohio_ponds$ponds$pond)
+N <- 2 * as.numeric(table(g))
+S <- cov_from_biallelic(rowsum(ohio_ponds$snp, g, reorder = FALSE)[ohio_ponds$ponds$pond, , drop = FALSE], N) / N[1]
+x <- c(unwrap(ohio_ponds$covariates), unwrap(ohio_ponds$forest500))
+graph <- conductance_surface(scale_covariates(x), ohio_ponds$ponds[c("x", "y")],
+  directions = 8)
+f <- list(uniform = S ~ 1, forest = S ~ forest500,
+          forest_slope = S ~ forest500 + slope,
+          full = S ~ forest500 + slope + elevation)
+ctl <- NewtonRaphsonControl(maxit = 200, ctol = 1e-8, ftol = 1e-8)
 
-# 1. Build the surface once and reuse it for every candidate model
-surface <- conductance_surface(covariates, coords, directions = 8, saveStack = TRUE)
+# 1. Fit each declared candidate; use the multiple-start audit above in practice.
+fits <- lapply(f, function(z) terradish(z, graph,
+  measurement_model = wishart_covariance, nu = 40, optimizer = "bfgs", control = ctl))
 
-# 2. Profile the graph once; reuse the recommended settings for every fit so
-#    models differ only in their formula, never in their optimizer
-rec <- terradish_assess_settings(melip.Fst ~ forestcover + altitude,
-                                 data = surface)$recommended
+# 2. Rank fits; 'converged' must be TRUE, and models within 2 AIC units tie.
+aic_table(fits, mod_names = names(fits))
+anova(fits$forest, fits$full)   # do slope and elevation add anything?
 
-fit_full <- terradish(melip.Fst ~ forestcover + altitude, data = surface,
-                      conductance_model = loglinear_conductance,
-                      measurement_model = mlpe,
-                      optimizer = rec$optimizer, control = rec$control)
-fit_alt  <- terradish(melip.Fst ~ altitude, data = surface,
-                      conductance_model = loglinear_conductance,
-                      measurement_model = mlpe,
-                      optimizer = rec$optimizer, control = rec$control)
-
-# 3. Nested hypothesis test: does forest cover add likelihood support?
-anova(fit_alt, fit_full)          # interpret with nesting and boundary checks
-
-# 4. Rank the whole set; AICc when sites are few relative to parameters
-aic_table(
-  list(fit_full, fit_alt),
-  mod_names = c("Full", "Altitude"),
-  AICc = TRUE
-)                                 # small delta is a heuristic within this set
-
-# 5. Fixed-domain transfer across spatial blocks. Prefer design-based blocks;
-#    otherwise cluster projected coordinates without standardizing them.
-# Center a local distance projection on the sampled Brazilian sites.
-lonlat <- terra::crds(terra::project(coords, "EPSG:4326"))
-local_crs <- sprintf("+proj=aeqd +lat_0=%f +lon_0=%f +datum=WGS84 +units=m",
-                     mean(lonlat[, 2]), mean(lonlat[, 1]))
-coords_projected <- terra::project(coords, local_crs)
-folds <- terradish_folds(coords_projected, k = 5, seed = 42)
-cv <- terradish_cv_folds(
-  data = surface,
-  formulas = list(full = melip.Fst ~ forestcover + altitude,
-                  altitude = melip.Fst ~ altitude),
-  folds = folds,
-  model = mlpe, nuisance = "fixed"
-)
-cv$summary                        # paired differences on common successful folds
-
-# 6. Map the surface with uncertainty
-plot(fit_full, type = "surface", data = surface)
+# 3. Score the same held-out ponds with all training parameters held fixed.
+cv <- terradish_cv_folds(graph, f, ohio_ponds$ponds$fold,
+  model = wishart_covariance, nu = 40, nuisance = "fixed",
+  optimizer = "bfgs", control = ctl)
+cv$results   # per-block held-out log-likelihood; larger is better
+cv$summary   # totals, shortfall from the best model, and its standard error
 ```
+
+</details>
 
 ## Summary of key functions
 
 | Function | Purpose |
-|----|----|
-| `anova(fit1, fit2)` | Likelihood ratio test between two nested models |
-| `aic_table(list(...))` | Rank models by AIC, AICc, or BIC |
-| `terradish_grid()` | Evaluate log-likelihood on a parameter grid |
-| `conductance()` | Fitted conductance with confidence intervals |
-| `mlpe_response_change()` | Response-scale change and confidence interval for MLPE pairwise covariates |
-| `terradish_folds()` | Reproducible spatial or balanced random fold assignment |
-| `terradish_cv_folds()` | Fixed-domain fold fitting with a uniform-conductance baseline |
+|---|---|
+| `aic_table()` | Rank compatible models by AIC, AICc, or BIC |
+| `terradish_rescale_nu()` | Examine the dependence of inference on assumed information |
+| `anova()` | Compare nested compatible likelihood models |
+| `confint()` | Read intervals on coefficient and scale parameters |
+| `terradish_cv_folds()` | Compare whole-site predictive scores on a fixed graph |
 
 ## See also
 
-- **`vignette("getting-started", package = "terradish")`**, the core
-  workflow and how to read a single fitted model.
-- **`vignette("spline-conductance", package = "terradish")`**, adding
-  non-linear covariate responses to the candidate set compared here.
-- **`vignette("ibe-ibr-workflow", package = "terradish")`**, building an
-  IBD / IBE / IBR / joint model set to rank with these tools.
-- **`vignette("simulation-design", package = "terradish")`**, how design
-  choices affect model discrimination under stated simulation scenarios.
+- [`vignette("getting-started", package = "terradish")`](getting-started.html): response
+  construction, graph conventions, and measurement parameters.
+- [`vignette("gaussian-scale-optimization", package = "terradish")`](gaussian-scale-optimization.html):
+  scale identification, profiles, and fixed-versus-estimated context.
+- [`vignette("spline-conductance", package = "terradish")`](spline-conductance.html): nonlinear
+  shape, basis coefficients, and predictive checks.
+- [`vignette("categorical-conductance", package = "terradish")`](categorical-conductance.html):
+  nominal class coding and reference contrasts.
+- [`vignette("wishart-covariance", package = "terradish")`](wishart-covariance.html):
+  how the assumed `nu` drives standard errors, tests, and AIC.
+- [`vignette("ibe-ibr-workflow", package = "terradish")`](ibe-ibr-workflow.html):
+  adding environmental differences between sites to the comparison.
+- [`vignette("mlpe-pairwise-distance", package = "terradish")`](mlpe-pairwise-distance.html):
+  pairwise genetic distances with MLPE, compared with the same AIC and
+  cross-validation tools.
+- [`vignette("simulation-design", package = "terradish")`](simulation-design.html):
+  simulating responses to check whether a comparison can detect an effect.

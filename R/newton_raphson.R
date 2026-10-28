@@ -219,8 +219,8 @@ BoxConstrainedNewton <- function(par, fn, lower = rep(-Inf, length(par)), upper 
     hessian_sym <- (hessian_sym + t(hessian_sym)) / 2
     ehess        <- eigen(hessian_sym, symmetric = TRUE)
     ehess$values <- abs(ehess$values)
-    ehess$values <- ifelse(ehess$values < max(abs(hessian_sym)) * etol, 1, ehess$values)
-    ihess <- ehess$vectors %*% solve(diag(ehess$values, nrow=length(free))) %*% t(ehess$vectors)
+    ehess$values <- ifelse(ehess$values <= max(abs(hessian_sym)) * etol, 1, ehess$values)
+    ihess <- ehess$vectors %*% diag(1 / ehess$values, nrow=length(free)) %*% t(ehess$vectors)
     desc <- matrix(0, length(par), 1L)
     desc[free, ] <- -ihess %*% gradient_box[free, , drop = FALSE]
     desc <- gap_step_bounded_variables(desc, par, gradient, lower, upper, eps)

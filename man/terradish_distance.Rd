@@ -34,7 +34,17 @@ terradish_distance(
 \item{cores}{Number of worker processes to use. \code{1} evaluates the grid serially.}
 }
 \value{
-An object of class \code{terradish_grid}
+A list of class \code{c("terradish_grid", "radish_grid")}:
+  \item{theta}{Data frame of the evaluated conductance coefficients, one
+    row per grid point.}
+  \item{distance}{When \code{covariance = FALSE}, a focal-site by
+    focal-site by grid-point array of resistance distances. Larger values
+    mean greater graph resistance between two sites. Their units depend on
+    the conductance scale, so compare them within a grid rather than as
+    map distances.}
+  \item{covariance}{When \code{covariance = TRUE}, the corresponding array
+    of graph covariance (the generalized inverse of the graph Laplacian),
+    returned in place of \code{distance}.}
 }
 \description{
 Calculates resistance distances associated with a parameterized conductance surface across

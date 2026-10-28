@@ -82,12 +82,31 @@ test_that("kernel boundary flags preserve conductance derivatives and use chi-ba
                  .25 * pchisq(3, 2, lower.tail = FALSE))
   expect_equal(.chibar_probability(0, 2), 1)
   fx <- inference_fixture(); S <- fx$S
+  # Keep the nested-model fixture's environmental contribution modest. The
+  # stronger omitted kernel in the general fixture can drive the null model
+  # toward an unbounded conductance contrast, which is unsuitable for an LRT.
+  E_graph <- terradish_distance(matrix(.4, 1), ~x, fx$graph,
+    covariance = TRUE)$covariance[, , 1]
+  K <- attr(fx$g, "kernel_covariates")[, , 1]
+  S <- .8 * E_graph + .05 * K + .2 * diag(nrow(E_graph))
   E <- diag(10)
   boundary <- fx$g(E, S, phi = c(1, 0, log(.2)), nu = 1000)
   expect_true(boundary$boundary)
   expect_false(boundary$no_structure_boundary)
   full <- terradish(S ~ x, fx$graph, measurement_model = fx$g, nu = 1000)
   null <- terradish(S ~ x, fx$graph, measurement_model = wishart_covariance, nu = 1000)
+  for (fit in list(null, full)) {
+    expect_equal(fit$convergence$code, 0L)
+    expect_equal(fit$fit$subproblem$convergence, 0L)
+  }
+  for (component in c("outer", "nuisance", "missing")) {
+    bad <- null
+    if (component == "outer") bad$convergence$code <- 1L
+    if (component == "nuisance") bad$fit$subproblem$convergence <- 1L
+    if (component == "missing") bad$fit$subproblem <- NULL
+    expect_error(anova(bad, full), "converged outer and final nuisance")
+    expect_error(anova(full, bad), "converged outer and final nuisance")
+  }
   expect_warning(table <- anova(null, full), "zero bounds")
   expect_match(attr(table, "heading")[1], "chi-bar")
   expect_equal(table[2, "Pr(>Chi)"], .5 * pchisq(table[2, "ChiSq"], 1, lower.tail = FALSE))
@@ -114,7 +133,9 @@ test_that("MLPE near-zero correlation has no Wald output", {
   raw <- mlpe(E, S, phi = c(0, 1, 0, -9))
   expect_true(raw$rho_boundary)
   fx <- inference_fixture(); S <- dist_from_cov(fx$S)
-  fit <- terradish(S ~ x, fx$graph, measurement_model = mlpe)
+  # This checks nuisance reporting, not an unrestricted landscape fit to a
+  # response that also contains an omitted environmental covariance term.
+  fit <- terradish(S ~ 1, fx$graph, measurement_model = mlpe)
   fit$fit$rho_boundary <- TRUE
   original_df <- fit$df
   s <- summary(fit)

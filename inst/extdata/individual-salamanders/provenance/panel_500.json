@@ -1,0 +1,105 @@
+{
+  "kind": "panel",
+  "index": 500,
+  "attempts": {
+    "zero": {
+      "valid": true,
+      "theta": {
+        "drying1": -0.15736032159589713,
+        "drying2": -0.45334662193918912
+      },
+      "phi": {
+        "tau": 0.21486201343313546,
+        "sigma": -1.9514130865683106
+      },
+      "logLik": 57.282506418955904,
+      "convergence": {
+        "code": 0,
+        "message": "converged",
+        "iterations": 8,
+        "max_abs_projected_gradient": 2.8593896670384238e-10,
+        "criterion": "projected_gradient",
+        "boundary": false,
+        "restarted": false
+      },
+      "nuisance_convergence": 0,
+      "curvature_positive": true,
+      "hessian": [
+        [5.1668037361279779, -3.8247293990816011],
+        [-3.8247293990815745, 5.3207338517562812]
+      ],
+      "conductance": [0.075569930870947211, 1.0110815419845922, 0.22494783360318421],
+      "wet_contrast": 13.379415996968994,
+      "dry_contrast": 4.4947378500571613,
+      "warnings": [],
+      "seconds": 13.109999999999999
+    },
+    "full_data": {
+      "valid": true,
+      "theta": {
+        "drying1": -0.15736028505012567,
+        "drying2": -0.45334660314577757
+      },
+      "phi": {
+        "tau": 0.21486201406409619,
+        "sigma": -1.9514130864545727
+      },
+      "logLik": 57.282506418955975,
+      "convergence": {
+        "code": 0,
+        "message": "converged",
+        "iterations": 5,
+        "max_abs_projected_gradient": 1.1721603215029908e-07,
+        "criterion": "projected_gradient",
+        "boundary": false,
+        "restarted": false
+      },
+      "nuisance_convergence": 0,
+      "curvature_positive": true,
+      "hessian": [
+        [5.1668035341288272, -3.8247293488076428],
+        [-3.824729348807669, 5.3207338708201952]
+      ],
+      "conductance": [0.075569931893101266, 1.0110815389623411, 0.22494786059356078],
+      "wet_contrast": 13.379415776007098,
+      "dry_contrast": 4.4947372973205493,
+      "warnings": [],
+      "seconds": 7.7699999999999996
+    }
+  },
+  "valid": true,
+  "selected": {
+    "valid": true,
+    "theta": {
+      "drying1": -0.15736028505012567,
+      "drying2": -0.45334660314577757
+    },
+    "phi": {
+      "tau": 0.21486201406409619,
+      "sigma": -1.9514130864545727
+    },
+    "logLik": 57.282506418955975,
+    "convergence": {
+      "code": 0,
+      "message": "converged",
+      "iterations": 5,
+      "max_abs_projected_gradient": 1.1721603215029908e-07,
+      "criterion": "projected_gradient",
+      "boundary": false,
+      "restarted": false
+    },
+    "nuisance_convergence": 0,
+    "curvature_positive": true,
+    "hessian": [
+      [5.1668035341288272, -3.8247293488076428],
+      [-3.824729348807669, 5.3207338708201952]
+    ],
+    "conductance": [0.075569931893101266, 1.0110815389623411, 0.22494786059356078],
+    "wet_contrast": 13.379415776007098,
+    "dry_contrast": 4.4947372973205493,
+    "warnings": [],
+    "seconds": 7.7699999999999996
+  },
+  "all_starts_converged": true,
+  "same_history_and_individuals": true
+}

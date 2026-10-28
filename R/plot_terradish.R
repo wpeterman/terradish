@@ -27,7 +27,12 @@
 #'     Covariance-response fits from \code{\link{wishart_covariance}} are shown
 #'     as the average fitted genetic covariance over the modeled lower triangle.
 #'     For Gaussian scale-aware conductance models, the predictive bands are
-#'     likewise conditional on the fitted \code{sigma} values.}
+#'     likewise conditional on the fitted \code{sigma} values. Each curve sets
+#'     one covariate to a common value in every cell. In a model with a
+#'     single covariate this makes conductance uniform, so the curve is the
+#'     \code{"marginal"} conductance curve inverted and rescaled; the plot is
+#'     most informative when other covariates still vary across the
+#'     landscape.}
 #'   \item{\code{"sigma"}}{For Gaussian scale-aware conductance models, plots
 #'     the fitted Gaussian kernel against distance for each \code{sigma} term,
 #'     with a dashed line at the fitted distance containing 90\% of
@@ -94,12 +99,17 @@
 #' expected:
 #' \itemize{
 #'   \item \code{"fit"}: a \code{ggplot} object with observed-vs-fitted
-#'     pairwise distances.
+#'     pairwise distances or genetic covariance, according to the response model.
 #'   \item \code{"surface"}, \code{"marginal"}, \code{"marginal_response"},
 #'     and \code{"sigma"}: either a single \code{ggplot} object (one panel) or
 #'     a named list of \code{ggplot} objects (multiple panels), with one plot
 #'     per panel/covariate.
 #' }
+#'
+#' @section Worked examples:
+#' \code{vignette("getting-started", package = "terradish")},
+#' \code{vignette("gaussian-scale-optimization", package = "terradish")},
+#' \code{vignette("spline-conductance", package = "terradish")}.
 #'
 #' @seealso \code{\link{terradish}}, \code{\link{conductance}},
 #'   \code{\link{fitted.terradish}}, \code{\link{loglinear_conductance}},
@@ -207,6 +217,7 @@ plot.terradish <- function(x,
 #' @param x A fitted legacy \code{radish} object.
 #' @param ... Additional graphical parameters.
 #' @name legacy_radish_plot_method
+#' @inherit plot.terradish return
 #' @keywords internal
 NULL
 
@@ -299,6 +310,9 @@ plot.radish <- function(x, ...) plot.terradish(x, ...)
 #'
 #' @param x A \code{terradish_plot_list} object.
 #' @param ... Unused.
+#' @return The input \code{x}, a \code{terradish_plot_list} containing named
+#'   \code{ggplot} panels, returned invisibly. Each panel is printed to the
+#'   active graphics device for its graphical side effect.
 #' @keywords internal
 #' @method print terradish_plot_list
 #' @export
@@ -1063,8 +1077,8 @@ print.terradish_plot_list <- function(x, ...)
         geom_rug(data = rug_i, aes(x = x), inherit.aes = FALSE,
                  sides = "b", linewidth = 0.3) +
         scale_x_continuous(labels = .terradish_plot_number) +
-        scale_y_continuous(name = ylab, labels = .terradish_plot_number) +
-        labs(title = panel_name, x = NULL) +
+        scale_y_continuous(labels = .terradish_plot_number) +
+        labs(title = panel_name, x = NULL, y = ylab) +  # labs() so users can override y
         .terradish_plot_theme()
     })
     names(plots) <- plot_levels
@@ -1214,8 +1228,8 @@ print.terradish_plot_list <- function(x, ...)
       geom_rug(data = rug_i, aes(x = x), inherit.aes = FALSE,
                sides = "b", linewidth = 0.3) +
       scale_x_continuous(labels = .terradish_plot_number) +
-      scale_y_continuous(name = ylab, labels = .terradish_plot_number) +
-      labs(title = panel_name, x = NULL) +
+      scale_y_continuous(labels = .terradish_plot_number) +
+      labs(title = panel_name, x = NULL, y = ylab) +  # labs() so users can override y
       .terradish_plot_theme()
   })
   names(plots) <- panel_labels

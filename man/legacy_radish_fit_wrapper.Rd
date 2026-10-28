@@ -11,6 +11,54 @@ radish(...)
 \item{...}{Arguments passed through the deprecated \code{radish()}
 compatibility wrapper to \code{\link{terradish}}.}
 }
+\value{
+An object of class \code{c("terradish", "radish")}, a list. Most
+  users need only the methods: \code{summary()} for estimates and intervals,
+  \code{coef()} and \code{confint()} for conductance coefficients,
+  \code{conductance()} and \code{plot()} for maps and curves, and
+  \code{AIC()}, \code{anova()}, or \code{\link{aic_table}} for comparison
+  (see \code{\link{terradish_methods}}). The list elements are:
+  \item{call, formula}{The matched call and the model formula.}
+  \item{dim}{Named vector with the number of graph vertices (raster cells),
+    focal sites, and graph edges.}
+  \item{convergence}{List describing the conductance optimization:
+    \code{code} (0 converged, 1 iteration limit reached, 2 stalled or line
+    search failed), \code{message}, \code{iterations},
+    \code{max_abs_projected_gradient}, \code{criterion}, \code{boundary}
+    (\code{TRUE} when an estimate sits on a bound or no resistance
+    structure was detected), and \code{restarted}. Check
+    \code{object$convergence$code == 0} before interpreting estimates.}
+  \item{fit}{The final graph and likelihood evaluation.
+    \code{object$fit$phi} holds the nuisance (measurement-model) estimates
+    on the measurement model's internal scale, for example log precision;
+    \code{summary()} reports them with intervals. \code{object$fit$fitted}
+    is the expected response matrix among focal sites.
+    \code{object$fit$subproblem$convergence} is the nuisance optimizer's
+    code (0 means converged), which should also be 0 before estimates are
+    interpreted.}
+  \item{loglik, df, aic}{Maximized log-likelihood, number of estimated
+    parameters (conductance coefficients plus nuisance parameters), and
+    \eqn{AIC = -2\ell + 2K}.}
+  \item{mle}{Conductance estimates (\code{theta}, on the log-conductance
+    scale per unit of each covariate as supplied to the graph), and the
+    gradient and Hessian of the log-likelihood at the estimate. Elements
+    ending in \code{_internal} are on the optimizer's scale.}
+  \item{submodels}{The conductance-model and measurement-model functions
+    used for the fit; \code{conductance()} and \code{plot()} reuse them.}
+  \item{comparison}{Measurement family, \code{nu}, graph fingerprint, and
+    response columns that \code{\link{aic_table}} and \code{anova()} use to
+    check that fits are comparable.}
+  \item{cost, diagnostics, approximation}{Newton steps and function calls,
+    solver timing and evaluation diagnostics, and a record of any landmark
+    or coarse-raster warm start.}
+  \item{gaussian_scale_info, spline_monotonicity}{Metadata for Gaussian
+    smoothing and spline conductance terms, or \code{NULL}.}
+  \item{leverage}{Leverage arrays for the response (\code{S}) and spatial
+    covariates (\code{X}) when \code{leverage = TRUE}, otherwise
+    \code{NULL} entries.}
+  \item{storage}{Present only when \code{slim = TRUE}; records the model
+    closures and leverage arrays that were removed.}
+}
 \description{
 Deprecated compatibility wrapper retained for older code that still calls
 \code{radish()}.

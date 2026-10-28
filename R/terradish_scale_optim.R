@@ -57,7 +57,7 @@
 
   list(
     fun = function(r, scale, kernel = "gaussian", ...)
-      kernel_scale.raster(r, sigma = scale, kernel = kernel, ...),
+      multiScaleR::kernel_scale.raster(r, sigma = scale, kernel = kernel, ...),
     args = c(list(kernel = kernel), scale_args),
     source = "kernel_scale.raster"
   )
@@ -551,6 +551,7 @@ terradish_scale_optim <- function(formula,
 #' \code{terra_radish_scale_optim()} calls.
 #'
 #' @name legacy_terra_radish_scale_optim
+#' @inherit terradish_scale_optim return
 #' @keywords internal
 NULL
 

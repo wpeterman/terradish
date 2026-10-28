@@ -11,6 +11,16 @@ radish_grid(...)
 \item{...}{Arguments passed through the deprecated \code{radish_grid()}
 compatibility wrapper to \code{\link{terradish_grid}}.}
 }
+\value{
+A list of class \code{terradish_grid} (also inheriting
+  \code{radish_grid}) containing the parameter grid \code{theta}, the
+  maximized log-likelihood \code{loglik} and nuisance parameters \code{phi}
+  at each grid row, and optionally the focal-site covariance array
+  \code{covariance}. Larger log-likelihoods indicate better fit within the
+  supplied grid. See \code{\link{terradish_grid}}.
+  The \code{approximation} element records any coarse-raster screening and
+  exact refinement used in the evaluation.
+}
 \description{
 Deprecated compatibility wrapper retained for older code that still calls
 \code{radish_grid()}.

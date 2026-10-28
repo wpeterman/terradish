@@ -122,6 +122,21 @@ error-rate guarantees. Use \code{\link{terradish_rescale_nu}} for sensitivity
 and \code{terradish_cv_folds(..., nuisance = "fixed")} to assess predictive
 support for a measurement-model extension.
 }
+\section{Numerical nugget limits}{
+
+Fitting uses the same small-nugget safeguards as
+\code{\link{wishart_covariance}}, retaining supplied bounds and fixed
+parameters. A verified numerical zero residual-variance limit does not
+remove the graph or environmental kernel coefficients. \code{summary()}
+omits Wald uncertainty for the log-scale nugget at that limit.
+}
+
+\section{Worked example}{
+
+See \code{vignette("ibe-ibr-workflow", package = "terradish")} for
+environmental covariance kernels and their distinction from MLPE slopes.
+}
+
 \section{Interpreting pairwise effects}{
 
 Construct one \code{\link{pairwise_covariates}} object to use the same

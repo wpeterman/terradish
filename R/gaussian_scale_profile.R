@@ -32,10 +32,14 @@
 #'   check for additional support regions. Limits stop at the original bounds.
 #'   At a boundary the usual chi-square calibration is an approximation.
 #'   Failed optimizations stop the calculation instead of silently dropping
-#'   profile points. This can be substantially slower than Wald intervals.
+#'   profile points. Both conductance and final measurement-parameter convergence
+#'   are required. This can be substantially slower than Wald intervals.
 #' @seealso \code{\link{gaussian_scale_summary}},
 #'   \code{\link{gaussian_smoothed_loglinear_conductance}},
 #'   \code{\link{terradish_inference}}
+#' @section Worked example:
+#' See \code{vignette("gaussian-scale-optimization", package = "terradish")}
+#' for scale profiles, forest-effect plots, and interpretation in map units.
 #' @examples
 #' \donttest{
 #' set.seed(24)
@@ -60,6 +64,10 @@
 #' @export
 gaussian_scale_profile <- function(fit, layer, n = 25, level = 0.95) {
   .terradish_require_submodels(fit, "Gaussian scale profiling")
+  if (!isTRUE(fit$convergence$code == 0) ||
+      !isTRUE(fit$fit$subproblem$convergence == 0))
+    stop("The fitted model must converge in both conductance and measurement parameters before profiling.",
+         call. = FALSE)
   info <- fit$gaussian_scale_info
   if (length(layer) != 1L || is.null(info) || !layer %in% info$scale_vars)
     stop("`layer` must name an estimated Gaussian scale.", call. = FALSE)
@@ -91,7 +99,8 @@ gaussian_scale_profile <- function(fit, layer, n = 25, level = 0.95) {
       measurement_model = fit$submodels$g, nu = fit$comparison$nu,
       theta = initial, optimizer = "newton", leverage = FALSE,
       control = NewtonRaphsonControl(maxit = 200, ctol = 1e-6, ftol = 1e-8))
-    if (candidate$convergence$code != 0L)
+    if (!isTRUE(candidate$convergence$code == 0) ||
+        !isTRUE(candidate$fit$subproblem$convergence == 0))
       stop("Profile optimization failed at scale ", value, ".", call. = FALSE)
     cache[[key]] <- candidate$loglik
     candidate$loglik

@@ -33,6 +33,19 @@ clamp when \code{support = "focal"}.}
 
 \item{...}{Additional arguments passed to methods.}
 }
+\value{
+If \code{x$stack} is non-\code{NULL} (the default when
+\code{saveStack = TRUE} in \code{\link{conductance_surface}}), a three-layer
+\code{terra::SpatRaster} with layer names:
+\describe{
+  \item{\code{est}}{Point-estimate conductance at each active cell.}
+  \item{\code{lower<Q>}}{Lower bound of the \code{quantile*100}\% interval
+    (e.g. \code{lower95} for the default \code{quantile = 0.95}).}
+  \item{\code{upper<Q>}}{Upper bound of the interval.}
+}
+Otherwise, a numeric matrix with one row per active cell and columns
+\code{est}, \code{lower<Q>}, and \code{upper<Q>}.
+}
 \description{
 Deprecated S3 method retained so legacy \code{"radish_graph"} objects still
 dispatch to \code{\link{conductance}}.

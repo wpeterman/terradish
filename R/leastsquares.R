@@ -105,7 +105,7 @@ leastsquares <- function(E, S, phi, nu = NULL, gradient = TRUE, hessian = TRUE, 
     R    <- Ed %*% t(ones) + ones %*% t(Ed) - 2 * symm(E)
     Rl   <- R[lower.tri(R)]
     Sl   <- S[lower.tri(S)]
-    fit  <- gls(Sl ~ Rl, method = "ML")
+    fit  <- nlme::gls(Sl ~ Rl, method = "ML")
 
     if (!nonnegative || coef(fit)[2] > 0) 
     {
@@ -115,7 +115,7 @@ leastsquares <- function(E, S, phi, nu = NULL, gradient = TRUE, hessian = TRUE, 
     }
     else
     {
-      fit <- gls(Sl ~ 1, method = "ML")
+      fit <- nlme::gls(Sl ~ 1, method = "ML")
       phi <- coef(fit)
       names(phi) <- NULL
       phi <- c("alpha" = phi[1], "beta" = 0, "tau" = -2 * log(sigma(fit)))

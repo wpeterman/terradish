@@ -1,54 +1,48 @@
-## Submission status
+## Resubmission
 
-This is a further corrected first submission of terradish 1.0.0. The initial
-archive was submitted on 2026-10-05. CRAN incoming checks flagged two
-possibly misspelled words in DESCRIPTION, "multigrid" and "natively". Both
-were removed without changing package code or numerical behavior. The version
-remains 1.0.0 because the first submission was not accepted.
+This is a resubmission of the new package terradish, first submitted as
+version 1.0.0 and now version 1.1.0. In response to the CRAN review, I have:
 
-The initial CRAN Windows check took 19 minutes, with tests taking 392 seconds
-and vignette rebuilding 400 seconds. The next two archives reduced those
-phases, but CRAN still reported overall checktime of 11 and then 15 minutes.
-In the latest check, tests took 76 seconds and vignette rebuilding took 166
-seconds; the remaining check stages and installation accounted for most of
-the total. This archive retains the full prose, code, printed results, and
-figures in five computational guides as precomputed displays. Their fully
-executable R Markdown sources are included under `inst/vignette-source/` and
-are rebuilt in continuous integration. Three other guides continue to execute
-during routine vignette checks. The longer multi-fit integration and
-simulation regressions remain conditional on `NOT_CRAN=true` and run in the
-GitHub Actions matrix. Package code and numerical behavior are unchanged.
+- Added references describing the methods to the Description field, in the
+  requested form: Peterman and Pope (2021) <doi:10.1111/mec.15716>, Clarke,
+  Rothery and Raybould (2002) <doi:10.1198/108571102320>, and Hanks and
+  Hooten (2013) <doi:10.1080/01621459.2012.724647>.
+- Added `\value` sections to every exported method, including the nine
+  topics listed in the review (`legacy_radish_*.Rd`,
+  `legacy_terra_radish_scale_optim.Rd`, and `print.terradish_plot_list.Rd`).
+  Each describes the class and structure of the result and what it means;
+  the print method documents that it returns its input invisibly and is
+  called for its side effect.
+- Removed the `setwd()` calls that parallel workers used to load package
+  sources. Workers now source files by absolute path, so no function changes
+  the working directory. No package function changes `options()` or `par()`.
+  The two vignette chunks that set `par()` restore it with `on.exit()`
+  immediately after the change.
 
-The required companion landgraph 0.0.3 is on CRAN, as is multiScaleR. The
-1.0.0 release focuses on symmetric resistance models; research prototypes
-remain on the experimental branch.
+Since the previous submission I also added two example datasets
+(`ohio_ponds`, `individual_salamanders`), four vignettes, and numerical
+safeguards for nuisance-parameter fitting, with regression tests.
+
+## R CMD check results
+
+0 errors | 0 warnings | 1 note
+
+- This is a new submission.
+
+The installed size is about 8.4 Mb (data 1.3, doc 2.1, extdata 1.5, and
+libs 1.6 Mb). The data and extdata hold the example datasets and the
+rasters and stored results the vignettes need to run without downloads;
+doc holds the twelve vignettes, whose precomputed figures keep check time
+low. The help-page logo was resized to reduce the size.
 
 ## Test environments
 
-- Windows 11 x86_64, R 4.6.1: full `R CMD check --as-cran` on this exact
-  source archive, 0 errors, 0 warnings, 1 NOTE (New submission). Installation,
-  ordinary and donttest examples, installed tests, vignette rebuilding, and
-  PDF and HTML manual checks passed.
-- Windows 11 x86_64, R 4.5.3: an earlier release metadata candidate passed
-  `R CMD check --as-cran` with the same expected NOTE. This does not cover
-  the current archive.
-
-The current archive is `terradish_1.0.0.tar.gz`, 2,948,822 bytes, SHA-256
-`033fb5061663a8c1544c7ad531bcd330e904226028363a619654615e9413dd92`.
-In the local R 4.6.1 check, installed tests took 29 seconds and vignette
-rebuilding took 38 seconds. In the previous local archive, these phases took
-57 and 197 seconds. Installed tests reported 387 passing
-expectations, no failures, one captured diagnostic warning, and 22 intentional
-CRAN skips. The captured warning did not produce a package-check warning.
-The full executable source of each precomputed guide was rebuilt to create
-the displayed results. CRAN's own checktime on this new archive has not yet
-been measured.
-
-## Note explanation
-
-"New submission" is expected for a first submission. The two DESCRIPTION
-spelling flags from the initial incoming checks are absent.
+- Windows 11 x86_64, R 4.6.1: `R CMD check --as-cran --no-manual` on the
+  built archive: 0 errors, 0 warnings, and the "New submission" NOTE. A
+  second, local-only NOTE reported that README.md and NEWS.md could not be
+  checked because pandoc was not on the check's PATH; both convert cleanly
+  with pandoc.
 
 ## Reverse dependencies
 
-This is a first submission, so there are no CRAN reverse dependencies.
+This is a new submission, so there are no reverse dependencies.

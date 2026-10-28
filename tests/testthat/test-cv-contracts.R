@@ -1,17 +1,20 @@
 # Extended multi-fit CV regressions run in CI with NOT_CRAN=true.
 skip_on_cran()
 
-cv_contract_fixture <- function() {
+cv_contract_fixture <- function(include_z = FALSE) {
   set.seed(19)
   r <- terra::rast(nrows = 9, ncols = 9, xmin = 0, xmax = 9, ymin = 0, ymax = 9,
                     crs = "EPSG:3857")
   terra::values(r) <- rnorm(81); names(r) <- "x"
   z <- r; terra::values(z) <- rnorm(81); names(z) <- "z"
-  r <- c(r, z)
+  if (include_z) r <- c(r, z)
   graph <- conductance_surface(r, terra::xyFromCell(r, seq(3, 80, 7)),
                                 directions = 4, saveStack = TRUE)
-  S <- simulate_covariance_response(.5, ~x, graph, tau = 1, sigma = .1,
-                                     nu = 200, seed = 21)$covariance
+  S <- expect_fixture_warnings(
+    simulate_covariance_response(.5, ~x, graph, tau = 1, sigma = .1,
+                                  nu = 200, seed = 21)$covariance,
+    "^Removed unused spatial covariates: z$",
+    required = if (include_z) "^Removed unused spatial covariates: z$" else character())
   list(graph = graph, S = S, folds = rep(1:3, 4))
 }
 
@@ -40,6 +43,12 @@ test_that("checkpoint signatures reject changed responses and repeated folds poo
   resumed <- terradish_cv_folds(fx$graph, list(one = S ~ x, two = S ~ x), folds,
     model = wishart_covariance, nu = 25, checkpoint = path)
   expect_equal(cv$results, resumed$results)
+  saved <- readRDS(path)
+  old <- saved; old$metadata$convergence_contract <- NULL
+  saveRDS(old, path)
+  expect_error(terradish_cv_folds(fx$graph, list(one = S ~ x, two = S ~ x), folds,
+    model = wishart_covariance, nu = 25, checkpoint = path), "not compatible")
+  saveRDS(saved, path)
   expect_equal(cv$repeats, 2L)
   expect_equal(cv$summary$n_folds_ok, c(6L, 6L))
   expect_true(all(is.finite(cv$summary$between_repeat_sd)))
@@ -97,11 +106,20 @@ test_that("fixed no-structure predictions do not require identified conductance"
 })
 
 test_that("Wishart CV totals scale with nu without changing rank", {
-  fx <- cv_contract_fixture(); S <- fx$S
-  a <- terradish_cv_folds(fx$graph, list(linear = S ~ x, both = S ~ x + z),
-    fx$folds, model = wishart_covariance, nu = 25)
-  b <- terradish_cv_folds(fx$graph, list(linear = S ~ x, both = S ~ x + z),
-    fx$folds, model = wishart_covariance, nu = 500)
+  fx <- cv_contract_fixture(include_z = TRUE); S <- fx$S
+  run <- function(nu) expect_fixture_warnings(
+    terradish_cv_folds(fx$graph, list(linear = S ~ x, both = S ~ x + z),
+      fx$folds, model = wishart_covariance, nu = nu, keep_fits = "full"),
+    c("^Removed unused spatial covariates: z$", "^Optimizer stalled:"),
+    required = "^Removed unused spatial covariates: z$")
+  a <- run(25)
+  b <- run(500)
+  for (cv in list(a, b)) {
+    expect_equal(cv$summary$n_folds_ok, c(3L, 3L))
+    expect_true(all(cv$results$nuisance_convergence == 0L))
+    expect_true(all(cv$results$error == "" & cv$results$baseline_error == ""))
+    expect_true(all(vapply(cv$fits, .terradish_fit_converged, logical(1))))
+  }
   expect_equal(b$summary$model, a$summary$model)
   expect_true(all(is.finite(a$summary$common_folds_total)))
   expect_gt(min(a$summary$n_common_folds), 0)

@@ -1,5 +1,70 @@
-terradish 1.0.0
+terradish 1.1.0
+----------------
+* New vignette, `vignette("mlpe-pairwise-distance")`: fitting and interpreting
+  pairwise genetic distances (FST) with MLPE on the `melip` data, including
+  every MLPE nuisance parameter, conditional coefficients, likelihood-ratio
+  tests, and spatial cross-validation.
+* Shortened the vignettes by removing repeated caveats and restatements while
+  keeping every reading, scale, and decision rule.
+* Reduced the package size by resizing the help-page logo (1.3 MB to 76 KB).
+* `plot(type = "marginal")` and `plot(type = "marginal_response")` now set
+  their default y-axis title with `labs()`, so a user's `labs(y = ...)` is
+  applied instead of being silently overridden by the scale name.
+* Documented every element returned by `terradish()`, `terradish_grid()`, and
+  `terradish_distance()`, and corrected `?mlpe`: `summary()` reports `rho` on
+  the logit scale, and `plogis(rho) / 2` gives the shared-site correlation.
+* Added the Peterman and Pope (2021) method reference to DESCRIPTION.
+* Vignettes now read their key outputs in plain terms: conductance ratios
+  with intervals, AIC and cross-validation decision rules, the likelihood-ratio
+  test, Gaussian scale summaries, and the full MLPE nuisance-parameter summary.
+  A decision rule for choosing a covariance (Wishart) or pairwise-distance
+  (MLPE) response, runnable quick references, and a complete set of
+  cross-links were added; development-history and repeated caveat text was cut.
+* Removed internal workflow notes and absolute local paths from the installed
+  individual-salamander provenance files, and dropped duplicate figure copies.
+* Use logarithmic viridis colors for conductance maps throughout the vignettes,
+  retaining original-unit labels and shared estimate/interval limits.
+* Retry a nonconverged nuisance warm start from the model's default values
+  within the caller's bounds. Failed retries remain failures, and diagnostic
+  warnings and convergence tolerances are unchanged.
+* Added a shared simulation and data-generation guide, genetic-response and
+  method-specific plotting demonstrations, and clearer explanations and links
+  across the pond and individual-based vignettes.
+* Added a focused individual-genotype SNP resistance vignette with raw matched
+  microsatellites, nonlinear drying, spatial prediction, and explicit IBE limits.
+* Require successful outer and final nuisance convergence for CV, likelihood-ratio
+  inference, and covariance-power summaries; flag incomplete convergence in AIC tables.
+* Standard MLPE nuisance fitting now profiles regression and residual variance
+  analytically before a deterministic correlation search and scaled Newton
+  refinement. Resistance-unit changes no longer alter the fitted objective.
+* Nuisance Hessian inversion now accounts for parameter units, and positive
+  coefficients are no longer treated as fixed at zero solely because their
+  numerical values are small. Newton steps also handle a zero Hessian safely.
+* Direct graph solves choose a high-conductance numerical reference on stiff
+  graphs by default, preserving the same graph likelihood. The original last-
+  vertex reference remains available through the direct solver control.
+  Direct solves now reject unresolved linear systems using a reported residual
+  tolerance; numerically invalid trials cannot silently enter the likelihood.
+* Ordinary two-component Wishart nuisance fits now use a deterministic
+  variance-component profile before Newton refinement. This prevents warm
+  starts with negligible log-nugget derivatives from retaining an inferior
+  likelihood and making objective and derivative evaluations depend on fit
+  history. Fixed predictive parameters and custom bounds are preserved.
+* Addressed CRAN manual review with method references in DESCRIPTION and
+  return-value documentation for exported legacy wrappers and plot printing.
+* Removed working-directory changes from source-loaded parallel workers and
+  kept the spline guide's plotting examples from changing caller graphics settings.
+  Source-loaded least-squares workers now resolve the regression fitter
+  explicitly from nlme.
+  MLPE workers explicitly resolve Matrix functions, and worker setup includes
+  the nuisance-profile helpers used by the combined package.
+* Precomputed the displayed results and figures in eight computational guides
+  while shipping their executable R Markdown sources. Other guides use saved
+  results or lightweight examples. Continuous integration rebuilds executable
+  guides and runs the full test suite.
+* Load multiScaleR when its optional smoothing backend is used.
 
+terradish 1.0.0
 ----------------
 * First CRAN release candidate of the supported symmetric resistance core.
   Directed, hierarchical, drift, selected-pair, Kron, block-CG, and legacy

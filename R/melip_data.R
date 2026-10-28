@@ -53,8 +53,8 @@
 #'
 #' @seealso \code{\link{conductance_surface}} for turning these layers into a
 #'   graph, and \code{\link{terradish}} for fitting a model to them.  See
-#'   \code{vignette("getting-started", package = "terradish")} for the full
-#'   worked example.
+#'   \code{vignette("mlpe-pairwise-distance", package = "terradish")} for the
+#'   full worked example with these data.
 #'
 #' @examples
 #' data(melip)

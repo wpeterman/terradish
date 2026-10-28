@@ -5,6 +5,9 @@ output:
   rmarkdown::html_vignette:
     number_sections: true
     toc: true
+    self_contained: true
+    mathjax: null
+    pandoc_args: ["--mathml"]
 vignette: >
   %\VignetteIndexEntry{Simulating Covariance Data to Plan a Study}
   %\VignetteEngine{knitr::rmarkdown}
@@ -12,414 +15,207 @@ vignette: >
 ---
 
 ```{r setup, include = FALSE}
-knitr::opts_chunk$set(
-  collapse = TRUE,
-  comment  = "#>",
-  fig.width  = 6,
-  fig.height = 4.5,
-  warning  = FALSE,
-  message  = FALSE
-)
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
+  fig.width = 6, fig.height = 4.5, message = FALSE, error = FALSE)
 ```
 
-## Why simulate before you sample?
+**Goal.** Simulate a response under stated assumptions and plan how to compare sampling designs.
 
-Landscape-genetic studies are expensive: every additional sampling site means
-field time and cost. Before
-committing to a design it is worth asking, in advance:
+The [data-generation guide](data-generation.html) explains the landscapes,
+SLiM histories, sampling, and matched markers used in these examples. Open it
+in R with `vignette("data-generation", package = "terradish")`.
 
-- **How many sampling sites** do I need to detect the conditional conductance
-  association specified in my scenario?
-- **How much approximately independent marker information** (represented by
-  the supplied `nu`) do I need?
-- **Where should the sites go**: spread evenly across the landscape, or placed
-  some other way?
-- If I run the analysis, **how often will I recover the generating parameters
-  under this model**, and how often will sampling variation obscure them?
+## How many ponds would you sample?
 
-`terradish` answers these questions by simulation. Because the Wishart
-covariance model has a tractable generative form, you can draw synthetic
-covariance matrices from a *known* conductance surface, refit the model, and
-measure how reliably the generating parameters are recovered, all without any forward-time
-genetic simulation. This vignette shows how.
+Suppose field effort allows visits to 12, 18, or all 24 candidate ponds,
+and before sampling you want to know whether those designs can recover a
+specified forest association. This guide sets up that question on the Ohio
+pond landscape from
+[`vignette("getting-started", package = "terradish")`](getting-started.html).
 
-This is a **design tool**, not a replacement for individual-based or
-coalescent simulation. It assumes the fitted model is correctly specified and
-asks: given that model and this set of scenarios, how much data do I need? The
-answer is conditional on the graph, parameters, candidate set, likelihood,
-optimizer, and sampling strategies evaluated here.
+The response is drawn directly from a covariance model.
+**These are new statistical draws, not the SLiM SNPs or microsatellites.**
+They give a fast check of recovery when the analysis model is correct,
+whereas SLiM generates ancestry and mutations through a biological process
+that need not obey the fitted likelihood.
 
----
+The guide runs one draw and one fit, and larger design comparisons are
+copyable recipes that routine builds skip. One successful fit cannot
+establish statistical power, interval coverage, or field sample size.
 
-## The generative model
-
-A covariance-based `terradish` fit (see
-`vignette("wishart-covariance", package = "terradish")`) assumes the observed
-genetic covariance matrix `S` is a noisy realization of a structured
-covariance:
-
-$$\Sigma = \tau \, E(\theta) + \sigma\, I, \qquad
-  \nu\, S \sim \mathrm{Wishart}(\nu, \Sigma)$$
-
-where:
-
-- $E(\theta)$ is the **conductance-implied covariance**: the generalized
-  inverse of the graph Laplacian at conductance parameters $\theta$. This is
-  the part that carries the landscape signal.
-- $\tau \ge 0$ scales that signal.
-- $\sigma \ge 0$ is a diagonal residual-variance term for covariance variation
-  not represented by $E(\theta)$. It is not a direct estimate of drift,
-  population size, or a Gaussian smoothing scale.
-- $\nu$ is the supplied **effective Wishart degrees of freedom**, not a fitted
-  parameter. It can be interpreted as the effective number of approximately
-  independent marker contributions. Large $\nu$ gives draws tightly clustered
-  around $\Sigma$; small $\nu$ gives noisier draws.
-
-`simulate_covariance_response()` draws from exactly this model, and
-`covariance_response_power()` automates the simulate-refit-summarize loop across
-many designs. Fitted `wishart_covariance()` models store the nugget internally
-on the log scale, but both simulation helpers accept $\sigma$ as the
-nonnegative variance added to the diagonal.
-
-For a fixed landscape template, $\tau / \sigma$ is a convenient
-**signal-to-nugget ratio**. Larger values place more weight on the
-landscape-implied covariance relative to diagonal noise. The ratio should be
-interpreted within a fixed template because rescaling $E(\theta)$ also changes
-its meaning.
-
-> **Keep `nu` front of mind.** As explained in
-> `vignette("wishart-covariance", package = "terradish")`, `nu` acts as an
-> *effective sample size*. It does not change the *point estimates* recovered
-> from a given covariance matrix, but it controls their precision (standard
-> errors scale as $1/\sqrt{\nu}$) and therefore the **statistical power** to
-> detect a nonzero coefficient under the simulated model. Sample size and
-> marker design are important study-design levers, but the effective `nu` may
-> be smaller than the raw marker count because of linkage and shared
-> population history. No marker-count rule automatically establishes it.
-> Distinguish the value that generates variation (`nu`) from the value
-> assumed when fitting (`nu_fit`).
-
----
-
-## Set up a landscape template
-
-We need a landscape to define the conductance surface. Any
-`conductance_surface()` works; here we reuse the bundled *Melipona* rasters as
-a realistic template. Build the surface with `saveStack = TRUE` so the
-simulation tools can subset focal sites efficiently.
+## Keep the landscape and specify a new response
 
 ```{r template}
 library(terradish)
 library(terra)
+data(ohio_ponds)
+ponds <- ohio_ponds$ponds
 
-data(melip)
-melip.altitude    <- terra::unwrap(melip.altitude)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords      <- terra::unwrap(melip.coords)
+# Reuse the forest context, full graph, and candidate pond locations.
+# saveStack retains the raster needed when designs subset focal ponds.
+x <- scale_covariates(c(unwrap(ohio_ponds$forest500),
+                        unwrap(ohio_ponds$covariates)[["slope"]]))
+surface <- conductance_surface(x, ponds[c("x", "y")],
+  directions = 8, saveStack = TRUE)
+c(candidate_ponds = length(surface$demes), resolution_m = res(x)[1])
 
-covariates <- c(melip.altitude, melip.forestcover)
-names(covariates) <- c("altitude", "forestcover")
-covariates <- scale_covariates(covariates)
-
-surface <- conductance_surface(covariates, melip.coords,
-                               directions = 8, saveStack = TRUE)
-
-cat("Candidate focal sites:", length(surface$demes), "\n")
+# A declared one-SD association, not an estimate from the SLiM data.
+theta_true <- c(forest500 = 0.6)
+tau_true <- 2
+variance_true <- 1
 ```
 
-We also fix the **generating parameters** we want to recover: a moderate
-positive forest-cover coefficient and a moderate negative altitude coefficient
-for log conductance.
-These are illustrative simulation settings, not estimates from the bundled
-*Melipona* genetic response. The bundled rasters provide a realistic landscape
-template, while the synthetic covariance response is generated from the values
-below.
+**How to read the setup.** Each design selects ponds from the same 24
+candidates while retaining routes through the full 100 m landscape.
+The forest coefficient 0.6 implies a conductance ratio of `exp(0.6)`,
+about 1.82, per standard deviation of forest context. Fixing context at
+500 m isolates the site-design question from scale estimation.
 
-```{r truth}
-theta_true <- c(forestcover = 0.6, altitude = -0.4)
-tau_true   <- 2   # strength of the landscape signal
-sigma_true <- 1   # nugget (non-landscape variance)
-```
+The simulator uses
 
----
+$$\Sigma=\tau E(\theta)+vI,\qquad
+\nu S\sim\mathrm{Wishart}(\nu,\Sigma).$$
 
-## A single simulated data set
+Here $E$ is graph covariance, $\tau$ weights it, and $v$ is additional
+diagonal variance. The simulation call's `sigma` takes $v$ itself, but the
+fitted measurement parameter named `sigma` is $\log(v)$. Neither is the
+Gaussian raster-smoothing scale.
 
-`simulate_covariance_response()` returns one covariance matrix (plus the
-ingredients used to build it). It has the same matrix form as a genotype
-covariance summary, but its sampling distribution is generated by the model.
-Real genotype summaries need not follow that distribution.
+Generating with `nu = 100` sets how noisy each simulated response is, not
+how many SNPs would supply that information. The simulator requires `nu`
+of at least the number of sampled ponds (24 here).
 
-```{r single-sim}
-sim <- simulate_covariance_response(
-  theta             = theta_true,
-  formula           = ~ forestcover + altitude,
-  data              = surface,
-  conductance_model = loglinear_conductance,
-  tau               = tau_true,
-  sigma             = sigma_true,
-  nu                = 100,     # 100 effective independent marker contributions
-  seed              = 1
-)
-
-dim(sim$covariance)        # one row/column per focal site
-round(sim$covariance[1:4, 1:4], 3)
-```
-
-Refitting estimates the parameters used to generate the data. One draw may
-depart substantially from the generating values:
+## Generate once and inspect recovery
 
 ```{r single-fit}
-fit <- terradish(
-  sim$covariance ~ forestcover + altitude,
-  data              = surface,
-  conductance_model = loglinear_conductance,
-  measurement_model = wishart_covariance,
-  nu                = 100
-)
-
-rbind(true      = theta_true,
-      estimated = round(coef(fit), 3))
+sim <- simulate_covariance_response(theta_true, ~ forest500, surface,
+  tau = tau_true, sigma = variance_true, nu = 100, seed = 1)
+control <- NewtonRaphsonControl(maxit = 200, ctol = 1e-8, ftol = 1e-8)
+fit <- terradish(sim$covariance ~ forest500, surface,
+  measurement_model = wishart_covariance, nu = 100,
+  optimizer = "bfgs", control = control)
+stopifnot(fit$convergence$code == 0,
+          fit$fit$subproblem$convergence == 0)
+rbind(generating = theta_true, estimated = coef(fit))
+confint(fit)
 ```
 
-A single replicate only tells you what happened *once*. To characterize a
-design you must repeat the draw many times.
+**How to read the output.** The estimated forest coefficient is
+`r round(coef(fit)[["forest500"]], 2)`, against the generating 0.6, and
+its 95% interval
+(`r paste(round(confint(fit), 2), collapse = " to ")`)
+`r if (confint(fit)[1, 1] <= 0.6 && confint(fit)[1, 2] >= 0.6) "contains" else "misses"`
+the true value. Only the design-sweep recipe below can estimate how often
+such intervals do. The harmless warnings note that this formula ignores
+`slope`, which stays in the raster stack for the multivariate recipes.
 
----
+```{r recovery-plot, fig.cap = "One simulated covariance: observed versus fitted values."}
+plot(fit, type = "fit")
+```
 
-## Separate generating information from assumed information
+**How to read the plot.** The upper cluster holds the 24 pond variances
+and the lower cluster the covariances between ponds. The blue line is a
+least-squares fit, not the 1:1 line. Most visual agreement comes from
+separating variances from covariances, so judge the fit within the lower
+cluster. `plot(fit, type = "marginal", data = surface)` shows the fitted
+forest-conductance curve for comparison with `exp(0.6 * x)`.
 
-`nu` controls variation among simulated covariance matrices. `nu_fit` controls
-the precision assumed by the fitted likelihood; its default is `nu`. Raising
-`nu_fit` while keeping `nu` fixed does not create more informative data. It
-can make intervals narrower and increase nominal detections while reducing
-coverage. Evaluate that mismatch explicitly:
+## Compare site designs without changing the question
 
-```{r nu-fit-sensitivity, eval = FALSE}
-# These runs use the same seeds and therefore the same simulated responses.
-# Increase nsim after checking runtime and convergence on a small pilot.
-design <- list(
-  theta = theta_true, formula = ~ forestcover + altitude, data = surface,
-  sample_sizes = 20, strategies = "spacefill",
-  tau = tau_true, sigma = sigma_true, nu = 100,
-  nsim = 100, seed = 905,
-  control = NewtonRaphsonControl(maxit = 100)
-)
+Before a design sweep, choose a recovery target, plausible effect sizes, a
+range of information assumptions, and a computation budget. The recipe
+below compares spatially spread and randomly selected ponds.
+`sample_sizes` counts **ponds**, not animals per pond or loci, so the
+helper does not simulate the benefit of collecting 15 versus 30 animals at
+a pond.
+
+```{r design-recipe, eval = FALSE}
+# Start with nsim = 5 to check runtime and failures, then increase replication.
+# All candidates use the same response within each simulated replicate.
+power <- covariance_response_power(
+  theta = theta_true, formula = ~ forest500, data = surface,
+  sample_sizes = c(12, 18, 24), strategies = c("spacefill", "random"),
+  fit_models = list(forest = list(formula = ~ forest500),
+                    forest_slope = list(formula = ~ forest500 + slope)),
+  tau = tau_true, sigma = variance_true,
+  nu = 100, nu_fit = 100, nsim = 200, n_designs = 2, seed = 905,
+  optimizer = "bfgs", cores = 1, control = control)
+power$summary
+power$parameter_summary
+```
+
+**How to read the eventual results.** These tables appear only when you
+run the recipe. Read fitting success before recovery, because failures are
+part of the assessment, not rows to discard. Slope has no generating
+effect in this benchmark, so its selection rate shows whether model
+comparison favors unneeded structure.
+
+| Quantity | Meaning | Decision it supports |
+|---|---|---|
+| `fit_rate` | Fraction of attempted fits that converge | Is the proposed design numerically usable? |
+| Parameter `power` | Fraction of attempts detecting the generating sign at the stated threshold | Is the specified association detected often enough? |
+| `bias`, `rmse` | Average signed error and root mean squared error | Are estimates accurate as well as detectable? |
+| `coverage` | Fraction of available intervals containing the generating value | Is uncertainty calibrated among the intervals being summarized? |
+| `conductance_power` | Fraction recovering the spatial surface above the specified correlation threshold | Is the fitted surface pattern recovered? |
+| `selected_AIC_rate` | Frequency a candidate ranks first in this candidate set | Does model comparison favor the generating association? |
+
+Check denominators alongside these summaries. Failed or boundary fits
+count as non-detections in parameter power, while bias and coverage depend
+on available estimates and intervals. High nominal power with poor
+coverage is not a sound design. Surface correlation measures relative
+spatial pattern, not absolute conductance or movement.
+
+## Separate data information from assumed precision
+
+`nu` sets the variability of the generated data, and `nu_fit` sets the
+information assumed when fitting. Raising only `nu_fit` narrows reported
+intervals without improving the data. Compare the two explicitly:
+
+```{r information-recipe, eval = FALSE}
+design <- list(theta = theta_true, formula = ~ forest500, data = surface,
+  sample_sizes = 18, strategies = "spacefill",
+  tau = tau_true, sigma = variance_true, nu = 100,
+  nsim = 200, seed = 905, optimizer = "bfgs", cores = 1, control = control)
 matched <- do.call(covariance_response_power, design)
 overstated <- do.call(covariance_response_power,
-                     c(design, list(nu_fit = 2000)))
+  c(design, list(nu_fit = 1000)))
 rbind(matched = matched$parameter_summary,
       overstated = overstated$parameter_summary)
 ```
 
-**How to read the output.** Compare fit rate, coverage, and power together.
-Similar estimates with narrower intervals under larger `nu_fit` reflect the
-assumed precision, not better recovery of the generating process. A high
-detection rate accompanied by poor coverage is not a successful design.
-Failed and nonconverged fits count as non-detections; inspect their frequency
-before interpreting power. Coverage and bias summaries require checking which
-replicates supplied valid estimates.
+**How to read this comparison.** Common seeds pair the simulated draws, so
+compare recovery, coverage, and fitting success together. A higher
+detection rate under overstated precision may simply reflect intervals
+that are too narrow. Neither setting establishes the effective `nu` of the
+bundled SNP panel.
 
-These are runnable study-design recipes rather than stored results. Long
-power sweeps are not run during vignette builds, and no hidden precomputed
-files are needed to render this guide. Save your configuration, seeds, full
-assessment objects, package versions, and convergence diagnostics when running
-them. Report Monte Carlo uncertainty: for a proportion `p` estimated from
-`B` independent replicates, its approximate Monte Carlo standard error is
-`sqrt(p * (1 - p) / B)`.
+## What can you take to the field?
 
-For covariance simulation, the generating `nu` must be at least the covariance
-dimension required by `stats::rWishart()`. That simulation constraint does not
-make raw marker counts appropriate fitted effective degrees of freedom.
+Report performance across plausible weak and strong associations instead
+of choosing the scenario that makes the smallest sample sufficient. For a
+proportion estimated from $B$ independent replicates, approximate Monte
+Carlo standard error is $\sqrt{p(1-p)/B}$, about 0.028 with 200
+replicates and $p=0.8$. Reused site designs add another layer to consider
+when summarizing uncertainty across a sweep.
 
-## Sampling sites and placement
-
-Compare both site count and placement under the same generating scenarios.
-More sites can improve recovery, but redundant sites or weak covariate coverage
-may add little information. Hold generating and fitting `nu` explicit in each
-comparison, include weak-signal scenarios, and assess whether the fitted model
-is numerically identifiable. Study-design conclusions remain internal to the
-simulated model. Additional validation against misspecified, coalescent, or
-individual-based processes is needed before translating them into field targets.
-
----
-
-## Comparing sampling strategies and candidate models
-
-`covariance_response_power()` automates the same loop across **sampling
-designs**: it subsets the focal sites in the surface to a target sample size,
-optionally using different placement strategies, simulates responses, refits
-candidate models, and summarizes recovery. The graph is reused across designs, but repeated fitting can still be costly.
-
-Here we compare three sample sizes under two placement strategies, and we fit
-two candidate models per replicate: the true two-covariate model and a reduced
-altitude-only model. This lets us measure both **parameter recovery** and
-**model-selection** performance.
-
-```{r power-run, eval = FALSE}
-power <- covariance_response_power(
-  theta             = theta_true,
-  formula           = ~ forestcover + altitude,
-  data              = surface,
-  sample_sizes      = c(10, 20, 34),
-  strategies        = c("spacefill", "random"),
-  conductance_model = loglinear_conductance,
-  fit_models = list(
-    full          = list(formula = ~ forestcover + altitude),
-    altitude_only = list(formula = ~ altitude)
-  ),
-  tau        = tau_true,
-  sigma      = sigma_true,
-  nu         = 100,
-  nu_fit     = 100,   # change separately to assess overstated precision
-  nsim       = 20,    # increase for smoother estimates in a real study
-  n_designs  = 2,     # random designs evaluated per sample size
-  seed       = 1,
-  control    = NewtonRaphsonControl(maxit = 100, verbose = FALSE)
-)
-
-power
-```
-
-
-### Scenario-level summary
-
-The `summary` table has one row per (strategy, sample size, model):
-
-```{r power-summary, eval = FALSE}
-power$summary[, c("strategy", "sample_size", "model",
-                  "fit_rate", "conductance_power",
-                  "mean_conductance_cor", "selected_AIC_rate")]
-```
-
-Key columns:
-
-- **`fit_rate`**: fraction of replicates that converged. Values below 1 flag a
-  design where the model is hard to fit (often too few sites).
-- **`conductance_power`**: fraction of replicates whose fitted conductance
-  surface has a Pearson correlation with the generating surface above
-  `conductance_cor_threshold` (default 0.9). This measures recovery of the
-  relative spatial pattern, not its absolute scale or an ecological mechanism.
-  It is useful for spline models whose basis coefficients are not individually
-  interpretable.
-- **`mean_conductance_cor`**: average correlation between the fitted and true
-  conductance surfaces.
-- **`selected_AIC_rate`**: how often each model had the lowest AIC within the
-  specified, comparable candidate set. For the `full` model, this is the rate
-  at which the generating formula ranked first among those candidates.
-
-### Parameter-level summary
-
-`parameter_summary` reports per-coefficient power, bias, RMSE, and confidence
-interval coverage:
-
-```{r power-params, eval = FALSE}
-power$parameter_summary[
-  power$parameter_summary$model == "full",
-  c("strategy", "sample_size", "parameter",
-    "power", "bias", "rmse", "coverage")
-]
-```
-
-What to look for:
-
-- **`power`**: proportion of all simulated replicates in which the coefficient
-  had the generating sign and a two-sided Wald p-value below `alpha`. Failed or
-  boundary fits count as non-detections. Choose a target such as 0.8 before the
-  assessment rather than treating it as a universal threshold.
-- **`bias`**: average estimate minus the generating value. Persistent bias can
-  reflect model misspecification, boundary behavior, optimization failures, or a
-  design too small for the asymptotic approximation.
-- **`rmse`**: typical estimation error; should shrink as sample size grows.
-- **`coverage`**: fraction of 95% confidence intervals that contain the truth.
-  Well-calibrated intervals give ~0.95. Coverage well below 0.95 means the
-  reported uncertainty is too optimistic for that design.
-
-
----
-
-## Interpreting and acting on the results
-
-A design assessment usually answers one of three questions:
-
-| Question | Column(s) to read | Decision rule |
-|----------|-------------------|---------------|
-| Enough sites? | `parameter_summary$power`, `conductance_power` | Pick the smallest sample size that reaches your predeclared recovery target under conservative scenarios. |
-| Enough marker information? | power-vs-`nu` curves | Identify the smallest plausible effective `nu` past the power elbow under conservative scenarios. |
-| Which site placement? | compare `strategy` rows | Prefer the strategy with higher power / surface correlation at equal cost. |
-| Trustworthy intervals? | `parameter_summary$coverage` | Require coverage near 0.95 before trusting reported CIs. |
-
-A few practical notes:
-
-- **Increase `nsim`.** The recipes use small pilot counts; no power sweep is executed at build time.
-  For a real assessment use at least 100-500 simulations per design so that
-  power and coverage estimates are stable.
-- **Match the simulation to your expectations.** The answer depends on
-  `theta`, `tau`, and `sigma`. If you are unsure, run the assessment across a
-  grid of plausible effect sizes and $\tau / \sigma$ ratios, then report the
-  range.
-- **Use and report defensible `nu` values.** Markers in linkage disequilibrium
-  are not independent, so the effective `nu` can be smaller than the raw marker
-  count. Planning with an optimistic `nu` overstates precision and power. Use
-  a justified range and report sensitivity to both generating `nu` and
-  assumed `nu_fit`.
-- **Spline and Gaussian models.** For non-linear conductance models the
-  individual coefficients are not interpretable; lean on
-  `conductance_power` and `mean_conductance_cor` rather than per-parameter
-  power. Pass the relevant factory via `conductance_model` and `fit_models`.
-
----
-
-## Quick reference
-
-```{r quick-reference, eval = FALSE}
-library(terradish)
-library(terra)
-
-# 1. Build a landscape template (saveStack = TRUE enables site subsetting)
-surface <- conductance_surface(covariates, coords,
-                               directions = 8, saveStack = TRUE)
-
-# 2. One simulated covariance matrix from specified generating parameters
-sim <- simulate_covariance_response(
-  theta = c(x1 = 0.6, x2 = -0.4), formula = ~ x1 + x2,
-  data = surface, tau = 2, sigma = 1, nu = 100, seed = 1
-)
-
-# 3. Refit to check recovery
-fit <- terradish(sim$covariance ~ x1 + x2, data = surface,
-                 conductance_model = loglinear_conductance,
-                 measurement_model = wishart_covariance, nu = 100)
-coef(fit)
-
-# 4. Full design assessment across sample sizes / strategies / models
-power <- covariance_response_power(
-  theta = c(x1 = 0.6, x2 = -0.4), formula = ~ x1 + x2,
-  data = surface, sample_sizes = c(10, 20, 30),
-  strategies = c("spacefill", "random"),
-  tau = 2, sigma = 1, nu = 100, nu_fit = 100, nsim = 200, seed = 1
-)
-power$summary            # fit rate, conductance recovery, model selection
-power$parameter_summary  # power, bias, RMSE, coverage per coefficient
-```
-
+Save settings, seeds, all fit outcomes, package versions, and the complete
+assessment object. Keep graph resolution, buffer, and forest scaling fixed
+when comparing site counts. If the goal includes choosing a scale or
+spline complexity, simulate and evaluate that selection procedure too.
 
 ## Summary of key functions
 
 | Function | Purpose |
-|----------|---------|
-| `conductance_surface()` | Build the landscape template; `saveStack = TRUE` enables site subsetting |
-| `simulate_covariance_response()` | One covariance matrix simulated from known parameters |
-| `terradish()` | Refit a simulated data set to check parameter recovery |
-| `covariance_response_power()` | Full design sweep across sample sizes, strategies, and models |
-| `$summary` | Per-scenario fit rate, conductance recovery, and model-selection rate |
-| `$parameter_summary` | Per-coefficient power, bias, RMSE, and interval coverage |
+|---|---|
+| `conductance_surface()` | Retain the landscape and candidate focal sites |
+| `simulate_covariance_response()` | Draw one response under declared statistical assumptions |
+| `terradish()` | Fit and inspect one draw before a larger assessment |
+| `covariance_response_power()` | Compare recovery across specified sampling designs |
 
 ## See also
 
-- `vignette("wishart-covariance", package = "terradish")`: the covariance
-  workflow and a full explanation of `nu`.
-- `vignette("getting-started", package = "terradish")`: the core modeling
-  workflow.
-- `vignette("model-comparison", package = "terradish")`: AIC, likelihood
-  ratio tests, and cross-validation for real data.
+- [`vignette("getting-started", package = "terradish")`](getting-started.html): the SLiM deme example and matched marker panels.
+- [`vignette("wishart-covariance", package = "terradish")`](wishart-covariance.html): response geometry and effective information.
+- [`vignette("model-comparison", package = "terradish")`](model-comparison.html): selection and prediction are different assessments.
+- [`vignette("ibe-ibr-workflow", package = "terradish")`](ibe-ibr-workflow.html): a simulated response with a known environmental component.
+- [`vignette("large-landscapes", package = "terradish")`](large-landscapes.html): solver settings when a design sweep requires many fits.

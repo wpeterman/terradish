@@ -1,12 +1,15 @@
 ---
-title: "Concurrent IBE and IBR in terradish"
+title: "Isolation by Environment and Resistance"
 author: "Bill Peterman"
 output:
   rmarkdown::html_vignette:
     number_sections: true
     toc: true
+    self_contained: true
+    mathjax: null
+    pandoc_args: ["--mathml"]
 vignette: >
-  %\VignetteIndexEntry{Concurrent IBE and IBR in terradish}
+  %\VignetteIndexEntry{Isolation by Environment and Resistance}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -21,492 +24,512 @@ To rerun every code chunk, copy `system.file("vignette-source", "ibe-ibr-workflo
 
 
 
-## What the joint model estimates
+**Goal.** Isolation by resistance (IBR) predicts that genetic differences
+grow with the landscape resistance between two ponds. Isolation by
+environment (IBE) predicts that they grow with the environmental
+difference between the ponds themselves. This guide shows you how to fit
+both in one model, read each coefficient, and test whether the
+environmental term improves prediction. The basic MLPE (maximum likelihood
+population effects) workflow for pairwise genetic distances is in
+[`vignette("mlpe-pairwise-distance", package = "terradish")`](mlpe-pairwise-distance.html),
+and this guide extends it with environmental differences.
 
-**Isolation by resistance (IBR)** associates genetic structure with resistance
-through a landscape graph. **Isolation by environment (IBE)** associates genetic
-structure with environmental differences between sampled sites. Fitting both
-estimates each association conditional on the other predictors. It does not
-allocate genetic variation to distinct causal mechanisms.
+## Three environmental hypotheses that should stay distinct
 
-This vignette builds one pairwise design containing geographic distance and
-scaled environmental differences, then uses it in both measurement families.
-A small synthetic example keeps the complete workflow runnable. See
-`vignette("getting-started", package = "terradish")` for preparing real rasters
-and `vignette("wishart-covariance", package = "terradish")` for genotype summaries.
+Two forest ponds with similar hydroperiod (days a pond holds water) but
+open land between them pose an IBR question. Two ponds joined by similar
+forest routes but with very different hydroperiods pose an endpoint
+environment question. Resistance and endpoint differences can be associated
+with the same genetic pattern, but they enter models differently.
+[`vignette("getting-started", package = "terradish")`](getting-started.html)
+introduces the Ohio pond genotypes and resistance graph used here.
 
-The two families connect the same pairwise differences to their responses:
+This guide distinguishes:
 
-| Component | MLPE distance regression | Wishart contrast covariance |
-|----|----|----|
-| Landscape | Resistance `R(theta)` with slope `beta` | Graph covariance `E(theta)` with weight `tau` |
-| Pairwise difference `D_k` | Additive mean term `gamma_k * D_k` | Centered kernel `K_k = -H D_k H / 2` with weight `lambda_k` |
-| Environmental constraint | `gamma_k` can have either sign | `lambda_k >= 0` |
-| Remaining variation | Intercept, residual precision, shared-site correlation | Common covariance nugget |
-| Effective information | Determined by the fitted MLPE likelihood | Analyst supplies `nu` |
+1. **MLPE paired-difference association:** environmental differences enter
+   the conditional mean of pairwise genetic distances.
+2. **Wishart environmental covariance:** a positive semidefinite site
+   kernel enters the covariance model with a nonnegative weight.
+3. **Environment-dependent exchange in a biological simulation:** an
+   environmental filter changes reproduction or successful dispersal, and
+   therefore ancestry. It need not produce the additive covariance in
+   item 2.
 
-Here `H` centers sites. For the corresponding covariance-derived distances,
-the Wishart model implies the additive mean
-`tau * R + sum(lambda_k * D_k) + 2 * exp(sigma)`. This makes the distance
-interpretation comparable to MLPE, although the likelihoods and constraints
-differ. The default `absdiff` kernel is not an outer product of site values;
-the `sqdiff` transform gives that special case.
+The bundled SLiM pond history gives forest resistance an active role and
+hydroperiod **no** generating effect, so it serves as a negative control.
+A separate response with a known positive environmental component then
+shows a real IBE signal.
 
-## 1. Build a landscape and one pairwise design
+## Prepare the graph, genotypes, and endpoint differences
 
 
 ``` r
 library(terradish)
 library(terra)
+data(ohio_ponds)
+ponds <- ohio_ponds$ponds
+g <- factor(ohio_ponds$samples$pond, levels = ponds$pond)
+N <- 2 * as.numeric(table(g))
+S_snp <- cov_from_biallelic(rowsum(ohio_ponds$snp, g, reorder = FALSE)[ohio_ponds$ponds$pond, , drop = FALSE], N) / N[1]
+D_snp <- dist_from_cov(S_snp)
 
-# A small projected grid with one continuous landscape covariate.
-r <- rast(nrows = 8, ncols = 8, xmin = 0, xmax = 8,
-          ymin = 0, ymax = 8, crs = "EPSG:3857")
-values(r) <- sin(seq_len(64) / 5) + seq_len(64) / 64
-names(r) <- "x"
-coords <- xyFromCell(r, c(1, 5, 8, 12, 20, 27, 33, 37, 45, 53, 57, 64))
-surface <- conductance_surface(r, coords, directions = 8, saveStack = TRUE)
+# Here forest500 is an unstandardized fraction; its coefficient is per unit fraction.
+forest500 <- unwrap(ohio_ponds$forest500)
+surface <- conductance_surface(forest500, ponds[c("x", "y")], directions = 8)
 
-# Environmental values are site attributes. They need not be graph covariates.
-environment <- data.frame(climate = sin(seq_len(nrow(coords))))
-environment_pairs <- pairwise_endpoint_covariates(
-  environment, transform = "absdiff", scale = TRUE
-)
-z <- pairwise_covariates(environment_pairs, geographic = dist(coords))
-head(z)
-#>      absdiff_climate geographic
-#> [1,]      0.08970956   4.000000
-#> [2,]      0.92630800   7.000000
-#> [3,]      2.11393080   3.162278
-#> [4,]      2.38126394   3.605551
-#> [5,]      1.48252254   3.605551
-#> [6,]      0.24400532   4.000000
+# Hypothetical hydroperiod is measured in days. Scale sites before forming differences.
+environment <- data.frame(hydroperiod = ponds$hydroperiod)
+pair_covariates <- pairwise_endpoint_covariates(environment,
+  transform = "absdiff", scale = TRUE)
+head(pair_covariates)
+#>      absdiff_hydroperiod
+#> [1,]          0.12317960
+#> [2,]          0.07687923
+#> [3,]          1.27291078
+#> [4,]          1.14482820
+#> [5,]          1.29603418
+#> [6,]          1.16267608
 ```
 
-**How to read the output.** Each row is an unordered site pair in R's
-lower-triangle order. The climate column is the absolute difference after
-standardizing site values; one unit is one site-level standard deviation of
-difference. Geographic distance retains the coordinate units, meters here.
-`pairwise_covariates()` does not scale either input again. In real studies,
-use a projection suitable for the study region and retain the same site order
-in the response, graph, and pairwise design.
+**How to read the output.** Each row is a pond pair, taken from the
+lower triangle column by column. The column is the absolute difference in
+standardized hydroperiod, so a value of one means the ponds differ by one
+full-site SD, not one day. Attributes store the site values and transform
+for spatial validation. Site order must match the genetic matrix and the
+graph's focal ponds.
 
-The supported transforms are `absdiff`, `sqdiff`, `euclidean`, and `manhattan`.
-Choose the transform before fitting and retain it across families. A Wishart
-kernel must be positive semidefinite in site contrasts; the constructor rejects
-incompatible pairwise geometry rather than silently correcting it.
+## Define the two measurement constructions
 
 
 ``` r
-g_mlpe <- mlpe_covariates(z)
-g_wishart <- wishart_covariates(z, model = "wishart_covariance")
+g_mlpe <- mlpe_covariates(pair_covariates)
+g_cov <- wishart_covariates(pair_covariates, model = "wishart_covariance")
+
+Delta <- matrix(0, nrow(ponds), nrow(ponds))
+Delta[lower.tri(Delta)] <- pair_covariates[, 1]
+Delta <- Delta + t(Delta)
+H <- diag(nrow(ponds)) - 1 / nrow(ponds)
+K <- -0.5 * H %*% Delta %*% H
+c(minimum_kernel_eigenvalue = min(eigen(K, symmetric = TRUE, only.values = TRUE)$values),
+  maximum_kernel_row_sum = max(abs(rowSums(K))))
+#> minimum_kernel_eigenvalue    maximum_kernel_row_sum
+#>              1.807218e-16              2.706169e-15
 ```
 
-These are measurement-model factories. Their coefficients are estimated when
-the resistance model is fitted. Both retain the original pairwise design so
-site subsets do not independently restandardize environmental values.
+**How to read the kernel check.** `K` is a centered site covariance
+kernel built from environmental **differences**, not raster smoothing.
+Tiny negative eigenvalues from rounding are harmless. Substantive ones
+make the kernel invalid, which `wishart_covariates()` checks before
+fitting.
 
-## 2. Create covariance and matching distance responses
+The two fitted models have different likelihoods:
 
-For an interpretable comparison between families, use the same covariance
-information represented in two forms. This example draws from a declared
-Wishart model with landscape, climate, and geographic components. It does
-not imply that a generic genetic distance or F~ST~ follows that distribution.
+$$\mathrm{E}[D_{ij}]=\alpha+\beta R_{ij}(\theta)+\gamma\Delta_{ij}
+\quad\text{(MLPE mean)},$$
+
+$$\Sigma=\tau E(\theta)+\lambda K+vI,\qquad
+K=-\tfrac12 H\Delta H,\quad v=\exp(\sigma_{\mathrm{nugget}})
+\quad\text{(Wishart covariance)}.$$
+
+MLPE is a Gaussian pairwise-distance model with shared-site dependence
+and an unconstrained environmental slope $\gamma$. Wishart models
+covariance among site contrasts, needs a coherent genetic response and
+assumed effective information, and constrains $\lambda\geq0$. Its implied
+off-diagonal squared-distance mean is
+
+$$\mathrm{E}[D_{ij}]=\tau R_{ij}(\theta)+\lambda\Delta_{ij}+2v.$$
+
+Both distance means can carry an additive environmental term, but their
+constraints, dependence models, and likelihoods differ. Wishart cannot
+represent a negative MLPE slope.
+
+| Quantity | Where it appears | What it measures |
+|---|---|---|
+| Forest coefficient (theta) | `coef(fit)` | Change in log conductance per unit raw forest fraction in this guide |
+| MLPE `alpha` | `summary(fit)$phi` | Expected genetic distance at zero resistance distance |
+| MLPE `beta` | `summary(fit)$phi` | IBR slope: increase in genetic distance per unit resistance distance |
+| MLPE `absdiff_hydroperiod` (gamma) | `summary(fit)$phi` | Change in genetic distance per unit endpoint difference, holding resistance fixed |
+| MLPE `tau` | `summary(fit)$phi`, log scale | Log residual precision; residual SD is `exp(-tau / 2)` |
+| MLPE `rho` | `summary(fit)$phi`, logit scale | Shared-pond correlation is `plogis(rho) / 2`, between 0 and 0.5 |
+| Wishart kernel weight (lambda) | `summary(fit)$phi` | Nonnegative environmental covariance component |
+| Wishart `tau` | `summary(fit)$phi` | Weight of graph covariance; a different parameter despite the shared name |
+| Wishart `sigma` | `summary(fit)$phi`, log scale | Log of the extra variance added to each pond |
+
+<details>
+<summary>Optional: absolute differences, squared differences, and similarity kernels</summary>
+
+### This kernel is not a Gaussian similarity kernel
+
+The default `absdiff` uses $\Delta_{ij}=|z_i-z_j|$, and `sqdiff` uses
+$(z_i-z_j)^2$, whose centered kernel is a rank-one outer product. Neither
+is the Gaussian similarity kernel $\exp[-(z_i-z_j)^2/(2h^2)]$, so do not
+call an absolute-difference component a Gaussian IBE kernel. A Gaussian
+kernel would need its own difference construction and an endpoint
+bandwidth, distinct from the spatial smoothing scale of forest.
+
+</details>
+
+## Use the SLiM SNP response as a negative control
 
 
 ``` r
-nu_demo <- 1000
-base <- simulate_covariance_response(c(x = 0.8), ~x, surface,
-  tau = 1, sigma = 0.1, nu = nu_demo, seed = 301)
-kernels <- attr(g_wishart, "kernel_covariates")
-Sigma <- base$Sigma + 0.1 * kernels[, , 1] + 0.05 * kernels[, , 2]
-set.seed(301)
-S_cov <- stats::rWishart(1, df = nu_demo, Sigma = Sigma)[, , 1] / nu_demo
-S_dist <- dist_from_cov(S_cov)
-check_distance_response(S_dist)$admissible
-#> [1] TRUE
+control <- NewtonRaphsonControl(maxit = 200, ctol = 1e-8, ftol = 1e-8)
+fit_snp_cov <- terradish(S_snp ~ forest500, surface,
+  measurement_model = wishart_covariance, nu = 40,
+  optimizer = "bfgs", control = control)
+fit_snp_cov_env <- terradish(S_snp ~ forest500, surface,
+  measurement_model = g_cov, nu = 40, optimizer = "bfgs", control = control)
+fit_snp_mlpe <- terradish(D_snp ~ forest500, surface,
+  measurement_model = mlpe, optimizer = "bfgs", control = control)
+fit_snp_mlpe_env <- terradish(D_snp ~ forest500, surface,
+  measurement_model = g_mlpe, optimizer = "bfgs", control = control)
+all_snp <- list(fit_snp_cov, fit_snp_cov_env, fit_snp_mlpe, fit_snp_mlpe_env)
+stopifnot(all(vapply(all_snp, function(z) z$convergence$code == 0 &&
+  z$fit$subproblem$convergence == 0, logical(1))))
+
+# Separate tables: these are not a common likelihood scale across families.
+aic_table(list(fit_snp_cov, fit_snp_cov_env), mod_names = c("IBR", "IBR + kernel"))
+#>          model K       AIC Delta_AIC AIC_wt Cum.wt   loglik converged boundary
+#> 1          IBR 3 -276.6249         0 0.7311 0.7311 141.3124      TRUE    FALSE
+#> 2 IBR + kernel 4 -274.6249         2 0.2689 1.0000 141.3124      TRUE     TRUE
+aic_table(list(fit_snp_mlpe, fit_snp_mlpe_env), mod_names = c("IBR", "IBR + difference"))
+#>              model K       AIC Delta_AIC AIC_wt Cum.wt   loglik converged
+#> 1              IBR 5 -1646.232    0.0000 0.6326 0.6326 828.1162      TRUE
+#> 2 IBR + difference 6 -1645.146    1.0868 0.3674 1.0000 828.5728      TRUE
+#>   boundary
+#> 1    FALSE
+#> 2    FALSE
 ```
 
-The diagnostic checks distance geometry. Here the generating model also
-supplies a sampling justification. For real data, assess that justification
-separately. `nu_demo` is an illustrative simulation setting, not a recommendation
-to use the number of SNPs as effective degrees of freedom.
-
-## 3. Fit the candidate models within each family
-
-The uniform surface still implies resistance among sites. Adding pairwise
-environmental terms to it is therefore **IBD + IBE (uniform surface)**, not
-an IBE-only model. Geographic distance is an additional explicit measurement
-predictor; uniform-graph resistance is generally not Euclidean distance.
+**How to read these comparisons.** Compare models only within a table,
+because the tables use different responses and likelihoods. In the
+Wishart table the kernel weight sits at its lower bound of zero
+(`boundary = TRUE`), so the log-likelihood is unchanged and the extra
+parameter costs exactly 2 AIC units. Do not report a symmetric interval
+around this boundary estimate. In the MLPE table the hydroperiod
+difference raises the log-likelihood by only
+0.46,
+less than its penalty, so IBR alone ranks first. Both results match the
+zero generating effect.
 
 
 ``` r
-ctrl <- NewtonRaphsonControl(maxit = 100, verbose = FALSE)
-fit_ibd <- terradish(S_dist ~ 1, surface,
-  measurement_model = mlpe, control = ctrl)
-fit_ibe <- terradish(S_dist ~ 1, surface,
-  measurement_model = g_mlpe, control = ctrl)
-fit_ibr <- terradish(S_dist ~ x, surface,
-  measurement_model = mlpe, control = ctrl)
-fit_joint <- terradish(S_dist ~ x, surface,
-  measurement_model = g_mlpe, control = ctrl)
-
-fit_w_ibd <- terradish(S_cov ~ 1, surface,
-  measurement_model = wishart_covariance, nu = nu_demo, control = ctrl)
-fit_w_ibe <- terradish(S_cov ~ 1, surface,
-  measurement_model = g_wishart, nu = nu_demo, control = ctrl)
-fit_w_ibr <- terradish(S_cov ~ x, surface,
-  measurement_model = wishart_covariance, nu = nu_demo, control = ctrl)
-fit_w_joint <- terradish(S_cov ~ x, surface,
-  measurement_model = g_wishart, nu = nu_demo, control = ctrl)
-
-fits <- list(mlpe_ibd = fit_ibd, mlpe_uniform_ibe = fit_ibe,
-  mlpe_ibr = fit_ibr, mlpe_joint = fit_joint,
-  wishart_ibd = fit_w_ibd, wishart_uniform_ibe = fit_w_ibe,
-  wishart_ibr = fit_w_ibr, wishart_joint = fit_w_joint)
-vapply(fits, function(fit) fit$convergence$code, numeric(1))
-#>            mlpe_ibd    mlpe_uniform_ibe            mlpe_ibr          mlpe_joint
-#>                   0                   0                   0                   0
-#>         wishart_ibd wishart_uniform_ibe         wishart_ibr       wishart_joint
-#>                   0                   0                   0                   0
-```
-
-Interpret code 0 as numerical convergence under the stopping criteria.
-Inspect nonzero codes, gradients, inner nuisance convergence, and active
-bounds before comparing fits. A no-resistance boundary makes the conductance
-surface unidentified; a zero environmental weight alone does not.
-
-## 4. Read conditional conductance and environmental associations
-
-
-``` r
-rbind(MLPE_without_pairs = coef(fit_ibr), MLPE_with_pairs = coef(fit_joint),
-      Wishart_without_pairs = coef(fit_w_ibr), Wishart_with_pairs = coef(fit_w_joint))
-#>                               x
-#> MLPE_without_pairs    0.6680284
-#> MLPE_with_pairs       0.8724362
-#> Wishart_without_pairs 0.5717631
-#> Wishart_with_pairs    0.9750254
-summary(fit_joint)
-#> Conductance surface with 64 vertices (12 focal) estimated by maximum likelihood
-#> Call:   terradish(formula = S_dist ~ x, data = surface, measurement_model = g_mlpe,
-#>     control = ctrl)
+summary(fit_snp_mlpe_env)
+#> Conductance surface with 10404 vertices (24 focal) estimated by maximum likelihood
+#> Call:   terradish(formula = D_snp ~ forest500, data = surface, measurement_model = g_mlpe,
+#>     optimizer = "bfgs", control = control)
 #>
-#> Loglikelihood: 202.3103 (7 degrees freedom)
-#> AIC: -390.6205
+#> Loglikelihood: 828.5728 (6 degrees freedom)
+#> AIC: -1645.146
 #>
 #> Number of function calls: 12
-#> Number of optimization steps: 4
-#> Convergence: converged | projected gradient: 1.27e-13
-#> Norm of gradient at MLE: 1.270095e-13
+#> Number of optimization steps: 5
+#> Convergence: converged | projected gradient: 4.08e-10
+#> Norm of gradient at MLE: 4.084646e-10
 #>
 #> Nuisance parameters (conditional on fitted conductance surface; measurement-model scale):
-#>                  Estimate   Std. Error  Lower 95%  Upper 95%
-#> alpha             0.196145   0.019870    0.157200   0.235090
-#> beta              1.285672   0.126366    1.038000   1.533345
-#> absdiff_climate   0.084677   0.004012    0.076814   0.092539
-#> geographic        0.042636   0.003393    0.035985   0.049287
-#> tau               6.750276   0.262462    6.235860   7.264692
-#> rho               0.066161   0.542338   -0.996802   1.129124
+#>                      Estimate   Std. Error  Lower 95%  Upper 95%
+#> alpha                 0.084786   0.029774    0.026431   0.143141
+#> beta                 35.934455   0.992163   33.989851  37.879059
+#> absdiff_hydroperiod   0.001749   0.001828   -0.001835   0.005333
+#> tau                   4.760509   0.271667    4.228051   5.292966
+#> rho                   2.611649   0.305231    2.013408   3.209891
 #>
 #> Resistance-distance equivalent of one unit of environmental difference:
-#>        covariate      ratio          SE      lower      upper            family
-#>  absdiff_climate 0.06586175 0.007663448 0.05084167 0.08088183 gaussian_distance
-#>       geographic 0.03316249 0.005654669 0.02207954 0.04424544 gaussian_distance
+#>            covariate        ratio           SE         lower        upper
+#>  absdiff_hydroperiod 4.866727e-05 5.177387e-05 -5.280765e-05 0.0001501422
+#>             family
+#>  gaussian_distance
 #> Coefficients:
-#>   Estimate Std. Error z value Pr(>|z|)
-#> x   0.8724     0.1450   6.016 1.79e-09 ***
+#>           Estimate Std. Error z value Pr(>|z|)
+#> forest500   4.1047     0.2466   16.64   <2e-16 ***
 #> ---
 #> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-summary(fit_w_joint)
-#> Conductance surface with 64 vertices (12 focal) estimated by maximum likelihood
-#> Call:   terradish(formula = S_cov ~ x, data = surface, measurement_model = g_wishart,
-#>     nu = nu_demo, control = ctrl)
-#>
-#> Loglikelihood: 644.3709 (5 degrees freedom)
-#> AIC: -1278.742
-#>
-#> Number of function calls: 19
-#> Number of optimization steps: 6
-#> Convergence: converged | projected gradient: 3.46e-14
-#> Norm of gradient at MLE: 3.463896e-14
-#>
-#> Nuisance parameters (conditional on fitted conductance surface; measurement-model scale):
-#>                         Estimate   Std. Error  Lower 95%  Upper 95%
-#> tau                      1.224681   0.124053    0.981541   1.467821
-#> lambda_absdiff_climate   0.093468   0.006626    0.080482   0.106454
-#> lambda_geographic        0.046175   0.004264    0.037818   0.054533
-#> sigma                   -2.310036   0.061823   -2.431206  -2.188865
-#>
-#> Resistance-distance equivalent of one unit of environmental difference:
-#>               covariate      ratio          SE      lower      upper
-#>  lambda_absdiff_climate 0.07632053 0.010350276 0.05603436 0.09660669
-#>       lambda_geographic 0.03770393 0.006839377 0.02429900 0.05110886
-#>              family
-#>  wishart_covariance
-#>  wishart_covariance
-#> Coefficients:
-#>   Estimate Std. Error z value Pr(>|z|)
-#> x   0.9750     0.1752   5.566 2.61e-08 ***
-#> ---
-#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+phi_mlpe <- summary(fit_snp_mlpe_env)$phi
+c(residual_sd = exp(-phi_mlpe[["tau"]] / 2),
+  shared_pond_correlation = plogis(phi_mlpe[["rho"]]) / 2)
+#>             residual_sd shared_pond_correlation
+#>              0.09252705              0.46580378
 ```
 
-**How to read the output.** A positive `x` coefficient means greater relative
-conductance as `x` increases, conditional on the included pairwise terms.
-The estimated coefficient can change after adding those terms because the
-model can represent the same spatial pattern in more than one way. Neither
-surface is a unique causal map of landscape effects.
+**How to read the MLPE summary.** The `Coefficients` table holds the
+forest conductance estimate, read as in Getting Started. The
+`Nuisance parameters` block holds the MLPE regression. `alpha`
+(0.085) is the expected genetic distance at
+zero resistance distance. `beta` (35.9)
+is the IBR slope, the increase in genetic distance per unit resistance
+distance. `absdiff_hydroperiod` (0.0017) is the
+environmental slope, and its interval spans zero, as expected for this
+negative control. `tau` is the log residual precision, so the residual
+standard deviation is `exp(-tau / 2)`, about
+0.093. `rho` is printed on the
+logit scale, and `plogis(rho) / 2` converts it to the correlation
+between two pairs that share a pond, here
+0.47. A value near the 0.5 ceiling
+means pond identity explains most of the residual variation, which is
+why pairwise distances need MLPE rather than ordinary regression.
 
-In MLPE, an environmental `gamma` gives the conditional change in genetic
-distance per unit of pairwise difference. It is unconstrained, so a negative
-estimate is possible. In Wishart, `lambda` is a nonnegative kernel weight.
-An association in the opposite direction is represented at the zero bound.
-The Wishart summary marks that boundary and gives an approximate one-sided
-upper limit rather than a symmetric interval.
+The `Resistance-distance equivalent` table, also available from
+`terradish_ibe_ratio()`, divides the environmental slope by `beta`,
+giving the resistance distance that changes genetic distance as much as
+one unit of environmental difference. Its interval also spans zero here.
+
+## A separate positive example: generate a covariance component
+
+Use the same landscape and endpoint values with a **separate statistical
+response** whose covariance contains graph weight 0.08, environmental
+weight 0.10, and diagonal variance 0.01. The graph is normalized here
+only to fix its units. The package does not normalize environmental
+kernels after constructing them.
 
 
 ``` r
-mlpe_response_change(fit_joint)
-#>         covariate       low     high contrast  estimate  conf.low conf.high
-#> 1 absdiff_climate 0.2743825 2.256586 1.982203 0.1678463 0.1522608 0.1834318
-#> 2      geographic 2.2360680 7.211103 4.975035 0.2121161 0.1790279 0.2452042
-#>   conf.level
-#> 1       0.95
-#> 2       0.95
+E <- terradish_distance(matrix(6, nrow = 1,
+  dimnames = list(NULL, "forest500")), ~ forest500, surface,
+  covariance = TRUE)$covariance[, , 1]
+E <- E / mean(diag(H %*% E %*% H))
+Sigma <- 0.08 * E + 0.10 * K + 0.01 * diag(nrow(ponds))
+expected_D <- 0.08 * dist_from_cov(E) + 0.10 * Delta + 0.02
+diag(expected_D) <- 0
+stopifnot(max(abs(dist_from_cov(Sigma) - expected_D)) < 1e-10)
+
+# A reproducible sample covariance of 400 independent Gaussian features.
+# Restore the caller's random-number state after this local demonstration.
+S_benchmark <- local({
+  had_seed <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
+  if (had_seed) previous_seed <- get(".Random.seed", envir = .GlobalEnv)
+  on.exit(if (had_seed) assign(".Random.seed", previous_seed, envir = .GlobalEnv)
+          else rm(".Random.seed", envir = .GlobalEnv))
+  set.seed(79301)
+  S <- rWishart(1, df = 400, Sigma = Sigma)[, , 1] / 400
+  H %*% S %*% H
+})
+D_benchmark <- dist_from_cov(S_benchmark)
 ```
 
-This reports the MLPE response change over the stored 10th-to-90th-percentile
-pairwise contrast. The nuisance inference includes uncertainty in the fitted
-conductance parameters. It remains conditional on the selected model and
-measurement assumptions.
-
-### Compare IBE:IBR ratios
+The identity check confirms that the distance and covariance forms
+describe the same generated features. Those features lack the SLiM
+panel's linkage, allele ascertainment, demographic history, and mutation
+process, so their 400 degrees of freedom cannot calibrate `nu` for the
+SNP analysis.
 
 
 ``` r
-ratios <- rbind(terradish_ibe_ratio(fit_joint),
-                terradish_ibe_ratio(fit_w_joint))
-ratios
-#>                covariate      ratio          SE      lower      upper
-#> 1        absdiff_climate 0.06586175 0.007663448 0.05084167 0.08088183
-#> 2             geographic 0.03316249 0.005654669 0.02207954 0.04424544
-#> 3 lambda_absdiff_climate 0.07632053 0.010350276 0.05603436 0.09660669
-#> 4      lambda_geographic 0.03770393 0.006839377 0.02429900 0.05110886
-#>               family
-#> 1  gaussian_distance
-#> 2  gaussian_distance
-#> 3 wishart_covariance
-#> 4 wishart_covariance
+benchmark_attempts <- list()
+fit_benchmark <- function(response, measurement, nu, label) {
+  candidates <- list()
+  for (start in c(-0.5, 0, 0.5)) {
+    fit <- tryCatch(terradish(response ~ forest500, surface,
+      measurement_model = measurement, nu = nu, theta = c(forest500 = start),
+      optimizer = "bfgs", control = control), error = identity)
+    valid <- !inherits(fit, "error") && isTRUE(fit$convergence$code == 0) &&
+      isTRUE(fit$fit$subproblem$convergence == 0)
+    benchmark_attempts[[length(benchmark_attempts) + 1L]] <<- data.frame(
+      family = label, start, valid,
+      logLik = if (inherits(fit, "error")) NA_real_ else as.numeric(logLik(fit)))
+    if (valid) candidates[[length(candidates) + 1L]] <- fit
+  }
+  if (!length(candidates)) stop("No converged benchmark fit for ", label)
+  candidates[[which.max(vapply(candidates, function(z) as.numeric(logLik(z)), numeric(1)))]]
+}
+fit_cov <- fit_benchmark(S_benchmark, g_cov, 400, "Wishart")
+fit_mlpe <- fit_benchmark(D_benchmark, g_mlpe, NULL, "MLPE")
+do.call(rbind, benchmark_attempts)
+#>    family start valid   logLik
+#> 1 Wishart  -0.5  TRUE 6279.478
+#> 2 Wishart   0.0  TRUE 6279.478
+#> 3 Wishart   0.5  TRUE 6279.478
+#> 4    MLPE  -0.5  TRUE 1018.029
+#> 5    MLPE   0.0  TRUE 1018.029
+#> 6    MLPE   0.5  TRUE 1018.029
+stopifnot(fit_cov$convergence$code == 0, fit_cov$fit$subproblem$convergence == 0,
+          fit_mlpe$convergence$code == 0, fit_mlpe$fit$subproblem$convergence == 0)
+environmental_estimate <- function(fit) {
+  phi <- fit$fit$phi
+  unname(phi[grepl("hydroperiod", rownames(phi)), 1])
+}
+data.frame(construction = c("Wishart covariance weight", "MLPE paired-mean slope"),
+  known_additive_distance_weight = 0.10,
+  estimate = c(environmental_estimate(fit_cov), environmental_estimate(fit_mlpe)))
+#>                construction known_additive_distance_weight  estimate
+#> 1 Wishart covariance weight                            0.1 0.0984631
+#> 2    MLPE paired-mean slope                            0.1 0.1000928
 ```
 
-The ratio is `gamma / beta` for MLPE and `lambda / tau` for Wishart. It is
-the resistance-distance equivalent of one unit of the pairwise difference.
-These ratios share an interpretation because the response is the same
-covariance-derived distance and both families use the same pairwise transform
-and scaling. Their absolute coefficients are not comparable across likelihoods.
-Each fit also estimates its own conductance surface, so its resistance scale
-can differ. The ratio is undefined when the resistance coefficient is zero.
-The geographic row has the same equivalent-distance interpretation but is
-an explicit IBD term, not an environmental mechanism.
+**How to read the output.** Each estimate is near the declared 0.10
+component on its own model scale. The shared expected-distance identity
+explains the similar numbers. It does not make the likelihoods
+interchangeable or validate either family for arbitrary genetic
+summaries, so do not pool their AICs or held-out log-likelihoods into
+one ranking.
 
-An environmental association can arise from local adaptation, historical
-structure, correlated geography, sampling, or another omitted predictor.
-The fitted term does not distinguish these mechanisms. A precise ratio alone
-does not establish causal IBE.
+The attempts table keeps every starting value. Compare likelihoods only
+when both convergence codes are zero. Agreement among converged starts
+supports numerical consistency but does not prove a global optimum.
+Judge each fit by its final convergence records, not by warnings, which
+intermediate nuisance steps can raise even when a later retry converges.
 
-## 5. Compare predictive support and sensitivity
+## Plot the environmental contribution
 
-Information criteria are computed separately within each likelihood family:
+An IBE coefficient belongs to the measurement model, not the raster
+conductance formula. `mlpe_response_change()` turns it into a change in
+genetic distance across a specified environmental contrast.
 
 
 ``` r
-labels <- c("IBD", "IBD + IBE (uniform surface)", "IBR", "IBR + pairwise terms")
-aic_table(list(fit_ibd, fit_ibe, fit_ibr, fit_joint), mod_names = labels)
-#>                         model K       AIC Delta_AIC AIC_wt Cum.wt   loglik
-#> 4        IBR + pairwise terms 7 -390.6205    0.0000 0.9999 0.9999 202.3103
-#> 2 IBD + IBE (uniform surface) 6 -371.5977   19.0228 0.0001 1.0000 191.7989
-#> 3                         IBR 5 -258.4388  132.1817 0.0000 1.0000 134.2194
-#> 1                         IBD 4 -246.4814  144.1391 0.0000 1.0000 127.2407
-#>   converged boundary
-#> 4      TRUE    FALSE
-#> 2      TRUE    FALSE
-#> 3      TRUE    FALSE
-#> 1      TRUE    FALSE
-aic_table(list(fit_w_ibd, fit_w_ibe, fit_w_ibr, fit_w_joint), mod_names = labels)
-#>                         model K        AIC Delta_AIC AIC_wt Cum.wt   loglik
-#> 4        IBR + pairwise terms 5 -1278.7417    0.0000      1      1 644.3709
-#> 2 IBD + IBE (uniform surface) 4 -1244.7385   34.0033      0      1 626.3692
-#> 3                         IBR 3  -672.7047  606.0371      0      1 339.3523
-#> 1                         IBD 2  -638.9348  639.8069      0      1 321.4674
-#>   converged boundary
-#> 4      TRUE    FALSE
-#> 2      TRUE    FALSE
-#> 3      TRUE    FALSE
-#> 1      TRUE    FALSE
+library(ggplot2)
+change <- mlpe_response_change(fit_mlpe)
+change
+#>             covariate        low     high contrast  estimate  conf.low
+#> 1 absdiff_hydroperiod 0.03976171 2.433682  2.39392 0.2396142 0.2347029
+#>   conf.high conf.level
+#> 1 0.2445255       0.95
+ggplot(change, aes(covariate, estimate)) +
+  geom_hline(yintercept = 0, linetype = 2) +
+  geom_pointrange(aes(ymin = conf.low, ymax = conf.high)) +
+  theme_bw() + labs(x = "Pairwise environmental predictor",
+                    y = "Expected change in squared genetic distance")
 ```
 
-Lower AIC balances fit and parameter count within the declared candidate set.
-Wishart AIC can over-select environmental kernels when `nu` overstates effective
-information. AICc does not repair that problem. Cross-family AIC comparisons
-have no common likelihood basis.
+![Expected genetic-distance change across the 10th-to-90th percentile environmental contrast in the MLPE example. The interval is conditional on the fitted conductance surface.](precomputed/ibe-ibr-workflow-ibe-contrast-1.png)
 
-### Nested tests and boundaries
+**How to read the output.** `low` and `high` are the 10th and 90th
+percentiles of the pairwise hydroperiod difference, in SD units.
+`estimate` is the expected change in squared genetic distance across
+that contrast, holding resistance fixed, about
+0.24, with a 95% interval of
+0.23 to 0.24.
+It equals the environmental slope times the width of the contrast. A
+positive value means ponds with more different hydroperiods are more
+genetically different at the same landscape resistance.
 
 
 ``` r
-anova(fit_ibr, fit_joint)
-#> Likelihood ratio test: chi-square (2 df)
-#> Null: ~ x
-#> Alt: ~ x
-#>      logLik Df  ChiSq Df(ChiSq)  Pr(>Chi)
-#> Null 134.22  5
-#> Alt  202.31  7 136.18         2 < 2.2e-16 ***
-#> ---
-#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
-anova(fit_w_ibr, fit_w_joint)
-#> Likelihood ratio test: chi-bar-square, binomial weights (2 kernels; exact for information-orthogonal kernels, approximate otherwise)
-#> Null: ~ x
-#> Alt: ~ x
-#>      logLik Df  ChiSq Df(ChiSq)  Pr(>Chi)
-#> Null 339.35  3
-#> Alt  644.37  5 610.04         2 < 2.2e-16 ***
-#> ---
-#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
+plot(fit_cov, type = "fit")
 ```
 
-Adding unconstrained MLPE slopes uses the ordinary chi-square reference under
-its asymptotic assumptions. Adding only nonnegative Wishart kernel weights
-uses a chi-bar-square reference with binomial weights. This reference is exact
-for information-orthogonal kernels and approximate otherwise. The climatic
-and geographic kernels here need not be orthogonal. Wishart test magnitudes
-also depend on supplied `nu`; treat them as descriptive at that value.
-The uniform-surface IBE model and the IBR model are not nested in each other.
+![Observed and fitted covariance for the environmental-covariance example. Each point is a modeled covariance entry, not an independent replicate.](precomputed/ibe-ibr-workflow-covariance-diagnostic-1.png)
+
+**How to read the plot.** This checks the combined graph and
+environmental covariance against the response. Pond variances (the
+diagonal) cluster apart from the between-pond covariances, and the blue
+line is a least-squares fit, not the 1:1 line. A forest
+`type = "marginal"` plot would show IBR conductance, not the hydroperiod
+effect, and `mlpe_response_change()` applies only to MLPE fits.
+
+## Validate an environmental extension within one family
 
 
 ``` r
-fit_w_lower_nu <- terradish_rescale_nu(fit_w_joint, nu = 50)
-rbind(primary = coef(fit_w_joint), sensitivity = coef(fit_w_lower_nu))
-#>                     x
-#> primary     0.9750254
-#> sensitivity 0.9750254
-terradish_ibe_ratio(fit_w_lower_nu)
-#>                covariate      ratio         SE       lower      upper
-#> 1 lambda_absdiff_climate 0.07632053 0.04628784 -0.01440198 0.16704303
-#> 2      lambda_geographic 0.03770393 0.03058662 -0.02224475 0.09765261
-#>               family
-#> 1 wishart_covariance
-#> 2 wishart_covariance
+cv_cov <- terradish_cv_folds(surface,
+  list(IBR = S_benchmark ~ forest500, IBR_IBE = S_benchmark ~ forest500),
+  folds = ponds$fold,
+  model = list(IBR = wishart_covariance, IBR_IBE = g_cov),
+  nu = 400, nuisance = "fixed", optimizer = "bfgs",
+  theta = c(forest500 = -0.5), keep_fits = "none", control = control)
+cv_cov$results[, c("model", "fold", "loglik", "nuisance_iterations", "error")]
+#>     model fold    loglik nuisance_iterations error
+#> 1     IBR    3 2057.7395                   0
+#> 2     IBR    1 1496.8187                   0
+#> 3     IBR    2  759.8227                   0
+#> 4 IBR_IBE    3 2522.1279                   0
+#> 5 IBR_IBE    1 1762.0905                   0
+#> 6 IBR_IBE    2  943.3442                   0
+cv_cov$summary
+#>     model folds failed n_folds_ok total_loglik common_folds_total
+#> 1 IBR_IBE     3      0          3     5227.563           5227.563
+#> 2     IBR     3      0          3     4314.381           4314.381
+#>   n_common_folds between_repeat_sd mean_loglik total_loglik_gain
+#> 1              3                NA    1742.521           875.483
+#> 2              3                NA    1438.127           594.674
+#>   mean_loglik_gain se_difference mean_difference within_one_se
+#> 1         291.8277       0.00000          0.0000          TRUE
+#> 2         198.2247      83.40555       -304.3939         FALSE
 ```
 
-Rescaling retains coefficient estimates and broadens uncertainty when `nu`
-decreases. Rescale every candidate to the same value for a model comparison.
-This is a sensitivity calculation, not estimation of effective information.
+**How to read the output.** The models differ only in the measurement
+model, so this tests the environmental kernel alone. Each row scores
+held-out ponds with every parameter fixed at its training value. Larger
+held-out log-likelihood is better. IBR + IBE
+totals 5228
+against 4314
+for IBR alone, which trails by about
+304
+per block, so the kernel improves prediction for this response, which
+was built with one. To validate an MLPE extension, run the same call with
+`D_benchmark` and the models `mlpe` and `g_mlpe`, and keep those scores
+separate from the Wishart scores.
 
-### Fixed-nuisance cross-validation
+## Interpreting IBE in field data
+
+Environmental differences and resistance are often spatially correlated,
+so neither model separates causal IBE from IBR on its own. Report the
+environmental coefficient as a conditional association, along with its
+transform, scaling, likelihood, and, for Wishart fits, `nu`.
+
+<details>
+<summary>Quick reference: expand for the complete copyable workflow</summary>
+
+## Quick reference: SNP negative-control construction
 
 
 ``` r
-# Use the identical site folds for the plain and extended measurement models.
-folds <- terradish_folds(coords, k = 3, method = "random", seed = 42)
-cv_mlpe <- terradish_cv_folds(surface,
-  formulas = list(IBR = S_dist ~ x, joint = S_dist ~ x), folds = folds,
-  model = list(IBR = mlpe, joint = g_mlpe), nuisance = "fixed", control = ctrl)
-cv_wishart <- terradish_cv_folds(surface,
-  formulas = list(IBR = S_cov ~ x, joint = S_cov ~ x), folds = folds,
-  model = list(IBR = wishart_covariance, joint = g_wishart),
-  nu = nu_demo, nuisance = "fixed", control = ctrl)
-cv_mlpe$summary
-cv_wishart$summary
+library(terradish)
+library(terra)
+data(ohio_ponds)
+g <- factor(ohio_ponds$samples$pond, levels = ohio_ponds$ponds$pond)
+N <- 2 * as.numeric(table(g))
+S <- cov_from_biallelic(rowsum(ohio_ponds$snp, g, reorder = FALSE)[ohio_ponds$ponds$pond, , drop = FALSE], N) / N[1]
+D <- dist_from_cov(S)
+graph <- conductance_surface(unwrap(ohio_ponds$forest500), ohio_ponds$ponds[c("x", "y")])
+endpoints <- pairwise_endpoint_covariates(data.frame(hydroperiod = ohio_ponds$ponds$hydroperiod),
+                                         scale = TRUE, transform = "absdiff")
+g_cov <- wishart_covariates(endpoints, model = "wishart_covariance")
+g_mlpe <- mlpe_covariates(endpoints)
+ctl <- NewtonRaphsonControl(maxit = 200, ctol = 1e-8, ftol = 1e-8)
+
+# 1. A PSD covariance component, with a nonnegative environmental weight.
+fit_cov <- terradish(S ~ forest500, graph, measurement_model = g_cov,
+  nu = 40, optimizer = "bfgs", control = ctl)
+
+# 2. An unconstrained paired-difference slope in a distance-mean model.
+fit_mlpe <- terradish(D ~ forest500, graph, measurement_model = g_mlpe,
+  optimizer = "bfgs", control = ctl)
+summary(fit_cov)
+summary(fit_mlpe)
+
+# 3. Compare each extension only with a baseline using the same response/family.
+# Hydroperiod has no generating effect in this SLiM pond history.
 ```
 
-All nuisance coefficients, including pairwise terms, are learned from training
-sites and held fixed during scoring. Compare candidates within each family,
-using paired differences on common successful folds. Reprofiling on test sites
-would instead assess performance after local recalibration. For spatial
-transfer, use defensible spatial blocks and more sites than this teaching
-example. Repeated folds expose partition sensitivity without creating new
-independent observations.
-
-## 6. Visualize the joint model
-
-
-``` r
-plot(fit_joint, type = "fit")
-```
-
-![Observed and fitted pairwise distances for the joint MLPE model.](precomputed/ibe-ibr-workflow-fit-plot-1.png)
-
-Agreement describes the fitted response summary. It does not show that the
-two spatial predictors identify distinct processes.
-
-
-``` r
-plot(fit_joint, type = "surface", data = surface)
-```
-
-![Relative conductance conditional on the pairwise climate and geographic terms.](precomputed/ibe-ibr-workflow-surface-plot-1.png)
-
-![Relative conductance conditional on the pairwise climate and geographic terms.](precomputed/ibe-ibr-workflow-surface-plot-2.png)
-
-![Relative conductance conditional on the pairwise climate and geographic terms.](precomputed/ibe-ibr-workflow-surface-plot-3.png)
-
-The map and its intervals concern the conductance component after including
-pairwise terms. Compare it with the fit omitting those terms before attributing
-the spatial pattern to landscape `x`.
-
-
-``` r
-plot(fit_joint, type = "marginal", data = surface)
-```
-
-![Conditional conductance association with landscape x.](precomputed/ibe-ibr-workflow-marginal-plot-1.png)
-
-For weakly sampled tails, compare unclamped predictions with
-`support = "focal"`. Clamping uses focal-cell covariate limits and changes
-prediction, not the fitted likelihood or the evidence for a mechanism.
-
-## Quick reference
-
-
-``` r
-# 1. Preserve identical transforms and site ordering across families.
-z <- pairwise_covariates(
-  pairwise_endpoint_covariates(environment, transform = "absdiff", scale = TRUE),
-  geographic = dist(coords)
-)
-g_mlpe <- mlpe_covariates(z)
-g_wishart <- wishart_covariates(z, model = "wishart_covariance")
-
-# 2. Use covariance-derived distances when comparing ratio interpretations.
-S_dist <- dist_from_cov(S_cov)
-fit_m <- terradish(S_dist ~ x, surface, measurement_model = g_mlpe)
-fit_w <- terradish(S_cov ~ x, surface, measurement_model = g_wishart, nu = nu_demo)
-
-# 3. Inspect convergence, conditional surface changes, and ratio uncertainty.
-summary(fit_m)
-summary(fit_w)
-rbind(terradish_ibe_ratio(fit_m), terradish_ibe_ratio(fit_w))
-
-# 4. Assess predictive support and sensitivity to effective information.
-terradish_ibe_ratio(terradish_rescale_nu(fit_w, nu = 50))
-```
+</details>
 
 ## Summary of key functions
 
 | Function | Purpose |
-|----|----|
-| `pairwise_endpoint_covariates()` | Transform site attributes into pairwise differences |
-| `pairwise_covariates()` | Combine those differences with geographic or other pairwise matrices |
-| `mlpe_covariates()`, `wishart_covariates()` | Use the same design in two likelihood families |
-| `terradish_ibe_ratio()` | Report resistance-equivalent ratios with joint uncertainty |
-| `mlpe_response_change()` | Express an MLPE pairwise association on the response scale |
-| `terradish_rescale_nu()` | Assess Wishart precision sensitivity without refitting |
-| `terradish_cv_folds()` | Evaluate held-out prediction on a fixed landscape graph |
+|---|---|
+| `pairwise_endpoint_covariates()` | Preserve the site-level transform and pair order |
+| `mlpe_covariates()` | Add differences to the paired-distance mean |
+| `wishart_covariates()` | Add PSD environmental covariance kernels |
+| `dist_from_cov()` | Keep covariance and squared-distance geometry coherent |
+| `terradish_cv_folds()` | Compare extensions within one likelihood family |
+| `mlpe_response_change()` | Translate an MLPE environmental coefficient to a genetic-response contrast |
 
 ## See also
 
-- `vignette("getting-started", package = "terradish")`: graph preparation and conductance interpretation.
-- `vignette("wishart-covariance", package = "terradish")`: covariance construction and effective information.
-- `vignette("model-comparison", package = "terradish")`: nesting, repeated folds, and paired comparisons.
-- `vignette("simulation-design", package = "terradish")`: recovery and coverage under declared scenarios.
+- [`vignette("getting-started", package = "terradish")`](getting-started.html): SNP and
+  microsatellite inputs and likelihood choice.
+- [`vignette("mlpe-pairwise-distance", package = "terradish")`](mlpe-pairwise-distance.html):
+  fitting pairwise genetic distances with MLPE and reading its summary.
+- [`vignette("gaussian-scale-optimization", package = "terradish")`](gaussian-scale-optimization.html):
+  spatial forest context, rather than endpoint differences.
+- [`vignette("model-comparison", package = "terradish")`](model-comparison.html): compatible
+  model comparisons and information sensitivity.
+- [`vignette("simulation-design", package = "terradish")`](simulation-design.html): statistical
+  response simulation and the limits of internal benchmarks.
+- [`vignette("wishart-covariance", package = "terradish")`](wishart-covariance.html):
+  choosing a covariance response or an MLPE pairwise distance.
+- [`vignette("individual-salamanders", package = "terradish")`](individual-salamanders.html):
+  individual genotypes, nonlinear resistance, and endpoint IBE terms.
+- [`vignette("data-generation", package = "terradish")`](data-generation.html):
+  how the pond history and hydroperiod values were simulated.

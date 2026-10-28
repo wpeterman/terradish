@@ -5,15 +5,18 @@ test_that("focal spline support and exact coarse refinement reuse the fitted bas
   rasters <- c(terra::unwrap(melip.altitude), terra::unwrap(melip.forestcover))
   names(rasters) <- c("altitude", "forestcover")
   coords <- terra::unwrap(melip.coords)
-  surface <- conductance_surface(scale_covariates(rasters), coords,
-                                  directions = 4, saveStack = TRUE)
+  surface <- expect_fixture_warnings(
+    conductance_surface(scale_covariates(rasters), coords,
+                         directions = 4, saveStack = TRUE),
+    "^Two or more focal sites share a raster cell;")
   control <- NewtonRaphsonControl(maxit = 200)
   fit <- terradish(melip.Fst ~s(altitude, df = 3), surface,
                     smooth_loglinear_conductance, mlpe, control = control)
-  coarse <- terradish(melip.Fst ~s(altitude, df = 3), surface,
+  coarse <- expect_fixture_warnings(terradish(melip.Fst ~s(altitude, df = 3), surface,
                        smooth_loglinear_conductance, mlpe, control = control,
                        approximation = "coarse_raster",
-                       approximation_control = list(factor = 2, exact_refine = TRUE))
+                       approximation_control = list(factor = 2, exact_refine = TRUE)),
+    "^Two or more focal sites share a raster cell;")
   expect_equal(coef(fit), coef(coarse), tolerance = 1e-6)
   expect_equal(as.numeric(logLik(fit)), as.numeric(logLik(coarse)), tolerance = 1e-8)
   clamped <- .clamp_graph_covariates(surface, support = "focal",

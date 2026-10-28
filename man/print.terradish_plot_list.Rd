@@ -11,6 +11,11 @@
 
 \item{...}{Unused.}
 }
+\value{
+The input \code{x}, a \code{terradish_plot_list} containing named
+  \code{ggplot} panels, returned invisibly. Each panel is printed to the
+  active graphics device for its graphical side effect.
+}
 \description{
 Internal helper used so multi-panel terradish plot objects auto-print to the
 active graphics device without printing list structure to the console.
