@@ -14,8 +14,17 @@ test_that("overstated fit information reduces coverage without changing the trut
   expect_lt(overstated$parameter_summary$coverage, matched$parameter_summary$coverage)
   keep <- matched$parameter_results$fit_ok & overstated$parameter_results$fit_ok
   expect_gt(sum(keep), 20)
-  expect_equal(matched$parameter_results$estimate[keep],
-    overstated$parameter_results$estimate[keep], tolerance = 1e-5)
-  expect_equal(matched$parameter_results$se[keep] / sqrt(20),
-    overstated$parameter_results$se[keep], tolerance = 1e-5)
+  # nu_fit = 20 * nu scales the log-likelihood by 20, so both fits share one
+  # maximum. A replicate with two likelihood peaks can still send the local
+  # optimizer to different peaks across platforms, so compare only replicates
+  # whose fits reached the same scaled log-likelihood.
+  loglik_at <- function(x)
+    x$results$loglik[match(x$parameter_results$simulation, x$results$simulation)]
+  same_peak <- keep &
+    abs(loglik_at(overstated) - 20 * loglik_at(matched)) < 1e-3
+  expect_gt(sum(same_peak), 20)
+  expect_equal(matched$parameter_results$estimate[same_peak],
+    overstated$parameter_results$estimate[same_peak], tolerance = 1e-5)
+  expect_equal(matched$parameter_results$se[same_peak] / sqrt(20),
+    overstated$parameter_results$se[same_peak], tolerance = 1e-5)
 })
