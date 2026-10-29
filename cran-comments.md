@@ -50,6 +50,13 @@ low. The help-page logo was resized to reduce the size.
   checked because pandoc was not on the check's PATH; both convert cleanly
   with pandoc.
 
+## Dependency on landgraph
+
+terradish imports landgraph (>= 0.0.3), which is on CRAN. An update to
+landgraph 0.0.4 is being submitted at the same time. terradish 1.1.0 passes
+`R CMD check --as-cran` with both landgraph 0.0.3 and 0.0.4, so the two
+submissions can be processed in either order.
+
 ## Reverse dependencies
 
 This is a new submission, so there are no reverse dependencies.
