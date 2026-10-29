@@ -28,6 +28,9 @@ safeguards for nuisance-parameter fitting, with regression tests.
 0 errors | 0 warnings | 1 note
 
 - This is a new submission.
+- The possibly misspelled words in DESCRIPTION (Hooten, Peterman, Raybould,
+  Rothery) are author surnames in the method references added at CRAN's
+  request.
 
 The installed size is about 8.4 Mb (data 1.3, doc 2.1, extdata 1.5, and
 libs 1.6 Mb). The data and extdata hold the example datasets and the
@@ -37,6 +40,10 @@ low. The help-page logo was resized to reduce the size.
 
 ## Test environments
 
+- win-builder, R-devel (2026-10-28 r90783 ucrt): 1 NOTE, the incoming
+  feasibility NOTE described above.
+- GitHub Actions, R CMD check: macOS (R release), Windows (R release and
+  R-devel), and Ubuntu (R-devel, release, and oldrel-1): OK.
 - Windows 11 x86_64, R 4.6.1: `R CMD check --as-cran --no-manual` on the
   built archive: 0 errors, 0 warnings, and the "New submission" NOTE. A
   second, local-only NOTE reported that README.md and NEWS.md could not be
