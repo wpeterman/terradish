@@ -1,0 +1,8 @@
+/* The README logo is not named logo.png, so pkgdown does not size it.
+   Hold it to the standard hex-sticker height beside the page title. */
+main h1 img[align="right"],
+.template-home h1 img {
+  height: 139px;
+  width: auto;
+  margin-left: 1rem;
+}

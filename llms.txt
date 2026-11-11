@@ -1,0 +1,563 @@
+# terradish ![terradish logo](reference/figures/terradish-sticker.png)
+
+| CI | CRAN | License | Archive |
+|:---|:---|:---|:---|
+| [![R-CMD-check](https://github.com/wpeterman/terradish/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/wpeterman/terradish/actions/workflows/R-CMD-check.yaml) | [![CRAN status](https://www.r-pkg.org/badges/version/terradish)](https://CRAN.R-project.org/package=terradish) | [![License: BSD 3-Clause](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause) | [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21225711.svg)](https://doi.org/10.5281/zenodo.21225711) |
+
+## Overview
+
+terradish estimates landscape conductance surfaces from genetic data by
+maximum likelihood on a raster graph. It fits log-linear conductance
+models and can optionally estimate each covariate’s Gaussian smoothing
+scale and spline shape.
+
+Models fit pairwise genetic distances through the MLPE likelihood, or
+allele-frequency covariance and squared distances derived from it
+through a Wishart likelihood on site contrasts. Both families accept the
+same pairwise environmental covariates alongside resistance. Exact
+sparse Cholesky and algebraic multigrid solvers handle large rasters.
+Fixed-domain spatial cross-validation compares conductance formulas.
+
+Estimated coefficients describe relative conductance and are conditional
+on the measurement-model terms. They do not directly estimate movement,
+migration, or causal landscape effects. For Wishart likelihoods, the
+user-supplied information parameter `nu` controls inferential precision.
+Using the SNP count overstated information by roughly an order of
+magnitude in the package’s forward-time validation experiments.
+
+## Citation
+
+To cite terradish or acknowledge its use, run `citation("terradish")`
+for the current reference and a BibTeX entry. The archived releases
+share the DOI
+[10.5281/zenodo.21225711](https://doi.org/10.5281/zenodo.21225711).
+
+Fitting one parameterized conductance surface to genetic data, in place
+of regressing on separate resistance distances, follows Peterman and
+Pope (2021), [doi:10.1111/mec.15716](https://doi.org/10.1111/mec.15716).
+
+## Installation
+
+There are two ways to install terradish:
+
+``` r
+
+# Get the released version from CRAN
+install.packages("terradish")
+
+# Alternatively, install the development version from GitHub
+# install.packages("remotes")
+remotes::install_github("wpeterman/terradish")
+```
+
+terradish requires the companion package landgraph, version 0.0.3 or
+later. Both routes install it from CRAN automatically.
+
+## Using terradish
+
+The full documentation, with every guide and help page, is at
+<https://wpeterman.github.io/terradish/>.
+
+A terradish analysis has three steps: build a raster graph from
+covariates and sampling locations with
+[`conductance_surface()`](https://wpeterman.github.io/terradish/reference/conductance_surface.md),
+fit a conductance model to a genetic response with
+[`terradish()`](https://wpeterman.github.io/terradish/reference/terradish.md),
+and then check, compare, and map the fit.
+
+### Quick start
+
+``` r
+
+library(terradish)
+library(terra)
+data(melip)
+
+# Unwrap the portable example data and standardize each raster layer.
+altitude <- terra::unwrap(melip.altitude)
+forestcover <- terra::unwrap(melip.forestcover)
+sites <- terra::unwrap(melip.coords)
+covariates <- c(altitude, forestcover)
+names(covariates) <- c("altitude", "forestcover")
+covariates <- scale_covariates(covariates)
+
+# A few sites fall in the same raster cell. Keep one site per cell so that
+# each graph vertex holds one sampled population.
+keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(sites)))
+sites <- sites[keep]
+Fst <- melip.Fst[keep, keep]
+graph <- conductance_surface(covariates, sites)  # eight neighbors by default
+
+# MLPE accounts for shared sampling sites among pairwise genetic distances.
+fit <- terradish(Fst ~ forestcover + altitude, graph,
+                 measurement_model = mlpe)
+fit$convergence
+summary(fit)
+coef(fit)
+confint(fit)
+vcov(fit)
+plot(fit, type = "surface", data = graph)
+plot(fit, type = "fit")
+```
+
+Check convergence before interpreting the surface. Code 0 meets the
+stopping rule; code 1 reaches the iteration limit; code 2 reports a
+stall or failed line search. Also inspect `fit$fit$subproblem` for
+nuisance optimization. Numerical convergence does not establish model
+adequacy.
+
+## Interpreting estimates
+
+For a standardized linear covariate, `exp(coef(fit))` is the conductance
+multiplier for a one-standard-deviation increase, holding other terms
+fixed. A common conductance scale is absorbed by the measurement model’s
+resistance coefficient, so absolute conductance is unidentified.
+
+Gaussian `sigma` describes raster smoothing in map units. The smoothed
+layer is re-standardized at every candidate sigma, so its coefficient is
+per standard deviation of that layer. The half-cell lower bound still
+smooths, and the upper bound is limited by the retained kernel window.
+Dispersal averaging can favor positive scales without a separate
+ecological scale of effect. Use
+[`gaussian_scale_summary()`](https://wpeterman.github.io/terradish/reference/gaussian_scale_summary.md),
+`summary(fit)$sigma_table`, and
+[`gaussian_scale_profile()`](https://wpeterman.github.io/terradish/reference/gaussian_scale_profile.md)
+to examine units, bounds, and uncertainty.
+
+Spline models are unpenalized regression splines with fixed degrees of
+freedom. Their centered bases and knots are retained for prediction.
+`summary(fit)$spline_monotonicity` describes shape over the focal-site
+covariate range. Tails outside that range are poorly identified.
+
+| Response | Measurement model | Main requirement |
+|----|----|----|
+| Pairwise genetic distances, including ratio-estimator FST | `mlpe` or `leastsquares` | A defensible mean structure; MLPE models shared-site correlation |
+| Allele-frequency covariance | `wishart_covariance` | Coherent covariance and explicit effective information |
+| Squared distances derived from covariance | `generalized_wishart` | Admissible geometry and explicit effective information |
+
+The two Wishart forms use the same site-contrast likelihood for matching
+covariance and distance representations. Passing
+[`check_distance_response()`](https://wpeterman.github.io/terradish/reference/check_distance_response.md)
+does not give an FST ratio estimator a Wishart sampling model. Grouped
+covariance should use the coherent `gower` diagonal from landgraph;
+`within` is on a different scale. Rare-variant weighting and unequal
+group sizes require sensitivity checks.
+
+### What `nu` changes
+
+Wishart point estimates are invariant to rescaling `nu` at the optimum.
+Standard errors scale as `1 / sqrt(nu)`, while likelihood-ratio
+statistics and the likelihood contribution to information criteria scale
+with `nu`. Linkage and shared population history can make effective
+information much smaller than the marker count.
+
+Use `terradish_rescale_nu(fit, nu = ...)` to report conclusions over
+plausible values. Dividing `nu` by 20 increases standard errors by
+`sqrt(20)` without refitting estimates. AIC at nominal marker
+information can over-select environmental terms and flexible curves. Use
+spatial CV for predictive support and rescaling for inferential
+sensitivity.
+
+## Combine IBE and IBR
+
+``` r
+
+# Raster covariates come first; coordinates come second.
+environment <- pairwise_endpoint_covariates(covariates, sites)
+lonlat <- terra::crds(terra::project(sites, "EPSG:4326"))
+local_crs <- sprintf("+proj=aeqd +lat_0=%f +lon_0=%f +datum=WGS84 +units=m",
+                     mean(lonlat[, 2]), mean(lonlat[, 1]))
+projected_sites <- terra::project(sites, local_crs)
+pairwise <- pairwise_covariates(environment,
+  geographic_100km = dist(terra::crds(projected_sites)) / 100000)
+
+joint <- terradish(Fst ~ forestcover + altitude, graph,
+                   measurement_model = mlpe_covariates(pairwise))
+terradish_ibe_ratio(joint)
+
+# The same object can enter a model for a coherent covariance response.
+wishart_measurement <- wishart_covariates(pairwise, model = "wishart_covariance")
+```
+
+Geographic differences in this example are in units of 100 km. The
+IBE:IBR ratio expresses an environmental difference in
+resistance-distance units with a joint uncertainty interval. Raw
+coefficients are not directly comparable across families. Ratios require
+matching transforms and scaling and are undefined when the resistance
+coefficient is zero.
+
+Environmental terms can reflect assortative mating, dispersal filtering,
+local adaptation, or environmental patterns in site variance. Report
+conductance fits with and without pairwise terms because signs can
+change. A uniform `~ 1` surface with environmental terms represents
+**IBD + IBE**, not IBE alone.
+
+## Model comparison
+
+[`terradish_folds()`](https://wpeterman.github.io/terradish/reference/terradish_folds.md)
+constructs folds;
+[`terradish_cv_folds()`](https://wpeterman.github.io/terradish/reference/terradish_cv_folds.md)
+keeps the landscape graph fixed while withholding sites. It accepts
+per-formula conductance factories and repeated folds. Reprofiled
+nuisance parameters compare conductance formulas under one measurement
+model. Set `nuisance = "fixed"` to retain every measurement parameter
+from training and score predictive densities when comparing measurement
+extensions.
+
+Read success counts first. Failed folds make full totals unavailable,
+and rankings use only folds successful for every candidate. Paired
+differences and their standard errors are descriptive because folds
+share data. Checkpoints reject incompatible input or model changes.
+
+MLPE and Wishart scores do not share a common predictive scale. Within
+one Wishart comparison, changing `nu` rescales scores without changing
+ranks when the same folds succeed. Likelihood-ratio tests require nested
+models, matching responses and graphs, and fixed `nu`. Environmental
+Wishart weights need a boundary reference, not an ordinary chi-square
+test.
+
+## Prediction and large landscapes
+
+New-landscape prediction reuses fitted log-linear terms, spline knots
+and centers, or Gaussian post-smoothing scaling. Apply stored input
+scaling with
+`scale_covariates(new_rasters, reference = original_scaled_rasters)`
+before building a new graph. Slim fits retain covariance and interval
+methods but cannot predict after their model closures are removed.
+
+`solver = "auto"` selects AMG above the large-graph threshold regardless
+of the number of right-hand sides. AMG iteration counts can increase
+with conductance contrast. Experimental parallel derivatives use PSOCK
+workers for Hessian and partial solves; AMG and cached CHOLMOD ignore
+`cores`.
+
+Cropping changes resistance. One unpublished development check found
+increases of 15 to 23% with a two-cell buffer and 1 to 2% with ten
+cells. These are case-specific results: compare larger-buffer refits.
+Landmark and coarse-raster starts require exact refinement;
+[`terradish_grid()`](https://wpeterman.github.io/terradish/reference/terradish_grid.md)
+supports exact evaluation only.
+[`terradish_assess_settings()`](https://wpeterman.github.io/terradish/reference/terradish_assess_settings.md)
+is a speed probe, not a convergence or statistical check.
+
+## Experimental features
+
+Directed conductance, hierarchical fields, site-specific drift terms,
+pair subsets, Kron reduction, block-CG, and legacy CV remain on the
+`experimental` branch. Their unresolved limitations are documented in
+that branch’s `EXPERIMENTAL.md`.
+
+``` r
+
+remotes::install_github("wpeterman/terradish@experimental")
+```
+
+## Guides
+
+The guides are numbered in reading order. Start with
+[`vignette("v01-getting-started", package = "terradish")`](https://wpeterman.github.io/terradish/articles/v01-getting-started.md),
+or with
+[`vignette("v03-mlpe-pairwise-distance", package = "terradish")`](https://wpeterman.github.io/terradish/articles/v03-mlpe-pairwise-distance.md)
+if your data are a pairwise genetic distance matrix such as FST. Open
+the collection with `browseVignettes("terradish")`.
+
+| Guide | Question it answers |
+|:---|:---|
+| `v01-getting-started` | How do I run one complete analysis, from genotypes to a conductance map? |
+| `v02-wishart-covariance` | Which genetic covariance response should I model, and is it admissible? |
+| `v03-mlpe-pairwise-distance` | How do I fit and read a model of pairwise genetic distances? |
+| `v04-model-comparison` | Which candidate model do information criteria and spatial cross-validation support? |
+| `v05-categorical-conductance` | How do I fit and interpret land-cover classes? |
+| `v06-spline-conductance` | Does a curved association predict better than a straight one? |
+| `v07-gaussian-scale-optimization` | Over what neighborhood does a covariate act? |
+| `v08-ibe-ibr-workflow` | Do environmental differences matter beyond resistance? |
+| `v09-individual-salamanders` | How do individual genotypes reveal a nonlinear resistance response? |
+| `v10-simulation-design` | How many sites would a study need? |
+| `v11-large-landscapes` | Which solver, storage, and domain settings suit a large raster? |
+| `v12-data-generation` | How were the bundled salamander data simulated? |
+
+Changes in each release are listed in `NEWS.md` and in the website
+changelog.
+
+## Attribution
+
+Nate Pope developed the sparse graph optimization, reverse-mode
+derivatives, MLPE, and generalized Wishart foundations in
+[radish](https://github.com/nspope/radish). terradish extends that
+framework with terra-native workflows and the supported features above.
+Selected deprecated `radish*` wrappers remain; full compatibility with
+every historical entry point is not promised.
+
+Report bugs and request features through the [issue
+tracker](https://github.com/wpeterman/terradish/issues).
+
+# Package index
+
+## Build the graph
+
+Prepare raster covariates and connect sampling locations to a raster
+graph.
+
+- [`scale_covariates()`](https://wpeterman.github.io/terradish/reference/scale_covariates.md)
+  : Scale raster covariates and retain original-scale metadata
+- [`conductance_surface()`](https://wpeterman.github.io/terradish/reference/conductance_surface.md)
+  : Build the raster graph from covariates and sampling sites
+- [`crop_to_focal_buffer()`](https://wpeterman.github.io/terradish/reference/crop_to_focal_buffer.md)
+  : Crop rasters to a focal-site buffer
+
+## Genetic responses
+
+Construct and check the genetic response. The covariance and distance
+constructors are re-exported from landgraph.
+
+- [`reexports`](https://wpeterman.github.io/terradish/reference/reexports.md)
+  [`cov_from_biallelic`](https://wpeterman.github.io/terradish/reference/reexports.md)
+  [`cov_from_genetic_data`](https://wpeterman.github.io/terradish/reference/reexports.md)
+  [`fst_from_biallelic`](https://wpeterman.github.io/terradish/reference/reexports.md)
+  [`dist_from_cov`](https://wpeterman.github.io/terradish/reference/reexports.md)
+  [`dist_from_biallelic`](https://wpeterman.github.io/terradish/reference/reexports.md)
+  : Objects exported from other packages
+- [`check_distance_response()`](https://wpeterman.github.io/terradish/reference/check_distance_response.md)
+  : Check that a squared-distance response is admissible
+- [`pca_dist()`](https://wpeterman.github.io/terradish/reference/pca_dist.md)
+  : Pairwise genetic distances from PCA scores
+
+## Fit and evaluate models
+
+Fit a conductance model by maximum likelihood and work with the fitted
+object.
+
+- [`terradish()`](https://wpeterman.github.io/terradish/reference/terradish.md)
+  : Fit a conductance model by maximum likelihood
+- [`print(`*`<terradish>`*`)`](https://wpeterman.github.io/terradish/reference/terradish_methods.md)
+  [`summary(`*`<terradish>`*`)`](https://wpeterman.github.io/terradish/reference/terradish_methods.md)
+  [`print(`*`<summary.terradish>`*`)`](https://wpeterman.github.io/terradish/reference/terradish_methods.md)
+  [`coef(`*`<terradish>`*`)`](https://wpeterman.github.io/terradish/reference/terradish_methods.md)
+  [`fitted(`*`<terradish>`*`)`](https://wpeterman.github.io/terradish/reference/terradish_methods.md)
+  [`simulate(`*`<terradish>`*`)`](https://wpeterman.github.io/terradish/reference/terradish_methods.md)
+  [`anova(`*`<terradish>`*`)`](https://wpeterman.github.io/terradish/reference/terradish_methods.md)
+  [`logLik(`*`<terradish>`*`)`](https://wpeterman.github.io/terradish/reference/terradish_methods.md)
+  [`AIC(`*`<terradish>`*`)`](https://wpeterman.github.io/terradish/reference/terradish_methods.md)
+  [`residuals(`*`<terradish>`*`)`](https://wpeterman.github.io/terradish/reference/terradish_methods.md)
+  : Print, summarize, compare, and extract from a fitted model
+- [`conductance()`](https://wpeterman.github.io/terradish/reference/conductance.md)
+  : Predict the fitted conductance surface with intervals
+- [`terradish_distance()`](https://wpeterman.github.io/terradish/reference/terradish_distance.md)
+  : Resistance distances on a grid of conductance parameters
+- [`slim_terradish()`](https://wpeterman.github.io/terradish/reference/slim_terradish.md)
+  : Shrink a fitted model for storage
+
+## Conductance models
+
+How raster covariates map to cell conductance.
+
+- [`terradish_conductance_model_factory`](https://wpeterman.github.io/terradish/reference/terradish_conductance_model_factory.md)
+  : Conductance models: the factory interface
+- [`loglinear_conductance()`](https://wpeterman.github.io/terradish/reference/loglinear_conductance.md)
+  : Log-linear conductance model
+- [`smooth_loglinear_conductance()`](https://wpeterman.github.io/terradish/reference/smooth_loglinear_conductance.md)
+  : Log-linear conductance model with spline terms
+- [`gaussian_smoothed_loglinear_conductance()`](https://wpeterman.github.io/terradish/reference/gaussian_smoothed_loglinear_conductance.md)
+  : Log-linear conductance model with estimated Gaussian smoothing
+  scales
+
+## Spatial scale
+
+Estimate, profile, and summarize Gaussian smoothing scales.
+
+- [`terradish_scale_optim()`](https://wpeterman.github.io/terradish/reference/terradish_scale_optim.md)
+  : Search raster smoothing scales by refitting the model
+- [`gaussian_scale_profile()`](https://wpeterman.github.io/terradish/reference/gaussian_scale_profile.md)
+  : Profile-likelihood interval for a Gaussian smoothing scale
+- [`gaussian_scale_summary()`](https://wpeterman.github.io/terradish/reference/gaussian_scale_summary.md)
+  : Summarize fitted Gaussian smoothing scales
+
+## Measurement models
+
+How resistance distance or covariance links to the observed genetic
+response, including pairwise and site-level environmental covariates.
+
+- [`terradish_measurement_model`](https://wpeterman.github.io/terradish/reference/terradish_measurement_model.md)
+  : Measurement models: the likelihood interface
+- [`mlpe()`](https://wpeterman.github.io/terradish/reference/mlpe.md) :
+  Maximum likelihood population effects (MLPE) measurement model
+- [`mlpe_covariates()`](https://wpeterman.github.io/terradish/reference/mlpe_covariates.md)
+  : MLPE measurement model with pairwise environmental covariates
+- [`mlpe_response_change()`](https://wpeterman.github.io/terradish/reference/mlpe_response_change.md)
+  : Change in genetic distance across an MLPE pairwise covariate
+  contrast
+- [`wishart_covariance()`](https://wpeterman.github.io/terradish/reference/wishart_covariance.md)
+  : Wishart covariance measurement model
+- [`wishart_covariates()`](https://wpeterman.github.io/terradish/reference/wishart_covariates.md)
+  : Wishart measurement model with environmental covariance kernels
+- [`generalized_wishart()`](https://wpeterman.github.io/terradish/reference/generalized_wishart.md)
+  : Generalized Wishart measurement model for squared distances
+- [`leastsquares()`](https://wpeterman.github.io/terradish/reference/leastsquares.md)
+  : Least-squares measurement model
+- [`pairwise_covariates()`](https://wpeterman.github.io/terradish/reference/pairwise_covariates.md)
+  : Combine environmental differences with other pairwise covariates
+- [`pairwise_endpoint_covariates()`](https://wpeterman.github.io/terradish/reference/pairwise_endpoint_covariates.md)
+  : Pairwise environmental differences from site-level covariates
+- [`terradish_ibe_ratio()`](https://wpeterman.github.io/terradish/reference/terradish_ibe_ratio.md)
+  : Express environmental effects in resistance-distance units
+
+## Inference and model comparison
+
+Standard errors and intervals, information criteria, and spatial
+cross-validation.
+
+- [`vcov(`*`<terradish>`*`)`](https://wpeterman.github.io/terradish/reference/terradish_inference.md)
+  [`nobs(`*`<terradish>`*`)`](https://wpeterman.github.io/terradish/reference/terradish_inference.md)
+  [`confint(`*`<terradish>`*`)`](https://wpeterman.github.io/terradish/reference/terradish_inference.md)
+  : Standard errors and confidence intervals for conductance parameters
+- [`terradish_rescale_nu()`](https://wpeterman.github.io/terradish/reference/terradish_rescale_nu.md)
+  : Rescale the effective information in a Wishart fit
+- [`aic_table()`](https://wpeterman.github.io/terradish/reference/aic_table.md)
+  : Rank fitted models by AIC, AICc, or BIC
+- [`terradish_folds()`](https://wpeterman.github.io/terradish/reference/terradish_folds.md)
+  : Assign sampling sites to cross-validation folds
+- [`terradish_cv_folds()`](https://wpeterman.github.io/terradish/reference/terradish_cv_folds.md)
+  [`print(`*`<terradish_cv_folds>`*`)`](https://wpeterman.github.io/terradish/reference/terradish_cv_folds.md)
+  : Spatial cross-validation of conductance formulas on a fixed graph
+
+## Plotting
+
+Diagnostic and interpretive plots of a fitted model.
+
+- [`plot(`*`<terradish>`*`)`](https://wpeterman.github.io/terradish/reference/plot.terradish.md)
+  : Plot a fitted model: fit, surface, marginal curves, and smoothing
+  kernels
+
+## Simulation and study design
+
+Simulate covariance responses and assess parameter recovery.
+
+- [`simulate_covariance_response()`](https://wpeterman.github.io/terradish/reference/simulate_covariance_response.md)
+  : Simulate genetic covariance matrices from a known conductance
+  surface
+- [`covariance_response_power()`](https://wpeterman.github.io/terradish/reference/covariance_response_power.md)
+  : Simulation-based power and parameter recovery for sampling designs
+- [`print(`*`<terradish_covariance_power>`*`)`](https://wpeterman.github.io/terradish/reference/print.terradish_covariance_power.md)
+  : Print and read a power assessment
+
+## Large landscapes and solver settings
+
+Solver benchmarks and speed settings for large rasters.
+
+- [`terradish_assess_settings()`](https://wpeterman.github.io/terradish/reference/terradish_assess_settings.md)
+  : Recommend optimizer and solver settings for a data set
+- [`print(`*`<terradish_setting_assessment>`*`)`](https://wpeterman.github.io/terradish/reference/print.terradish_setting_assessment.md)
+  : Print and read a settings assessment
+- [`terradish_solver_benchmark()`](https://wpeterman.github.io/terradish/reference/terradish_solver_benchmark.md)
+  : Benchmark sparse Cholesky solver settings on a graph
+
+## Optimizer controls
+
+Tuning for the Newton-type optimizers and their line searches.
+
+- [`NewtonRaphsonControl()`](https://wpeterman.github.io/terradish/reference/NewtonRaphsonControl.md)
+  : Control settings for the Newton and BFGS optimizers
+- [`ArmijoControl()`](https://wpeterman.github.io/terradish/reference/ArmijoControl.md)
+  : Control settings for Armijo backtracking line search
+- [`HagerZhangControl()`](https://wpeterman.github.io/terradish/reference/HagerZhangControl.md)
+  : Control settings for Hager-Zhang line search
+
+## Data sets
+
+Bundled example data used in the help pages and guides.
+
+- [`ohio_ponds`](https://wpeterman.github.io/terradish/reference/ohio_ponds.md)
+  : Simulated Ohio forest-pond SNP and microsatellite data
+- [`individual_salamanders`](https://wpeterman.github.io/terradish/reference/individual_salamanders.md)
+  : Simulated individual salamander genotypes and resistance analyses
+- [`melip`](https://wpeterman.github.io/terradish/reference/melip.md) :
+  Melipona stingless bee landscape and FST example data
+
+## Compatibility
+
+Names kept from the radish package and their terradish replacements.
+
+- [`radish_compatibility`](https://wpeterman.github.io/terradish/reference/radish_compatibility.md)
+  : Deprecated radish names
+
+## Low-level tools
+
+Direct likelihood evaluation and small helpers. Most analyses do not
+need these.
+
+- [`terradish_grid()`](https://wpeterman.github.io/terradish/reference/terradish_grid.md)
+  : Profile likelihood on a grid of conductance parameters
+- [`terradish_algorithm()`](https://wpeterman.github.io/terradish/reference/terradish_algorithm.md)
+  : Low-level likelihood and derivatives at one parameter value
+- [`lower()`](https://wpeterman.github.io/terradish/reference/lower.md)
+  : Extract the strict lower triangle of a matrix
+- [`scale_to_0_1()`](https://wpeterman.github.io/terradish/reference/scale_to_0_1.md)
+  : Rescale values to the unit interval
+
+# Articles
+
+### Start here
+
+One complete analysis, from matched genotypes to a fitted conductance
+map. Read this first; every other guide builds on it.
+
+- [01. Getting Started with
+  terradish](https://wpeterman.github.io/terradish/articles/v01-getting-started.md):
+
+### Genetic responses
+
+Choose and check the genetic quantity the model explains: an
+allele-frequency covariance with a Wishart likelihood, or a pairwise
+genetic distance with MLPE.
+
+- [02. Choosing and Checking a Genetic Covariance
+  Response](https://wpeterman.github.io/terradish/articles/v02-wishart-covariance.md):
+- [03. Pairwise Genetic Distances with
+  MLPE](https://wpeterman.github.io/terradish/articles/v03-mlpe-pairwise-distance.md):
+
+### Comparing models
+
+Candidate tables, information criteria, likelihood-ratio tests, and
+spatial cross-validation.
+
+- [04. Model Comparison and Selection in
+  terradish](https://wpeterman.github.io/terradish/articles/v04-model-comparison.md):
+
+### Conductance model forms
+
+Beyond a linear term: land-cover classes, curved associations, and the
+spatial scale at which a covariate acts.
+
+- [05. Categorical Landscape
+  Covariates](https://wpeterman.github.io/terradish/articles/v05-categorical-conductance.md):
+- [06. Spline Conductance
+  Models](https://wpeterman.github.io/terradish/articles/v06-spline-conductance.md):
+- [07. Gaussian Scale
+  Optimization](https://wpeterman.github.io/terradish/articles/v07-gaussian-scale-optimization.md):
+
+### Hypotheses and case studies
+
+Separating isolation by environment from isolation by resistance, and a
+full individual-based analysis with a nonlinear response.
+
+- [08. Isolation by Environment and
+  Resistance](https://wpeterman.github.io/terradish/articles/v08-ibe-ibr-workflow.md):
+- [09. Individual Genotypes and Nonlinear Landscape
+  Resistance](https://wpeterman.github.io/terradish/articles/v09-individual-salamanders.md):
+
+### Study design and computation
+
+Simulation for planning a study, and solver, storage, and domain choices
+for large rasters.
+
+- [10. Simulating Covariance Data to Plan a
+  Study](https://wpeterman.github.io/terradish/articles/v10-simulation-design.md):
+- [11. Large
+  Landscapes](https://wpeterman.github.io/terradish/articles/v11-large-landscapes.md):
+
+### Background
+
+How the bundled salamander example data were simulated and sampled.
+
+- [12. How the Salamander Example Data Were
+  Generated](https://wpeterman.github.io/terradish/articles/v12-data-generation.md):

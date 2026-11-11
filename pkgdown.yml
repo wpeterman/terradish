@@ -1,0 +1,20 @@
+pandoc: '3.10'
+pkgdown: 2.2.0
+pkgdown_sha: ~
+articles:
+  v01-getting-started: v01-getting-started.html
+  v02-wishart-covariance: v02-wishart-covariance.html
+  v03-mlpe-pairwise-distance: v03-mlpe-pairwise-distance.html
+  v04-model-comparison: v04-model-comparison.html
+  v05-categorical-conductance: v05-categorical-conductance.html
+  v06-spline-conductance: v06-spline-conductance.html
+  v07-gaussian-scale-optimization: v07-gaussian-scale-optimization.html
+  v08-ibe-ibr-workflow: v08-ibe-ibr-workflow.html
+  v09-individual-salamanders: v09-individual-salamanders.html
+  v10-simulation-design: v10-simulation-design.html
+  v11-large-landscapes: v11-large-landscapes.html
+  v12-data-generation: v12-data-generation.html
+last_built: 2026-11-11T20:21Z
+urls:
+  reference: https://wpeterman.github.io/terradish/reference
+  article: https://wpeterman.github.io/terradish/articles

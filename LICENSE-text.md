@@ -1,0 +1,5 @@
+# License
+
+    YEAR: 2020-2026
+    COPYRIGHT HOLDER: Bill Peterman, Nathaniel S. Pope
+    ORGANIZATION: Bill Peterman, Nathaniel S. Pope
