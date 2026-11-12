@@ -49,4 +49,13 @@ rbind(original = sqrt(diag(vcov(fit))),
 \seealso{
 \code{\link{terradish_inference}}, \code{\link{aic_table}},
   \code{\link{terradish_cv_folds}}
+
+Other inference and model comparison:
+\code{\link[=aic_table]{aic_table()}},
+\code{\link[=mlpe_response_change]{mlpe_response_change()}},
+\code{\link[=terradish_cv_folds]{terradish_cv_folds()}},
+\code{\link[=terradish_folds]{terradish_folds()}},
+\code{\link[=terradish_ibe_ratio]{terradish_ibe_ratio()}},
+\code{\link{terradish_inference}}
 }
+\concept{inference and model comparison}

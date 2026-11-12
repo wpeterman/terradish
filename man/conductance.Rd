@@ -3,7 +3,7 @@
 \name{conductance}
 \alias{conductance}
 \alias{conductance.terradish_graph}
-\title{Estimate conductance from a fitted model}
+\title{Predict the fitted conductance surface with intervals}
 \usage{
 conductance(x, ...)
 
@@ -27,7 +27,9 @@ conductance(x, ...)
 
 \item{quantile}{Confidence level for the pointwise conductance interval.
 The default \code{0.95} gives a 95% interval computed via the delta method
-applied to the MLE of \code{theta} and its inverse Hessian.}
+applied to the MLE of \code{theta} and its inverse Hessian. This is the
+same quantity that \code{confint()} calls \code{level} and
+\code{summary()} calls \code{conf.level}.}
 
 \item{support}{Optional support constraint for conductance evaluation.
 Use \code{"none"} (default) to evaluate the fitted conductance model over
@@ -54,6 +56,10 @@ If \code{x$stack} is non-\code{NULL} (the default when
 }
 Otherwise, a numeric matrix with one row per active cell and columns
 \code{est}, \code{lower<Q>}, and \code{upper<Q>}.
+
+Conductance is relative: a common multiplier is absorbed by the measurement
+model, so compare values among cells of one surface instead of reading
+them as absolute rates.
 }
 \description{
 Extracts per-cell conductance values and pointwise confidence intervals from
@@ -89,26 +95,36 @@ supported for prediction to a new graph.
 library(terra)
 
 data(melip)
-melip.altitude <- terra::unwrap(melip.altitude)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords <- terra::unwrap(melip.coords)
-
-covariates <- c(terra::scale(melip.altitude),
-                terra::scale(melip.forestcover))
+covariates <- c(terra::unwrap(melip.altitude),
+                terra::unwrap(melip.forestcover))
+coords <- terra::unwrap(melip.coords)
 names(covariates) <- c("altitude", "forestcover")
-surface <- conductance_surface(covariates, melip.coords, directions = 8)
+# Coarsened so the example runs quickly; name layers, then scale.
+covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+                                                na.rm = TRUE))
+# Keep one site per raster cell.
+keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+Fst <- melip.Fst[keep, keep]
+surface <- conductance_surface(covariates, coords[keep])
 
-fit <- terradish(melip.Fst ~ forestcover + altitude, surface,
-              loglinear_conductance, leastsquares,
-              control = NewtonRaphsonControl(maxit = 5))
+fit <- terradish(Fst ~ forestcover + altitude, surface,
+                 measurement_model = mlpe)
 
 cond <- conductance(surface, fit)
 names(cond)   # "est", "lower95", "upper95"
-plot(cond)
+plot(cond)    # relative conductance and its pointwise 95\% limits
 
 }
 }
 \seealso{
 \code{\link{terradish}}, \code{\link{conductance_surface}},
   \code{\link{plot.terradish}}
+
+Other model fitting:
+\code{\link[=terradish]{terradish()}},
+\code{\link[=terradish_algorithm]{terradish_algorithm()}},
+\code{\link[=terradish_distance]{terradish_distance()}},
+\code{\link[=terradish_grid]{terradish_grid()}},
+\code{\link{terradish_methods}}
 }
+\concept{model fitting}

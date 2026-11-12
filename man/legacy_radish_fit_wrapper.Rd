@@ -13,7 +13,8 @@ compatibility wrapper to \code{\link{terradish}}.}
 }
 \value{
 An object of class \code{c("terradish", "radish")}, a list. Most
-  users need only the methods: \code{summary()} for estimates and intervals,
+  users need only the methods: \code{summary()} for estimates, standard
+  errors, and nuisance-parameter intervals,
   \code{coef()} and \code{confint()} for conductance coefficients,
   \code{conductance()} and \code{plot()} for maps and curves, and
   \code{AIC()}, \code{anova()}, or \code{\link{aic_table}} for comparison
@@ -62,5 +63,8 @@ An object of class \code{c("terradish", "radish")}, a list. Most
 \description{
 Deprecated compatibility wrapper retained for older code that still calls
 \code{radish()}.
+}
+\seealso{
+\code{\link{radish_compatibility}}
 }
 \keyword{internal}

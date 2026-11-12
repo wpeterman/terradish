@@ -1,5 +1,5 @@
 ---
-title: "Isolation by Environment and Resistance"
+title: "08. Isolation by Environment and Resistance"
 author: "Bill Peterman"
 output:
   rmarkdown::html_vignette:
@@ -9,7 +9,7 @@ output:
     mathjax: null
     pandoc_args: ["--mathml"]
 vignette: >
-  %\VignetteIndexEntry{Isolation by Environment and Resistance}
+  %\VignetteIndexEntry{08. Isolation by Environment and Resistance}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -17,7 +17,7 @@ vignette: >
 The displayed results and figures in this guide were computed from the
 executable R Markdown source shipped with the package. Routine package
 checks use these precomputed results to keep the CRAN check time modest.
-To rerun every code chunk, copy `system.file("vignette-source", "ibe-ibr-workflow.Rmd", package = "terradish")` to a writable directory and render that copy with `rmarkdown::render()`.
+To rerun every code chunk, copy `system.file("vignette-source", "v08-ibe-ibr-workflow.Rmd", package = "terradish")` to a writable directory and render that copy with `rmarkdown::render()`.
 
 ---
 
@@ -31,7 +31,7 @@ difference between the ponds themselves. This guide shows you how to fit
 both in one model, read each coefficient, and test whether the
 environmental term improves prediction. The basic MLPE (maximum likelihood
 population effects) workflow for pairwise genetic distances is in
-[`vignette("mlpe-pairwise-distance", package = "terradish")`](mlpe-pairwise-distance.html),
+[`vignette("v03-mlpe-pairwise-distance", package = "terradish")`](v03-mlpe-pairwise-distance.html),
 and this guide extends it with environmental differences.
 
 ## Three environmental hypotheses that should stay distinct
@@ -41,7 +41,7 @@ open land between them pose an IBR question. Two ponds joined by similar
 forest routes but with very different hydroperiods pose an endpoint
 environment question. Resistance and endpoint differences can be associated
 with the same genetic pattern, but they enter models differently.
-[`vignette("getting-started", package = "terradish")`](getting-started.html)
+[`vignette("v01-getting-started", package = "terradish")`](v01-getting-started.html)
 introduces the Ohio pond genotypes and resistance graph used here.
 
 This guide distinguishes:
@@ -97,6 +97,10 @@ standardized hydroperiod, so a value of one means the ponds differ by one
 full-site SD, not one day. Attributes store the site values and transform
 for spatial validation. Site order must match the genetic matrix and the
 graph's focal ponds.
+
+`dist_from_cov()` returns **squared** genetic distances, so `D_snp` and
+every MLPE response in this guide are squared distances. The text below
+says "genetic distance" for short, and the plot labels spell out "squared".
 
 ## Define the two measurement constructions
 
@@ -158,7 +162,7 @@ represent a negative MLPE slope.
 <details>
 <summary>Optional: absolute differences, squared differences, and similarity kernels</summary>
 
-### This kernel is not a Gaussian similarity kernel
+**This kernel is not a Gaussian similarity kernel.**
 
 The default `absdiff` uses $\Delta_{ij}=|z_i-z_j|$, and `sqdiff` uses
 $(z_i-z_j)^2$, whose centered kernel is a rank-one outer product. Neither
@@ -206,7 +210,10 @@ because the tables use different responses and likelihoods. In the
 Wishart table the kernel weight sits at its lower bound of zero
 (`boundary = TRUE`), so the log-likelihood is unchanged and the extra
 parameter costs exactly 2 AIC units. Do not report a symmetric interval
-around this boundary estimate. In the MLPE table the hydroperiod
+around this boundary estimate. When you run this chunk, `aic_table()` warns
+that a model has a parameter on a boundary, and this kernel weight is the
+parameter it means. The `K` column counts estimated parameters and is
+unrelated to the kernel matrix `K` built above. In the MLPE table the hydroperiod
 difference raises the log-likelihood by only
 0.46,
 less than its penalty, so IBR alone ranks first. Both results match the
@@ -391,14 +398,14 @@ ggplot(change, aes(covariate, estimate)) +
                     y = "Expected change in squared genetic distance")
 ```
 
-![Expected genetic-distance change across the 10th-to-90th percentile environmental contrast in the MLPE example. The interval is conditional on the fitted conductance surface.](precomputed/ibe-ibr-workflow-ibe-contrast-1.png)
+![Expected genetic-distance change across the 10th-to-90th percentile environmental contrast in the MLPE example. The interval is conditional on the fitted conductance surface.](precomputed/v08-ibe-ibr-workflow-ibe-contrast-1.png)
 
 **How to read the output.** `low` and `high` are the 10th and 90th
 percentiles of the pairwise hydroperiod difference, in SD units.
 `estimate` is the expected change in squared genetic distance across
 that contrast, holding resistance fixed, about
-0.24, with a 95% interval of
-0.23 to 0.24.
+0.240, with a 95% interval of
+0.235 to 0.245.
 It equals the environmental slope times the width of the contrast. A
 positive value means ponds with more different hydroperiods are more
 genetically different at the same landscape resistance.
@@ -408,7 +415,7 @@ genetically different at the same landscape resistance.
 plot(fit_cov, type = "fit")
 ```
 
-![Observed and fitted covariance for the environmental-covariance example. Each point is a modeled covariance entry, not an independent replicate.](precomputed/ibe-ibr-workflow-covariance-diagnostic-1.png)
+![Observed and fitted covariance for the environmental-covariance example. Each point is a modeled covariance entry, not an independent replicate.](precomputed/v08-ibe-ibr-workflow-covariance-diagnostic-1.png)
 
 **How to read the plot.** This checks the combined graph and
 environmental covariance against the response. Pond variances (the
@@ -460,15 +467,22 @@ was built with one. To validate an MLPE extension, run the same call with
 `D_benchmark` and the models `mlpe` and `g_mlpe`, and keep those scores
 separate from the Wishart scores.
 
+Do not compare the two rows with `total_loglik_gain` or `mean_loglik_gain`.
+No uniform candidate is listed here, so the default `baseline = TRUE`
+scores a uniform-conductance baseline separately for each row, using that
+row's own measurement model. The two gains therefore rest on different
+baselines. Use `total_loglik` and `mean_difference`, which share one scale.
+`terradish_cv_folds()` scores only pairs of ponds within each held-out
+block, and the
+[spatial prediction section of the model-comparison guide](v04-model-comparison.html#compare-spatial-prediction)
+explains that rule and the remaining summary columns.
+
 ## Interpreting IBE in field data
 
 Environmental differences and resistance are often spatially correlated,
 so neither model separates causal IBE from IBR on its own. Report the
 environmental coefficient as a conditional association, along with its
 transform, scaling, likelihood, and, for Wishart fits, `nu`.
-
-<details>
-<summary>Quick reference: expand for the complete copyable workflow</summary>
 
 ## Quick reference: SNP negative-control construction
 
@@ -502,8 +516,6 @@ summary(fit_mlpe)
 # Hydroperiod has no generating effect in this SLiM pond history.
 ```
 
-</details>
-
 ## Summary of key functions
 
 | Function | Purpose |
@@ -517,19 +529,19 @@ summary(fit_mlpe)
 
 ## See also
 
-- [`vignette("getting-started", package = "terradish")`](getting-started.html): SNP and
+- [`vignette("v01-getting-started", package = "terradish")`](v01-getting-started.html): SNP and
   microsatellite inputs and likelihood choice.
-- [`vignette("mlpe-pairwise-distance", package = "terradish")`](mlpe-pairwise-distance.html):
+- [`vignette("v03-mlpe-pairwise-distance", package = "terradish")`](v03-mlpe-pairwise-distance.html):
   fitting pairwise genetic distances with MLPE and reading its summary.
-- [`vignette("gaussian-scale-optimization", package = "terradish")`](gaussian-scale-optimization.html):
+- [`vignette("v07-gaussian-scale-optimization", package = "terradish")`](v07-gaussian-scale-optimization.html):
   spatial forest context, rather than endpoint differences.
-- [`vignette("model-comparison", package = "terradish")`](model-comparison.html): compatible
+- [`vignette("v04-model-comparison", package = "terradish")`](v04-model-comparison.html): compatible
   model comparisons and information sensitivity.
-- [`vignette("simulation-design", package = "terradish")`](simulation-design.html): statistical
+- [`vignette("v10-simulation-design", package = "terradish")`](v10-simulation-design.html): statistical
   response simulation and the limits of internal benchmarks.
-- [`vignette("wishart-covariance", package = "terradish")`](wishart-covariance.html):
+- [`vignette("v02-wishart-covariance", package = "terradish")`](v02-wishart-covariance.html):
   choosing a covariance response or an MLPE pairwise distance.
-- [`vignette("individual-salamanders", package = "terradish")`](individual-salamanders.html):
+- [`vignette("v09-individual-salamanders", package = "terradish")`](v09-individual-salamanders.html):
   individual genotypes, nonlinear resistance, and endpoint IBE terms.
-- [`vignette("data-generation", package = "terradish")`](data-generation.html):
+- [`vignette("v12-data-generation", package = "terradish")`](v12-data-generation.html):
   how the pond history and hydroperiod values were simulated.

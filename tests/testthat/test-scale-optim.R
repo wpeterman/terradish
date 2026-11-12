@@ -42,22 +42,27 @@ test_that("terra_radish_scale_optim alias supports coordinate search", {
   covariates <- dat$covariates[["altitude"]]
   names(covariates) <- "altitude"
 
-  opt <- terra_radish_scale_optim(
-    melip.Fst ~ altitude,
-    covariates = covariates,
-    coords = dat$coords,
-    scales = c(altitude = 1.5),
-    lower = c(altitude = 1),
-    upper = c(altitude = 2),
-    search = "coordinate",
-    maxit = 1,
-    tol = 0,
-    scale_fun = toy_scale_fun,
-    postprocess = scale_covariates,
-    measurement_model = leastsquares,
-    optimizer = "bfgs",
-    control = NewtonRaphsonControl(maxit = 2, verbose = FALSE),
-    verbose = FALSE
+  # The legacy name now signals the same deprecation warning as the other
+  # radish wrappers before forwarding its arguments unchanged.
+  opt <- expect_fixture_warnings(
+    terra_radish_scale_optim(
+      melip.Fst ~ altitude,
+      covariates = covariates,
+      coords = dat$coords,
+      scales = c(altitude = 1.5),
+      lower = c(altitude = 1),
+      upper = c(altitude = 2),
+      search = "coordinate",
+      maxit = 1,
+      tol = 0,
+      scale_fun = toy_scale_fun,
+      postprocess = scale_covariates,
+      measurement_model = leastsquares,
+      optimizer = "bfgs",
+      control = NewtonRaphsonControl(maxit = 2, verbose = FALSE),
+      verbose = FALSE
+    ),
+    "deprecated"
   )
 
   expect_true(opt$par[["altitude"]] >= 1)

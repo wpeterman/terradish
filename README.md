@@ -1,23 +1,54 @@
-# terradish <img src="man/figures/terradish-sticker.png" align="right" height="200"/>
+# terradish <img src="man/figures/terradish-sticker.png" align="right" height="139" alt="terradish logo" />
 
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21225711.svg)](https://doi.org/10.5281/zenodo.21225711)
+| CI | CRAN | R-universe | License | Archive |
+|:---|:---|:---|:---|:---|
+| [![R-CMD-check](https://github.com/wpeterman/terradish/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/wpeterman/terradish/actions/workflows/R-CMD-check.yaml) | [![CRAN status](https://www.r-pkg.org/badges/version/terradish)](https://CRAN.R-project.org/package=terradish) | [![R-universe version](https://wpeterman.r-universe.dev/terradish/badges/version)](https://wpeterman.r-universe.dev/terradish) | [![License: BSD 3-Clause](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause) | [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21225711.svg)](https://doi.org/10.5281/zenodo.21225711) |
+| [![codecov](https://codecov.io/gh/wpeterman/terradish/graph/badge.svg)](https://app.codecov.io/gh/wpeterman/terradish) [![pkgdown](https://github.com/wpeterman/terradish/actions/workflows/pkgdown.yaml/badge.svg)](https://github.com/wpeterman/terradish/actions/workflows/pkgdown.yaml) | [![CRAN downloads](https://cranlogs.r-pkg.org/badges/grand-total/terradish)](https://CRAN.R-project.org/package=terradish) | [![R-universe checks](https://wpeterman.r-universe.dev/terradish/badges/checks)](https://wpeterman.r-universe.dev/terradish) | | |
 
-terradish estimates landscape conductance surfaces from genetic data by maximum likelihood on a raster graph. It fits log-linear conductance models and can optionally estimate each covariate's Gaussian smoothing scale and spline shape. Models fit pairwise genetic distances through the MLPE likelihood, or allele-frequency covariance and squared distances derived from it through a Wishart likelihood on site contrasts. Both families accept the same pairwise environmental covariates alongside resistance. Exact sparse Cholesky and algebraic multigrid solvers handle large rasters. Fixed-domain spatial cross-validation compares conductance formulas.
+## Overview
+
+terradish estimates landscape conductance surfaces from genetic data by maximum likelihood on a raster graph. It fits log-linear conductance models and can optionally estimate each covariate's Gaussian smoothing scale and spline shape.
+
+Models fit pairwise genetic distances through the MLPE likelihood, or allele-frequency covariance and squared distances derived from it through a Wishart likelihood on site contrasts. Both families accept the same pairwise environmental covariates alongside resistance. Exact sparse Cholesky and algebraic multigrid solvers handle large rasters. Fixed-domain spatial cross-validation compares conductance formulas.
 
 Estimated coefficients describe relative conductance and are conditional on the measurement-model terms. They do not directly estimate movement, migration, or causal landscape effects. For Wishart likelihoods, the user-supplied information parameter `nu` controls inferential precision. Using the SNP count overstated information by roughly an order of magnitude in the package's forward-time validation experiments.
 
+## Citation
+
+To cite terradish or acknowledge its use, run `citation("terradish")` for the current reference and a BibTeX entry. The archived releases share the DOI [10.5281/zenodo.21225711](https://doi.org/10.5281/zenodo.21225711).
+
+Fitting one parameterized conductance surface to genetic data, in place of regressing on separate resistance distances, follows Peterman and Pope (2021), [doi:10.1111/mec.15716](https://doi.org/10.1111/mec.15716).
+
 ## Installation
 
-The supported core requires landgraph version 0.0.3 or later. Install a compatible companion version before terradish:
+There are three ways to install terradish:
 
 ```r
-remotes::install_github("wpeterman/landgraph")
+# Get the released version from CRAN
+install.packages("terradish")
+
+# Get the development version as a prebuilt binary from R-universe
+install.packages(
+  "terradish",
+  repos = c("https://wpeterman.r-universe.dev", "https://cloud.r-project.org")
+)
+
+# Alternatively, build the development version from GitHub source
+# install.packages("remotes")
 remotes::install_github("wpeterman/terradish")
 ```
 
-For local development with both repositories checked out side by side, install landgraph from its checkout first. The terradish CRAN release depends on that companion version being available on CRAN.
+R-universe rebuilds terradish from GitHub after each change and provides binaries for Windows and macOS, so the development version installs without a compiler. Building from GitHub source compiles the package's C++ code, which requires Rtools on Windows or the Xcode command line tools on macOS.
 
-## Quick start
+terradish requires the companion package landgraph, version 0.0.3 or later. All three routes install it automatically.
+
+## Using terradish
+
+The full documentation, with every guide and help page, is at <https://wpeterman.github.io/terradish/>.
+
+A terradish analysis has three steps: build a raster graph from covariates and sampling locations with `conductance_surface()`, fit a conductance model to a genetic response with `terradish()`, and then check, compare, and map the fit.
+
+### Quick start
 
 ```r
 library(terradish)
@@ -31,10 +62,16 @@ sites <- terra::unwrap(melip.coords)
 covariates <- c(altitude, forestcover)
 names(covariates) <- c("altitude", "forestcover")
 covariates <- scale_covariates(covariates)
+
+# A few sites fall in the same raster cell. Keep one site per cell so that
+# each graph vertex holds one sampled population.
+keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(sites)))
+sites <- sites[keep]
+Fst <- melip.Fst[keep, keep]
 graph <- conductance_surface(covariates, sites)  # eight neighbors by default
 
 # MLPE accounts for shared sampling sites among pairwise genetic distances.
-fit <- terradish(melip.Fst ~ forestcover + altitude, graph,
+fit <- terradish(Fst ~ forestcover + altitude, graph,
                  measurement_model = mlpe)
 fit$convergence
 summary(fit)
@@ -81,7 +118,7 @@ projected_sites <- terra::project(sites, local_crs)
 pairwise <- pairwise_covariates(environment,
   geographic_100km = dist(terra::crds(projected_sites)) / 100000)
 
-joint <- terradish(melip.Fst ~ forestcover + altitude, graph,
+joint <- terradish(Fst ~ forestcover + altitude, graph,
                    measurement_model = mlpe_covariates(pairwise))
 terradish_ibe_ratio(joint)
 
@@ -107,7 +144,7 @@ New-landscape prediction reuses fitted log-linear terms, spline knots and center
 
 `solver = "auto"` selects AMG above the large-graph threshold regardless of the number of right-hand sides. AMG iteration counts can increase with conductance contrast. Experimental parallel derivatives use PSOCK workers for Hessian and partial solves; AMG and cached CHOLMOD ignore `cores`.
 
-Cropping changes resistance. One audit found increases of 15–23% with a two-cell buffer and 1–2% with ten cells. These are case-specific results: compare larger-buffer refits. Landmark and coarse-raster starts require exact refinement; `terradish_grid()` supports exact evaluation only. `terradish_assess_settings()` is a speed probe, not a convergence or statistical check.
+Cropping changes resistance. One unpublished development check found increases of 15 to 23% with a two-cell buffer and 1 to 2% with ten cells. These are case-specific results: compare larger-buffer refits. Landmark and coarse-raster starts require exact refinement; `terradish_grid()` supports exact evaluation only. `terradish_assess_settings()` is a speed probe, not a convergence or statistical check.
 
 ## Experimental features
 
@@ -117,19 +154,29 @@ Directed conductance, hierarchical fields, site-specific drift terms, pair subse
 remotes::install_github("wpeterman/terradish@experimental")
 ```
 
-## Changes in 1.0.0
+## Guides
 
-- The supported core concentrates on log-linear, Gaussian, and spline conductance with MLPE and contrast Wishart likelihoods.
-- Graphs use eight directions by default. Gaussian alignment, kernel bounds, spline prediction, and environmental kernels are corrected.
-- Convergence records, covariance and interval methods, Gaussian profiles, IBE ratios, and `nu` sensitivity are available.
-- Fixed-domain CV supports per-formula factories, fixed nuisance prediction, repeated folds, failure accounting, and compatible checkpoints.
-- Stored scaling, new-landscape prediction, combined pairwise covariates, and `nu_fit` sensitivity are supported.
-- Research prototypes and unsupported solvers have moved off the supported core. See `NEWS.md` for migration details.
+The guides are numbered in reading order. Start with `vignette("v01-getting-started", package = "terradish")`, or with `vignette("v03-mlpe-pairwise-distance", package = "terradish")` if your data are a pairwise genetic distance matrix such as FST. Open the collection with `browseVignettes("terradish")`.
 
-## Vignettes and attribution
+| Guide | Question it answers |
+|:---|:---|
+| `v01-getting-started` | How do I run one complete analysis, from genotypes to a conductance map? |
+| `v02-wishart-covariance` | Which genetic covariance response should I model, and is it admissible? |
+| `v03-mlpe-pairwise-distance` | How do I fit and read a model of pairwise genetic distances? |
+| `v04-model-comparison` | Which candidate model do information criteria and spatial cross-validation support? |
+| `v05-categorical-conductance` | How do I fit and interpret land-cover classes? |
+| `v06-spline-conductance` | Does a curved association predict better than a straight one? |
+| `v07-gaussian-scale-optimization` | Over what neighborhood does a covariate act? |
+| `v08-ibe-ibr-workflow` | Do environmental differences matter beyond resistance? |
+| `v09-individual-salamanders` | How do individual genotypes reveal a nonlinear resistance response? |
+| `v10-simulation-design` | How many sites would a study need? |
+| `v11-large-landscapes` | Which solver, storage, and domain settings suit a large raster? |
+| `v12-data-generation` | How were the bundled salamander data simulated? |
 
-Start with `vignette("getting-started", package = "terradish")`, or with `vignette("mlpe-pairwise-distance", package = "terradish")` if your data are a pairwise genetic distance matrix such as FST. Other guides cover comparison, IBE and IBR, Wishart covariance, splines, Gaussian scales, large landscapes, and simulation design. Open the collection with `browseVignettes("terradish")`.
+Changes in each release are listed in `NEWS.md` and in the website changelog.
+
+## Attribution
 
 Nate Pope developed the sparse graph optimization, reverse-mode derivatives, MLPE, and generalized Wishart foundations in [radish](https://github.com/nspope/radish). terradish extends that framework with terra-native workflows and the supported features above. Selected deprecated `radish*` wrappers remain; full compatibility with every historical entry point is not promised.
 
-Contact Bill Peterman (Peterman.73@osu.edu) or submit an issue on GitHub for bug reports and feature requests.
+Report bugs and request features through the [issue tracker](https://github.com/wpeterman/terradish/issues).

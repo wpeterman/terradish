@@ -1,0 +1,386 @@
+---
+title: "10. Simulating Covariance Data to Plan a Study"
+author: "Bill Peterman"
+output:
+  rmarkdown::html_vignette:
+    number_sections: true
+    toc: true
+    self_contained: true
+    mathjax: null
+    pandoc_args: ["--mathml"]
+vignette: >
+  %\VignetteIndexEntry{10. Simulating Covariance Data to Plan a Study}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
+  fig.width = 6, fig.height = 4.5, warning = FALSE, message = FALSE, error = FALSE)
+options(width = 100)
+```
+
+**Goal.** Simulate a response under stated assumptions, compare sampling designs with a small power sweep, and read the resulting tables.
+
+The [data-generation guide](v12-data-generation.html) explains the landscapes,
+SLiM histories, sampling, and matched markers used in these examples. Open it
+in R with `vignette("v12-data-generation", package = "terradish")`.
+
+## How many ponds would you sample?
+
+Suppose field effort allows visits to 12, 18, or all 24 candidate ponds,
+and before sampling you want to know whether those designs can recover a
+specified forest association. This guide sets up that question on the Ohio
+pond landscape from
+[`vignette("v01-getting-started", package = "terradish")`](v01-getting-started.html).
+
+The response is drawn directly from a covariance model.
+**These are new statistical draws, not the SLiM SNPs or microsatellites.**
+They give a fast check of recovery when the analysis model is correct,
+whereas SLiM generates ancestry and mutations through a biological process
+that need not obey the fitted likelihood.
+
+The guide first runs one draw and one fit, then a reduced design sweep
+that is small enough to compute here. One successful fit cannot establish
+statistical power, interval coverage, or field sample size, and the reduced
+sweep shows how to read the tables, not how many ponds a real study needs.
+
+## Keep the landscape and specify a new response
+
+```{r template}
+library(terradish)
+library(terra)
+data(ohio_ponds)
+ponds <- ohio_ponds$ponds
+
+# Reuse the forest context, full graph, and candidate pond locations.
+# saveStack retains the raster needed when designs subset focal ponds.
+x <- scale_covariates(c(unwrap(ohio_ponds$forest500),
+                        unwrap(ohio_ponds$covariates)[["slope"]]))
+surface <- conductance_surface(x, ponds[c("x", "y")],
+  directions = 8, saveStack = TRUE)
+c(candidate_ponds = length(surface$demes), resolution_m = res(x)[1])
+
+# A declared one-SD association, not an estimate from the SLiM data.
+theta_true <- c(forest500 = 0.6)
+tau_true <- 2
+variance_true <- 1
+```
+
+**How to read the setup.** Each design selects ponds from the same 24
+candidates while retaining routes through the full 100 m landscape.
+The forest coefficient 0.6 implies a conductance ratio of `exp(0.6)`,
+about 1.82, per standard deviation of forest context. Fixing context at
+500 m isolates the site-design question from scale estimation.
+
+The simulator uses
+
+$$\Sigma=\tau E(\theta)+vI,\qquad
+\nu S\sim\mathrm{Wishart}(\nu,\Sigma).$$
+
+Here $E$ is graph covariance, $\tau$ weights it, and $v$ is additional
+diagonal variance. The `sigma` argument of the simulation call takes $v$
+itself, but the fitted measurement parameter named `sigma` is $\log(v)$.
+Neither is the Gaussian raster-smoothing scale.
+
+Generating with `nu = 100` sets how noisy each simulated response is, not
+how many SNPs would supply that information. The simulator requires `nu`
+of at least the number of sampled ponds (24 here).
+
+## Generate once and inspect recovery
+
+```{r single-fit}
+# One simulated covariance among all 24 ponds, then one fit to it.
+sim <- simulate_covariance_response(theta_true, ~ forest500, surface,
+  tau = tau_true, sigma = variance_true, nu = 100, seed = 1)
+control <- NewtonRaphsonControl(maxit = 200, ctol = 1e-8, ftol = 1e-8)
+fit <- terradish(sim$covariance ~ forest500, surface,
+  measurement_model = wishart_covariance, nu = 100,
+  optimizer = "bfgs", control = control)
+stopifnot(fit$convergence$code == 0,
+          fit$fit$subproblem$convergence == 0)
+rbind(generating = theta_true, estimated = coef(fit))
+confint(fit)
+```
+
+**How to read the output.** The estimated forest coefficient is
+`r round(coef(fit)[["forest500"]], 2)`, against the generating 0.6, and
+its 95% interval
+(`r paste(round(confint(fit), 2), collapse = " to ")`)
+`r if (confint(fit)[1, 1] <= 0.6 && confint(fit)[1, 2] >= 0.6) "contains" else "misses"`
+the true value. Only a design sweep can estimate how often such intervals
+do. When you run these calls, R warns "Removed unused spatial covariates:
+slope" each time a formula leaves `slope` out. The warning is harmless
+here, because `slope` stays in the raster stack for the two-covariate
+candidate fitted below. This guide hides warnings in its displayed output.
+
+```{r recovery-plot, fig.cap = "One simulated covariance: observed versus fitted values."}
+plot(fit, type = "fit")
+```
+
+**How to read the plot.** The upper cluster holds the 24 pond variances
+and the lower cluster the covariances between ponds. The blue line is a
+least-squares fit, not the 1:1 line. Most visual agreement comes from
+separating variances from covariances, so judge the fit within the lower
+cluster. `plot(fit, type = "marginal", data = surface)` shows the fitted
+forest-conductance curve for comparison with `exp(0.6 * x)`.
+
+## Compare site designs without changing the question
+
+Before a design sweep, choose a recovery target, plausible effect sizes, a
+range of information assumptions, and a computation budget. The sweep
+below compares spatially spread (`"spacefill"`) and randomly selected
+ponds. `sample_sizes` counts **ponds**, not animals per pond or loci, so
+the helper does not simulate the benefit of collecting 15 versus 30
+animals at a pond.
+
+```{r reading-helpers, include = FALSE}
+# Helpers for the numbers quoted in the prose; they do not change any result.
+pick <- function(tab, strategy, size, model, column)
+  tab[tab$strategy == strategy & tab$sample_size == size & tab$model == model, column]
+fmt <- function(x, digits = 2) format(round(x, digits), nsmall = digits)
+```
+
+```{r design-sweep}
+# A reduced sweep: 30 simulated responses per design keep this guide quick
+# to build. Use nsim = 200 or more for a real study (see the fit count below).
+# Both candidate models are fitted to the same response in each replicate.
+sweep_seconds <- system.time(
+  power <- covariance_response_power(
+    theta = theta_true, formula = ~ forest500, data = surface,
+    sample_sizes = c(12, 18, 24), strategies = c("spacefill", "random"),
+    fit_models = list(forest = list(formula = ~ forest500),
+                      forest_slope = list(formula = ~ forest500 + slope)),
+    tau = tau_true, sigma = variance_true,
+    nu = 100, nu_fit = 100, nsim = 30, n_designs = 2, seed = 905,
+    optimizer = "bfgs", cores = 1, control = control)
+)[["elapsed"]]
+
+# Scenario-level summary: fitting success, surface recovery, model selection.
+scenario <- power$summary[, c("strategy", "sample_size", "model", "n_replicates",
+  "fit_rate", "conductance_power", "selected_AIC_rate")]
+print(scenario[order(scenario$model, scenario$strategy, scenario$sample_size), ],
+      digits = 2, row.names = FALSE)
+```
+
+**How to read the scenario table.** `n_replicates` is the denominator of
+every rate in its row, so read it first. Space-filling selection is
+deterministic: each sample size has one space-filling design, evaluated on
+`nsim = 30` simulated responses. `n_designs = 2` multiplies only the random
+designs, which therefore have 60 replicates. At 24 ponds both strategies
+use every candidate pond, so those rows describe the same design and
+differ only through their simulated draws.
+
+Read `fit_rate` next, because failed fits are part of the assessment, not
+rows to discard. Here it ranges from
+`r fmt(min(power$summary$fit_rate))` to `r fmt(max(power$summary$fit_rate))`
+across all rows. `conductance_power` is the fraction of replicates whose
+fitted surface correlates with the generating surface above 0.9. For the
+`forest` model with space-filling designs it is
+`r fmt(pick(power$summary, "spacefill", 12, "forest", "conductance_power"))`,
+`r fmt(pick(power$summary, "spacefill", 18, "forest", "conductance_power"))`, and
+`r fmt(pick(power$summary, "spacefill", 24, "forest", "conductance_power"))`
+at 12, 18, and 24 ponds. Slope has no generating effect, so
+`selected_AIC_rate` shows how often AIC prefers unneeded structure: with
+space-filling designs the `forest_slope` model ranks first in
+`r fmt(pick(power$summary, "spacefill", 12, "forest_slope", "selected_AIC_rate"))`,
+`r fmt(pick(power$summary, "spacefill", 18, "forest_slope", "selected_AIC_rate"))`, and
+`r fmt(pick(power$summary, "spacefill", 24, "forest_slope", "selected_AIC_rate"))`
+of replicates at the three sample sizes.
+
+```{r design-parameters}
+# Parameter-level summary for the forest coefficient (generating value 0.6).
+recovery <- power$parameter_summary[, c("strategy", "sample_size", "model",
+  "n_replicates", "power", "coverage", "bias", "rmse")]
+
+# Monte Carlo standard error of each power estimate, from its own denominator.
+recovery$mc_se <- sqrt(recovery$power * (1 - recovery$power) / recovery$n_replicates)
+print(recovery[order(recovery$model, recovery$strategy, recovery$sample_size), ],
+      digits = 2, row.names = FALSE)
+```
+
+**How to read the parameter table.** Each row describes the forest
+coefficient under one design and one fitted model. `power` is the fraction
+of replicates that detect the generating sign at the 0.05 level, and
+`coverage` is the fraction of intervals that contain 0.6. For the `forest`
+model with space-filling designs, power is
+`r fmt(pick(power$parameter_summary, "spacefill", 12, "forest", "power"))`,
+`r fmt(pick(power$parameter_summary, "spacefill", 18, "forest", "power"))`, and
+`r fmt(pick(power$parameter_summary, "spacefill", 24, "forest", "power"))`
+at 12, 18, and 24 ponds, with coverage of
+`r fmt(pick(power$parameter_summary, "spacefill", 12, "forest", "coverage"))`,
+`r fmt(pick(power$parameter_summary, "spacefill", 18, "forest", "coverage"))`, and
+`r fmt(pick(power$parameter_summary, "spacefill", 24, "forest", "coverage"))`.
+The same model with random designs has power of
+`r fmt(pick(power$parameter_summary, "random", 12, "forest", "power"))` and
+`r fmt(pick(power$parameter_summary, "random", 18, "forest", "power"))`
+at 12 and 18 ponds. Root mean squared error for the space-filling `forest`
+rows is
+`r fmt(pick(power$parameter_summary, "spacefill", 12, "forest", "rmse"))`,
+`r fmt(pick(power$parameter_summary, "spacefill", 18, "forest", "rmse"))`, and
+`r fmt(pick(power$parameter_summary, "spacefill", 24, "forest", "rmse"))`.
+
+The `mc_se` column is $\sqrt{p(1-p)/B}$, with $B$ taken from
+`n_replicates`. Its largest value here is
+`r fmt(max(recovery$mc_se), 3)`, so this reduced sweep cannot resolve
+differences in power smaller than about
+`r fmt(2 * max(recovery$mc_se))`
+(two standard errors). Treat smaller gaps between rows as noise, and
+increase `nsim` before you rank designs that close.
+
+**What the sweep says about the opening question.** Under these declared
+assumptions, 12 ponds are too few. Either strategy detects the forest
+association in about two thirds of replicates or fewer, and the space-filling
+design at 12 ponds also loses fits, covers the true value less often than
+the nominal 95%, and has a much larger error than any other row, which
+signals unstable estimates. At 18 and 24 ponds power exceeds 0.9, and the
+gap between those two sizes is within Monte Carlo error. Of the three
+designs, 18 ponds is therefore the smallest that recovers this association
+reliably. That answer holds only for this effect size, this `nu`, and a
+correctly specified model, so repeat the sweep across the plausible range
+of each before you commit field effort.
+
+**Why the 12-pond space-filling row looks worse.** The row describes one
+design, not the strategy. Space-filling selection keeps the 12 ponds that
+are farthest apart (median nearest-neighbor distance about 2.3 km, against
+about 1.4 km for a random draw of 12), and widely separated ponds share
+little covariance for the forest coefficient to explain. A follow-up run
+of 150 responses for this design gave a median estimate of 0.62, close to
+the generating 0.6, with a few weakly identified fits far in the right
+tail whose intervals were correspondingly wide. Those few fits produce the
+large bias and error. Single random designs of 12 ponds vary as much: in
+12 random designs with 30 responses each, error ranged from 0.21 to 1.30
+and fit rate from 0.90 to 1.00. The pooled `random` row averages over
+that variation, and the space-filling row cannot. Use `n_designs` greater
+than 1 to see between-design variation for random selection, and do not
+read one row as a verdict on a strategy.
+
+**What the sweep cost.** It fitted `r nrow(power$results)` models (3
+sample sizes, 90 simulated responses each, 2 candidate models) in about
+`r round(sweep_seconds / 60)` minutes on one core of the machine that built
+this guide. The same call with `nsim = 200` fits 3,600 models and takes
+roughly seven times as long. Start with `nsim = 5` to check runtime and
+failures, then increase replication.
+
+The tables carry more columns than the two prints show:
+
+| Quantity | Meaning | Decision it supports |
+|---|---|---|
+| `n_replicates` | Number of fits behind each rate in the row | How precise is every other column? |
+| `fit_rate` | Fraction of attempted fits that converge | Is the proposed design numerically usable? |
+| Parameter `power` | Fraction of attempts detecting the generating sign at the stated threshold | Is the specified association detected often enough? |
+| `correct_sign_rate`, `significant_rate` | The two parts of `power`: the right sign, and significance | Does low power come from wrong signs or wide intervals? |
+| `all_parameter_power` | Fraction of replicates detecting every generating parameter at once | Is the whole specified model recovered? |
+| `bias`, `rmse` | Average signed error and root mean squared error | Are estimates accurate as well as detectable? |
+| `coverage` | Fraction of available intervals containing the generating value | Is uncertainty calibrated among the intervals being summarized? |
+| `conductance_power` | Fraction recovering the spatial surface above the specified correlation threshold | Is the fitted surface pattern recovered? |
+| `mean_conductance_cor` | Average correlation between fitted and generating surfaces | How close is the typical fitted surface? |
+| `selected_AIC_rate`, `selected_AICc_rate` | Frequency a candidate ranks first in this candidate set | Does model comparison favor the generating association? |
+
+Check denominators alongside these summaries. Failed or boundary fits
+count as non-detections in parameter power, while bias and coverage depend
+on available estimates and intervals. High nominal power with poor
+coverage is not a sound design. Surface correlation measures relative
+spatial pattern, not absolute conductance or movement.
+
+## Separate data information from assumed precision
+
+`nu` sets the variability of the generated data, and `nu_fit` sets the
+information assumed when fitting. Raising only `nu_fit` narrows reported
+intervals without improving the data. Compare the two explicitly:
+
+```{r information-comparison}
+# One design (18 space-filling ponds), fitted twice to the same draws:
+# once with the generating nu, once assuming ten times the information.
+design <- list(theta = theta_true, formula = ~ forest500, data = surface,
+  sample_sizes = 18, strategies = "spacefill",
+  tau = tau_true, sigma = variance_true, nu = 100,
+  nsim = 50, seed = 905, optimizer = "bfgs", cores = 1, control = control)
+matched <- do.call(covariance_response_power, design)
+overstated <- do.call(covariance_response_power,
+  c(design, list(nu_fit = 1000)))
+information <- rbind(matched = matched$parameter_summary,
+                     overstated = overstated$parameter_summary)
+print(information[, c("n_replicates", "fit_rate", "power", "coverage",
+                      "mean_estimate", "rmse")], digits = 3)
+```
+
+**How to read this comparison.** Both runs use the same seed, so they fit
+the same 50 simulated responses. Assuming ten times the information
+changes power from
+`r fmt(information["matched", "power"])` to `r fmt(information["overstated", "power"])`
+and coverage from
+`r fmt(information["matched", "coverage"])` to `r fmt(information["overstated", "coverage"])`,
+while the mean estimate is
+`r fmt(information["matched", "mean_estimate"], 3)` and
+`r fmt(information["overstated", "mean_estimate"], 3)`.
+Overstated precision narrows the intervals without moving the estimates,
+so compare recovery, coverage, and fitting success together. Neither
+setting establishes the effective `nu` of the bundled SNP panel.
+
+## What can you take to the field?
+
+Report performance across plausible weak and strong associations instead
+of choosing the scenario that makes the smallest sample sufficient. For a
+proportion estimated from $B$ independent replicates, approximate Monte
+Carlo standard error is $\sqrt{p(1-p)/B}$. Take $B$ from the
+`n_replicates` column of the row you are reading: with $p=0.8$ the error
+is about 0.073 for 30 replicates, 0.052 for 60, and 0.028 for 200. Reused
+site designs add another layer to consider when summarizing uncertainty
+across a sweep.
+
+Save settings, seeds, all fit outcomes, package versions, and the complete
+assessment object. Keep graph resolution, buffer, and forest scaling fixed
+when comparing site counts. If the goal includes choosing a scale or
+spline complexity, simulate and evaluate that selection procedure too.
+
+## Quick reference: one draw, one fit, one small sweep
+
+```{r quick-reference, eval = FALSE}
+library(terradish)
+library(terra)
+data(ohio_ponds)
+
+# 1. Keep the full landscape and every candidate site in one graph.
+x <- scale_covariates(c(unwrap(ohio_ponds$forest500),
+                        unwrap(ohio_ponds$covariates)[["slope"]]))
+graph <- conductance_surface(x, ohio_ponds$ponds[c("x", "y")], directions = 8)
+ctl <- NewtonRaphsonControl(maxit = 200, ctol = 1e-8, ftol = 1e-8)
+
+# 2. Draw one response under declared values and check that one fit recovers it.
+sim <- simulate_covariance_response(c(forest500 = 0.6), ~ forest500, graph,
+  tau = 2, sigma = 1, nu = 100, seed = 1)
+fit <- terradish(sim$covariance ~ forest500, graph,
+  measurement_model = wishart_covariance, nu = 100,
+  optimizer = "bfgs", control = ctl)
+confint(fit)                 # does the interval contain 0.6?
+
+# 3. Sweep sample sizes and strategies; start small, then raise nsim.
+power <- covariance_response_power(
+  theta = c(forest500 = 0.6), formula = ~ forest500, data = graph,
+  sample_sizes = c(12, 18, 24), strategies = c("spacefill", "random"),
+  fit_models = list(forest = list(formula = ~ forest500),
+                    forest_slope = list(formula = ~ forest500 + slope)),
+  tau = 2, sigma = 1, nu = 100, nu_fit = 100,
+  nsim = 5, n_designs = 2, seed = 905,
+  optimizer = "bfgs", cores = 1, control = ctl)
+power$summary                # n_replicates and fit_rate first
+power$parameter_summary      # power, coverage, bias, and rmse per design
+```
+
+## Summary of key functions
+
+| Function | Purpose |
+|---|---|
+| `conductance_surface()` | Retain the landscape and candidate focal sites |
+| `simulate_covariance_response()` | Draw one response under declared statistical assumptions |
+| `terradish()` | Fit and inspect one draw before a larger assessment |
+| `covariance_response_power()` | Compare recovery across specified sampling designs |
+
+## See also
+
+- [`vignette("v01-getting-started", package = "terradish")`](v01-getting-started.html): the SLiM deme example and matched marker panels.
+- [`vignette("v02-wishart-covariance", package = "terradish")`](v02-wishart-covariance.html): response geometry and effective information.
+- [`vignette("v04-model-comparison", package = "terradish")`](v04-model-comparison.html): selection and prediction are different assessments.
+- [`vignette("v08-ibe-ibr-workflow", package = "terradish")`](v08-ibe-ibr-workflow.html): a simulated response with a known environmental component.
+- [`vignette("v11-large-landscapes", package = "terradish")`](v11-large-landscapes.html): solver settings when a design sweep requires many fits.

@@ -2,7 +2,7 @@
 % Please edit documentation in R/solver_benchmark.R
 \name{terradish_solver_benchmark}
 \alias{terradish_solver_benchmark}
-\title{Benchmark linear solver settings for a terradish graph}
+\title{Benchmark sparse Cholesky solver settings on a graph}
 \usage{
 terradish_solver_benchmark(
   data,
@@ -65,9 +65,13 @@ large enough that Cholesky factorization is a visible part of the fit time.
 \examples{
 library(terra)
 data(melip)
-melip.altitude <- terra::unwrap(melip.altitude)
-melip.coords <- terra::unwrap(melip.coords)
-surface <- conductance_surface(melip.altitude, melip.coords, directions = 8)
+altitude <- terra::unwrap(melip.altitude)
+coords <- terra::unwrap(melip.coords)
+names(altitude) <- "altitude"
+# Keep one site per raster cell (some melip sites share a cell).
+keep <- !duplicated(terra::cellFromXY(altitude, terra::crds(coords)))
+surface <- conductance_surface(altitude, coords[keep])
+# One row per setting: setup (factorization) and solve times in seconds.
 terradish_solver_benchmark(
   surface,
   factorization = c("simplicial_ldl", "simplicial_ll"),
@@ -75,3 +79,12 @@ terradish_solver_benchmark(
 )
 
 }
+\seealso{
+\code{\link{terradish_assess_settings}}, \code{\link{terradish}}
+
+Other solver settings:
+\code{\link[=print.terradish_setting_assessment]{print.terradish_setting_assessment()}},
+\code{\link[=slim_terradish]{slim_terradish()}},
+\code{\link[=terradish_assess_settings]{terradish_assess_settings()}}
+}
+\concept{solver settings}

@@ -2,7 +2,8 @@
 % Please edit documentation in R/spatial_cv.R
 \name{terradish_cv_folds}
 \alias{terradish_cv_folds}
-\title{Fixed-domain cross-validation for terradish models}
+\alias{print.terradish_cv_folds}
+\title{Spatial cross-validation of conductance formulas on a fixed graph}
 \usage{
 terradish_cv_folds(
   data,
@@ -20,6 +21,8 @@ terradish_cv_folds(
   nuisance = c("reprofile", "fixed"),
   ...
 )
+
+\method{print}{terradish_cv_folds}(x, ...)
 }
 \arguments{
 \item{data}{A prebuilt \code{terradish_graph}, usually returned by
@@ -32,8 +35,14 @@ the same response matrix and likelihood family.}
 \code{\link{terradish_folds}}, or supply study-specific labels. A list of
 fold vectors requests repeated cross-validation.}
 
-\item{model}{Measurement model function or one of \code{"mlpe"},
-\code{"wishart"}, or \code{"ls"}. With fixed nuisance parameters, a named
+\item{model}{Measurement model function or one of \code{"mlpe"}
+(\code{\link{mlpe}}), \code{"ls"} (\code{\link{leastsquares}}),
+\code{"generalized_wishart"} (\code{\link{generalized_wishart}}, a
+squared-distance response), or \code{"wishart_covariance"}
+(\code{\link{wishart_covariance}}, a covariance-matrix response). The
+short string \code{"wishart"} is kept for existing code and selects
+\code{generalized_wishart}; prefer the full names, which cannot be
+confused. With fixed nuisance parameters, a named
 list matching the formula names can compare models within one family.}
 
 \item{nu}{Effective Wishart degrees of freedom when required by the selected
@@ -67,7 +76,12 @@ parameter, including environmental coefficients, at its training estimate.}
 
 \item{...}{Additional arguments passed to \code{\link{terradish}}. An
 explicit \code{optimizer} is used for each training fit. Otherwise the
-training call tries Newton and retries with BFGS if Newton raises an error.}
+training call tries Newton and retries with BFGS if Newton raises an error.
+For \code{print()}, further arguments passed to the data-frame print
+method.}
+
+\item{x}{An object of class \code{"terradish_cv_folds"}, for
+\code{print()}.}
 }
 \value{
 An object of class \code{"terradish_cv_folds"}. Its \code{folds}
@@ -76,7 +90,33 @@ An object of class \code{"terradish_cv_folds"}. Its \code{folds}
   by formula, common-fold totals, paired differences from the best model,
   the standard error of their mean, and a one-standard-error flag.
   Repeated runs also report the SD of repeat totals over common folds.
-  Optional retained fits are stored in \code{fits}.
+  Optional retained fits are stored in \code{fits}. \code{print()} returns
+  its input invisibly.
+
+  Columns of \code{results}: \code{model}, \code{fold}, \code{repetition},
+  \code{n_train} and \code{n_test} (sites), \code{loglik} (held-out
+  log-likelihood of the trained model; larger is better),
+  \code{baseline_loglik} (the same for uniform conductance),
+  \code{loglik_gain} (their difference), \code{nuisance_iterations} and
+  \code{nuisance_convergence}, \code{elapsed_seconds}, \code{error} and
+  \code{baseline_error} (messages for failed fits or scores),
+  \code{common_fold} (\code{TRUE} when every model succeeded on that fold),
+  and \code{paired_difference} (the model's \code{loglik} minus the best
+  model's on the same fold).
+
+  Columns of \code{summary}, which \code{print()} displays with the best
+  model first: \code{folds}, \code{failed}, and \code{n_folds_ok} (fold
+  counts; read these first), \code{total_loglik} and \code{mean_loglik}
+  over all of a model's folds (\code{NA} total when any fold failed),
+  \code{common_folds_total} and \code{n_common_folds} (the total over
+  folds on which every model succeeded; models are ranked by this column),
+  \code{between_repeat_sd}, \code{total_loglik_gain} and
+  \code{mean_loglik_gain} (improvement over uniform conductance),
+  \code{mean_difference} and \code{se_difference} (mean paired difference
+  from the best model and its standard error across folds), and
+  \code{within_one_se} (\code{TRUE} when that mean difference is no larger
+  than its standard error, so the model is not clearly worse than the
+  best one).
 }
 \description{
 Fits one or more conductance formulas to each training fold while retaining
@@ -86,7 +126,8 @@ fold or held at their training estimates for predictive scoring.
 }
 \details{
 The graph domain and raster covariates remain fixed. Only the focal-site
-columns in \code{demes} and \code{rhs}, the response matrix, and any
+entries of the graph (its \code{demes} index and the matching solver
+right-hand sides), the response matrix, and any
 measurement-model site attributes are subset. This evaluates transfer to
 held-out sites within the observed landscape rather than rebuilding a new
 landscape for every fold.
@@ -127,8 +168,8 @@ covariance-Wishart models.
 }
 \section{Worked examples}{
 
-See \code{vignette("model-comparison", package = "terradish")} for pond
-comparisons and \code{vignette("individual-salamanders", package = "terradish")}
+See \code{vignette("v04-model-comparison", package = "terradish")} for pond
+comparisons and \code{vignette("v09-individual-salamanders", package = "terradish")}
 for individual sampling, matched markers, and spatial prediction plots.
 }
 
@@ -149,9 +190,25 @@ cv <- terradish_cv_folds(
   folds = folds,
   model = wishart_covariance, nu = 1000, nuisance = "fixed",
   control = NewtonRaphsonControl(maxit = 100))
-cv$summary
-# Check fold success counts before comparing common-fold predictive scores.
+# Check fold success counts (failed, n_folds_ok) before comparing the
+# common-fold predictive scores. The best model is listed first.
+cv
+cv$summary[, c("model", "n_folds_ok", "common_folds_total",
+               "mean_difference", "se_difference", "within_one_se")]
 # Random folds illustrate the call; choose ecological spatial blocks in practice.
 }
 
 }
+\seealso{
+\code{\link{terradish_folds}}, \code{\link{aic_table}},
+  \code{\link{terradish_rescale_nu}}
+
+Other inference and model comparison:
+\code{\link[=aic_table]{aic_table()}},
+\code{\link[=mlpe_response_change]{mlpe_response_change()}},
+\code{\link[=terradish_folds]{terradish_folds()}},
+\code{\link[=terradish_ibe_ratio]{terradish_ibe_ratio()}},
+\code{\link{terradish_inference}},
+\code{\link[=terradish_rescale_nu]{terradish_rescale_nu()}}
+}
+\concept{inference and model comparison}

@@ -2,7 +2,7 @@
 % Please edit documentation in R/radish_grid.R
 \name{terradish_distance}
 \alias{terradish_distance}
-\title{Resistance distances from a parameterized conductance surface}
+\title{Resistance distances on a grid of conductance parameters}
 \usage{
 terradish_distance(
   theta,
@@ -17,7 +17,9 @@ terradish_distance(
 \arguments{
 \item{theta}{A matrix of dimension (grid size) x (number of parameters)}
 
-\item{formula}{A formula with the name of a matrix of observed genetic distances on the lhs, and covariates in the creation of \code{data} on the rhs}
+\item{formula}{A formula whose right-hand side names the covariates used
+to create \code{data}. A left-hand side, if supplied, is not used, so a
+one-sided formula such as \code{~ forestcover + altitude} is sufficient.}
 
 \item{data}{An object of class \code{terradish_graph} (see
 \code{\link{conductance_surface}})}
@@ -51,28 +53,38 @@ Calculates resistance distances associated with a parameterized conductance surf
 a grid of parameter values.
 }
 \examples{
-
 library(terra)
 
 data(melip)
-melip.altitude <- terra::unwrap(melip.altitude)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords <- terra::unwrap(melip.coords)
-
-keep <- 1:10
-covariates <- terra::aggregate(c(melip.altitude, melip.forestcover),
-                               fact = 5, na.rm = TRUE)
-covariates <- scale_covariates(covariates)
+covariates <- c(terra::unwrap(melip.altitude),
+                terra::unwrap(melip.forestcover))
+coords <- terra::unwrap(melip.coords)[1:10]
 names(covariates) <- c("altitude", "forestcover")
-surface <- conductance_surface(covariates, melip.coords[keep], directions = 8)
+# Coarsened so the example runs quickly; name layers, then scale.
+covariates <- scale_covariates(terra::aggregate(covariates, fact = 5,
+                                                na.rm = TRUE))
+# Keep one site per raster cell.
+keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+surface <- conductance_surface(covariates, coords[keep])
 
 theta <- as.matrix(expand.grid(forestcover = seq(-0.5, 0.5, length.out = 3),
                                altitude = seq(-0.5, 0.5, length.out = 3)))
 
-distances <- terradish_distance(theta, ~forestcover + altitude, 
-                             surface, terradish::loglinear_conductance, cores = 1)
+distances <- terradish_distance(theta, ~ forestcover + altitude, surface)
 
-ibd <- which(theta[,1] == 0 & theta[,2] == 0)
-round(distances$distance[,,ibd], 4)
+# Resistance distances under uniform conductance (all coefficients zero)
+ibd <- which(theta[, 1] == 0 & theta[, 2] == 0)
+round(distances$distance[, , ibd], 4)
 
 }
+\seealso{
+\code{\link{terradish_grid}}, \code{\link{terradish}}
+
+Other model fitting:
+\code{\link[=conductance]{conductance()}},
+\code{\link[=terradish]{terradish()}},
+\code{\link[=terradish_algorithm]{terradish_algorithm()}},
+\code{\link[=terradish_grid]{terradish_grid()}},
+\code{\link{terradish_methods}}
+}
+\concept{model fitting}

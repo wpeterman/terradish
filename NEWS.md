@@ -1,3 +1,79 @@
+terradish (development version)
+-------------------------------
+* Fixed an intermittent hang or crash with the direct solver. When a trial
+  conductance made the reduced Laplacian not positive definite, terradish
+  raised its error from inside CHOLMOD's factorization, which left Matrix's
+  shared CHOLMOD workspace in an invalid state. A later supernodal
+  factorization in the same R session could then loop forever or crash R.
+  terradish now lets CHOLMOD finish before raising the same error. The hang
+  appeared with the supernodal factorization (`solver_control =
+  list(factorization = "supernodal_ll")`), which
+  `terradish_assess_settings()` can recommend.
+* `conductance_surface()` now forms the reduced graph Laplacian as a principal
+  submatrix of the full Laplacian instead of through a sparse projection. The
+  result is identical; graph construction on a raster of one million pixels
+  drops from more than 45 minutes to under a minute, and models can be fitted
+  on graphs of that size in minutes to tens of minutes on one core.
+* Vignettes are now numbered in reading order, from `01. Getting Started with
+  terradish` to `12. How the Salamander Example Data Were Generated`, in both
+  their titles and file names, so that R, RStudio, and CRAN list them in
+  order. Vignette names gained a numbered prefix: use, for example,
+  `vignette("v01-getting-started", package = "terradish")`.
+* Added a package website, <https://wpeterman.github.io/terradish/>, with the
+  guides grouped by purpose and the help pages grouped by task.
+* The development version is available as prebuilt binaries from R-universe,
+  <https://wpeterman.r-universe.dev>. The README gives the install command.
+* Documentation review. Help pages now describe the code where the two
+  disagreed: the `nu` guidance in `terradish_assess_settings()`, the plain-list
+  return of `NewtonRaphsonControl()` and `HagerZhangControl()`, the reserved
+  `validate` argument, the effect of `directions = 4` on resistance, and the
+  `"wishart"` shortcut in `terradish_cv_folds()`. `summary()` elements,
+  cross-validation columns, interval scales, and the model interfaces are
+  documented in full, a parameter-name glossary was added to `?terradish`'s
+  package page, help topics were retitled by task and grouped into families,
+  and `?radish_compatibility` maps the deprecated radish names.
+* Examples keep one `melip` site per raster cell and name layers before
+  scaling, so they run without warnings.
+* Vignettes state what spatial cross-validation scores (pairs within each
+  held-out block), read `within_one_se` as a descriptive flag, and name the
+  block that drives a difference. The simulation-design and large-landscapes
+  guides now show their output, and every guide has an open quick reference.
+* `DESCRIPTION` names Denis Demidov as copyright holder of the bundled AMGCL
+  library.
+* `print()` for cross-validation results lists each measurement model once.
+* `plot(fit)` with neither `type` nor `data` now draws the fit plot with a
+  message. Before, it stopped because the default type needs `data`. An
+  explicitly requested type that needs `data` still stops.
+* `simulate()` accepts only `method = "permutation"`, the one implemented
+  method; `"parametric"` always stopped with an error and is no longer offered.
+  `terradish(validate = TRUE)` now warns that the argument is deprecated and
+  ignored.
+* `NewtonRaphsonControl()` and `HagerZhangControl()` return classed lists, as
+  `ArmijoControl()` does. Their elements are unchanged.
+* `generalized_wishart()` names its nuisance parameters `tau` and `sigma`, as
+  the other measurement models do. Estimates are unchanged, but
+  `fit$fit$phi` and `summary()$phi_table` gain row names, the zero-variance
+  rule for `sigma` now applies to these fits, and cross-validation checkpoints
+  made with this model must be recomputed.
+* `terra_radish_scale_optim()` signals a deprecation warning, like the other
+  legacy radish wrappers.
+* "Removed unused spatial covariates" is raised once per call to
+  `terradish()`, `terradish_cv_folds()`, `covariance_response_power()`,
+  `terradish_scale_optim()`, `gaussian_scale_profile()`, and
+  `terradish_assess_settings()`, not once per fold or refit.
+* `terradish_cv_folds()` accepts `model = "wishart_covariance"` and
+  `model = "generalized_wishart"`. The short string `"wishart"` is unchanged
+  and still selects `generalized_wishart`.
+* `gaussian_scale_summary()` warns that `sigma` is in degrees once per
+  session for a longitude/latitude raster, not on every call. The
+  `native_unit` column still reads `"degrees"` each time.
+* The two `melip` rasters now carry distinct layer names, `altitude` and
+  `forestcover`. Their values are unchanged.
+* New test comparing `curvature = "gauss_newton"` with the exact curvature for
+  `mlpe`. Coefficients agree, but standard errors can differ materially (by
+  about a factor of two in one configuration), so `?terradish` and the
+  large-landscapes guide now advise exact standard errors for MLPE fits.
+
 terradish 1.1.0
 ----------------
 * New vignette, `vignette("mlpe-pairwise-distance")`: fitting and interpreting

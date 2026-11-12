@@ -26,6 +26,9 @@ expected:
 }
 \description{
 Deprecated S3 method retained so legacy \code{"radish"} fit objects still
-dispatch to \code{\link[graphics]{plot}}.
+dispatch to \code{\link{plot.terradish}}.
+}
+\seealso{
+\code{\link{radish_compatibility}}
 }
 \keyword{internal}

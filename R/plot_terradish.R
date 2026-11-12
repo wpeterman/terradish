@@ -1,6 +1,13 @@
-#' Plot methods for fitted terradish models
+#' Plot a fitted model: fit, surface, marginal curves, and smoothing kernels
 #'
-#' Five plot types for objects returned by \code{\link{terradish}}:
+#' Five plot types for objects returned by \code{\link{terradish}}. The
+#' default type, \code{"marginal_response"}, and the \code{"surface"} and
+#' \code{"marginal"} types need the graph, so call
+#' \code{plot(fit, data = surface)}. \code{plot(fit)} alone, with neither
+#' \code{type} nor \code{data}, shows the \code{"fit"} plot instead and says
+#' so in a message. A type that needs the graph and is requested explicitly
+#' without \code{data} stops with an error. Only \code{type = "fit"} and
+#' \code{type = "sigma"} work without \code{data}.
 #' \describe{
 #'   \item{\code{"fit"}}{Observed vs. fitted response values. Distance-response
 #'     models are shown as pairwise genetic distance against fitted resistance
@@ -11,8 +18,9 @@
 #'     interval bounds, displayed in three side-by-side panels.}
 #'   \item{\code{"marginal"}}{Marginal association of each raster covariate with
 #'     conductance, varying one covariate at a time while averaging over the
-#'     observed values of all other model covariates, with a 95\% pointwise
-#'     confidence band via the delta method. For Gaussian scale-aware
+#'     observed values of all other model covariates, with a pointwise
+#'     confidence band (95\% by default; see \code{quantile}) via the delta
+#'     method. For Gaussian scale-aware
 #'     conductance models, these curves are conditional on the fitted
 #'     \code{sigma} values and are shown on the smoothed covariate scale. For
 #'     spline-expanded conductance models from
@@ -52,7 +60,10 @@
 #'   \code{"surface"}, \code{"marginal"}, or \code{"sigma"}.
 #' @param data The \code{terradish_graph} used when fitting \code{x}. Required
 #'   for \code{type = "surface"}, \code{type = "marginal"}, and
-#'   \code{type = "marginal_response"}.
+#'   \code{type = "marginal_response"}; these types stop with an error when
+#'   they are requested explicitly and \code{data} is missing. When both
+#'   \code{type} and \code{data} are omitted, the \code{"fit"} plot is drawn
+#'   with a message.
 #' @param covariates Optional \code{SpatRaster} of covariates on their
 #'   \strong{original (unscaled)} scale. When supplied for
 #'   \code{type = "marginal"}, the x-axis of each panel is back-transformed to
@@ -73,6 +84,7 @@
 #' @param distance_unit Optional label used with
 #'   \code{distance_per_map_unit} for \code{type = "sigma"}.
 #' @param quantile Confidence level for interval bands. Default \code{0.95}.
+#'   This is the quantity that \code{confint()} calls \code{level}.
 #' @param n Number of evaluation points for each marginal-association curve.
 #'   Defaults to \code{100} for \code{"marginal_response"} (each point
 #'   requires a full Laplacian solve) and \code{200} for \code{"marginal"}.
@@ -90,9 +102,10 @@
 #' @param clamp_covariates Optional character vector of covariate names to clamp
 #'   when \code{support = "focal"}. Defaults to all numeric covariates used by
 #'   each plot type.
-#' @param ... Additional graphical parameters forwarded to
-#'   \code{\link[graphics]{plot}} (for \code{"fit"}) or ignored for the other
-#'   types.
+#' @param ... For \code{type = "fit"}, the base-style arguments
+#'   \code{xlab}, \code{ylab}, \code{main}, \code{pch}, \code{cex}, and
+#'   \code{col}; anything else is passed to the point layer
+#'   (\code{ggplot2::geom_point()}). Ignored for the other types.
 #'
 #' @return
 #' A plot object that is returned visibly so base R auto-printing works as
@@ -107,9 +120,9 @@
 #' }
 #'
 #' @section Worked examples:
-#' \code{vignette("getting-started", package = "terradish")},
-#' \code{vignette("gaussian-scale-optimization", package = "terradish")},
-#' \code{vignette("spline-conductance", package = "terradish")}.
+#' \code{vignette("v01-getting-started", package = "terradish")},
+#' \code{vignette("v07-gaussian-scale-optimization", package = "terradish")},
+#' \code{vignette("v06-spline-conductance", package = "terradish")}.
 #'
 #' @seealso \code{\link{terradish}}, \code{\link{conductance}},
 #'   \code{\link{fitted.terradish}}, \code{\link{loglinear_conductance}},
@@ -118,33 +131,36 @@
 #' @examples
 #' \donttest{
 #' data(melip)
-#' melip.altitude    <- terra::unwrap(melip.altitude)
-#' melip.forestcover <- terra::unwrap(melip.forestcover)
-#' melip.coords      <- terra::unwrap(melip.coords)
+#' covariates <- c(terra::unwrap(melip.altitude),
+#'                 terra::unwrap(melip.forestcover))
+#' coords <- terra::unwrap(melip.coords)
+#' names(covariates) <- c("altitude", "forestcover")
+#' # Coarsened so the example runs quickly; name layers, then scale.
+#' covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+#'                                                 na.rm = TRUE))
+#' # Keep one site per raster cell (some melip sites share a cell).
+#' keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+#' coords <- coords[keep]
+#' Fst <- melip.Fst[keep, keep]
+#' surface <- conductance_surface(covariates, coords)
 #'
-#' # Build surface with scaled covariates. The raster is coarsened so the
-#' # example runs quickly; use the full resolution in a real analysis.
-#' covariates_scaled <- c(melip.altitude, melip.forestcover)
-#' names(covariates_scaled) <- c("altitude", "forestcover")
-#' covariates_scaled <- terra::aggregate(covariates_scaled, fact = 3, na.rm = TRUE)
-#' covariates_scaled <- scale_covariates(covariates_scaled)
-#' surface <- conductance_surface(covariates_scaled, melip.coords,
-#'                                directions = 8, saveStack = TRUE)
+#' fit <- terradish(Fst ~ altitude + forestcover, surface,
+#'                  measurement_model = mlpe)
 #'
-#' fit <- terradish(melip.Fst ~ altitude + forestcover, surface,
-#'                  loglinear_conductance, mlpe)
+#' # The default type needs the graph: approximate response-scale marginal
+#' # associations with predictive bands.
+#' plot(fit, data = surface)
 #'
-#' # Observed vs. fitted pairwise genetic distances
+#' # Observed vs. fitted pairwise genetic distances (no graph needed).
+#' # plot(fit) with no other arguments draws this plot and says so.
 #' plot(fit, type = "fit")
 #'
 #' # Fitted conductance surface with 95% CI (three-panel figure)
 #' plot(fit, type = "surface", data = surface)
 #'
-#' # Marginal-association plots on the original covariate scale
+#' # Marginal-association plots. Because the layers were scaled with
+#' # scale_covariates(), the x-axes are back-transformed to original units.
 #' plot(fit, type = "marginal", data = surface)
-#'
-#' # Approximate response-scale marginal associations with predictive bands
-#' plot(fit, type = "marginal_response", data = surface)
 #'
 #' # For Gaussian scale-aware fits, visualize the fitted sigma kernels
 #' # plot(fit_gaussian, type = "sigma")
@@ -172,7 +188,17 @@ plot.terradish <- function(x,
                             clamp_covariates = NULL,
                             ...)
 {
+  # The default type needs the graph. When neither `type` nor `data` was
+  # supplied, fall back to the fit plot, which needs no graph. A type that
+  # was requested explicitly keeps its usual error when `data` is missing.
+  default_type <- missing(type)
   type <- match.arg(type)
+  if (default_type && is.null(data))
+  {
+    message("`data` was not supplied, so plot() shows type = \"fit\". ",
+            "Pass the fitted graph as `data` for the default marginal-response plot.")
+    type <- "fit"
+  }
   support <- match.arg(support)
   if (!identical(type, "fit"))
   {
@@ -212,11 +238,12 @@ plot.terradish <- function(x,
 #' Legacy radish plot method
 #'
 #' Deprecated S3 method retained so legacy \code{"radish"} fit objects still
-#' dispatch to \code{\link[graphics]{plot}}.
+#' dispatch to \code{\link{plot.terradish}}.
 #'
 #' @param x A fitted legacy \code{radish} object.
 #' @param ... Additional graphical parameters.
 #' @name legacy_radish_plot_method
+#' @seealso \code{\link{radish_compatibility}}
 #' @inherit plot.terradish return
 #' @keywords internal
 NULL

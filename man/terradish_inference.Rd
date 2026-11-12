@@ -5,7 +5,7 @@
 \alias{vcov.terradish}
 \alias{nobs.terradish}
 \alias{confint.terradish}
-\title{Covariance and intervals for fitted conductance parameters}
+\title{Standard errors and confidence intervals for conductance parameters}
 \usage{
 \method{vcov}{terradish}(object, ...)
 
@@ -20,16 +20,42 @@
 
 \item{parm}{Names or indices of parameters to include.}
 
-\item{level}{Confidence level between zero and one.}
+\item{level}{Confidence level between zero and one. This is the quantity
+that \code{summary()} calls \code{conf.level} and that
+\code{conductance()} and \code{plot()} call \code{quantile}.}
 }
 \value{
-\code{vcov()} returns a covariance matrix; \code{confint()} returns
-a two-column interval matrix; \code{nobs()} returns the number of focal sites.
+\code{vcov()} returns the named covariance matrix of the
+conductance parameters, the inverse of the observed information, on the
+scale of \code{coef()}. \code{confint()} returns a matrix with one row per
+parameter and two columns holding the lower and upper Wald limits, labeled
+by their percentiles. \code{nobs()} returns the number of focal sites.
 }
 \description{
-Extracts observed-curvature uncertainty from a full or slim fit.
+\code{vcov()} and \code{confint()} report the uncertainty of the fitted
+conductance parameters from the curvature (observed information) of the
+log-likelihood at the estimate. They work on a full or slim fit.
 }
 \details{
+\strong{Reading the output.} Both functions are on the scale of
+\code{coef()}: log conductance per unit of each covariate (per standard
+deviation for covariates scaled with \code{\link{scale_covariates}}), and
+map units for Gaussian \code{sigma.<layer>} smoothing scales.
+\code{confint()} returns Wald intervals, the estimate plus or minus a
+normal quantile times its standard error.
+\code{sqrt(diag(vcov(fit)))} gives the standard errors that
+\code{summary()} prints. Exponentiate a log-conductance estimate or
+interval endpoint to read it as a conductance multiplier:
+\code{exp(confint(fit))} is the interval for the ratio of conductance per
+unit increase in the covariate, and an interval that excludes 1 on that
+scale excludes zero on the log scale. Do not exponentiate rows for
+Gaussian smoothing scales.
+
+The intervals are conditional on the fitted model. For Wishart fits they
+also depend on the supplied \code{nu}: standard errors scale as
+\code{1 / sqrt(nu)} (see \code{\link{terradish_rescale_nu}}). Uncertainty
+in the nuisance parameters is reported separately by \code{summary()}.
+
 Gaussian scale intervals are Wald intervals truncated at the fitted bounds.
 Stored profile intervals take precedence when their confidence level matches.
 The observation count is the number of focal sites (individuals or
@@ -52,9 +78,19 @@ fit <- terradish(response ~ x, graph, measurement_model = wishart_covariance,
 coef(fit)       # Relative log conductance per unit of x.
 vcov(fit)       # Joint uncertainty in conductance parameters.
 confint(fit)    # A model-based interval conditional on the supplied nu.
+exp(confint(fit))  # The same interval as a conductance multiplier.
 nobs(fit)       # Number of focal sites, the sample size for AICc and BIC.
 }
 \seealso{
 \code{\link{terradish}}, \code{\link{slim_terradish}},
   \code{\link{gaussian_scale_profile}}, \code{\link{terradish_rescale_nu}}
+
+Other inference and model comparison:
+\code{\link[=aic_table]{aic_table()}},
+\code{\link[=mlpe_response_change]{mlpe_response_change()}},
+\code{\link[=terradish_cv_folds]{terradish_cv_folds()}},
+\code{\link[=terradish_folds]{terradish_folds()}},
+\code{\link[=terradish_ibe_ratio]{terradish_ibe_ratio()}},
+\code{\link[=terradish_rescale_nu]{terradish_rescale_nu()}}
 }
+\concept{inference and model comparison}

@@ -1,4 +1,4 @@
-#' Benchmark linear solver settings for a terradish graph
+#' Benchmark sparse Cholesky solver settings on a graph
 #'
 #' Times the linear-system setup and solve used internally by
 #' \code{\link{terradish_algorithm}} for a fixed graph and conductance vector.
@@ -41,12 +41,20 @@
 #'   graph size, factorization mode, solve backend, setup time, solve time, and
 #'   total time.
 #'
+#' @seealso \code{\link{terradish_assess_settings}}, \code{\link{terradish}}
+#'
+#' @family solver settings
+#'
 #' @examples
 #' library(terra)
 #' data(melip)
-#' melip.altitude <- terra::unwrap(melip.altitude)
-#' melip.coords <- terra::unwrap(melip.coords)
-#' surface <- conductance_surface(melip.altitude, melip.coords, directions = 8)
+#' altitude <- terra::unwrap(melip.altitude)
+#' coords <- terra::unwrap(melip.coords)
+#' names(altitude) <- "altitude"
+#' # Keep one site per raster cell (some melip sites share a cell).
+#' keep <- !duplicated(terra::cellFromXY(altitude, terra::crds(coords)))
+#' surface <- conductance_surface(altitude, coords[keep])
+#' # One row per setting: setup (factorization) and solve times in seconds.
 #' terradish_solver_benchmark(
 #'   surface,
 #'   factorization = c("simplicial_ldl", "simplicial_ll"),

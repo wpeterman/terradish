@@ -66,6 +66,52 @@ model-based study design. \code{\link{slim_terradish}} reduces stored
 fit size when later prediction is unnecessary.}
 }
 
+\strong{Parameter names and their scales.} Several names recur with
+different meanings. Read each one on the scale of the model that reports
+it.
+\describe{
+\item{\code{theta}}{Conductance parameters, returned by \code{coef()}.
+Log-linear and spline coefficients are on the log-conductance scale, so
+\code{exp(theta)} is a conductance multiplier per unit of the
+covariate. Gaussian \code{sigma.<layer>} entries of \code{theta} are
+smoothing scales in map units.}
+\item{\code{phi}}{Nuisance parameters of the measurement model, reported
+by \code{summary()}. Their names and scales depend on the model:
+\code{alpha}, \code{beta}, \code{tau}, \code{rho}, \code{sigma}, and
+environmental coefficients.}
+\item{\code{tau}}{In \code{\link{mlpe}} and \code{\link{leastsquares}},
+the log residual precision: the residual variance is \code{exp(-tau)}.
+In \code{\link{wishart_covariance}}, \code{\link{generalized_wishart}},
+and \code{\link{simulate_covariance_response}}, the nonnegative
+multiplier on the graph covariance, on its natural scale.}
+\item{\code{sigma}}{In fitted Wishart models, the log nugget variance:
+the nugget is \code{exp(sigma)}. In
+\code{\link{simulate_covariance_response}} and
+\code{\link{covariance_response_power}}, the nugget variance itself, on
+its natural scale. In
+\code{\link{gaussian_smoothed_loglinear_conductance}}, a Gaussian
+smoothing scale in map units (\code{sigma.<layer>}). In
+\code{\link{HagerZhangControl}}, a line-search constant unrelated to
+any model.}
+\item{\code{rho}}{In \code{\link{mlpe}}, the shared-site correlation on a
+logit scale: the correlation is \code{plogis(rho) / 2}, between 0 and
+0.5. \code{rho_start} in \code{\link{mlpe_covariates}} is on the
+natural scale. In \code{\link{HagerZhangControl}}, an unrelated
+line-search constant.}
+\item{\code{nu}}{Effective Wishart degrees of freedom, supplied by the
+user and never estimated. It scales the log-likelihood, so standard
+errors scale as \code{1 / sqrt(nu)} while point estimates do not
+change. It is not the marker count. Unused by the distance models.}
+\item{\code{alpha}, \code{beta}}{In the distance models, the intercept
+and the slope of genetic distance on resistance distance, in the units
+of the response.}
+\item{\code{lambda_<covariate>}}{In \code{\link{wishart_covariates}}, a
+nonnegative weight on an environmental covariance kernel.}
+}
+
+\strong{Moving from radish.} The original \code{radish*} function names
+still work but are deprecated; see \code{\link{radish_compatibility}}.
+
 \strong{Experimental features.} Directed and hierarchical models,
 site-specific drift terms, selected-pair likelihoods, and other research
 prototypes remain on the \code{experimental} branch. Their identifiability
@@ -74,8 +120,8 @@ Install it explicitly with
 \code{remotes::install_github("wpeterman/terradish@experimental")}.
 
 \strong{Vignettes.}  Start with
-\code{vignette("getting-started", package = "terradish")}, or with
-\code{vignette("mlpe-pairwise-distance", package = "terradish")} if your
+\code{vignette("v01-getting-started", package = "terradish")}, or with
+\code{vignette("v03-mlpe-pairwise-distance", package = "terradish")} if your
 data are a pairwise genetic distance matrix.  The others cover
 model comparison, joint isolation by environment and resistance, the
 covariance-based Wishart workflow, spline conductance, scale optimization,
@@ -85,15 +131,30 @@ study design.  List them all with
 }
 \section{Worked examples}{
 
-\code{vignette("data-generation", package = "terradish")},
-\code{vignette("getting-started", package = "terradish")},
-\code{vignette("individual-salamanders", package = "terradish")},
-\code{vignette("mlpe-pairwise-distance", package = "terradish")}.
+\code{vignette("v12-data-generation", package = "terradish")},
+\code{vignette("v01-getting-started", package = "terradish")},
+\code{vignette("v09-individual-salamanders", package = "terradish")},
+\code{vignette("v03-mlpe-pairwise-distance", package = "terradish")}.
 }
 
+\references{
+Peterman WE, Pope NS (2021). The use and misuse of regression models in
+landscape genetic analyses. Molecular Ecology, 30, 37--47.
+\doi{10.1111/mec.15716}.
+
+Clarke RT, Rothery P, Raybould AF (2002). Confidence limits for regression
+relationships between distance matrices: estimating gene flow with distance.
+Journal of Agricultural, Biological, and Environmental Statistics, 7,
+361--372. \doi{10.1198/108571102320}.
+
+Hanks EM, Hooten MB (2013). Circuit theory and model-based inference for
+landscape connectivity. Journal of the American Statistical Association,
+108, 22--33. \doi{10.1080/01621459.2012.724647}.
+}
 \seealso{
 \code{\link{terradish}}, \code{\link{conductance_surface}},
-\code{\link{terradish_methods}}, \code{\link{melip}}
+\code{\link{terradish_methods}}, \code{\link{melip}},
+\code{\link{radish_compatibility}}
 }
 \author{
 \strong{Maintainer}: Bill Peterman \email{peterman.73@osu.edu} (\href{https://orcid.org/0000-0001-5229-9268}{ORCID})
@@ -102,6 +163,11 @@ Authors:
 \itemize{
   \item Bill Peterman \email{peterman.73@osu.edu} (\href{https://orcid.org/0000-0001-5229-9268}{ORCID})
   \item Nathaniel S. Pope \email{nspope@utexas.edu} (\href{https://orcid.org/0000-0001-8409-7812}{ORCID})
+}
+
+Other contributors:
+\itemize{
+  \item Denis Demidov (Bundled AMGCL library in inst/include/amgcl) [copyright holder]
 }
 
 }

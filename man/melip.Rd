@@ -7,7 +7,7 @@
 \alias{melip.forestcover}
 \alias{melip.coords}
 \alias{melip.Fst}
-\title{Melipona Example Data}
+\title{Melipona stingless bee landscape and FST example data}
 \format{
 Four objects, loaded together by \code{data(melip)}:
 \describe{
@@ -34,18 +34,19 @@ Four objects, loaded together by \code{data(melip)}:
 }
 }
 \source{
-Redistributed from the \code{radish} package, where the data were
-  assembled for the original resistance-surface optimizer.  A primary
-  citation for the underlying \emph{Melipona} sampling and genotyping is not
-  recorded in the package sources.
+Distributed with the \code{radish} package by Nathaniel S. Pope
+  (\url{https://github.com/nspope/radish}). The original study that
+  collected and genotyped the \emph{Melipona} samples is not recorded in
+  the package sources.
 }
 \usage{
 data(melip)
 }
 \description{
 Landscape and genetic data for 37 sampled populations of the stingless bee
-genus \emph{Melipona} in Brazil, bundled with \pkg{terradish} so every help
-page and vignette can run a complete worked example.  The four objects are
+genus \emph{Melipona} in Brazil, bundled with \pkg{terradish} so that help
+pages can run complete worked examples on a small real data set.  The four
+objects are
 stored separately in the package data, so \code{data(melip)} loads all of
 them into the calling environment at once.
 }
@@ -64,7 +65,19 @@ Gaussian raster-smoothing scale as a distance.
 
 The altitude layer arrives pre-rescaled, but the two layers are still on
 different scales, so run \code{\link{scale_covariates}} before fitting, as
-every example here does.
+the fitting examples in this package do.
+
+The raster layers are named \code{"altitude"} and \code{"forestcover"},
+so \code{c(altitude, forestcover)} can be used in a model formula
+directly. Make sure layers carry the names you want before calling
+\code{\link{scale_covariates}}, because the stored scaling is keyed by
+layer name and model formulas refer to layers by name.
+
+Three of the 37 sites fall in a raster cell that already holds another
+site, and more do so on a coarsened raster.
+\code{\link{conductance_surface}} warns when sites share a cell. The
+examples keep one site per cell with
+\code{!duplicated(terra::cellFromXY(covariates, terra::crds(coords)))}.
 }
 \examples{
 data(melip)
@@ -86,11 +99,24 @@ round(Fst[1:4, 1:4], 3)
 terra::plot(altitude, main = "Altitude (rescaled)")
 terra::points(coords, pch = 19, cex = 0.7, col = "red")
 
+# The layers are already named; scale them before fitting.
+covariates <- c(altitude, forestcover)
+names(covariates)
+covariates <- scale_covariates(covariates)
+
+# Sites that share a raster cell with an earlier site
+sum(duplicated(terra::cellFromXY(covariates, terra::crds(coords))))
+
 }
 \seealso{
 \code{\link{conductance_surface}} for turning these layers into a
   graph, and \code{\link{terradish}} for fitting a model to them.  See
-  \code{vignette("mlpe-pairwise-distance", package = "terradish")} for the
+  \code{vignette("v03-mlpe-pairwise-distance", package = "terradish")} for the
   full worked example with these data.
+
+Other datasets:
+\code{\link{individual_salamanders}},
+\code{\link{ohio_ponds}}
 }
+\concept{datasets}
 \keyword{datasets}

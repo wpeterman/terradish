@@ -2,7 +2,7 @@
 % Please edit documentation in R/generalized_wishart.R
 \name{generalized_wishart}
 \alias{generalized_wishart}
-\title{Generalized Wishart distance regression}
+\title{Generalized Wishart measurement model for squared distances}
 \usage{
 generalized_wishart(
   E,
@@ -49,7 +49,7 @@ with respect to \code{phi}?}
 }
 \value{
 When \code{phi} is missing, a list with elements \code{phi}
-  (starting values \code{c(tau = 1, sigma = 0)}), \code{lower}
+  (named starting values \code{c(tau = 1, sigma = 0)}), \code{lower}
   (\code{c(0, -Inf)}), and \code{upper}.  Otherwise a list containing:
  \item{objective}{Negative log-likelihood.}
  \item{fitted}{Matrix of expected squared genetic distances.}
@@ -76,12 +76,17 @@ The nuisance parameters are:
 \describe{
   \item{\code{tau}}{Nonnegative scale applied to the conductance-implied
     covariance \code{E}. A \code{tau} near zero signals no detectable
-    contribution from conductance-implied covariance under this model.}
+    contribution from conductance-implied covariance under this model.
+    This differs from \code{tau} in \code{\link{mlpe}} and
+    \code{\link{leastsquares}}, where it is the log residual precision.}
   \item{\code{sigma}}{Log-scale identity component: the nugget variance
     added to the diagonal is \eqn{\exp(\sigma)}. It represents diagonal
     variance not captured by the graph covariance, including sampling
     variation and model mismatch. It is not a smoothing scale or a direct
-    estimate of genetic drift or population size.}
+    estimate of genetic drift or population size. The simulators
+    \code{\link{simulate_covariance_response}} and
+    \code{\link{covariance_response_power}} take the nugget on its natural
+    scale, so pass them \code{exp()} of a fitted \code{sigma}.}
 }
 
 The fitted covariance is \eqn{\Sigma = \tau E + \exp(\sigma) I}.  The model
@@ -125,7 +130,7 @@ estimates do not depend on it, but standard errors, likelihood-ratio tests,
 and information criteria do. It is a dispersion parameter that you set,
 rather than the number of markers. Linkage and the population history
 shared by loci can make effective information much smaller than the SNP
-count. In forward-time simulations used to validate terradish, standard
+count. In unpublished forward-time simulations run during development, standard
 errors at the SNP count were three to five times smaller than the spread
 among replicate histories. Those model-based errors understated uncertainty.
 
@@ -138,31 +143,40 @@ an unsuitable response matrix.
 }
 
 \examples{
-
 library(terra)
 
 data(melip)
-melip.altitude <- terra::unwrap(melip.altitude)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords <- terra::unwrap(melip.coords)
-
-covariates <- c(melip.altitude, melip.forestcover)
+covariates <- c(terra::unwrap(melip.altitude),
+                terra::unwrap(melip.forestcover))
+coords <- terra::unwrap(melip.coords)
 names(covariates) <- c("altitude", "forestcover")
-surface <- conductance_surface(covariates, melip.coords, directions = 8)
+# Coarsened so the example runs quickly; name layers, then scale.
+covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+                                                na.rm = TRUE))
+# Keep one site per raster cell (some melip sites share a cell).
+keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+coords <- coords[keep]
+Fst <- melip.Fst[keep, keep]
+surface <- conductance_surface(covariates, coords)
 
-# Inverse of the graph Laplacian at the null conductance model.
-laplacian_inv <- terradish_distance(theta = matrix(0, 1, 2), 
-                                 formula = ~forestcover + altitude,
-                                 data = surface,
-                                 terradish::loglinear_conductance, 
-                                 covariance = TRUE)$covariance[,,1]
+# Graph covariance (generalized inverse of the graph Laplacian) among the
+# focal sites under uniform conductance (all coefficients zero).
+laplacian_inv <- terradish_distance(theta = matrix(0, 1, 2),
+                                    formula = ~ forestcover + altitude,
+                                    data = surface,
+                                    covariance = TRUE)$covariance[, , 1]
 
-# Generate an admissible squared-distance response from a PSD covariance.
+# Generate an admissible squared-distance response from a positive
+# definite covariance, then evaluate the likelihood at known values.
+set.seed(1)
 Sigma <- 0.8 * laplacian_inv + 0.2 * diag(nrow(laplacian_inv))
 observed_covariance <- rWishart(1, df = 40, Sigma = Sigma)[, , 1] / 40
 observed_squared_distance <- dist_from_cov(observed_covariance)
-generalized_wishart(laplacian_inv, observed_squared_distance, nu = 40,
-                    phi = c(tau = 0.8, sigma = log(0.2)))
+check_distance_response(observed_squared_distance)$admissible
+value <- generalized_wishart(laplacian_inv, observed_squared_distance,
+                             nu = 40,
+                             phi = c(tau = 0.8, sigma = log(0.2)))
+value$objective  # negative log-likelihood; sigma is the LOG nugget
 
 }
 \references{
@@ -174,4 +188,15 @@ Sinica 19:631-649.
   \code{\link{wishart_covariance}}, \code{\link{wishart_covariates}},
   \code{\link{mlpe}},
   \code{\link{terradish}}
+
+Other measurement models:
+\code{\link[=leastsquares]{leastsquares()}},
+\code{\link[=mlpe]{mlpe()}},
+\code{\link[=mlpe_covariates]{mlpe_covariates()}},
+\code{\link[=pairwise_covariates]{pairwise_covariates()}},
+\code{\link[=pairwise_endpoint_covariates]{pairwise_endpoint_covariates()}},
+\code{\link{terradish_measurement_model}},
+\code{\link[=wishart_covariance]{wishart_covariance()}},
+\code{\link[=wishart_covariates]{wishart_covariates()}}
 }
+\concept{measurement models}

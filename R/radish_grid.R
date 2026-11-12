@@ -514,11 +514,11 @@
   df
 }
 
-#' Evaluate likelihood of a parameterized conductance surface
+#' Profile likelihood on a grid of conductance parameters
 #'
 #' Calculates the profile likelihood of a parameterized conductance surface across
-#' a grid of parameter values (e.g. the nuisance parameters are optimized at each
-#' point on the grid).
+#' a grid of parameter values (that is, the nuisance parameters are optimized at
+#' each point on the grid).
 #'
 #' @param theta A matrix of dimension (grid size) x (number of parameters)
 #' @param formula A formula with the name of a response matrix compatible with
@@ -561,35 +561,42 @@
 #'   \item{approximation}{Record of the approximation setting (always
 #'     \code{"none"}).}
 #'
+#' @seealso \code{\link{terradish}} for the optimizer and
+#'   \code{\link{terradish_distance}} for resistance distances on the same
+#'   kind of grid.
+#'
+#' @family model fitting
+#'
 #' @examples
 #' \donttest{
-#'
 #' library(terra)
-#' 
-#' data(melip)
-#' melip.altitude <- terra::unwrap(melip.altitude)
-#' melip.forestcover <- terra::unwrap(melip.forestcover)
-#' melip.coords <- terra::unwrap(melip.coords)
-#' 
-#' covariates <- c(terra::scale(melip.altitude),
-#'                 terra::scale(melip.forestcover))
-#' names(covariates) <- c("altitude", "forestcover")
-#' surface <- conductance_surface(covariates, melip.coords, directions = 8,
-#'                                saveStack = TRUE)
 #'
-#' fit_mlpe <- terradish(melip.Fst ~ altitude + forestcover, data = surface,
-#'                    terradish::loglinear_conductance, terradish::mlpe,
-#'                    control = NewtonRaphsonControl(maxit = 5, verbose = FALSE))
+#' data(melip)
+#' covariates <- c(terra::unwrap(melip.altitude),
+#'                 terra::unwrap(melip.forestcover))
+#' coords <- terra::unwrap(melip.coords)
+#' names(covariates) <- c("altitude", "forestcover")
+#' # Coarsened so the example runs quickly; name layers, then scale.
+#' covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+#'                                                 na.rm = TRUE))
+#' # Keep one site per raster cell (some melip sites share a cell).
+#' keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+#' Fst <- melip.Fst[keep, keep]
+#' surface <- conductance_surface(covariates, coords[keep])
+#'
+#' fit_mlpe <- terradish(Fst ~ altitude + forestcover, data = surface,
+#'                       measurement_model = mlpe)
 #'
 #' theta <- as.matrix(expand.grid(forestcover = seq(-0.5, 0.5, length.out = 3),
 #'                                altitude = seq(-0.5, 0.5, length.out = 3)))
 #'
-#' grid <- terradish_grid(theta, melip.Fst ~ forestcover + altitude, surface,
-#'                     terradish::loglinear_conductance, terradish::mlpe, cores = 1)
+#' grid <- terradish_grid(theta, Fst ~ forestcover + altitude, surface,
+#'                        measurement_model = mlpe)
 #'
+#' # Profile log-likelihood at each grid point; the maximum should lie near
+#' # the fitted coefficients.
 #' cbind(grid$theta, loglik = grid$loglik)
 #' coef(fit_mlpe)
-#'
 #' }
 #' @export
 
@@ -652,6 +659,7 @@ terradish_grid <- function(theta,
 #' @param ... Arguments passed through the deprecated \code{radish_grid()}
 #'   compatibility wrapper to \code{\link{terradish_grid}}.
 #' @name legacy_radish_grid_wrapper
+#' @seealso \code{\link{radish_compatibility}}
 #' @return A list of class \code{terradish_grid} (also inheriting
 #'   \code{radish_grid}) containing the parameter grid \code{theta}, the
 #'   maximized log-likelihood \code{loglik} and nuisance parameters \code{phi}
@@ -671,13 +679,15 @@ radish_grid <- function(...)
   .terradish_forward_call(match.call(), "terradish_grid")
 }
 
-#' Resistance distances from a parameterized conductance surface
+#' Resistance distances on a grid of conductance parameters
 #'
 #' Calculates resistance distances associated with a parameterized conductance surface across
 #' a grid of parameter values.
 #'
 #' @param theta A matrix of dimension (grid size) x (number of parameters)
-#' @param formula A formula with the name of a matrix of observed genetic distances on the lhs, and covariates in the creation of \code{data} on the rhs
+#' @param formula A formula whose right-hand side names the covariates used
+#'   to create \code{data}. A left-hand side, if supplied, is not used, so a
+#'   one-sided formula such as \code{~ forestcover + altitude} is sufficient.
 #' @param data An object of class \code{terradish_graph} (see
 #'   \code{\link{conductance_surface}})
 #' @param conductance_model A function of class
@@ -700,30 +710,33 @@ radish_grid <- function(...)
 #'     of graph covariance (the generalized inverse of the graph Laplacian),
 #'     returned in place of \code{distance}.}
 #'
-#' @examples
+#' @seealso \code{\link{terradish_grid}}, \code{\link{terradish}}
 #'
+#' @family model fitting
+#'
+#' @examples
 #' library(terra)
-#' 
+#'
 #' data(melip)
-#' melip.altitude <- terra::unwrap(melip.altitude)
-#' melip.forestcover <- terra::unwrap(melip.forestcover)
-#' melip.coords <- terra::unwrap(melip.coords)
-#' 
-#' keep <- 1:10
-#' covariates <- terra::aggregate(c(melip.altitude, melip.forestcover),
-#'                                fact = 5, na.rm = TRUE)
-#' covariates <- scale_covariates(covariates)
+#' covariates <- c(terra::unwrap(melip.altitude),
+#'                 terra::unwrap(melip.forestcover))
+#' coords <- terra::unwrap(melip.coords)[1:10]
 #' names(covariates) <- c("altitude", "forestcover")
-#' surface <- conductance_surface(covariates, melip.coords[keep], directions = 8)
+#' # Coarsened so the example runs quickly; name layers, then scale.
+#' covariates <- scale_covariates(terra::aggregate(covariates, fact = 5,
+#'                                                 na.rm = TRUE))
+#' # Keep one site per raster cell.
+#' keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+#' surface <- conductance_surface(covariates, coords[keep])
 #'
 #' theta <- as.matrix(expand.grid(forestcover = seq(-0.5, 0.5, length.out = 3),
 #'                                altitude = seq(-0.5, 0.5, length.out = 3)))
 #'
-#' distances <- terradish_distance(theta, ~forestcover + altitude, 
-#'                              surface, terradish::loglinear_conductance, cores = 1)
+#' distances <- terradish_distance(theta, ~ forestcover + altitude, surface)
 #'
-#' ibd <- which(theta[,1] == 0 & theta[,2] == 0)
-#' round(distances$distance[,,ibd], 4)
+#' # Resistance distances under uniform conductance (all coefficients zero)
+#' ibd <- which(theta[, 1] == 0 & theta[, 2] == 0)
+#' round(distances$distance[, , ibd], 4)
 #'
 #' @export
 
@@ -841,6 +854,7 @@ terradish_distance <- function(theta,
 #'   \code{radish_distance()} compatibility wrapper to
 #'   \code{\link{terradish_distance}}.
 #' @name legacy_radish_distance_wrapper
+#' @seealso \code{\link{radish_compatibility}}
 #' @return A list of class \code{terradish_grid} (also inheriting
 #'   \code{radish_grid}) containing the parameter grid \code{theta} and either
 #'   \code{distance}, an array of resistance distances, or \code{covariance},

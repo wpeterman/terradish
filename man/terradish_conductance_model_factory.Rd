@@ -2,23 +2,68 @@
 % Please edit documentation in R/radish_conductance_model.R
 \name{terradish_conductance_model_factory}
 \alias{terradish_conductance_model_factory}
-\title{Conductance model factories}
-\usage{
-terradish_conductance_model_factory
-}
+\title{Conductance models: the factory interface}
 \description{
-Functions that generate objects of class \code{"terradish_conductance_model"}
-that represent mappings from spatial data (e.g. rasters) to conductance.
+A conductance model maps the spatial covariates at each raster cell to a
+positive conductance. Conductance models are created by factories, which
+are functions of class \code{"terradish_conductance_model_factory"}. Pass a
+factory to the \code{conductance_model} argument of
+\code{\link{terradish}}.
+}
+\details{
+\strong{Choosing a model.}
+\describe{
+  \item{\code{\link{loglinear_conductance}}}{Log-linear conductance in the
+    formula terms, including factors, interactions, and polynomial terms.
+    The default.}
+  \item{\code{\link{smooth_loglinear_conductance}}}{Log-linear conductance
+    with fixed-degree regression splines for \code{s()} terms.}
+  \item{\code{\link{gaussian_smoothed_loglinear_conductance}}}{A
+    constructor that returns a factory. Selected rasters are Gaussian
+    smoothed and each smoothing scale is estimated with the coefficients.}
+}
+
+\strong{Interface.} A factory has the signature \code{factory(formula, x)},
+where \code{formula} is the conductance formula (its left-hand side is
+ignored) and \code{x} is the data frame of covariates stored in a
+\code{\link{conductance_surface}} object (\code{surface$x}).
+\code{\link{terradish}} calls the factory for you. It returns a function
+of class \code{"terradish_conductance_model"} that takes the conductance
+parameter vector \code{theta} and returns a list with
+\code{conductance} (one positive value per graph vertex), \code{confint}
+(a function giving pointwise intervals from a parameter covariance
+matrix), and the derivative functions \code{df__dtheta},
+\code{df__dx}, \code{d2f__dtheta_dtheta}, and \code{d2f__dtheta_dx} that
+the optimizer uses. The returned function carries a \code{"default"}
+attribute with named starting values, and may carry \code{"lower"} and
+\code{"upper"} bounds. The legacy class names
+\code{"radish_conductance_model_factory"} and
+\code{"radish_conductance_model"} are also carried for compatibility.
+
+All built-in models use a log link, so every coefficient is a change in
+log conductance and \code{exp()} of a coefficient is a conductance
+multiplier. No intercept is estimated, because a common conductance
+multiplier is absorbed by the measurement model.
 }
 \section{Worked examples}{
 
-See \code{vignette("getting-started", package = "terradish")} for a
-log-linear model, \code{vignette("categorical-conductance", package = "terradish")}
-for class contrasts, and \code{vignette("spline-conductance", package = "terradish")}
-for nonlinear curves and their plots.
+See \code{vignette("v01-getting-started", package = "terradish")} for a
+log-linear model, \code{vignette("v05-categorical-conductance", package = "terradish")}
+for class contrasts, \code{vignette("v06-spline-conductance", package = "terradish")}
+for nonlinear curves and their plots, and
+\code{vignette("v07-gaussian-scale-optimization", package = "terradish")}
+for estimated smoothing scales.
 }
 
 \seealso{
 \code{\link{loglinear_conductance}},
-  \code{\link{smooth_loglinear_conductance}}
+  \code{\link{smooth_loglinear_conductance}},
+  \code{\link{gaussian_smoothed_loglinear_conductance}},
+  \code{\link{terradish}}
+
+Other conductance models:
+\code{\link[=gaussian_smoothed_loglinear_conductance]{gaussian_smoothed_loglinear_conductance()}},
+\code{\link[=loglinear_conductance]{loglinear_conductance()}},
+\code{\link[=smooth_loglinear_conductance]{smooth_loglinear_conductance()}}
 }
+\concept{conductance models}

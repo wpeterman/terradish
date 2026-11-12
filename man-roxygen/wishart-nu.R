@@ -4,7 +4,7 @@
 #' and information criteria do. It is a dispersion parameter that you set,
 #' rather than the number of markers. Linkage and the population history
 #' shared by loci can make effective information much smaller than the SNP
-#' count. In forward-time simulations used to validate terradish, standard
+#' count. In unpublished forward-time simulations run during development, standard
 #' errors at the SNP count were three to five times smaller than the spread
 #' among replicate histories. Those model-based errors understated uncertainty.
 #'

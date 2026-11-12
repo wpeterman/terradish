@@ -80,7 +80,9 @@ The nuisance parameters are:
   \item{\code{beta}}{IBR slope; constrained \eqn{\geq 0} when
     \code{nonnegative = TRUE}.}
   \item{\code{tau}}{Log-precision of the Gaussian errors: residual variance
-    is \eqn{\exp(-\tau)}.}
+    is \eqn{\exp(-\tau)}, so the residual standard deviation is
+    \code{exp(-tau / 2)}. In the Wishart measurement models \code{tau}
+    denotes a different quantity (see \code{\link{wishart_covariance}}).}
 }
 The mean structure is \eqn{S_{ij} = \alpha + \beta R_{ij} + e_{ij}}, where
 \eqn{R_{ij}} is the resistance distance between sites \eqn{i} and \eqn{j}
@@ -94,30 +96,49 @@ diagnostics, or initial parameter searches rather than as the default basis
 for distance-response inference.
 }
 \examples{
-
 library(terra)
 
 data(melip)
-melip.altitude <- terra::unwrap(melip.altitude)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords <- terra::unwrap(melip.coords)
-
-covariates <- c(melip.altitude, melip.forestcover)
+covariates <- c(terra::unwrap(melip.altitude),
+                terra::unwrap(melip.forestcover))
+coords <- terra::unwrap(melip.coords)
 names(covariates) <- c("altitude", "forestcover")
-surface <- conductance_surface(covariates, melip.coords, directions = 8)
+# Coarsened so the example runs quickly; name layers, then scale.
+covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+                                                na.rm = TRUE))
+# Keep one site per raster cell (some melip sites share a cell).
+keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+coords <- coords[keep]
+Fst <- melip.Fst[keep, keep]
+surface <- conductance_surface(covariates, coords)
 
-# inverse of graph Laplacian at null model (IBD) 
-laplacian_inv <- terradish_distance(theta = matrix(0, 1, 2), 
-                                 formula = ~forestcover + altitude,
-                                 data = surface,
-                                 terradish::loglinear_conductance, 
-                                 covariance = TRUE)$covariance[,,1]
+# Graph covariance (generalized inverse of the graph Laplacian) among the
+# focal sites under uniform conductance (all coefficients zero).
+laplacian_inv <- terradish_distance(theta = matrix(0, 1, 2),
+                                    formula = ~ forestcover + altitude,
+                                    data = surface,
+                                    covariance = TRUE)$covariance[, , 1]
 
-leastsquares(laplacian_inv, melip.Fst) #without 'phi': return MLE of phi
-leastsquares(laplacian_inv, melip.Fst, phi = c(0., 0.5, -0.1))
+# Without 'phi': starting values and bounds for the nuisance parameters
+leastsquares(laplacian_inv, Fst)
+# With 'phi': the negative log-likelihood and derivatives at those values
+value <- leastsquares(laplacian_inv, Fst,
+                      phi = c(alpha = 0, beta = 0.5, tau = -0.1))
+value$objective
 
 }
 \seealso{
 \code{\link{mlpe}}, \code{\link{generalized_wishart}},
   \code{\link{wishart_covariance}}, \code{\link{terradish}}
+
+Other measurement models:
+\code{\link[=generalized_wishart]{generalized_wishart()}},
+\code{\link[=mlpe]{mlpe()}},
+\code{\link[=mlpe_covariates]{mlpe_covariates()}},
+\code{\link[=pairwise_covariates]{pairwise_covariates()}},
+\code{\link[=pairwise_endpoint_covariates]{pairwise_endpoint_covariates()}},
+\code{\link{terradish_measurement_model}},
+\code{\link[=wishart_covariance]{wishart_covariance()}},
+\code{\link[=wishart_covariates]{wishart_covariates()}}
 }
+\concept{measurement models}

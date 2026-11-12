@@ -14,7 +14,7 @@
   fixed
 }
 
-#' Profile a Gaussian smoothing scale
+#' Profile-likelihood interval for a Gaussian smoothing scale
 #'
 #' Fixes one scale at each grid value and reoptimizes all remaining conductance
 #' and measurement parameters on the fitted graph.
@@ -37,8 +37,9 @@
 #' @seealso \code{\link{gaussian_scale_summary}},
 #'   \code{\link{gaussian_smoothed_loglinear_conductance}},
 #'   \code{\link{terradish_inference}}
+#' @family spatial scale
 #' @section Worked example:
-#' See \code{vignette("gaussian-scale-optimization", package = "terradish")}
+#' See \code{vignette("v07-gaussian-scale-optimization", package = "terradish")}
 #' for scale profiles, forest-effect plots, and interpretation in map units.
 #' @examples
 #' \donttest{
@@ -63,6 +64,10 @@
 #' }
 #' @export
 gaussian_scale_profile <- function(fit, layer, n = 25, level = 0.95) {
+  # Raise the unused-covariate warning once for this call, not once per
+  # internal refit (see .unused_covariate_state).
+  .unused_covariate_scope_open()
+  on.exit(.unused_covariate_scope_close(), add = TRUE)
   .terradish_require_submodels(fit, "Gaussian scale profiling")
   if (!isTRUE(fit$convergence$code == 0) ||
       !isTRUE(fit$fit$subproblem$convergence == 0))

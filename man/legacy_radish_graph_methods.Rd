@@ -45,9 +45,16 @@ If \code{x$stack} is non-\code{NULL} (the default when
 }
 Otherwise, a numeric matrix with one row per active cell and columns
 \code{est}, \code{lower<Q>}, and \code{upper<Q>}.
+
+Conductance is relative: a common multiplier is absorbed by the measurement
+model, so compare values among cells of one surface instead of reading
+them as absolute rates.
 }
 \description{
 Deprecated S3 method retained so legacy \code{"radish_graph"} objects still
 dispatch to \code{\link{conductance}}.
+}
+\seealso{
+\code{\link{radish_compatibility}}
 }
 \keyword{internal}

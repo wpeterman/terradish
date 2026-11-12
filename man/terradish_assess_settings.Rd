@@ -2,7 +2,7 @@
 % Please edit documentation in R/settings_assessment.R
 \name{terradish_assess_settings}
 \alias{terradish_assess_settings}
-\title{Assess terradish speed settings for a data set}
+\title{Recommend optimizer and solver settings for a data set}
 \usage{
 terradish_assess_settings(
   formula,
@@ -41,11 +41,13 @@ Should match the model you plan to use for the final fit.}
 
 \item{nu}{Effective Wishart degrees of freedom passed to measurement models
 that require it (\code{\link{generalized_wishart}},
-\code{\link{wishart_covariance}}). For biallelic SNPs, use the number of
-approximately independent retained SNPs. For microsatellites, use the
-locus count as the conservative primary value and report sensitivity to
-larger plausible values. Ignored by \code{\link{mlpe}} and
-\code{\link{leastsquares}}.}
+\code{\link{wishart_covariance}}). It is a dispersion parameter that you
+set, rather than the number of markers: linkage and the population
+history shared by loci can make effective information much smaller than
+the SNP count. Use the same value you plan to use for the final fit; it
+does not change the speed comparison. See the effective-information
+section of \code{\link{wishart_covariance}}. Ignored by
+\code{\link{mlpe}} and \code{\link{leastsquares}}.}
 
 \item{theta}{Optional starting conductance parameter values.  If
 \code{NULL}, the default all-zero start is used.}
@@ -104,10 +106,13 @@ An object of class \code{"terradish_setting_assessment"} with
   \item{\code{profile}}{A list of graph statistics (number of vertices,
     edges, focal sites, parameters, and, for
     \code{\link{smooth_loglinear_conductance}}, spline-expansion counts.}
-  \item{\code{optimizer_benchmark}}{A data frame of optimizer probe results
-    (one row per candidate), or \code{NULL} if \code{optimizer_probe = FALSE}.}
-  \item{\code{solver_benchmark}}{A data frame of solver probe results, or
-    \code{NULL} if \code{solver_probe = FALSE}.}
+  \item{\code{benchmarks}}{A list of probe results: \code{optimizer} (a
+    data frame with one row per optimizer candidate, or \code{NULL} if
+    \code{optimizer_probe = FALSE}), \code{solver} (a data frame of solver
+    probe results, or \code{NULL} if \code{solver_probe = FALSE}), and
+    \code{coarse} (the coarse-raster probe, or \code{NULL}).}
+  \item{\code{reasons}}{The reason recorded for each recommended setting.}
+  \item{\code{call}}{The matched call.}
   \item{\code{defaults}}{The terradish defaults for the profiled model,
     after resolving \code{optimizer = "auto"} on the expanded conductance
     parameter count.}
@@ -153,22 +158,24 @@ fit <- terradish(formula, data,
 }
 \examples{
 \donttest{
-data(melip)
-melip.altitude <- terra::unwrap(melip.altitude)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords <- terra::unwrap(melip.coords)
-
-covariates <- c(melip.altitude, melip.forestcover)
-names(covariates) <- c("altitude", "forestcover")
 # Coarsened for the example. Assessment is most useful on the large graphs
 # where solver choice actually matters, so use the full resolution there.
-covariates <- terra::aggregate(covariates, fact = 3, na.rm = TRUE)
-covariates <- scale_covariates(covariates)
-surface <- conductance_surface(covariates, melip.coords,
-                               directions = 8, saveStack = TRUE)
+data(melip)
+covariates <- c(terra::unwrap(melip.altitude),
+                terra::unwrap(melip.forestcover))
+coords <- terra::unwrap(melip.coords)
+names(covariates) <- c("altitude", "forestcover")
+# Coarsened so the example runs quickly; name layers, then scale.
+covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+                                                na.rm = TRUE))
+# Keep one site per raster cell (some melip sites share a cell).
+keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+coords <- coords[keep]
+Fst <- melip.Fst[keep, keep]
+surface <- conductance_surface(covariates, coords)
 
 assessment <- terradish_assess_settings(
-  melip.Fst ~ forestcover + altitude,
+  Fst ~ forestcover + altitude,
   data = surface,
   measurement_model = mlpe,
   probe_maxit = 2
@@ -176,7 +183,7 @@ assessment <- terradish_assess_settings(
 assessment
 
 fit <- terradish(
-  melip.Fst ~ forestcover + altitude,
+  Fst ~ forestcover + altitude,
   data = surface,
   conductance_model = loglinear_conductance,
   measurement_model = mlpe,
@@ -187,7 +194,7 @@ fit <- terradish(
 )
 
 smooth_assessment <- terradish_assess_settings(
-  melip.Fst ~ forestcover + s(altitude, df = 3),
+  Fst ~ forestcover + s(altitude, df = 3),
   data = surface,
   conductance_model = smooth_loglinear_conductance,
   measurement_model = mlpe,
@@ -197,3 +204,13 @@ smooth_assessment$comparison$summary
 }
 
 }
+\seealso{
+\code{\link{terradish_solver_benchmark}}, \code{\link{terradish}},
+  \code{\link{slim_terradish}}
+
+Other solver settings:
+\code{\link[=print.terradish_setting_assessment]{print.terradish_setting_assessment()}},
+\code{\link[=slim_terradish]{slim_terradish()}},
+\code{\link[=terradish_solver_benchmark]{terradish_solver_benchmark()}}
+}
+\concept{solver settings}

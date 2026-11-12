@@ -1,5 +1,5 @@
 ---
-title: "Gaussian Scale Optimization"
+title: "07. Gaussian Scale Optimization"
 author: "Bill Peterman"
 output:
   rmarkdown::html_vignette:
@@ -9,7 +9,7 @@ output:
     mathjax: null
     pandoc_args: ["--mathml"]
 vignette: >
-  %\VignetteIndexEntry{Gaussian Scale Optimization}
+  %\VignetteIndexEntry{07. Gaussian Scale Optimization}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 editor_options:
@@ -24,7 +24,7 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
 
 **Goal.** Estimate the forest neighborhood in meters, read its uncertainty, and compare its predictions with those of a fixed neighborhood.
 
-[`vignette("data-generation", package = "terradish")`](data-generation.html)
+[`vignette("v12-data-generation", package = "terradish")`](v12-data-generation.html)
 explains the landscapes, SLiM histories, sampling, and matched markers used
 in these examples.
 
@@ -35,7 +35,7 @@ gene exchange. A Gaussian smoother averages neighboring cells, weighting
 nearer cells more, and its standard deviation, $\sigma_{\mathrm{forest}}$,
 sets how broadly forest is averaged. `terradish` estimates that scale
 jointly with the conductance association. Start with
-[`vignette("getting-started", package = "terradish")`](getting-started.html)
+[`vignette("v01-getting-started", package = "terradish")`](v01-getting-started.html)
 for genotype construction and the resistance-graph workflow.
 
 This guide uses the same 24 Ohio ponds and 2,500 SNPs, simulated with a
@@ -239,7 +239,7 @@ plot(profile_fit, type = "marginal", data = surface,
 describes how broadly forest was averaged. The band conditions on the fitted
 sigma, so it omits scale uncertainty, which the profile above addresses.
 
-```{r gaussian-map, fig.cap = "Conductance estimate and model bounds after smoothing forest at the fitted scale. Colors use a shared logarithmic scale, with legend labels in conductance units."}
+```{r gaussian-map, fig.cap = c("Conductance estimate after smoothing forest at the fitted scale. Colors use a logarithmic scale shared with the two bound maps, with legend labels in conductance units.", "Lower model bound of conductance at the fitted scale, on the same color scale as the estimate.", "Upper model bound of conductance at the fitted scale, on the same color scale as the estimate.")}
 maps <- plot(profile_fit, type = "surface", data = surface)
 C <- conductance(surface, profile_fit)
 map_limits <- range(terra::values(C), na.rm = TRUE)
@@ -275,7 +275,11 @@ aic_table(list(fit_uniform, fit_fixed, fit_gaussian),
 more than 70 AIC units. The estimated-scale model nearly matches the
 log-likelihood of the true 500 m layer, so its `Delta_AIC` of about 2 is
 the penalty for one extra parameter. Models within 2 AIC units of the best
-have comparable support. With field data the true scale is unknown, which
+usually have comparable support, but that rule does not credit a parameter
+that leaves the log-likelihood almost unchanged (141.33 against 141.31
+here). Read this table as "estimating the scale costs one parameter and
+fits no better than the true layer", not as support for a second model.
+With field data the true scale is unknown, which
 is why you estimate it.
 
 ## Evaluate prediction in whole held-out ponds
@@ -334,8 +338,23 @@ ggplot(cv$results, aes(model, loglik_gain, color = fold)) +
 **How to read the plot.** Both forest models beat uniform conductance in
 every block. Summed over blocks, the fixed 500 m layer scores
 `r round(diff(cv$summary$total_loglik[match(c("estimated", "fixed500"), cv$summary$model)]), 1)`
-log-likelihood units above the estimated scale, the price of estimating a
-scale you would not know in a field study. For long runs, `checkpoint`
+log-likelihood units above the estimated scale. Block 2 alone supplies
+`r round(with(cv$results, loglik[model == "fixed500" & fold == "2"] - loglik[model == "estimated" & fold == "2"]), 1)`
+of those units, and in blocks 1 and 3 the two models differ by less than
+0.3. One block therefore drives the gap, so read it as weak evidence that
+knowing the true scale predicts better, not as a stable cost of estimating
+scale. In `cv$summary`, the estimated-scale model trails by
+`r round(abs(cv$summary$mean_difference[cv$summary$model == "estimated"]), 1)`
+units per block (`mean_difference`) with a standard error of
+`r round(cv$summary$se_difference[cv$summary$model == "estimated"], 1)`
+(`se_difference`), and `within_one_se` is `FALSE` because the shortfall
+exceeds that error. With three blocks the flag is descriptive, not a test.
+
+`terradish_cv_folds()` scores only pairs of ponds within each held-out
+block. The
+[spatial prediction section of the model-comparison guide](v04-model-comparison.html#compare-spatial-prediction)
+explains that scoring rule and these summary columns. For long runs,
+`checkpoint`
 saves completed folds to a file you supply so an interrupted run can
 resume.
 
@@ -352,10 +371,7 @@ Gaussian smoothing is for continuous layers. Averaging land-cover codes
 such as forest 41 and cropland 82 has no ecological meaning. Use factors
 for unsmoothed class contrasts, or derive continuous class proportions
 before estimating their context, as described in
-[`vignette("categorical-conductance", package = "terradish")`](categorical-conductance.html).
-
-<details>
-<summary>Quick reference: expand for the complete copyable workflow</summary>
+[`vignette("v05-categorical-conductance", package = "terradish")`](v05-categorical-conductance.html).
 
 ## Quick reference: estimate and validate one Gaussian context
 
@@ -394,8 +410,6 @@ cv$results
 cv$summary
 ```
 
-</details>
-
 ## Summary of key functions
 
 | Function | Purpose |
@@ -409,16 +423,16 @@ cv$summary
 
 ## See also
 
-- [`vignette("getting-started", package = "terradish")`](getting-started.html): build SNP and
+- [`vignette("v01-getting-started", package = "terradish")`](v01-getting-started.html): build SNP and
   microsatellite responses and read the measurement parameters.
-- [`vignette("model-comparison", package = "terradish")`](model-comparison.html): compare
+- [`vignette("v04-model-comparison", package = "terradish")`](v04-model-comparison.html): compare
   candidates without mixing incompatible likelihoods.
-- [`vignette("spline-conductance", package = "terradish")`](spline-conductance.html): estimate
+- [`vignette("v06-spline-conductance", package = "terradish")`](v06-spline-conductance.html): estimate
   response shape after defining its spatial context.
-- [`vignette("categorical-conductance", package = "terradish")`](categorical-conductance.html):
+- [`vignette("v05-categorical-conductance", package = "terradish")`](v05-categorical-conductance.html):
   class coding, as distinct from continuous forest context.
-- [`vignette("large-landscapes", package = "terradish")`](large-landscapes.html):
+- [`vignette("v11-large-landscapes", package = "terradish")`](v11-large-landscapes.html):
   coarse-raster warm starts for Gaussian scale models.
-- [`vignette("wishart-covariance", package = "terradish")`](wishart-covariance.html):
+- [`vignette("v02-wishart-covariance", package = "terradish")`](v02-wishart-covariance.html):
   how the assumed `nu` affects the profile interval and AIC.
 - `?ohio_ponds`: sampling, provenance, and simulation limits.

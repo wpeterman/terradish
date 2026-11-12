@@ -4,15 +4,20 @@
 # the fully executable R Markdown sources ship in inst/vignette-source.
 
 guides <- c(
-  "categorical-conductance",
-  "gaussian-scale-optimization",
-  "getting-started",
-  "model-comparison",
-  "ibe-ibr-workflow",
-  "mlpe-pairwise-distance",
-  "simulation-design",
-  "spline-conductance"
+  "v05-categorical-conductance",
+  "v07-gaussian-scale-optimization",
+  "v01-getting-started",
+  "v04-model-comparison",
+  "v08-ibe-ibr-workflow",
+  "v03-mlpe-pairwise-distance",
+  "v10-simulation-design",
+  "v06-spline-conductance",
+  "v11-large-landscapes"
 )
+# Guide 09 is not regenerated here: its vignette runs live from bundled
+# results, and inst/vignette-source holds an identical copy for readers.
+# The check at the end of this script stops if the two copies differ.
+mirrored <- "v09-individual-salamanders"
 requested <- commandArgs(trailingOnly = TRUE)
 if (length(requested)) {
   unknown <- setdiff(requested, guides)
@@ -96,4 +101,12 @@ for (guide in guides) {
     saveRDS(receipt, file.path(receipt_dir, paste0(guide, '.rds')))
   }
   message(guide, ": ", length(figures), " precomputed figures")
+}
+
+# Mirrored guides are compared, never knitted, so no long chunk runs here.
+for (guide in mirrored) {
+  copies <- file.path(c("inst/vignette-source", "vignettes"), paste0(guide, ".Rmd"))
+  if (!all(file.exists(copies)) ||
+      !identical(readLines(copies[1], warn = FALSE), readLines(copies[2], warn = FALSE)))
+    stop("The two copies of ", guide, ".Rmd differ; make them identical.")
 }

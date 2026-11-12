@@ -1,4 +1,4 @@
-#' Reduce the storage size of a fitted terradish model
+#' Shrink a fitted model for storage
 #'
 #' Removes components that are useful for prediction or diagnostics but can
 #' make a fitted \code{terradish} object expensive to serialize. The fitted
@@ -28,21 +28,32 @@
 #'   records the removed components and the object's size before and after
 #'   slimming.
 #'
+#' @seealso \code{\link{terradish}} (argument \code{slim}),
+#'   \code{\link{terradish_inference}}
+#'
+#' @family solver settings
+#'
 #' @examples
 #' \donttest{
 #' data(melip)
-#' altitude <- terra::unwrap(melip.altitude)
-#' forestcover <- terra::unwrap(melip.forestcover)
+#' covariates <- c(terra::unwrap(melip.altitude),
+#'                 terra::unwrap(melip.forestcover))
 #' coords <- terra::unwrap(melip.coords)
-#' covariates <- c(altitude, forestcover)
 #' names(covariates) <- c("altitude", "forestcover")
+#' # Coarsened so the example runs quickly; name layers, then scale.
+#' covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+#'                                                 na.rm = TRUE))
+#' # Keep one site per raster cell (some melip sites share a cell).
+#' keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+#' coords <- coords[keep]
+#' Fst <- melip.Fst[keep, keep]
 #' surface <- conductance_surface(covariates, coords)
-#' fit <- terradish(melip.Fst ~ altitude, surface,
-#'                  measurement_model = leastsquares,
-#'                  control = NewtonRaphsonControl(maxit = 2))
+#' fit <- terradish(Fst ~ altitude + forestcover, surface,
+#'                  measurement_model = mlpe)
 #' fit_slim <- slim_terradish(fit)
-#' object.size(fit_slim) <= object.size(fit)
-#' coef(fit_slim)
+#' fit_slim$storage[c("bytes_before", "bytes_after")]
+#' coef(fit_slim)     # estimates, summaries, and intervals still work
+#' confint(fit_slim)
 #' }
 #'
 #' @export

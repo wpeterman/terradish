@@ -35,3 +35,8 @@
 ^figure$
 ^vignettes/.*\.rds$
 ^man-roxygen$
+^_pkgdown\.yml$
+^docs$
+^pkgdown$
+^vignettes/site-figures$
+^codecov\.yml$

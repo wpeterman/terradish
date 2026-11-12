@@ -66,12 +66,15 @@ averaging, and even the half-cell lower bound applies some smoothing.
 If the retained raster is in longitude/latitude, the native-unit results are
 in degrees. In that case, use a projected raster for direct distance
 interpretation, or provide an approximate \code{distance_per_map_unit}
-conversion if you need a quick descriptive summary.
+conversion if you need a quick descriptive summary. Without a conversion
+the function warns once per session, and the \code{native_unit} column
+reads \code{"degrees"} on every call.
 }
 \examples{
 \donttest{
 data(melip)
 forestcover <- terra::unwrap(melip.forestcover)
+coords <- terra::unwrap(melip.coords)
 names(forestcover) <- "forestcover"
 
 # Coarsen the raster so the example runs quickly; the Gaussian model
@@ -79,11 +82,14 @@ names(forestcover) <- "forestcover"
 # count. Use the full resolution in a real analysis.
 forestcover <- terra::aggregate(forestcover, fact = 3, na.rm = TRUE)
 
+# Keep one site per raster cell (some melip sites share a cell).
+keep <- !duplicated(terra::cellFromXY(forestcover, terra::crds(coords)))
+Fst <- melip.Fst[keep, keep]
+
 # Feed the model the raw (unsmoothed, unstandardized) raster: it smooths and
 # standardizes internally at each candidate sigma.
-surface <- conductance_surface(forestcover, terra::unwrap(melip.coords),
-                               directions = 8, saveStack = TRUE)
-fit <- terradish(melip.Fst ~ forestcover,
+surface <- conductance_surface(forestcover, coords[keep], saveStack = TRUE)
+fit <- terradish(Fst ~ forestcover,
                  data = surface,
                  conductance_model =
                    gaussian_smoothed_loglinear_conductance(surface),
@@ -91,10 +97,24 @@ fit <- terradish(melip.Fst ~ forestcover,
                  optimizer = "bfgs")
 
 # sigma is in map units. The melip rasters are unprojected, so those units
-# are degrees; distance_per_map_unit rescales the reported distances.
-gaussian_scale_summary(fit)
-gaussian_scale_summary(fit, distance_per_map_unit = 111,
-                       distance_unit = "km")
+# are degrees; distance_per_map_unit rescales the reported distances
+# (roughly 111 km per degree near the equator). Without a conversion the
+# function warns that the scale is in degrees.
+scales <- gaussian_scale_summary(fit, distance_per_map_unit = 111,
+                                 distance_unit = "km")
+scales
+# One row per smoothed layer: sigma, its bounds, and the kernel radii.
+scales[, c("covariate", "sigma", "sigma_lower", "sigma_upper")]
 }
 
 }
+\seealso{
+\code{\link{gaussian_smoothed_loglinear_conductance}},
+  \code{\link{gaussian_scale_profile}}, \code{\link{plot.terradish}}
+
+Other spatial scale:
+\code{\link[=gaussian_scale_profile]{gaussian_scale_profile()}},
+\code{\link[=gaussian_smoothed_loglinear_conductance]{gaussian_smoothed_loglinear_conductance()}},
+\code{\link[=terradish_scale_optim]{terradish_scale_optim()}}
+}
+\concept{spatial scale}

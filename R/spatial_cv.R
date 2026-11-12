@@ -42,7 +42,7 @@
   coords[, 1:2, drop = FALSE]
 }
 
-#' Construct reproducible cross-validation folds
+#' Assign sampling sites to cross-validation folds
 #'
 #' Creates either spatially blocked folds by k-means clustering projected site
 #' coordinates or balanced random folds. Fold labels can also be supplied
@@ -74,12 +74,25 @@
 #' @return An integer vector of fold labels with attributes recording the
 #'   construction method, seed, and number of folds.
 #'
+#' @seealso \code{\link{terradish_cv_folds}}
+#'
+#' @family inference and model comparison
+#'
 #' @examples
 #' data(melip)
 #' coords <- terra::unwrap(melip.coords)
-#' coords_projected <- terra::project(coords, "EPSG:5070")
+#'
+#' # The melip coordinates are longitude and latitude. Project them to a local
+#' # azimuthal equidistant system centered on the sites, so that k-means
+#' # distances are in meters.
+#' lonlat <- terra::crds(coords)
+#' local_crs <- sprintf(
+#'   "+proj=aeqd +lat_0=%f +lon_0=%f +datum=WGS84 +units=m",
+#'   mean(lonlat[, 2]), mean(lonlat[, 1]))
+#' coords_projected <- terra::project(coords, local_crs)
+#'
 #' folds <- terradish_folds(coords_projected, k = 3, seed = 1)
-#' table(folds)
+#' table(folds)   # number of sites in each spatial block
 #'
 #' @export
 terradish_folds <- function(pts, k = 5L,
@@ -223,7 +236,7 @@ terradish_folds <- function(pts, k = 5L,
   unname(tools::md5sum(path))
 }
 
-#' Fixed-domain cross-validation for terradish models
+#' Spatial cross-validation of conductance formulas on a fixed graph
 #'
 #' Fits one or more conductance formulas to each training fold while retaining
 #' the complete landscape graph, then evaluates the trained coefficients on the
@@ -237,8 +250,14 @@ terradish_folds <- function(pts, k = 5L,
 #' @param folds Fold membership for each focal site. Use
 #'   \code{\link{terradish_folds}}, or supply study-specific labels. A list of
 #'   fold vectors requests repeated cross-validation.
-#' @param model Measurement model function or one of \code{"mlpe"},
-#'   \code{"wishart"}, or \code{"ls"}. With fixed nuisance parameters, a named
+#' @param model Measurement model function or one of \code{"mlpe"}
+#'   (\code{\link{mlpe}}), \code{"ls"} (\code{\link{leastsquares}}),
+#'   \code{"generalized_wishart"} (\code{\link{generalized_wishart}}, a
+#'   squared-distance response), or \code{"wishart_covariance"}
+#'   (\code{\link{wishart_covariance}}, a covariance-matrix response). The
+#'   short string \code{"wishart"} is kept for existing code and selects
+#'   \code{generalized_wishart}; prefer the full names, which cannot be
+#'   confused. With fixed nuisance parameters, a named
 #'   list matching the formula names can compare models within one family.
 #' @param nu Effective Wishart degrees of freedom when required by the selected
 #'   measurement model.
@@ -263,10 +282,15 @@ terradish_folds <- function(pts, k = 5L,
 #' @param ... Additional arguments passed to \code{\link{terradish}}. An
 #'   explicit \code{optimizer} is used for each training fit. Otherwise the
 #'   training call tries Newton and retries with BFGS if Newton raises an error.
+#'   For \code{print()}, further arguments passed to the data-frame print
+#'   method.
+#' @param x An object of class \code{"terradish_cv_folds"}, for
+#'   \code{print()}.
 #'
 #' @details
 #' The graph domain and raster covariates remain fixed. Only the focal-site
-#' columns in \code{demes} and \code{rhs}, the response matrix, and any
+#' entries of the graph (its \code{demes} index and the matching solver
+#' right-hand sides), the response matrix, and any
 #' measurement-model site attributes are subset. This evaluates transfer to
 #' held-out sites within the observed landscape rather than rebuilding a new
 #' landscape for every fold.
@@ -311,11 +335,37 @@ terradish_folds <- function(pts, k = 5L,
 #'   by formula, common-fold totals, paired differences from the best model,
 #'   the standard error of their mean, and a one-standard-error flag.
 #'   Repeated runs also report the SD of repeat totals over common folds.
-#'   Optional retained fits are stored in \code{fits}.
+#'   Optional retained fits are stored in \code{fits}. \code{print()} returns
+#'   its input invisibly.
+#'
+#'   Columns of \code{results}: \code{model}, \code{fold}, \code{repetition},
+#'   \code{n_train} and \code{n_test} (sites), \code{loglik} (held-out
+#'   log-likelihood of the trained model; larger is better),
+#'   \code{baseline_loglik} (the same for uniform conductance),
+#'   \code{loglik_gain} (their difference), \code{nuisance_iterations} and
+#'   \code{nuisance_convergence}, \code{elapsed_seconds}, \code{error} and
+#'   \code{baseline_error} (messages for failed fits or scores),
+#'   \code{common_fold} (\code{TRUE} when every model succeeded on that fold),
+#'   and \code{paired_difference} (the model's \code{loglik} minus the best
+#'   model's on the same fold).
+#'
+#'   Columns of \code{summary}, which \code{print()} displays with the best
+#'   model first: \code{folds}, \code{failed}, and \code{n_folds_ok} (fold
+#'   counts; read these first), \code{total_loglik} and \code{mean_loglik}
+#'   over all of a model's folds (\code{NA} total when any fold failed),
+#'   \code{common_folds_total} and \code{n_common_folds} (the total over
+#'   folds on which every model succeeded; models are ranked by this column),
+#'   \code{between_repeat_sd}, \code{total_loglik_gain} and
+#'   \code{mean_loglik_gain} (improvement over uniform conductance),
+#'   \code{mean_difference} and \code{se_difference} (mean paired difference
+#'   from the best model and its standard error across folds), and
+#'   \code{within_one_se} (\code{TRUE} when that mean difference is no larger
+#'   than its standard error, so the model is not clearly worse than the
+#'   best one).
 #'
 #' @section Worked examples:
-#' See \code{vignette("model-comparison", package = "terradish")} for pond
-#' comparisons and \code{vignette("individual-salamanders", package = "terradish")}
+#' See \code{vignette("v04-model-comparison", package = "terradish")} for pond
+#' comparisons and \code{vignette("v09-individual-salamanders", package = "terradish")}
 #' for individual sampling, matched markers, and spatial prediction plots.
 #'
 #' @examples
@@ -335,11 +385,17 @@ terradish_folds <- function(pts, k = 5L,
 #'   folds = folds,
 #'   model = wishart_covariance, nu = 1000, nuisance = "fixed",
 #'   control = NewtonRaphsonControl(maxit = 100))
-#' cv$summary
-#' # Check fold success counts before comparing common-fold predictive scores.
+#' # Check fold success counts (failed, n_folds_ok) before comparing the
+#' # common-fold predictive scores. The best model is listed first.
+#' cv
+#' cv$summary[, c("model", "n_folds_ok", "common_folds_total",
+#'                "mean_difference", "se_difference", "within_one_se")]
 #' # Random folds illustrate the call; choose ecological spatial blocks in practice.
 #' }
 #'
+#' @seealso \code{\link{terradish_folds}}, \code{\link{aic_table}},
+#'   \code{\link{terradish_rescale_nu}}
+#' @family inference and model comparison
 #' @export
 terradish_cv_folds <- function(data, formulas, folds, model = "mlpe", nu = NULL,
                                conductance_model = loglinear_conductance,
@@ -349,6 +405,10 @@ terradish_cv_folds <- function(data, formulas, folds, model = "mlpe", nu = NULL,
                                measurement_control = NULL,
                                nuisance = c("reprofile", "fixed"), ...)
 {
+  # Raise the unused-covariate warning once for this call, not once per
+  # internal refit (see .unused_covariate_state).
+  .unused_covariate_scope_open()
+  on.exit(.unused_covariate_scope_close(), add = TRUE)
   if (!inherits(data, c("terradish_graph", "radish_graph")))
     stop("`data` must be a terradish graph.", call. = FALSE)
   keep_fits <- match.arg(keep_fits)
@@ -631,11 +691,14 @@ terradish_cv_folds <- function(data, formulas, folds, model = "mlpe", nu = NULL,
   out
 }
 
+#' @rdname terradish_cv_folds
 #' @export
 print.terradish_cv_folds <- function(x, ...)
 {
   cat("Fixed-domain terradish cross-validation\n")
-  cat("Measurement model:", x$measurement_model, "\n")
+  # Candidates usually share one measurement model; print each name once.
+  cat("Measurement model:",
+      paste(unique(x$measurement_model), collapse = ", "), "\n")
   cat("Repeats:", x$repeats, "| nuisance:", x$nuisance, "\n")
   cat("Ranks use common successful folds; differences are paired against the best model.\n\n")
   print(x$summary, row.names = FALSE, ...)

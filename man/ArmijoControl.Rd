@@ -57,3 +57,11 @@ ctrl <- NewtonRaphsonControl(
 str(ctrl$ls.control)
 
 }
+\seealso{
+\code{\link{NewtonRaphsonControl}}, \code{\link{HagerZhangControl}}
+
+Other optimizer controls:
+\code{\link[=HagerZhangControl]{HagerZhangControl()}},
+\code{\link[=NewtonRaphsonControl]{NewtonRaphsonControl()}}
+}
+\concept{optimizer controls}

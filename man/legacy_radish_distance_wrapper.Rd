@@ -24,4 +24,7 @@ A list of class \code{terradish_grid} (also inheriting
 Deprecated compatibility wrapper retained for older code that still calls
 \code{radish_distance()}.
 }
+\seealso{
+\code{\link{radish_compatibility}}
+}
 \keyword{internal}

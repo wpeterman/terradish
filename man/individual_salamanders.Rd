@@ -3,7 +3,7 @@
 \docType{data}
 \name{individual_salamanders}
 \alias{individual_salamanders}
-\title{Simulated Individual Salamander Genotypes and Resistance Analyses}
+\title{Simulated individual salamander genotypes and resistance analyses}
 \format{
 A list with three elements:
 \describe{
@@ -98,8 +98,8 @@ The vignette explains these files and the longer opt-in reproduction.
 }
 \section{Worked examples}{
 
-\code{vignette("data-generation", package = "terradish")},
-\code{vignette("individual-salamanders", package = "terradish")}.
+\code{vignette("v12-data-generation", package = "terradish")},
+\code{vignette("v09-individual-salamanders", package = "terradish")}.
 }
 
 \examples{
@@ -115,6 +115,11 @@ table(animals$samples$fold)           # 40 withheld adults per spatial fold
 \seealso{
 \code{\link{cov_from_genetic_data}},
   \code{\link{cov_from_biallelic}}, \code{\link{dist_from_cov}},
-  \code{vignette("individual-salamanders", package = "terradish")}.
+  \code{vignette("v09-individual-salamanders", package = "terradish")}.
+
+Other datasets:
+\code{\link{melip}},
+\code{\link{ohio_ponds}}
 }
+\concept{datasets}
 \keyword{datasets}

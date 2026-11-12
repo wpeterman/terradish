@@ -59,6 +59,6 @@ for (name in c("BOOTSTRAP_ESTIMATES.csv", "panel_500.json", "panel_1000.json")) 
 }
 for (name in c("landscape-and-samples", "drying-response-and-markers", "predictive-comparisons"))
   stopifnot(file.copy(file.path(bundle, "figures", paste0(name, ".png")),
-    file.path("vignettes", "precomputed", paste0("individual-salamanders-", name, ".png")),
+    file.path("vignettes", "precomputed", paste0("v09-individual-salamanders-", name, ".png")),
     overwrite = TRUE))
 message("Curated two matched scenarios, 40 prediction records, and the frozen second assay.")

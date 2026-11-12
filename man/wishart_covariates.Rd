@@ -2,7 +2,7 @@
 % Please edit documentation in R/wishart_covariates.R
 \name{wishart_covariates}
 \alias{wishart_covariates}
-\title{Wishart measurement models with site-level environmental covariance kernels}
+\title{Wishart measurement model with environmental covariance kernels}
 \usage{
 wishart_covariates(
   x,
@@ -115,8 +115,8 @@ and kernels are spatially correlated.
 Scaling is applied to site values before the pairwise transform; kernels
 are not normalized afterward. Site subsets retain these original pairwise
 values and rebuild centered kernels without restandardizing the subset.
-In the package's null-simulation audit, AIC selected an environmental kernel
-in 19 of 40 runs at the SNP-count value of \code{nu}, and in none at a
+In an unpublished development null simulation, AIC selected an
+environmental kernel in 19 of 40 runs at the SNP-count value of \code{nu}, and in none at a
 replicate-calibrated value. These are results of that design, not general
 error-rate guarantees. Use \code{\link{terradish_rescale_nu}} for sensitivity
 and \code{terradish_cv_folds(..., nuisance = "fixed")} to assess predictive
@@ -133,7 +133,7 @@ omits Wald uncertainty for the log-scale nugget at that limit.
 
 \section{Worked example}{
 
-See \code{vignette("ibe-ibr-workflow", package = "terradish")} for
+See \code{vignette("v08-ibe-ibr-workflow", package = "terradish")} for
 environmental covariance kernels and their distinction from MLPE slopes.
 }
 
@@ -163,7 +163,7 @@ estimates do not depend on it, but standard errors, likelihood-ratio tests,
 and information criteria do. It is a dispersion parameter that you set,
 rather than the number of markers. Linkage and the population history
 shared by loci can make effective information much smaller than the SNP
-count. In forward-time simulations used to validate terradish, standard
+count. In unpublished forward-time simulations run during development, standard
 errors at the SNP count were three to five times smaller than the spread
 among replicate histories. Those model-based errors understated uncertainty.
 
@@ -179,22 +179,27 @@ an unsuitable response matrix.
 library(terra)
 
 data(melip)
-melip.altitude    <- terra::unwrap(melip.altitude)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords      <- terra::unwrap(melip.coords)
-
-covariates <- c(melip.altitude, melip.forestcover)
+covariates <- c(terra::unwrap(melip.altitude),
+                terra::unwrap(melip.forestcover))
+coords <- terra::unwrap(melip.coords)
 names(covariates) <- c("altitude", "forestcover")
+# Coarsened so the example runs quickly; name layers, then scale.
 covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
                                                 na.rm = TRUE))
-surface <- conductance_surface(covariates, melip.coords, directions = 8)
+# Keep one site per raster cell (some melip sites share a cell).
+keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+coords <- coords[keep]
+Fst <- melip.Fst[keep, keep]
+surface <- conductance_surface(covariates, coords)
 
 # Build an altitude kernel for a covariance-Wishart model.
-g_wc <- wishart_covariates(melip.altitude, coords = melip.coords,
+g_wc <- wishart_covariates(terra::unwrap(melip.altitude), coords = coords,
                            model = "wishart_covariance", scale = TRUE)
 inherits(g_wc, "terradish_measurement_model")  # TRUE
 
 # Simulate an admissible covariance response, then fit the extended model.
+# The simulator takes the nugget variance on its natural scale (0.2); the
+# fitted `sigma` is its logarithm.
 \donttest{
 simulated <- simulate_covariance_response(
   theta = c(altitude = 0.2, forestcover = -0.1),
@@ -208,7 +213,7 @@ fit_joint_w <- terradish(
   measurement_model = g_wc,
   nu                = 40
 )
-# phi table shows tau, lambda_altitude, and sigma.
+# phi table shows tau, lambda_altitude, and sigma (log nugget).
 summary(fit_joint_w)
 }
 
@@ -222,4 +227,15 @@ Sinica 19:631-649.
   \code{\link{generalized_wishart}}, \code{\link{wishart_covariance}},
   \code{\link{mlpe_covariates}},
   \code{\link{pairwise_endpoint_covariates}}, \code{\link{terradish}}
+
+Other measurement models:
+\code{\link[=generalized_wishart]{generalized_wishart()}},
+\code{\link[=leastsquares]{leastsquares()}},
+\code{\link[=mlpe]{mlpe()}},
+\code{\link[=mlpe_covariates]{mlpe_covariates()}},
+\code{\link[=pairwise_covariates]{pairwise_covariates()}},
+\code{\link[=pairwise_endpoint_covariates]{pairwise_endpoint_covariates()}},
+\code{\link{terradish_measurement_model}},
+\code{\link[=wishart_covariance]{wishart_covariance()}}
 }
+\concept{measurement models}

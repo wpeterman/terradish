@@ -1,4 +1,4 @@
-#' Assess covariance-response parameter recovery by simulation
+#' Simulation-based power and parameter recovery for sampling designs
 #'
 #' Runs a fast simulation study for covariance-response \code{terradish} fits.
 #' Candidate sampling designs are created by subsetting the focal sites in an
@@ -8,7 +8,7 @@
 #' Gaussian smoothing widths are simulated and reported in map units.
 #'
 #' @param theta True conductance parameters. By default these are interpreted on
-#'   the same external scale returned by \code{\link{coef}} for fitted
+#'   the same external scale returned by \code{coef()} for fitted
 #'   \code{terradish} models. For most conductance models the internal and
 #'   external scales are identical. For
 #'   \code{\link{gaussian_smoothed_loglinear_conductance}}, the external scale
@@ -30,7 +30,8 @@
 #' @param tau Nonnegative scaling applied to the conductance-implied covariance
 #'   matrix during simulation.
 #' @param sigma Nonnegative nugget variance added to the covariance diagonal
-#'   during simulation.
+#'   during simulation, on its natural (variance) scale. The fitted Wishart
+#'   \code{sigma} is the logarithm of this quantity.
 #' @param nu Effective Wishart information used to simulate the response.
 #'   Larger values reduce simulated sampling noise. The fitting value defaults
 #'   to it through \code{nu_fit = nu}; neither is an estimate
@@ -39,7 +40,7 @@
 #'   least the largest assessed covariance-matrix dimension.
 #' @param nsim Number of covariance-response simulations per sampling design.
 #' @param n_designs Number of independent site designs per sample size for
-#'   \code{strategy = "random"}. Deterministic strategies are evaluated once.
+#'   the \code{"random"} strategy. Deterministic strategies are evaluated once.
 #' @param seed Optional random seed for reproducible site and response
 #'   simulation.
 #' @param theta_scale Is \code{theta} supplied on the \code{"external"} or
@@ -95,21 +96,28 @@
 #' convergence diagnostics also count as failed fits.
 #' Inspect \code{fit_rate} before interpreting power or coverage.
 #'
+#' @seealso \code{\link{simulate_covariance_response}},
+#'   \code{\link{print.terradish_covariance_power}}
+#'
+#' @family simulation and study design
+#'
 #' @examples
 #' \donttest{
-#' data(melip)
-#' melip.altitude <- terra::unwrap(melip.altitude)
-#' melip.forestcover <- terra::unwrap(melip.forestcover)
-#' melip.coords <- terra::unwrap(melip.coords)
-#'
-#' covariates <- c(melip.altitude, melip.forestcover)
-#' names(covariates) <- c("altitude", "forestcover")
-#' covariates <- scale_covariates(covariates)
-#' # Coarsen the raster: a power sweep refits many times, so cell count is the
+#' # Coarsened: a power sweep refits many times, so cell count is the
 #' # dominant cost. Use the full resolution for a real design study.
-#' covariates <- terra::aggregate(covariates, fact = 3, na.rm = TRUE)
-#' surface <- conductance_surface(covariates, melip.coords,
-#'                                directions = 8, saveStack = TRUE)
+#' data(melip)
+#' covariates <- c(terra::unwrap(melip.altitude),
+#'                 terra::unwrap(melip.forestcover))
+#' coords <- terra::unwrap(melip.coords)
+#' names(covariates) <- c("altitude", "forestcover")
+#' # Coarsened so the example runs quickly; name layers, then scale.
+#' covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+#'                                                 na.rm = TRUE))
+#' # Keep one site per raster cell (some melip sites share a cell).
+#' keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+#' coords <- coords[keep]
+#' Fst <- melip.Fst[keep, keep]
+#' surface <- conductance_surface(covariates, coords)
 #'
 #' spline_model <- smooth_loglinear_conductance(
 #'   ~ forestcover + s(altitude, df = 4), surface$x)
@@ -182,6 +190,10 @@ covariance_response_power <- function(theta,
                                       verbose = FALSE,
                                       nu_fit = nu)
 {
+  # Raise the unused-covariate warning once for this call, not once per
+  # internal refit (see .unused_covariate_state).
+  .unused_covariate_scope_open()
+  on.exit(.unused_covariate_scope_close(), add = TRUE)
   stopifnot(inherits(formula, "formula"))
   if (length(nu_fit) != 1L || !is.finite(nu_fit) || nu_fit <= 0)
     stop("`nu_fit` must be finite and positive.", call. = FALSE)
@@ -506,7 +518,7 @@ covariance_response_power <- function(theta,
   out
 }
 
-#' Print a covariance-response power assessment
+#' Print and read a power assessment
 #'
 #' Compact display for the object returned by
 #' \code{\link{covariance_response_power}}: the settings the sweep ran under,
@@ -545,8 +557,10 @@ covariance_response_power <- function(theta,
 #'   what each returned component contains,
 #'   \code{\link{simulate_covariance_response}} for a single simulated data
 #'   set, and \code{\link{terradish}} for fitting one.  See
-#'   \code{vignette("simulation-design", package = "terradish")} for a worked
+#'   \code{vignette("v10-simulation-design", package = "terradish")} for a worked
 #'   study-design walkthrough.
+#'
+#' @family simulation and study design
 #'
 #' @examples
 #' \donttest{
@@ -556,8 +570,10 @@ covariance_response_power <- function(theta,
 #' # coarsened, and only a handful of simulations, so the example is quick
 #' covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
 #'                                                 na.rm = TRUE))
-#' surface <- conductance_surface(covariates, terra::unwrap(melip.coords),
-#'                                directions = 8, saveStack = TRUE)
+#' # Keep one site per raster cell (some melip sites share a cell).
+#' coords <- terra::unwrap(melip.coords)
+#' keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+#' surface <- conductance_surface(covariates, coords[keep])
 #'
 #' power <- covariance_response_power(
 #'   theta        = c(forestcover = 0.5, altitude = -0.4),

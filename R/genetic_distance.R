@@ -3,7 +3,7 @@
 # dist_from_biallelic) moved to the landgraph package and are re-exported via
 # R/reexports.R; the functions below still call them through terradish's namespace.
 
-#' Simulate covariance responses from a conductance surface
+#' Simulate genetic covariance matrices from a known conductance surface
 #'
 #' Simulates one or more covariance response matrices from a known
 #' conductance-resistance relationship, using the same Wishart covariance model
@@ -19,8 +19,13 @@
 #' @param conductance_model Conductance-model factory, such as
 #'   \code{\link{loglinear_conductance}}.
 #' @param tau Nonnegative scaling applied to the conductance-implied covariance
-#'   matrix.
-#' @param sigma Nonnegative nugget variance added to the diagonal.
+#'   matrix, on the same scale as the fitted Wishart \code{tau}.
+#' @param sigma Nonnegative nugget variance added to the diagonal, on its
+#'   natural (variance) scale. This differs from the fitted \code{sigma}
+#'   reported for \code{\link{wishart_covariance}} and
+#'   \code{\link{generalized_wishart}}, which is the logarithm of the nugget
+#'   variance. To simulate from a fitted model, pass \code{exp()} of the
+#'   fitted \code{sigma}.
 #' @param nu Effective Wishart degrees of freedom: controls the amount of
 #'   sampling noise in the simulated covariance: larger \code{nu} gives tighter
 #'   draws around \code{Sigma}. This is a model assumption, not a marker
@@ -54,12 +59,19 @@
 #'   \code{\link{terradish_distance}(covariance = TRUE)}.}
 #' \item{theta}{The validated conductance parameter matrix used for simulation.}
 #' \item{tau}{The supplied \code{tau}.}
-#' \item{sigma}{The supplied \code{sigma}.}
+#' \item{sigma}{The supplied \code{sigma} (nugget variance, natural scale).}
 #' \item{nu}{The supplied \code{nu}.}
 #'
+#' @seealso \code{\link{covariance_response_power}},
+#'   \code{\link{wishart_covariance}}
+#'
+#' @family simulation and study design
+#'
 #' @examples
-#' r1 <- terra::rast(nrows = 3, ncols = 3, vals = 1:9)
-#' r2 <- terra::rast(nrows = 3, ncols = 3, vals = c(9, 1, 4, 3, 8, 2, 5, 7, 6))
+#' r1 <- terra::rast(nrows = 3, ncols = 3, xmin = 0, xmax = 3, ymin = 0,
+#'                   ymax = 3, vals = 1:9)
+#' r2 <- terra::rast(nrows = 3, ncols = 3, xmin = 0, xmax = 3, ymin = 0,
+#'                   ymax = 3, vals = c(9, 1, 4, 3, 8, 2, 5, 7, 6))
 #' covariates <- c(r1, r2)
 #' names(covariates) <- c("x1", "x2")
 #' pts <- terra::vect(matrix(c(0.5, 0.5,

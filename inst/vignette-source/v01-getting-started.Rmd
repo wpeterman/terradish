@@ -1,5 +1,5 @@
 ---
-title: "Getting Started with terradish"
+title: "01. Getting Started with terradish"
 author: "Bill Peterman"
 output:
   rmarkdown::html_vignette:
@@ -9,7 +9,7 @@ output:
     mathjax: null
     pandoc_args: ["--mathml"]
 vignette: >
-  %\VignetteIndexEntry{Getting Started with terradish}
+  %\VignetteIndexEntry{01. Getting Started with terradish}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 editor_options:
@@ -17,21 +17,16 @@ editor_options:
     wrap: 72
 ---
 
-The displayed results and figures in this guide were computed from the
-executable R Markdown source shipped with the package. Routine package
-checks use these precomputed results to keep the CRAN check time modest.
-To rerun every code chunk, copy `system.file("vignette-source", "getting-started.Rmd", package = "terradish")` to a writable directory and render that copy with `rmarkdown::render()`.
-
----
-
-
-
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
+  fig.width = 6, fig.height = 4.5, warning = FALSE, message = FALSE, error = FALSE)
+```
 
 **Goal.** Follow one complete analysis from matched genotypes to a forest conductance map, using SNPs first and then microsatellites.
 
-The [data-generation guide](data-generation.html) explains the landscapes,
+The [data-generation guide](v12-data-generation.html) explains the landscapes,
 SLiM histories, sampling, and matched markers used in these examples. Open it
-in R with `vignette("data-generation", package = "terradish")`.
+in R with `vignette("v12-data-generation", package = "terradish")`.
 
 ## What will you learn?
 
@@ -41,9 +36,14 @@ resistance (IBR)**, genetic patterns follow a graph of connected raster
 cells, where higher cell conductance strengthens connections between
 neighbors. The graph yields resistance distances and covariance among
 sampling locations, and a measurement model links those quantities to the
-observed genetic summary. Conductance is a fitted model quantity, so
-claims about movement, habitat suitability, or causal effects need
-evidence beyond the fitted surface.
+observed genetic summary. Fitting one parameterized conductance surface
+to the genetic data, rather than regressing on separate resistance
+distances, follows Peterman and Pope (2021). Hanks and Hooten (2013) give
+background on covariance models built from a circuit graph, and Clarke,
+Rothery and Raybould (2002) on the population-effects model for pairwise
+distances. Conductance is a fitted model quantity, so claims about
+movement, habitat suitability, or causal effects need evidence beyond the
+fitted surface.
 
 Starting from raw simulated genotypes, this guide works through four steps:
 
@@ -60,24 +60,23 @@ landscape download.
 
 | Your question | Guide | Response used |
 |---|---|---|
-| How broad is the relevant forest neighborhood? | [`vignette("gaussian-scale-optimization", package = "terradish")`](gaussian-scale-optimization.html) | Pond SNP covariance |
-| Do slope and elevation add useful information? | [`vignette("model-comparison", package = "terradish")`](model-comparison.html) | Same pond SNP covariance |
-| Does a curved association predict better? | [`vignette("spline-conductance", package = "terradish")`](spline-conductance.html) | Same pond SNP covariance |
-| Do differences between pond environments matter? | [`vignette("ibe-ibr-workflow", package = "terradish")`](ibe-ibr-workflow.html) | Pond SNP negative control, then a labeled covariance example |
-| How do I interpret land-cover classes? | [`vignette("categorical-conductance", package = "terradish")`](categorical-conductance.html) | Labeled covariance example on the same landscape |
-| How do individual genotypes reveal nonlinear resistance? | [`vignette("individual-salamanders", package = "terradish")`](individual-salamanders.html) | Terrestrial SNP IBR with matched microsatellite comparison |
-| Which genetic response and information assumption should I use? | [`vignette("wishart-covariance", package = "terradish")`](wishart-covariance.html) | Matched pond SNPs and microsatellites |
-| I have a pairwise genetic distance matrix ($F_{ST}$, $D_{PS}$) | [`vignette("mlpe-pairwise-distance", package = "terradish")`](mlpe-pairwise-distance.html) | Pairwise distance with MLPE |
-
-Displayed results are precomputed to keep package builds fast.
+| How broad is the relevant forest neighborhood? | [`vignette("v07-gaussian-scale-optimization", package = "terradish")`](v07-gaussian-scale-optimization.html) | Pond SNP covariance |
+| Do slope and elevation add useful information? | [`vignette("v04-model-comparison", package = "terradish")`](v04-model-comparison.html) | Same pond SNP covariance |
+| Does a curved association predict better? | [`vignette("v06-spline-conductance", package = "terradish")`](v06-spline-conductance.html) | Same pond SNP covariance |
+| Do differences between pond environments matter? | [`vignette("v08-ibe-ibr-workflow", package = "terradish")`](v08-ibe-ibr-workflow.html) | Pond SNP negative control, then a labeled covariance example |
+| How do I interpret land-cover classes? | [`vignette("v05-categorical-conductance", package = "terradish")`](v05-categorical-conductance.html) | Labeled covariance example on the same landscape |
+| How do individual genotypes reveal nonlinear resistance? | [`vignette("v09-individual-salamanders", package = "terradish")`](v09-individual-salamanders.html) | Terrestrial SNP IBR with matched microsatellite comparison |
+| Which genetic response and information assumption should I use? | [`vignette("v02-wishart-covariance", package = "terradish")`](v02-wishart-covariance.html) | Matched pond SNPs and microsatellites |
+| I have a pairwise genetic distance matrix ($F_{ST}$, $D_{PS}$) | [`vignette("v03-mlpe-pairwise-distance", package = "terradish")`](v03-mlpe-pairwise-distance.html) | Pairwise distance with MLPE |
 
 **Starting from a pairwise distance matrix?** Fit pairwise $F_{ST}$,
-$D_{PS}$, or individual genetic distances with `measurement_model = mlpe`
+$D_{PS}$ (one minus the proportion of shared alleles), or individual
+genetic distances with `measurement_model = mlpe`
 (maximum likelihood population effects), which accounts for pairs that
 share a site. The conductance formula, graph, and coefficient
 interpretation match this guide, and only the measurement model and its
 nuisance parameters change (see `?mlpe`).
-[`vignette("mlpe-pairwise-distance", package = "terradish")`](mlpe-pairwise-distance.html)
+[`vignette("v03-mlpe-pairwise-distance", package = "terradish")`](v03-mlpe-pairwise-distance.html)
 works through that case.
 
 ## Meet the forest-pond example
@@ -95,13 +94,12 @@ although the settings are not calibrated to a real salamander population.
 Each pond retains 20 animals screened to exclude known immediate
 relatives, and all 480 carry both 2,500 SNPs and 24 microsatellite loci from the same
 simulated ancestry.
-[`vignette("data-generation", package = "terradish")`](data-generation.html)
+[`vignette("v12-data-generation", package = "terradish")`](v12-data-generation.html)
 gives the full design.
 
 ## Load and inspect the data
 
-
-``` r
+```{r load-data}
 library(terradish)
 library(terra)
 data(ohio_ponds)
@@ -116,20 +114,8 @@ data.frame(quantity = c("Ponds", "Raw captures", "Retained animals", "SNPs",
                         "Microsatellite loci"),
            number = c(nrow(ponds), nrow(ohio_ponds$raw_samples), nrow(samples),
                       ncol(ohio_ponds$snp), ncol(ohio_ponds$microsat) / 2))
-#>              quantity number
-#> 1               Ponds     24
-#> 2        Raw captures    780
-#> 3    Retained animals    480
-#> 4                SNPs   2500
-#> 5 Microsatellite loci     24
 terra::res(raw)
-#> [1] 100 100
 table(samples$pond)
-#>
-#> P01 P02 P03 P04 P05 P06 P07 P08 P09 P10 P11 P12 P13 P14 P15 P16 P17 P18 P19 P20
-#>  20  20  20  20  20  20  20  20  20  20  20  20  20  20  20  20  20  20  20  20
-#> P21 P22 P23 P24
-#>  20  20  20  20
 ```
 
 **How to read the output.** The genetic rows are animals, but this guide
@@ -139,8 +125,7 @@ keeps distances in meters, which matters when you interpret a smoothing
 distance. `?ohio_ponds` documents every field, including raw captures and
 pedigree metadata.
 
-
-``` r
+```{r landscape, fig.height = 3.2, fig.cap = "***The real landscape and hypothetical sampling ponds.*** Forest is a fraction from 0 to 1; elevation is in meters. The entire landscape remains in the graph, including nonforest cells between forest ponds."}
 local({
   old <- par(mfrow = c(1, 2), mar = c(3, 3, 2, 3))
   on.exit(par(old))
@@ -150,8 +135,6 @@ local({
   points(ponds$x, ponds$y, pch = 21, bg = "white", cex = 0.7)
 })
 ```
-
-![***The real landscape and hypothetical sampling ponds.*** Forest is a fraction from 0 to 1; elevation is in meters. The entire landscape remains in the graph, including nonforest cells between forest ponds.](precomputed/getting-started-landscape-1.png)
 
 **How to read the map.** Every pond is forested, yet travel between ponds
 is not equivalent, because the graph includes the intervening matrix and
@@ -166,8 +149,7 @@ A SNP dosage is the number of copies of a chosen allele in a diploid
 animal (0, 1, or 2), not a genetic distance. Check the animal order, then
 sum dosage within ponds.
 
-
-``` r
+```{r snp-response}
 G <- ohio_ponds$snp
 stopifnot(identical(rownames(G), samples$individual))
 groups <- factor(samples$pond, levels = ponds$pond)
@@ -181,15 +163,8 @@ stopifnot(identical(rownames(Y), ponds$pond), all(N == N[1]))
 # Equal sample sizes allow this common scale conversion to allele frequencies.
 S <- cov_from_biallelic(Y, N) / N[1]
 round(S[1:4, 1:4], 3)
-#>        P01   P02   P03    P04
-#> P01  0.336 0.053 0.025 -0.015
-#> P02  0.053 0.260 0.067  0.031
-#> P03  0.025 0.067 0.156  0.031
-#> P04 -0.015 0.031 0.031  0.293
 c(maximum_absolute_row_sum = max(abs(rowSums(S))),
   minimum_eigenvalue = min(eigen(S, symmetric = TRUE, only.values = TRUE)$values))
-#> maximum_absolute_row_sum       minimum_eigenvalue
-#>             1.845746e-15            -6.015204e-17
 ```
 
 **How to read the output.** `S` is a 24 by 24 pond covariance. A positive
@@ -223,44 +198,17 @@ along a linked 50 Mb chromosome.
 
 </details>
 
-
-``` r
+```{r distance-response}
 # The covariance also defines a coherent squared-distance representation.
 D <- dist_from_cov(S)
 check_distance_response(D)
-#> $admissible
-#> [1] TRUE
-#>
-#> $min_eigenvalue
-#> [1] -1.162121e-16
-#>
-#> $relative_min_eigenvalue
-#> [1] -1.429493e-16
-#>
-#> $n_negative
-#> [1] 0
-#>
-#> $tolerance
-#> [1] 1e-07
-#>
-#> $eigenvalue_threshold
-#> [1] 8.1296e-08
-#>
-#> $max_eigenvalue
-#> [1] 0.81296
-#>
-#> $n_sites
-#> [1] 24
 round(D[1:4, 1:4], 3)
-#>        P01   P02   P03   P04
-#> [1,] 0.000 0.490 0.442 0.658
-#> [2,] 0.490 0.000 0.281 0.490
-#> [3,] 0.442 0.281 0.000 0.386
-#> [4,] 0.658 0.490 0.386 0.000
 ```
 
 **How to read the output.** `D` holds squared genetic distances,
-$D_{ij}=S_{ii}+S_{jj}-2S_{ij}$, with a zero diagonal. It measures
+$D_{ij}=S_{ii}+S_{jj}-2S_{ij}$, with a zero diagonal. The printed matrix
+keeps pond names on its columns only, so rows `[1,]` to `[4,]` are ponds
+P01 to P04 in the same order. It measures
 differences in standardized allele frequencies, not $F_{ST}$ or meters.
 `check_distance_response()` reports `admissible = TRUE` because `D` comes
 from a valid covariance, so `generalized_wishart` could fit it. Distances
@@ -286,14 +234,16 @@ Start with the fixed `forest500` context that generated exchange, so the
 first model has a single landscape coefficient. The Gaussian-scale guide
 estimates that scale from the raw forest layer.
 
-
-``` r
+```{r graph}
 fixed <- c(raw, forest500)
 
 # Standardize continuous layers over the full graph domain, not only pond cells.
 scaled <- scale_covariates(fixed)
+# scale_covariates() records each layer's center and scale. saveStack = TRUE
+# (the default) keeps that record with the graph, so plots can label axes in
+# original units.
 surface <- conductance_surface(scaled, ponds[c("x", "y")],
-  directions = 8, saveStack = TRUE) # retain scaling information for plot axes
+  directions = 8, saveStack = TRUE)
 ```
 
 Eight directions connect each cell to its cardinal and diagonal
@@ -308,21 +258,23 @@ $$C_i = \exp(\theta_{\mathrm{forest}} x_{i,500}),$$
 where $x_{i,500}$ is the standardized, smoothed forest fraction. The
 coefficient therefore describes one standard deviation (SD) of forest
 context over this landscape, which is
-0.132 in
+`r round(attr(scaled, "terradish_scale")$forest500[["scale"]], 3)` in
 forest fraction. There is no conductance intercept, because multiplying
 every cell's conductance by the same constant does not change the fit.
 
 ## Fit forest and uniform-conductance models
 
 Fit both models to the same response, graph, and likelihood. The Wishart
-likelihood also needs `nu`, the amount of independent information you
-assume `S` contains. You must supply it, and it is not the SNP count,
-because linked SNPs share history. We use `nu = 40` as a working value (it
-matches `N` only by coincidence). Hold it fixed across compared models and
+likelihood also needs `nu`, the **effective Wishart information** you
+assume `S` contains. You must supply it, and it is not a count of
+independent markers, because linked SNPs share history. This guide uses
+`nu = 40` as a working value (it matches `N` only by coincidence). The
+graph also carries layers that the formula does not use, so `terradish()`
+warns that it removed them. That warning is expected, and this guide does
+not print it. Hold `nu` fixed across compared models and
 report how results change over a plausible range.
 
-
-``` r
+```{r fit-models}
 control <- NewtonRaphsonControl(maxit = 200, ctol = 1e-8, ftol = 1e-8)
 fit_uniform <- terradish(S ~ 1, surface,
   measurement_model = wishart_covariance, nu = 40,
@@ -332,33 +284,14 @@ fit_forest <- terradish(S ~ forest500, surface,
   optimizer = "bfgs", control = control)
 
 summary(fit_forest)
-#> Conductance surface with 10404 vertices (24 focal) estimated by maximum likelihood
-#> Call:   terradish(formula = S ~ forest500, data = surface, measurement_model = wishart_covariance,
-#>     nu = 40, optimizer = "bfgs", control = control)
-#>
-#> Loglikelihood: 141.3124 (3 degrees freedom)
-#> AIC: -276.6249
-#>
-#> Number of function calls: 13
-#> Number of optimization steps: 6
-#> Convergence: converged | projected gradient: 1.7e-12
-#> Norm of gradient at MLE: 1.703684e-12
-#>
-#> Nuisance parameters (conditional on fitted conductance surface; measurement-model scale):
-#>        Estimate  Std. Error  Lower 95%  Upper 95%
-#> tau     1.5090    0.1928      1.1311     1.8870
-#> sigma  -3.4186    0.7604     -4.9090    -1.9281
-#>
-#> Coefficients:
-#>           Estimate Std. Error z value Pr(>|z|)
-#> forest500  0.58003    0.09377   6.185 6.19e-10 ***
-#> ---
-#> Signif. codes:  0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
 ```
 
 **How to read the summary.** First check the `Convergence:` line. In the
 `Coefficients` table, `forest500` is on the log-conductance scale, and its
 positive estimate means more forest context goes with higher conductance.
+The standard error, z value, and p-value all scale with the assumed `nu`,
+so read them as conditional on `nu = 40`. The sensitivity check below
+shows how they change.
 The uniform model (conductance one everywhere) is the graph version of
 isolation by distance (IBD), where genetic differences grow with
 separation but no cell is easier to cross than another.
@@ -375,56 +308,43 @@ does not change the fit.
 | `forest500` (theta) | `coef(fit_forest)` | Change in log conductance per one SD of forest context |
 | `tau` | `summary(fit_forest)$phi` | Weight of the graph covariance in the fitted covariance |
 | `sigma` | `summary(fit_forest)$phi`, log scale | Log of the extra variance added to each pond (the nugget); not a smoothing distance |
-| `nu` | Supplied by you | Assumed information in `S`, held fixed across compared models |
+| `nu` | Supplied by you | Effective Wishart information assumed for `S`, held fixed across compared models |
 
-
-``` r
+```{r interpretation}
 theta_forest <- coef(fit_forest)[["forest500"]]
 c(conductance_ratio_per_SD = exp(theta_forest),
   percent_change_per_SD = 100 * (exp(theta_forest) - 1),
   nugget_variance = exp(summary(fit_forest)$phi[["sigma"]]))
-#> conductance_ratio_per_SD    percent_change_per_SD          nugget_variance
-#>               1.78608717              78.60871721               0.03275952
 exp(confint(fit_forest))  # 95% interval for the conductance ratio
-#>              2.5 %   97.5 %
-#> forest500 1.486221 2.146456
 ```
 
 **How to read these values.** Exponentiating the coefficient gives a
 conductance ratio. Each one-SD increase in smoothed forest
-(0.13 in
+(`r round(attr(scaled, "terradish_scale")$forest500[["scale"]], 2)` in
 forest fraction) multiplies conductance by about
-1.79, a 79%
+`r round(exp(theta_forest), 2)`, a `r round(100 * (exp(theta_forest) - 1))`%
 increase, with a 95% interval of
-1.49 to 2.15.
+`r paste(round(exp(confint(fit_forest)), 2), collapse = " to ")`.
 The nugget variance is in the units of `S`. It absorbs sampling variation
 and model mismatch and does not measure drift or population size.
 
-
-``` r
+```{r information-sensitivity}
 # Lower assumed information widens uncertainty without changing the coefficients.
 less_information <- terradish_rescale_nu(fit_forest, nu = 20)
 rbind(nu40 = sqrt(diag(vcov(fit_forest))),
       nu20 = sqrt(diag(vcov(less_information))))
-#>       forest500
-#> nu40 0.09377258
-#> nu20 0.13261445
 ```
 
 **How to read the output.** Halving `nu` multiplies each standard error by
 $\sqrt{2}$ but leaves the estimate unchanged. If the interval still
 excludes zero at the smallest plausible `nu`, the conclusion does not
 hinge on that assumption. The check does not estimate the true
-information content.
+effective information.
 
 ## Check convergence, comparison, and adequacy
 
-
-``` r
+```{r diagnostics}
 aic_table(list(fit_uniform, fit_forest), mod_names = c("uniform", "forest500"))
-#>       model K       AIC Delta_AIC AIC_wt Cum.wt   loglik converged boundary
-#> 2 forest500 3 -276.6249    0.0000      1      1 141.3124      TRUE    FALSE
-#> 1   uniform 2 -203.5238   73.1011      0      1 103.7619      TRUE    FALSE
 ```
 
 **How to read the output.** Check `converged` first. It is `TRUE` only
@@ -434,17 +354,16 @@ code 0, and `boundary` flags an estimate stuck at a limit. Lower AIC is
 better, `Delta_AIC` is each model's distance from the best, and `AIC_wt`
 is its relative support within this set. Models within 2 AIC units of the
 best have comparable support. The forest model is
-73.1 AIC units
+`r round(diff(sort(c(AIC(fit_uniform), AIC(fit_forest)))), 1)` AIC units
 better than uniform conductance. AIC depends on `nu`, and fits to
 different marker panels or likelihood families cannot share one table.
 
-
-``` r
+```{r fit-plot, fig.cap = "***Observed and fitted squared genetic distances.*** Each point is a pond pair, and the dashed line marks equality."}
 library(ggplot2)
 # Include the measurement nugget by converting fitted response covariance.
 predicted_D <- dist_from_cov(fitted(fit_forest))
-pairs <- lower.tri(D)
-diagnostic <- data.frame(observed = D[pairs], fitted = predicted_D[pairs])
+pond_pairs <- lower.tri(D)   # one entry per pair of ponds
+diagnostic <- data.frame(observed = D[pond_pairs], fitted = predicted_D[pond_pairs])
 ggplot(diagnostic, aes(observed, fitted)) +
   geom_point(alpha = 0.6, size = 1.5) +
   geom_abline(slope = 1, intercept = 0, linetype = 2) +
@@ -452,16 +371,13 @@ ggplot(diagnostic, aes(observed, fitted)) +
   labs(x = "Observed squared genetic distance", y = "Fitted squared genetic distance")
 ```
 
-![***Observed and fitted squared genetic distances.*** Each point is a pond pair, and the dashed line marks equality.](precomputed/getting-started-fit-plot-1.png)
-
 **How to read the plot.** Points near the dashed line are pond pairs the
 model predicts well, and the spread shows variation it does not capture.
 If a group of points sits off the line together, color them by pond to see
 whether one pond drives the misfit. Pairs share ponds, so the points are
 not independent, and a regression through them is not a new test.
 
-
-``` r
+```{r surface-plot, fig.cap = "***Fitted relative conductance at fixed 500 m context,*** shown on a logarithmic color scale."}
 C <- conductance(surface, fit_forest)
 maps <- plot(fit_forest, type = "surface", data = surface)
 # Use the same limits here and in the three uncertainty panels below.
@@ -476,8 +392,6 @@ maps[[1]] + map_colors +
              shape = 21, fill = "white", size = 1.5)
 ```
 
-![***Fitted relative conductance at fixed 500 m context,*** shown on a logarithmic color scale.](precomputed/getting-started-surface-plot-1.png)
-
 **How to read the map.** Yellow cells have high fitted conductance and
 dark purple cells low conductance, across the whole landscape, not only
 near ponds. On the logarithmic scale, equal color steps are equal ratios,
@@ -491,32 +405,27 @@ The conductance curve shows the forest relationship fitted to raster
 cells. The genetic-response curve passes that relationship through the
 graph and measurement model.
 
-
-``` r
+```{r forest-conductance, fig.cap = "Forest context and relative conductance, with a 95% interval band at each forest value."}
 plot(fit_forest, type = "marginal", data = surface,
      marginal_covariates = "forest500") +
   labs(x = "Forest fraction after 500 m smoothing", y = "Relative conductance")
 ```
 
-![Forest context and relative conductance, with a 95% interval band at each forest value.](precomputed/getting-started-forest-conductance-1.png)
-
 **How to read the curve.** Conductance rises with forest and equals 1 at
 the landscape-average forest value, so the curve shows conductance
 relative to an average cell. The horizontal axis is back-transformed to
-forest fraction because `saveStack = TRUE` kept the scaling information.
+forest fraction because `scale_covariates()` recorded the scaling and
+the graph kept that record (`saveStack = TRUE`, the default).
 The rug marks landscape forest values, and the band reflects coefficient
 uncertainty under `nu = 40`.
 
-
-``` r
+```{r forest-genetic-response, fig.cap = "Forest context and the fitted genetic response: the mean fitted covariance among ponds, including each pond's variance, when every cell takes the forest value on the horizontal axis."}
 # Each point requires a graph solve; 25 points keep this demonstration manageable.
 plot(fit_forest, type = "marginal_response", data = surface,
      marginal_covariates = "forest500", n = 25) +
   labs(x = "Forest fraction after 500 m smoothing",
        y = "Mean fitted genetic covariance")
 ```
-
-![Forest context and the fitted genetic response: the mean fitted covariance among ponds, including each pond's variance, when every cell takes the forest value on the horizontal axis.](precomputed/getting-started-forest-genetic-response-1.png)
 
 **How to read the genetic-response curve.** At each forest value,
 `type = "marginal_response"` sets forest to that value in every cell,
@@ -531,12 +440,9 @@ describes each plot type.
 
 The package also draws the observed-versus-fitted check and interval maps:
 
-
-``` r
+```{r package-fit, fig.height = 4, fig.cap = "Built-in diagnostic: observed versus fitted covariance for every pond pair and every pond variance."}
 plot(fit_forest, type = "fit")
 ```
-
-![Built-in diagnostic: observed versus fitted covariance for every pond pair and every pond variance.](precomputed/getting-started-package-fit-1.png)
 
 **How to read the plot.** This covariance-scale version of the distance
 plot separates pond variances (the diagonal of `S`) from between-pond
@@ -544,14 +450,9 @@ covariances, so judge agreement within each cluster. Fitted values are on
 the horizontal axis, and the blue line is a least-squares fit of observed
 on fitted values, not the 1:1 line.
 
-
-``` r
+```{r interval-maps, fig.height = 4, fig.cap = c("Lower 95% bound of fitted conductance, on the same logarithmic color scale as the estimate.", "Upper 95% bound of fitted conductance, on the same logarithmic color scale as the estimate.")}
 for (p in maps[-1]) print(p + map_colors)
 ```
-
-![Lower and upper 95% bounds of fitted conductance, on the same logarithmic color scale as the estimate.](precomputed/getting-started-interval-maps-1.png)
-
-![Lower and upper 95% bounds of fitted conductance, on the same logarithmic color scale as the estimate.](precomputed/getting-started-interval-maps-2.png)
 
 **How to read the maps.** The bounds share the estimate's spatial pattern
 because they come from the same forest coefficient. Conductance is least
@@ -565,8 +466,7 @@ constructor turns the two allele columns per locus into standardized
 allele-indicator features and a grouped covariance with a coherent Gower
 diagonal.
 
-
-``` r
+```{r microsatellite-response}
 stopifnot(identical(rownames(ohio_ponds$microsat), samples$individual))
 S_ms <- cov_from_genetic_data(ohio_ponds$microsat, groups = groups,
   input = "allele_calls", loci = ohio_ponds$microsat_loci,
@@ -580,15 +480,18 @@ data.frame(marker = c("2500 SNPs", "24 microsatellite loci"),
                          coef(fit_ms)[["forest500"]]),
   conductance_ratio = exp(c(coef(fit_forest)[["forest500"]],
                             coef(fit_ms)[["forest500"]])))
-#>                   marker forest_coefficient conductance_ratio
-#> 1              2500 SNPs          0.5800273          1.786087
-#> 2 24 microsatellite loci          0.4887609          1.630295
 ```
 
 **How to read the output.** Both panels come from the same animals and
 history, and both estimate a positive forest effect. Compare the
 coefficients, but do not rank the fits by AIC or log-likelihood, because
-different responses give incomparable likelihoods. Nor are the two panels
+different responses give incomparable likelihoods. The microsatellite fit
+reuses `nu = 40` only so the call matches the SNP fit. Point estimates do
+not depend on `nu`, which is why this table compares coefficients and
+reports no standard errors. Effective Wishart information is a property
+of each response, so choose and justify `nu` separately for every marker
+panel before you report uncertainty; 24 loci are unlikely to support the
+value you would defend for 2,500 SNPs. Nor are the two panels
 independent replicates. `diagonal = "gower"` puts each pond's variance on
 the scale of the between-pond covariances, as the Wishart likelihood
 requires, whereas the `"within"` diagonal is on a different scale and is
@@ -596,8 +499,7 @@ unsuitable here.
 
 ## Quick reference: a complete fixed-context SNP workflow
 
-
-``` r
+```{r quick-reference, eval = FALSE}
 library(terradish)
 library(terra)
 library(ggplot2)
@@ -661,26 +563,41 @@ for (p in maps) {
 
 ## See also
 
-- [`vignette("gaussian-scale-optimization", package = "terradish")`](gaussian-scale-optimization.html):
+- [`vignette("v07-gaussian-scale-optimization", package = "terradish")`](v07-gaussian-scale-optimization.html):
   estimate forest context and inspect its profile and prediction.
-- [`vignette("model-comparison", package = "terradish")`](model-comparison.html):
+- [`vignette("v04-model-comparison", package = "terradish")`](v04-model-comparison.html):
   compare candidate covariates and held-out performance.
-- [`vignette("spline-conductance", package = "terradish")`](spline-conductance.html):
+- [`vignette("v06-spline-conductance", package = "terradish")`](v06-spline-conductance.html):
   distinguish nonlinear response shape from spatial context.
-- [`vignette("ibe-ibr-workflow", package = "terradish")`](ibe-ibr-workflow.html):
+- [`vignette("v08-ibe-ibr-workflow", package = "terradish")`](v08-ibe-ibr-workflow.html):
   distinguish environmental differences from resistance.
-- [`vignette("categorical-conductance", package = "terradish")`](categorical-conductance.html):
+- [`vignette("v05-categorical-conductance", package = "terradish")`](v05-categorical-conductance.html):
   class contrasts on a separate specified covariance example.
-- [`vignette("wishart-covariance", package = "terradish")`](wishart-covariance.html):
+- [`vignette("v02-wishart-covariance", package = "terradish")`](v02-wishart-covariance.html):
   choose between a covariance response and a pairwise distance with MLPE.
-- [`vignette("mlpe-pairwise-distance", package = "terradish")`](mlpe-pairwise-distance.html):
+- [`vignette("v03-mlpe-pairwise-distance", package = "terradish")`](v03-mlpe-pairwise-distance.html):
   fit a pairwise genetic distance such as $F_{ST}$ with MLPE and read its summary.
-- [`vignette("individual-salamanders", package = "terradish")`](individual-salamanders.html):
+- [`vignette("v09-individual-salamanders", package = "terradish")`](v09-individual-salamanders.html):
   individual genotypes and a nonlinear (hump-shaped) resistance response.
-- [`vignette("large-landscapes", package = "terradish")`](large-landscapes.html):
+- [`vignette("v11-large-landscapes", package = "terradish")`](v11-large-landscapes.html):
   solvers, cropping, and warm starts for large rasters.
-- [`vignette("simulation-design", package = "terradish")`](simulation-design.html):
+- [`vignette("v10-simulation-design", package = "terradish")`](v10-simulation-design.html):
   simulate responses to plan sampling and check power.
-- [`vignette("data-generation", package = "terradish")`](data-generation.html):
+- [`vignette("v12-data-generation", package = "terradish")`](v12-data-generation.html):
   how the example landscapes, histories, and markers were produced.
 - `?ohio_ponds`: data fields, assumptions, and installed provenance.
+
+## References
+
+Clarke RT, Rothery P, Raybould AF (2002). Confidence limits for regression
+relationships between distance matrices: estimating gene flow with
+distance. *Journal of Agricultural, Biological, and Environmental
+Statistics*, 7, 361-372. <https://doi.org/10.1198/108571102320>
+
+Hanks EM, Hooten MB (2013). Circuit theory and model-based inference for
+landscape connectivity. *Journal of the American Statistical Association*,
+108, 22-33. <https://doi.org/10.1080/01621459.2012.724647>
+
+Peterman WE, Pope NS (2021). The use and misuse of regression models in
+landscape genetic analyses. *Molecular Ecology*, 30, 37-47.
+<https://doi.org/10.1111/mec.15716>

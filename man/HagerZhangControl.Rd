@@ -22,7 +22,9 @@ HagerZhangControl(
 \code{0 < delta < sigma < 1}. Smaller values accept shorter steps more
 readily.}
 
-\item{sigma}{Curvature condition constant (Wolfe condition 2). Must satisfy
+\item{sigma}{Curvature condition constant (Wolfe condition 2). This line
+search constant is unrelated to the \code{sigma} parameters of the
+measurement and conductance models. Must satisfy
 \code{delta < sigma < 1}. Values close to 1 relax the curvature requirement
 and allow fewer function evaluations per step.}
 
@@ -56,8 +58,8 @@ produce unit-scale search directions.}
 values) be printed to the console?}
 }
 \value{
-A named list of class \code{"HagerZhangControl"} holding the line
-  search settings.  The elements are the arguments above, stored unchanged:
+A named list of class \code{"terradish_hager_zhang_control"}
+  holding the line search settings.  The elements are the arguments above, stored unchanged:
   \code{delta}, \code{sigma}, \code{alphamax}, \code{rho}, \code{epsilon},
   \code{gamma}, \code{linesearchmax}, \code{psi3}, \code{c}, and
   \code{verbose}.  Pass the object to the \code{ls.control} argument of
@@ -81,7 +83,8 @@ problems. Common reasons to change them:
   \item \strong{Line-search failures}: increase \code{linesearchmax} or
     loosen \code{sigma} toward 1.
   \item \strong{Slow convergence with many small steps}: tighten \code{sigma}
-    (e.g. 0.1) to enforce a stronger curvature condition.
+    (e.g. 0.5; it must stay above \code{delta}) to enforce a stronger
+    curvature condition.
   \item \strong{Initial non-finite objectives}: increase \code{psi3} to take
     larger backtracking steps when \code{c} is too large.
 }
@@ -100,8 +103,13 @@ opt_ctrl <- NewtonRaphsonControl(
 \references{
 Hager WW, Zhang H. 2006. Algorithm 851: \code{CG_DESCENT}, a conjugate gradient
 method with guaranteed descent. ACM Transactions on Mathematical Software
-32(1):113-137.
+32(1):113-137. \doi{10.1145/1132973.1132979}.
 }
 \seealso{
 \code{\link{NewtonRaphsonControl}}, \code{\link{ArmijoControl}}
+
+Other optimizer controls:
+\code{\link[=ArmijoControl]{ArmijoControl()}},
+\code{\link[=NewtonRaphsonControl]{NewtonRaphsonControl()}}
 }
+\concept{optimizer controls}

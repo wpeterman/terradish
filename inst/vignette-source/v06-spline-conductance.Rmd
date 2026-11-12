@@ -1,5 +1,5 @@
 ---
-title: "Spline Conductance Models"
+title: "06. Spline Conductance Models"
 author: "Bill Peterman"
 output:
   rmarkdown::html_vignette:
@@ -9,7 +9,7 @@ output:
     mathjax: null
     pandoc_args: ["--mathml"]
 vignette: >
-  %\VignetteIndexEntry{Spline Conductance Models}
+  %\VignetteIndexEntry{06. Spline Conductance Models}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -21,7 +21,7 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
 
 **Goal.** Decide whether a bend in the forest association is useful or just extra flexibility, reading the fitted curve and predictive comparison together.
 
-[`vignette("data-generation", package = "terradish")`](data-generation.html)
+[`vignette("v12-data-generation", package = "terradish")`](v12-data-generation.html)
 explains the landscapes, SLiM histories, sampling, and matched markers used
 in these examples.
 
@@ -29,8 +29,8 @@ in these examples.
 
 Gaussian smoothing sets the spatial context of a raster covariate. A
 spline sets the **shape** of its association with conductance. Start with
-[`vignette("getting-started", package = "terradish")`](getting-started.html)
-and [`vignette("gaussian-scale-optimization", package = "terradish")`](gaussian-scale-optimization.html)
+[`vignette("v01-getting-started", package = "terradish")`](v01-getting-started.html)
+and [`vignette("v07-gaussian-scale-optimization", package = "terradish")`](v07-gaussian-scale-optimization.html)
 for the shared Ohio pond response and its spatial context.
 
 A forest association can rise steadily, level off, or change direction,
@@ -59,9 +59,14 @@ library(terra)
 library(ggplot2)
 data(ohio_ponds)
 ponds <- ohio_ponds$ponds
+# Sum SNP dosage within ponds, keep ponds in their declared order, and
+# build the pond covariance exactly as in Getting Started.
 g <- factor(ohio_ponds$samples$pond, levels = ponds$pond)
-N <- 2 * as.numeric(table(g))
-S <- cov_from_biallelic(rowsum(ohio_ponds$snp, g, reorder = FALSE)[ohio_ponds$ponds$pond, , drop = FALSE], N) / N[1]
+Y <- rowsum(ohio_ponds$snp, g, reorder = FALSE)
+Y <- Y[ponds$pond, , drop = FALSE]
+N <- 2 * as.numeric(table(g))        # sampled allele copies per pond
+S <- cov_from_biallelic(Y, N) / N[1]
+# Standardize every layer over the full landscape, then build the graph.
 x <- c(unwrap(ohio_ponds$covariates), unwrap(ohio_ponds$forest500))
 surface <- conductance_surface(scale_covariates(x), ponds[c("x", "y")], directions = 8)
 ```
@@ -69,6 +74,11 @@ surface <- conductance_surface(scale_covariates(x), ponds[c("x", "y")], directio
 All cells and all 24 ponds remain in the graph, and forest context is
 standardized over the whole landscape. Fixing 500 m uses the known
 simulated scale, which a field study must instead justify or estimate.
+
+The graph carries layers (`forest`, `slope`, `elevation`) that these
+formulas do not use. When you run the fits below, `terradish()` warns that
+it removed the unused layers. That warning is expected here, and this
+guide does not print it.
 
 ## See how basis functions build a curve
 
@@ -137,7 +147,7 @@ meaning (see the table).
 | $\beta_b$ | Weighted basis sum in log-conductance | Joint curve parameters, not individual ecological slopes |
 | 500 m context | Precomputed forest raster | Spatial averaging held fixed for the shape comparison |
 | `tau` and measurement `sigma` | Covariance likelihood | Graph weight and log additional diagonal variance |
-| `nu = 40` | Likelihood and curvature | Assumed information, held equal across candidates |
+| `nu = 40` | Likelihood and curvature | Effective Wishart information, an assumption held equal across candidates |
 
 ## Interpret the fitted association and its support
 
@@ -154,7 +164,7 @@ log-linear generating model also bends upward on this scale, because
 conductance is the exponential of a straight line, so a bend alone is not
 evidence of a threshold. The horizontal axis is back-transformed to forest
 fraction. The gray band is a 95% interval at each forest value and widens
-where few ponds were sampled.
+toward the extremes of forest, where few ponds supply information.
 
 ```{r focal-support}
 focal_values <- surface$x$forest500[as.integer(surface$demes)]
@@ -184,7 +194,7 @@ plot(fit_spline, type = "marginal", data = surface, support = "focal") +
 
 ## View the genetic-response curve
 
-```{r spline-response, fig.cap = "Spline forest association on the mean fitted covariance scale. Each forest value is applied across the graph, retaining the other covariates and pond locations."}
+```{r spline-response, fig.cap = "Spline forest association on the mean fitted covariance scale. Each forest value is applied to every cell of the graph, with pond locations unchanged."}
 plot(fit_spline, type = "marginal_response", data = surface,
      marginal_covariates = "forest500", n = 25) +
   labs(x = "Forest fraction after 500 m smoothing",
@@ -193,13 +203,14 @@ plot(fit_spline, type = "marginal_response", data = surface,
 
 **How to read this curve.** As in Getting Started, each point sets forest
 to one value in every cell and averages the fitted covariance among ponds,
-including each pond's variance. More forest raises conductance and shrinks the graph's contribution to
-covariance, so the average falls as forest rises. With forest as the only
+including each pond's variance. More forest raises conductance and
+shrinks the graph's contribution to covariance, so the average falls as
+forest rises. With forest as the only
 predictor, this is the conductance curve above, inverted and rescaled. The
 band is an approximate interval for that average, not for any pond pair,
 and its normal approximation can dip below zero where data are sparse.
 
-```{r spline-map, fig.cap = "Spline conductance estimate and pointwise model bounds over the full landscape. Colors use a shared logarithmic scale, with legend labels in conductance units."}
+```{r spline-map, fig.cap = c("Spline conductance estimate over the full landscape. Colors use a logarithmic scale shared with the two bound maps, with legend labels in conductance units.", "Lower 95% pointwise bound of spline conductance, on the same logarithmic color scale as the estimate.", "Upper 95% pointwise bound of spline conductance, on the same logarithmic color scale as the estimate.")}
 maps <- plot(fit_spline, type = "surface", data = surface)
 C <- conductance(surface, fit_spline)
 map_limits <- range(terra::values(C), na.rm = TRUE)
@@ -238,20 +249,41 @@ cv$summary
 likelihood even when the true shape is linear, and the AIC penalty counts
 their added coefficients. Spatial validation then asks whether the
 association transfers to whole held-out ponds, with measurement parameters
-fixed at training values. A spline that fits better
-but predicts worse favors the simpler association for this purpose.
+fixed at training values. `terradish_cv_folds()` scores only the pairs of
+ponds within each held-out block, not pairs that join a training pond to
+a held-out pond (see
+[how spatial cross-validation scores models](v04-model-comparison.html#compare-spatial-prediction)).
+A spline that fits better but does not predict better favors the simpler
+association for this purpose.
 
-Here the spline's AIC advantage is less than one unit, while its summed
-held-out score is about
+Here the spline's AIC advantage is less than one unit, which is a tie. The
+linear model is the spline's straight-line special case, so a
+likelihood-ratio test also applies. From the two log-likelihoods in the
+table, the statistic is `r round(2 * as.numeric(logLik(fit_spline) - logLik(fit_linear)), 2)` on 2
+degrees of freedom (the two extra coefficients), or
+$p\approx$ `r round(pchisq(2 * as.numeric(logLik(fit_spline) - logLik(fit_linear)), df = 2, lower.tail = FALSE), 2)`
+from `pchisq()`, so the full-data fit gives no clear support for the bend.
+
+In held-out prediction, the spline's summed score is about
 `r round(cv$summary$total_loglik[cv$summary$model == "linear"] - cv$summary$total_loglik[cv$summary$model == "spline_df3"])`
-units below the linear model, and in block 2 it even loses to uniform
-conductance. In `cv$summary`, the spline trails linear by about
+units below the linear model. Block
+`r cv$results$fold[cv$results$model == "linear"][which.max(cv$results$loglik[cv$results$model == "linear"] - cv$results$loglik[cv$results$model == "spline_df3"])]`
+alone supplies about `r round(max(cv$results$loglik[cv$results$model == "linear"] - cv$results$loglik[cv$results$model == "spline_df3"]))` of
+those units, and in that block the spline even loses to uniform
+conductance. In the other two blocks the two models score within about one
+unit of each other. In `cv$summary`, the spline trails linear by about
 `r sprintf("%.2f", abs(cv$summary$mean_difference[cv$summary$model == "spline_df3"]))`
 units per block (standard error
-`r sprintf("%.2f", cv$summary$se_difference[cv$summary$model == "spline_df3"])`),
-just over one standard error, so `within_one_se` is `FALSE`. The curve
-rises like the simulated association, but the extra flexibility does not
-improve prediction, so prefer the linear model.
+`r sprintf("%.2f", cv$summary$se_difference[cv$summary$model == "spline_df3"])`).
+The difference and its standard error are nearly equal, and the standard
+error rests on three blocks, so `within_one_se = FALSE` is a descriptive
+flag and not a decision. One block drives the gap.
+
+Prefer the linear model on parsimony. The spline spends two more
+coefficients, ties on AIC, gains no clear support from the
+likelihood-ratio test, and does not predict better overall in the
+held-out blocks. The curve rises like the simulated association, and the
+extra flexibility adds nothing a reader can rely on.
 
 ## What to take to your own study
 
@@ -269,18 +301,18 @@ locations as biological breakpoints. Splines use a fixed spatial context,
 so to estimate the smoothing scale, use a log-linear term in the Gaussian
 scale model instead.
 
-<details>
-<summary>Quick reference: expand for the complete copyable workflow</summary>
-
 ## Quick reference: shape at a fixed context
 
 ```{r quick-reference, eval = FALSE}
 library(terradish)
 library(terra)
 data(ohio_ponds)
+# 0. Pond covariance from SNP dosage, with ponds in their declared order.
 g <- factor(ohio_ponds$samples$pond, levels = ohio_ponds$ponds$pond)
+Y <- rowsum(ohio_ponds$snp, g, reorder = FALSE)
+Y <- Y[ohio_ponds$ponds$pond, , drop = FALSE]
 N <- 2 * as.numeric(table(g))
-S <- cov_from_biallelic(rowsum(ohio_ponds$snp, g, reorder = FALSE)[ohio_ponds$ponds$pond, , drop = FALSE], N) / N[1]
+S <- cov_from_biallelic(Y, N) / N[1]
 x <- c(unwrap(ohio_ponds$covariates), unwrap(ohio_ponds$forest500))
 graph <- conductance_surface(scale_covariates(x), ohio_ponds$ponds[c("x", "y")])
 ctl <- NewtonRaphsonControl(maxit = 200, ctol = 1e-8, ftol = 1e-8)
@@ -289,23 +321,22 @@ ctl <- NewtonRaphsonControl(maxit = 200, ctol = 1e-8, ftol = 1e-8)
 fit <- terradish(S ~ s(forest500, df = 3), graph,
   conductance_model = smooth_loglinear_conductance,
   measurement_model = wishart_covariance, nu = 40, optimizer = "bfgs", control = ctl)
-summary(fit)   # check Convergence; spline monotonicity is reported at the end
+summary(fit)   # check Convergence; spline shape is reported before Coefficients
 
 # 2. Interpret the whole curve, including its supported range.
 plot(fit, type = "marginal", data = graph)
 plot(fit, type = "marginal", data = graph, support = "focal")
 
-# 3. Compare prediction with a simpler log-linear shape.
+# 3. Compare prediction with a simpler log-linear shape. Scores use only
+#    pairs within each held-out block; prefer the simpler shape on a tie.
 cv <- terradish_cv_folds(graph,
   list(linear = S ~ forest500, spline = S ~ s(forest500, df = 3)),
   ohio_ponds$ponds$fold, model = wishart_covariance, nu = 40,
   conductance_model = list(linear = loglinear_conductance,
                            spline = smooth_loglinear_conductance),
   nuisance = "fixed", optimizer = "bfgs", control = ctl)
-cv$summary
+cv$summary   # within_one_se is a descriptive tie flag, not a decision
 ```
-
-</details>
 
 ## Summary of key functions
 
@@ -320,15 +351,15 @@ cv$summary
 
 ## See also
 
-- [`vignette("getting-started", package = "terradish")`](getting-started.html): genotype
+- [`vignette("v01-getting-started", package = "terradish")`](v01-getting-started.html): genotype
   construction and fixed-context fitting.
-- [`vignette("gaussian-scale-optimization", package = "terradish")`](gaussian-scale-optimization.html):
+- [`vignette("v07-gaussian-scale-optimization", package = "terradish")`](v07-gaussian-scale-optimization.html):
   estimate the spatial context of a continuous raster.
-- [`vignette("model-comparison", package = "terradish")`](model-comparison.html): multivariate
+- [`vignette("v04-model-comparison", package = "terradish")`](v04-model-comparison.html): multivariate
   candidates, information sensitivity, and predictive selection.
-- [`vignette("categorical-conductance", package = "terradish")`](categorical-conductance.html):
+- [`vignette("v05-categorical-conductance", package = "terradish")`](v05-categorical-conductance.html):
   factors for class contrasts rather than smooth gradients.
-- [`vignette("individual-salamanders", package = "terradish")`](individual-salamanders.html):
+- [`vignette("v09-individual-salamanders", package = "terradish")`](v09-individual-salamanders.html):
   a hump-shaped (quadratic) resistance response with individual genotypes.
-- [`vignette("data-generation", package = "terradish")`](data-generation.html):
+- [`vignette("v12-data-generation", package = "terradish")`](v12-data-generation.html):
   how the pond landscape and genetic history were simulated.

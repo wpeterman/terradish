@@ -21,7 +21,8 @@ scanned column-by-column (standard R column-major order).
 \details{
 This is a thin wrapper around \code{x[lower.tri(x)]}.  It is provided as a
 convenience for extracting vectorized pairwise measurements from symmetric
-matrices such as distance or covariance matrices.
+matrices such as distance or covariance matrices. The order matches the
+rows of \code{\link{pairwise_covariates}} and of R's \code{dist()}.
 }
 \examples{
 m <- matrix(1:9, nrow = 3)
@@ -36,4 +37,9 @@ lower(D)
 }
 \seealso{
 \code{\link[base]{lower.tri}}
+
+Other genetic responses:
+\code{\link[=check_distance_response]{check_distance_response()}},
+\code{\link[=pca_dist]{pca_dist()}}
 }
+\concept{genetic responses}

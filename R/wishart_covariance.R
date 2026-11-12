@@ -81,12 +81,19 @@
 #' uncertainty for \code{sigma} at that limit.
 #'
 #' @section Worked examples:
-#' \code{vignette("wishart-covariance", package = "terradish")},
-#' \code{vignette("individual-salamanders", package = "terradish")}.
+#' \code{vignette("v02-wishart-covariance", package = "terradish")},
+#' \code{vignette("v09-individual-salamanders", package = "terradish")}.
+#'
+#' @references
+#' Hanks EM, Hooten MB (2013). Circuit theory and model-based inference for
+#' landscape connectivity. Journal of the American Statistical Association,
+#' 108, 22--33. \doi{10.1080/01621459.2012.724647}.
 #'
 #' @seealso \code{\link{cov_from_genetic_data}}, \code{\link{cov_from_biallelic}},
 #'   \code{\link{generalized_wishart}}, \code{\link{wishart_covariates}},
 #'   \code{\link{simulate_covariance_response}}, \code{\link{terradish}}
+#'
+#' @family measurement models
 #'
 #' @return When \code{phi} is missing, a list with elements \code{phi}
 #'   (least-squares starting values for \code{(tau, sigma)}), \code{lower}
@@ -107,8 +114,13 @@
 #'               0.3, 1.5, 0.4,
 #'               0.2, 0.4, 1.1), nrow = 3, byrow = TRUE)
 #' Sigma <- 0.8 * E + 0.2 * diag(3)
-#' S <- rWishart(1, df = 20, Sigma = Sigma)[,,1] / 20
-#' wishart_covariance(E, S, phi = c(0.8, log(0.2)), nu = 20)
+#' set.seed(1)
+#' S <- rWishart(1, df = 20, Sigma = Sigma)[, , 1] / 20
+#' # tau multiplies the graph covariance; sigma is the LOG nugget variance.
+#' value <- wishart_covariance(E, S, phi = c(tau = 0.8, sigma = log(0.2)),
+#'                             nu = 20)
+#' value$objective  # negative log-likelihood at these values
+#' value$fitted     # fitted covariance, tau * E + exp(sigma) * I
 #'
 #' @export
 #' @template wishart-nu

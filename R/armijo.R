@@ -27,6 +27,10 @@
 #'   \code{min_alpha}, and \code{verbose}), suitable for the \code{ls.control}
 #'   element of a \code{\link{NewtonRaphsonControl}} object.
 #'
+#' @seealso \code{\link{NewtonRaphsonControl}}, \code{\link{HagerZhangControl}}
+#'
+#' @family optimizer controls
+#'
 #' @examples
 #' ctrl <- NewtonRaphsonControl(
 #'   maxit = 25,

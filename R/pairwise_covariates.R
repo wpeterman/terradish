@@ -5,7 +5,7 @@
   as.integer(round(n))
 }
 
-#' Combine environmental and other pairwise covariates
+#' Combine environmental differences with other pairwise covariates
 #'
 #' Combines differences calculated from site attributes with user-supplied
 #' pairwise matrices, such as geographic distance, in one measurement-model
@@ -21,6 +21,8 @@
 #'   Wishart model, each supplied distance must additionally produce a positive
 #'   semidefinite centered kernel; the measurement-model constructor checks it.
 #'   Site labels, when supplied on square matrices, must agree across inputs.
+#' @family measurement models
+#'
 #' @examples
 #' climate <- pairwise_endpoint_covariates(data.frame(temp = c(4, 7, 9)))
 #' geography <- dist(cbind(c(0, 1, 3), c(0, 2, 1)))

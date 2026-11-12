@@ -2,7 +2,7 @@
 % Please edit documentation in R/radish_graph.R
 \name{conductance_surface}
 \alias{conductance_surface}
-\title{Create a parameterized conductance surface}
+\title{Build the raster graph from covariates and sampling sites}
 \usage{
 conductance_surface(
   covariates,
@@ -16,8 +16,8 @@ conductance_surface(
 \item{covariates}{A \code{SpatRaster} (or \code{PackedSpatRaster}) whose
 layers contain the spatial covariates to be used in the conductance model.
 Layer names must match the right-hand side of the formula passed to
-\code{\link{terradish}}.  Scale continuous layers with
-\code{\link{scale_covariates}} before calling this function.}
+\code{\link{terradish}}.  Name the layers first, then scale continuous
+layers with \code{\link{scale_covariates}} before calling this function.}
 
 \item{coords}{Locations of the focal sampling sites, in the same coordinate
 reference system as \code{covariates}.  Supported inputs:
@@ -58,6 +58,12 @@ An object of class \code{"terradish_graph"} (also inheriting
   \item{\code{vertex_coordinates}}{xy-coordinate matrix of active cells.}
   \item{\code{directions}}{The adjacency rule (4 or 8).}
   \item{\code{covariates}}{Names of the covariate columns.}
+  \item{\code{laplacian}, \code{rhs}, \code{reduced_index},
+    \code{choleski_templates}, \code{choleski}}{Internal solver state: the
+    reduced graph Laplacian template, the right-hand sides for the focal
+    sites, the retained vertex index, and symbolic sparse Cholesky
+    factorizations. These are reused by the fitting functions and are not
+    meant to be modified.}
   \item{\code{stack}}{The masked \code{SpatRaster} (or \code{NULL} if
     \code{saveStack = FALSE}).}
 }
@@ -83,66 +89,77 @@ The function aborts if any focal site belongs to a disconnected component.
 
 \strong{Cropping:} when \code{crop_buffer} is supplied, cropping changes
 the graph domain.  Always use the same \code{terradish_graph} for all
-models you intend to compare.  A buffer that is too tight may cut off
-landscape corridors that affect resistance distances; check stability by
-refitting with several buffer values.
+models you intend to compare.  Cropping removes possible movement paths
+and can inflate resistance. In an unpublished development check on one
+landscape, resistance increased by 15--23 percent with a two-cell buffer
+and by 1--2 percent with ten cells. These are case-specific results;
+refit with several buffer values before interpreting a cropped landscape.
 
 \strong{Categorical covariates:} raster layers representing categorical
 variables must be stored as factor-valued \code{SpatRaster} layers (see
-\code{\link[terra]{as.factor}} and the example below).  Level names are
+\code{\link[terra:is.bool]{as.factor}} and the example below).  Level names are
 taken from the \code{VALUE} column of the levels table when present;
 otherwise the first non-\code{ID} column is used.  Factor levels are
 dummy-coded by \code{\link[stats]{model.matrix}} during model fitting, with
 one level as the reference.
 
-\strong{Directions:} \code{directions = 4} gives a more conservative graph
-that can underestimate resistance in diagonal corridors.
-\code{directions = 8} is preferred unless there is a specific reason to
-restrict movement to the cardinal directions.
-Eight-neighbor adjacency is the default. Each edge has conductance
-\eqn{c_i + c_j}; diagonal edges receive no additional distance weighting.
-Duplicate focal cells trigger a warning. Focal sites on pruned disconnected
-components cannot be fitted on the retained graph.
+\strong{Directions:} eight-neighbor adjacency is the default and is
+preferred unless there is a specific reason to restrict movement to the
+cardinal directions. \code{directions = 4} removes the diagonal edges, so
+it can overstate resistance (understate connectivity) along diagonal
+corridors. Each edge has conductance \eqn{c_i + c_j}; diagonal edges
+receive no additional distance weighting.
 
-Cropping removes possible movement paths and can inflate resistance. The
-supplied release audit measured increases of 15--23 percent with a two-cell
-buffer and 1--2 percent with ten cells. These are case-specific results;
-compare a larger-buffer fit before interpreting a cropped landscape.
+\strong{Sites sharing a cell:} two or more focal sites that fall in the
+same raster cell trigger a warning, because their resistance distance is
+zero. Use a finer raster, or keep one site per cell as in the example.
 }
 \examples{
-
 library(terra)
 
 data(melip)
-melip.altitude <- terra::unwrap(melip.altitude)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords <- terra::unwrap(melip.coords)
+covariates <- c(terra::unwrap(melip.altitude),
+                terra::unwrap(melip.forestcover))
+coords <- terra::unwrap(melip.coords)
 
-covariates <- c(terra::scale(melip.altitude),
-                terra::scale(melip.forestcover))
+# Name the layers first, then scale them.
 names(covariates) <- c("altitude", "forestcover")
+covariates <- scale_covariates(covariates)
 
-surface <- conductance_surface(covariates, melip.coords, directions = 8)
+# A few melip sites fall in the same raster cell. Keep one site per cell
+# (and the matching rows and columns of the genetic matrix).
+keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+coords <- coords[keep]
+Fst <- melip.Fst[keep, keep]
+
+surface <- conductance_surface(covariates, coords)  # eight neighbors
+surface$directions
+nrow(surface$x)       # number of graph vertices (non-missing cells)
+length(surface$demes) # number of focal sites
 
 # For large rasters where sites occupy only part of the map, crop first.
-surface_cropped <- conductance_surface(
-  covariates,
-  melip.coords,
-  directions = 8,
-  crop_buffer = 0.05
-)
+surface_cropped <- conductance_surface(covariates, coords,
+                                       crop_buffer = 0.05)
 
-# categorical covariates:
-# raster layers of categorical covariates should be factor-valued, see 'details'
-forestcover_class <- cut(terra::values(melip.forestcover)[,1], breaks = c(0, 1/6, 1/3, 1))
-melip.forestcover_cat <- terra::setValues(melip.forestcover, as.numeric(forestcover_class))
-melip.forestcover_cat <- terra::as.factor(melip.forestcover_cat)
-
-RAT <- levels(melip.forestcover_cat)[[1]]
+# Categorical covariates must be factor-valued layers (see Details).
+forestcover <- terra::unwrap(melip.forestcover)
+forestcover_class <- cut(terra::values(forestcover)[, 1],
+                         breaks = c(0, 1/6, 1/3, 1))
+forestcover_cat <- terra::setValues(forestcover,
+                                    as.numeric(forestcover_class))
+forestcover_cat <- terra::as.factor(forestcover_cat)
+RAT <- levels(forestcover_cat)[[1]]
 RAT$VALUE <- levels(forestcover_class) # explicitly define level names
-levels(melip.forestcover_cat) <- RAT
+levels(forestcover_cat) <- RAT
+names(forestcover_cat) <- "forestcover"
 
-covariates_cat <- c(melip.forestcover_cat, melip.altitude)
-names(covariates_cat) <- c("forestcover", "altitude")
+surface_cat <- conductance_surface(forestcover_cat, coords)
+levels(surface_cat$x$forestcover)
 
 }
+\seealso{
+Other graph setup:
+\code{\link[=crop_to_focal_buffer]{crop_to_focal_buffer()}},
+\code{\link[=scale_covariates]{scale_covariates()}}
+}
+\concept{graph setup}
