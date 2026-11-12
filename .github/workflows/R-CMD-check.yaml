@@ -48,9 +48,26 @@ jobs:
           needs: check
 
       - uses: r-lib/actions/check-r-package@v2
+        # Fail the step, not the whole job, if the check stalls. A step
+        # failure lets the upload step below run; a job timeout does not.
+        timeout-minutes: 60
         with:
           build_args: 'c("--no-manual", "--compact-vignettes=gs+qpdf")'
           upload-results: true
+
+      # check-r-package uploads its results only when the check finishes.
+      # When the step is stopped by its timeout, keep the partial example and
+      # test output so the stalled example or test can be identified.
+      - name: Upload partial check output
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: partial-check-${{ runner.os }}-r${{ matrix.config.r }}
+          path: |
+            check/*.Rcheck/00check.log
+            check/*.Rcheck/*-Ex*
+            check/*.Rcheck/tests/*.Rout*
+          if-no-files-found: ignore
 
       - name: Rebuild full executable vignette sources
         if: matrix.config.os == 'ubuntu-latest' && matrix.config.r == 'release'

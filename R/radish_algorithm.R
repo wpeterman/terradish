@@ -268,23 +268,48 @@
 
 .terradish_with_solver_warning_guard <- function(expr, context)
 {
-  withCallingHandlers(
-    expr,
-    warning = function(w)
-    {
-      message <- conditionMessage(w)
-      if (.terradish_solver_warning_is_fatal(message))
+  # Matrix reports CHOLMOD problems such as "matrix not positive definite" as
+  # R warnings raised from inside the compiled factorization. The handler
+  # below runs while CHOLMOD is still on the C stack, so it must not call
+  # stop() there: that would jump out of CHOLMOD before it restores its
+  # workspace (the supernodal link lists kept in Matrix's shared CHOLMOD
+  # state), and a later supernodal factorization can then loop forever.
+  # Instead, record the first fatal warning, muffle it so CHOLMOD finishes
+  # normally, and raise the error once the solver call has returned. Matrix
+  # may then signal its own error (for example from Cholesky()); that happens
+  # after CHOLMOD has returned, so it is caught here and replaced by the
+  # terradish message. Errors without a preceding fatal warning pass through.
+  fatal_message <- NULL
+  result <- tryCatch(
+    withCallingHandlers(
+      expr,
+      warning = function(w)
       {
-        stop(
-          context,
-          " ",
-          message,
-          " Current conductance values produced a non-positive-definite reduced Laplacian.",
-          call. = FALSE
-        )
+        message <- conditionMessage(w)
+        if (.terradish_solver_warning_is_fatal(message))
+        {
+          if (is.null(fatal_message))
+            fatal_message <<- message
+          invokeRestart("muffleWarning")
+        }
       }
+    ),
+    error = function(e)
+    {
+      if (is.null(fatal_message))
+        stop(e)
+      NULL
     }
   )
+  if (!is.null(fatal_message))
+    stop(
+      context,
+      " ",
+      fatal_message,
+      " Current conductance values produced a non-positive-definite reduced Laplacian.",
+      call. = FALSE
+    )
+  result
 }
 
 .choleski_template <- function(s, factorization)

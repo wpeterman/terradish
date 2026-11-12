@@ -1,5 +1,14 @@
 terradish (development version)
 -------------------------------
+* Fixed an intermittent hang or crash with the direct solver. When a trial
+  conductance made the reduced Laplacian not positive definite, terradish
+  raised its error from inside CHOLMOD's factorization, which left Matrix's
+  shared CHOLMOD workspace in an invalid state. A later supernodal
+  factorization in the same R session could then loop forever or crash R.
+  terradish now lets CHOLMOD finish before raising the same error. The hang
+  appeared with the supernodal factorization (`solver_control =
+  list(factorization = "supernodal_ll")`), which
+  `terradish_assess_settings()` can recommend.
 * `conductance_surface()` now forms the reduced graph Laplacian as a principal
   submatrix of the full Laplacian instead of through a sparse projection. The
   result is identical; graph construction on a raster of one million pixels
