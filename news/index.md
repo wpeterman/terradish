@@ -77,6 +77,14 @@
   and
   [`terradish_assess_settings()`](https://wpeterman.github.io/terradish/reference/terradish_assess_settings.md),
   not once per fold or refit.
+- [`terradish_cv_folds()`](https://wpeterman.github.io/terradish/reference/terradish_cv_folds.md)
+  accepts `model = "wishart_covariance"` and
+  `model = "generalized_wishart"`. The short string `"wishart"` is
+  unchanged and still selects `generalized_wishart`.
+- [`gaussian_scale_summary()`](https://wpeterman.github.io/terradish/reference/gaussian_scale_summary.md)
+  warns that `sigma` is in degrees once per session for a
+  longitude/latitude raster, not on every call. The `native_unit` column
+  still reads `"degrees"` each time.
 - The two `melip` rasters now carry distinct layer names, `altitude` and
   `forestcover`. Their values are unchanged.
 - New test comparing `curvature = "gauss_newton"` with the exact

@@ -265,10 +265,10 @@ assessment
 #> Recommended settings:
 #>   optimizer: newton (fastest acceptable probe: newton_hager_zhang)
 #>   line search: HagerZhangControl
-#>   solver: direct (fastest direct solver probe: simplicial_ll + cholmod_cpp)
+#>   solver: direct (fastest direct solver probe: simplicial_ldl + cholmod_cpp)
 #>   solver_control:
 #> $factorization
-#> [1] "simplicial_ll"
+#> [1] "simplicial_ldl"
 #> 
 #> $solve_backend
 #> [1] "cholmod_cpp"
@@ -279,19 +279,19 @@ assessment
 #> 
 #> Optimizer probes:
 #>               label elapsed loglik gradient_evaluations hessian_evaluations
-#>  newton_hager_zhang    0.34   1495                   10                   4
-#>    bfgs_hager_zhang    0.28   1494                    8                   1
-#>         bfgs_armijo    0.17   1492                    5                   1
+#>  newton_hager_zhang    0.20   1495                   10                   4
+#>    bfgs_hager_zhang    0.13   1494                    8                   1
+#>         bfgs_armijo    0.12   1492                    5                   1
 #>  line_search_trials status
 #>                   6     OK
 #>                   5     OK
 #>                   2     OK
 #> 
 #> Fastest direct solver probes:
-#>  factorization      solve_backend setup_time solve_time total_time
-#>  simplicial_ll        cholmod_cpp          0  0.0006941          0
-#>  supernodal_ll             matrix          0  0.0000000          0
-#>  supernodal_ll cholmod_cpp_cached          0  0.0020207          0
+#>   factorization      solve_backend setup_time solve_time total_time
+#>  simplicial_ldl        cholmod_cpp          0  0.0006257          0
+#>   simplicial_ll             matrix          0  0.0000000          0
+#>   simplicial_ll cholmod_cpp_cached          0  0.0007256          0
 #> 
 
 fit <- terradish(

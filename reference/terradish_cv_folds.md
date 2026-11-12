@@ -55,12 +55,15 @@ print(x, ...)
   ([`mlpe`](https://wpeterman.github.io/terradish/reference/mlpe.md)),
   `"ls"`
   ([`leastsquares`](https://wpeterman.github.io/terradish/reference/leastsquares.md)),
-  or `"wishart"`. The string `"wishart"` selects
-  [`generalized_wishart`](https://wpeterman.github.io/terradish/reference/generalized_wishart.md),
-  which expects a squared-distance response. For a covariance-matrix
-  response pass the function itself, `model = wishart_covariance`. With
-  fixed nuisance parameters, a named list matching the formula names can
-  compare models within one family.
+  `"generalized_wishart"`
+  ([`generalized_wishart`](https://wpeterman.github.io/terradish/reference/generalized_wishart.md),
+  a squared-distance response), or `"wishart_covariance"`
+  ([`wishart_covariance`](https://wpeterman.github.io/terradish/reference/wishart_covariance.md),
+  a covariance-matrix response). The short string `"wishart"` is kept
+  for existing code and selects `generalized_wishart`; prefer the full
+  names, which cannot be confused. With fixed nuisance parameters, a
+  named list matching the formula names can compare models within one
+  family.
 
 - nu:
 

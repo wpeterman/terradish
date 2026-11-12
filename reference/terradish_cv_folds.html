@@ -122,11 +122,13 @@ fold vectors requests repeated cross-validation.</p></dd>
 
 <dt id="arg-model">model<a class="anchor" aria-label="anchor" href="#arg-model"></a></dt>
 <dd><p>Measurement model function or one of <code>"mlpe"</code>
-(<code><a href="mlpe.html">mlpe</a></code>), <code>"ls"</code> (<code><a href="leastsquares.html">leastsquares</a></code>), or
-<code>"wishart"</code>. The string <code>"wishart"</code> selects
-<code><a href="generalized_wishart.html">generalized_wishart</a></code>, which expects a squared-distance
-response. For a covariance-matrix response pass the function itself,
-<code>model = wishart_covariance</code>. With fixed nuisance parameters, a named
+(<code><a href="mlpe.html">mlpe</a></code>), <code>"ls"</code> (<code><a href="leastsquares.html">leastsquares</a></code>),
+<code>"generalized_wishart"</code> (<code><a href="generalized_wishart.html">generalized_wishart</a></code>, a
+squared-distance response), or <code>"wishart_covariance"</code>
+(<code><a href="wishart_covariance.html">wishart_covariance</a></code>, a covariance-matrix response). The
+short string <code>"wishart"</code> is kept for existing code and selects
+<code>generalized_wishart</code>; prefer the full names, which cannot be
+confused. With fixed nuisance parameters, a named
 list matching the formula names can compare models within one family.</p></dd>
 
 

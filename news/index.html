@@ -87,6 +87,10 @@
 <li>
 <code><a href="../reference/legacy_terra_radish_scale_optim.html">terra_radish_scale_optim()</a></code> signals a deprecation warning, like the other legacy radish wrappers.</li>
 <li>“Removed unused spatial covariates” is raised once per call to <code><a href="../reference/terradish.html">terradish()</a></code>, <code><a href="../reference/terradish_cv_folds.html">terradish_cv_folds()</a></code>, <code><a href="../reference/covariance_response_power.html">covariance_response_power()</a></code>, <code><a href="../reference/terradish_scale_optim.html">terradish_scale_optim()</a></code>, <code><a href="../reference/gaussian_scale_profile.html">gaussian_scale_profile()</a></code>, and <code><a href="../reference/terradish_assess_settings.html">terradish_assess_settings()</a></code>, not once per fold or refit.</li>
+<li>
+<code><a href="../reference/terradish_cv_folds.html">terradish_cv_folds()</a></code> accepts <code>model = "wishart_covariance"</code> and <code>model = "generalized_wishart"</code>. The short string <code>"wishart"</code> is unchanged and still selects <code>generalized_wishart</code>.</li>
+<li>
+<code><a href="../reference/gaussian_scale_summary.html">gaussian_scale_summary()</a></code> warns that <code>sigma</code> is in degrees once per session for a longitude/latitude raster, not on every call. The <code>native_unit</code> column still reads <code>"degrees"</code> each time.</li>
 <li>The two <code>melip</code> rasters now carry distinct layer names, <code>altitude</code> and <code>forestcover</code>. Their values are unchanged.</li>
 <li>New test comparing <code>curvature = "gauss_newton"</code> with the exact curvature for <code>mlpe</code>. Coefficients agree, but standard errors can differ materially (by about a factor of two in one configuration), so <code><a href="../reference/terradish.html">?terradish</a></code> and the large-landscapes guide now advise exact standard errors for MLPE fits.</li>
 </ul></div>

@@ -325,10 +325,10 @@ arguments (<code>optimizer</code>, <code>control</code>, <code>solver</code>,
 <span class="r-out co"><span class="r-pr">#&gt;</span> Recommended settings:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   optimizer: newton (fastest acceptable probe: newton_hager_zhang)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   line search: HagerZhangControl</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   solver: direct (fastest direct solver probe: simplicial_ll + cholmod_cpp)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   solver: direct (fastest direct solver probe: simplicial_ldl + cholmod_cpp)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   solver_control:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $factorization</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "simplicial_ll"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "simplicial_ldl"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $solve_backend</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] "cholmod_cpp"</span>
@@ -339,19 +339,19 @@ arguments (<code>optimizer</code>, <code>control</code>, <code>solver</code>,
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Optimizer probes:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>               label elapsed loglik gradient_evaluations hessian_evaluations</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  newton_hager_zhang    0.34   1495                   10                   4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    bfgs_hager_zhang    0.28   1494                    8                   1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         bfgs_armijo    0.17   1492                    5                   1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  newton_hager_zhang    0.20   1495                   10                   4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    bfgs_hager_zhang    0.13   1494                    8                   1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         bfgs_armijo    0.12   1492                    5                   1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  line_search_trials status</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   6     OK</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   5     OK</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   2     OK</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Fastest direct solver probes:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  factorization      solve_backend setup_time solve_time total_time</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  simplicial_ll        cholmod_cpp          0  0.0006941          0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  supernodal_ll             matrix          0  0.0000000          0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  supernodal_ll cholmod_cpp_cached          0  0.0020207          0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   factorization      solve_backend setup_time solve_time total_time</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  simplicial_ldl        cholmod_cpp          0  0.0006257          0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   simplicial_ll             matrix          0  0.0000000          0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   simplicial_ll cholmod_cpp_cached          0  0.0007256          0</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="va">fit</span> <span class="op">&lt;-</span> <span class="fu"><a href="terradish.html">terradish</a></span><span class="op">(</span></span></span>

@@ -336,6 +336,21 @@ smallest that recovers this association reliably. That answer holds only
 for this effect size, this <code>nu</code>, and a correctly specified
 model, so repeat the sweep across the plausible range of each before you
 commit field effort.</p>
+<p><strong>Why the 12-pond space-filling row looks worse.</strong> The
+row describes one design, not the strategy. Space-filling selection
+keeps the 12 ponds that are farthest apart (median nearest-neighbor
+distance about 2.3 km, against about 1.4 km for a random draw of 12),
+and widely separated ponds share little covariance for the forest
+coefficient to explain. A follow-up run of 150 responses for this design
+gave a median estimate of 0.62, close to the generating 0.6, with a few
+weakly identified fits far in the right tail whose intervals were
+correspondingly wide. Those few fits produce the large bias and error.
+Single random designs of 12 ponds vary as much: in 12 random designs
+with 30 responses each, error ranged from 0.21 to 1.30 and fit rate from
+0.90 to 1.00. The pooled <code>random</code> row averages over that
+variation, and the space-filling row cannot. Use <code>n_designs</code>
+greater than 1 to see between-design variation for random selection, and
+do not read one row as a verdict on a strategy.</p>
 <p><strong>What the sweep cost.</strong> It fitted 540 models (3 sample
 sizes, 90 simulated responses each, 2 candidate models) in about 14
 minutes on one core of the machine that built this guide. The same call

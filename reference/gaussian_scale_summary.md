@@ -77,7 +77,9 @@ smoothing.
 If the retained raster is in longitude/latitude, the native-unit results
 are in degrees. In that case, use a projected raster for direct distance
 interpretation, or provide an approximate `distance_per_map_unit`
-conversion if you need a quick descriptive summary.
+conversion if you need a quick descriptive summary. Without a conversion
+the function warns once per session, and the `native_unit` column reads
+`"degrees"` on every call.
 
 ## See also
 

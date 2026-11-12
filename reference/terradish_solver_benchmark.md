@@ -106,9 +106,9 @@ terradish_solver_benchmark(
   n_replicates = 1
 )
 #>   solver  factorization solve_backend replicate n_vertices n_rhs setup_time
-#> 1 direct simplicial_ldl        matrix         1      22443    34       0.07
-#> 2 direct  simplicial_ll        matrix         1      22443    34       0.08
+#> 1 direct simplicial_ldl        matrix         1      22443    34       0.05
+#> 2 direct  simplicial_ll        matrix         1      22443    34       0.05
 #>   solve_time total_time
-#> 1       0.01       0.12
-#> 2       0.01       0.17
+#> 1       0.02       0.11
+#> 2       0.02       0.11
 ```

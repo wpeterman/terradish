@@ -107,8 +107,8 @@ power                     # settings header plus the scenario summary
 #>             0.9331250                 0.9641851         0.6666667
 #>             0.9942349                 0.9961422         1.0000000
 #>  selected_AICc_rate mean_elapsed conductance_cor_threshold all_parameter_power
-#>           0.6666667    0.3133333                       0.9           0.6666667
-#>           1.0000000    0.2433333                       0.9           1.0000000
+#>           0.6666667    0.3466667                       0.9           0.6666667
+#>           1.0000000    0.2866667                       0.9           1.0000000
 power$parameter_summary   # per-coefficient power, bias, RMSE, coverage
 #>    strategy sample_size model   parameter true n_replicates  fit_rate     power
 #> 1 spacefill           8 truth    altitude -0.4            3 0.6666667 0.6666667

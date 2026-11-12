@@ -123,9 +123,9 @@ assessment                      # the four-part report described above
 #> 
 #> Optimizer probes:
 #>               label elapsed loglik gradient_evaluations hessian_evaluations
-#>  newton_hager_zhang    0.19   1495                   10                   4
-#>    bfgs_hager_zhang    0.14   1494                    8                   1
-#>         bfgs_armijo    0.14   1492                    5                   1
+#>  newton_hager_zhang    0.22   1495                   10                   4
+#>    bfgs_hager_zhang    0.19   1494                    8                   1
+#>         bfgs_armijo    0.10   1492                    5                   1
 #>  line_search_trials status
 #>                   6     OK
 #>                   5     OK
@@ -133,9 +133,9 @@ assessment                      # the four-part report described above
 #> 
 #> Fastest direct solver probes:
 #>   factorization solve_backend setup_time solve_time total_time
-#>  simplicial_ldl   cholmod_cpp          0   0.000691          0
-#>   simplicial_ll        matrix          0   0.000000          0
-#>   supernodal_ll        matrix          0   0.000000          0
+#>  simplicial_ldl   cholmod_cpp          0  0.0008286          0
+#>   simplicial_ll        matrix          0  0.0000000          0
+#>   supernodal_ll        matrix          0  0.0000000          0
 #> 
 assessment$comparison$summary   # one-line verdict against the defaults
 #> [1] "Assessment differs from terradish defaults: solver_control tuned from terradish defaults."
