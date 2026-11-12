@@ -1,4 +1,4 @@
-#' Control settings for Newton-like optimizers
+#' Control settings for the Newton and BFGS optimizers
 #'
 #' Tuning parameters shared by Newton-Raphson and BFGS quasi-Newton
 #' optimizers inside \code{\link{terradish}}.
@@ -15,8 +15,10 @@
 #'   Hessian entry are replaced by one when forming the Newton step.
 #'   Increasing this value regularizes the step
 #'   at the cost of slower convergence near flat regions.
-#' @param verbose Logical.  If \code{TRUE}, print the iteration count,
-#'   objective value, and gradient norm at each step.
+#' @param verbose Logical.  If \code{TRUE}, report the iteration count,
+#'   objective value, and gradient norm at each step (emitted with
+#'   \code{message()}). The \code{verbose} argument of \code{\link{terradish}}
+#'   overrides this field when it is set explicitly.
 #' @param eps Box-constraint tolerance.  A parameter is considered to be
 #'   "on the boundary" when it is within \code{eps * abs(par)} of the bound.
 #'   Active-constraint gradient components are zeroed before the step is taken.
@@ -43,12 +45,14 @@
 #'     \code{maxit}.
 #'   \item You want a quick exploratory fit: reduce \code{maxit} (for example
 #'     5 to 10).
-#'   \item Fitting is slow because of oscillation: tighten \code{ctol} or
-#'     switch to a more conservative line search via \code{ls.control}.
+#'   \item The optimizer reports a stall (code 2) or repeated line-search
+#'     failures: scale the covariates, start closer to zero, or adjust the
+#'     line search through \code{ls.control}.
 #' }
 #'
-#' @return A named list of class \code{"NewtonRaphsonControl"} holding the
-#'   settings passed to the optimizer.  The elements are the arguments above,
+#' @return A named list of class
+#'   \code{"terradish_newton_raphson_control"} holding the settings passed to
+#'   the optimizer.  The elements are the arguments above,
 #'   validated and stored unchanged: \code{maxit}, \code{ctol}, \code{ftol},
 #'   \code{etol}, \code{verbose}, \code{eps}, \code{del}, and
 #'   \code{ls.control} (itself a \code{HagerZhangControl} or
@@ -59,6 +63,8 @@
 #'
 #' @seealso \code{\link{HagerZhangControl}}, \code{\link{ArmijoControl}},
 #'   \code{\link{terradish}}
+#'
+#' @family optimizer controls
 #'
 #' @examples
 #' ctrl <- NewtonRaphsonControl(maxit = 25, verbose = FALSE)
@@ -73,11 +79,14 @@
 #' names(covariates) <- c("altitude", "forestcover")
 #' covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
 #'                                                 na.rm = TRUE))
-#' surface <- conductance_surface(covariates, terra::unwrap(melip.coords),
-#'                                directions = 8)
+#' # Keep one site per raster cell (some melip sites share a cell).
+#' coords <- terra::unwrap(melip.coords)
+#' keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+#' Fst <- melip.Fst[keep, keep]
+#' surface <- conductance_surface(covariates, coords[keep])
 #'
 #' # A tighter, longer-running control than the default
-#' fit <- terradish(melip.Fst ~ forestcover + altitude, data = surface,
+#' fit <- terradish(Fst ~ forestcover + altitude, data = surface,
 #'                  conductance_model = loglinear_conductance,
 #'                  measurement_model = mlpe,
 #'                  control = NewtonRaphsonControl(maxit = 200, ctol = 1e-8))
@@ -85,7 +94,7 @@
 #'
 #' # The same fit, reporting each optimizer step. `verbose` is the simple
 #' # switch; it overrides whatever `control` says.
-#' fit_loud <- terradish(melip.Fst ~ forestcover + altitude, data = surface,
+#' fit_loud <- terradish(Fst ~ forestcover + altitude, data = surface,
 #'                       conductance_model = loglinear_conductance,
 #'                       measurement_model = mlpe,
 #'                       control = ctrl_quick, verbose = TRUE)
@@ -100,9 +109,14 @@ NewtonRaphsonControl <- function(maxit = 100,
                                  eps = 1e-8, 
                                  del = 1,
                                  ls.control = HagerZhangControl())
-  list(maxit = maxit, ctol = ctol, etol = etol, 
-       ftol = ftol, verbose = verbose, eps = eps, 
-       del = del, ls.control = ls.control)
+  # Classed like ArmijoControl(), so control objects can be recognized with
+  # inherits(). The elements and their order are unchanged.
+  structure(
+    list(maxit = maxit, ctol = ctol, etol = etol,
+         ftol = ftol, verbose = verbose, eps = eps,
+         del = del, ls.control = ls.control),
+    class = c("terradish_newton_raphson_control", "list")
+  )
 
 # Both optimizers iterate `seq_len(maxit)` and then read the loop variable, so
 # a non-positive or non-finite `maxit` has to be rejected up front rather than

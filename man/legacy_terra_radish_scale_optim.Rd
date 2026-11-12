@@ -5,27 +5,12 @@
 \alias{terra_radish_scale_optim}
 \title{Legacy terradish scale-optimization alias}
 \usage{
-terra_radish_scale_optim(
-  formula,
-  covariates,
-  coords,
-  scales = NULL,
-  lower = NULL,
-  upper = NULL,
-  scale_grid = NULL,
-  search = c("coordinate", "grid"),
-  objective = c("aic", "logLik"),
-  grid_points = 5L,
-  maxit = 10L,
-  tol = 0.1,
-  scale_fun = "terradish",
-  scale_args = NULL,
-  postprocess = scale_covariates,
-  directions = 8L,
-  theta = NULL,
-  verbose = FALSE,
-  ...
-)
+terra_radish_scale_optim(...)
+}
+\arguments{
+\item{...}{Arguments passed through the deprecated
+\code{terra_radish_scale_optim()} compatibility wrapper to
+\code{\link{terradish_scale_optim}}.}
 }
 \value{
 An object of class \code{"terradish_scale_optim"}, a list with:
@@ -53,7 +38,11 @@ An object of class \code{"terradish_scale_optim"}, a list with:
   the coordinate search converged (always \code{0} for a grid search).}
 }
 \description{
-Legacy alias retained for backward compatibility with older
-\code{terra_radish_scale_optim()} calls.
+Deprecated compatibility wrapper retained for older code that still calls
+\code{terra_radish_scale_optim()}. It signals a deprecation warning and
+forwards its arguments unchanged.
+}
+\seealso{
+\code{\link{radish_compatibility}}
 }
 \keyword{internal}

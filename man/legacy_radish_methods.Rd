@@ -29,13 +29,7 @@
 
 \method{fitted}{radish}(object, type = c("response", "distance", "covariance"), ...)
 
-\method{simulate}{radish}(
-  object,
-  nsim = 1,
-  seed = NULL,
-  method = c("permutation", "parametric"),
-  ...
-)
+\method{simulate}{radish}(object, nsim = 1, seed = NULL, method = "permutation", ...)
 
 \method{anova}{radish}(object, ..., alternative = NULL)
 
@@ -105,5 +99,8 @@ requirements.
 \description{
 Deprecated S3 methods retained for legacy objects that still dispatch on the
 older \code{"radish"} class names.
+}
+\seealso{
+\code{\link{radish_compatibility}}
 }
 \keyword{internal}

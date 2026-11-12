@@ -1,0 +1,268 @@
+# pkgdown configuration for the terradish website.
+# Preview locally with pkgdown::build_site(); the output goes to docs/, which
+# is ignored by git and by R CMD build. The deployed site is built by
+# .github/workflows/pkgdown.yaml and published from the gh-pages branch.
+url: https://wpeterman.github.io/terradish/
+
+template:
+  bootstrap: 5
+  # Same Bootswatch theme as the landscapemetrics site this one is modeled on.
+  bootswatch: sandstone
+  # The vignettes are written for MathML (pandoc --mathml), so the site
+  # renders math the same way and needs no JavaScript math library.
+  math-rendering: mathml
+
+# A version with a fourth component (for example 1.1.1.9000) builds a
+# development site under dev/. A three-part release version builds the
+# released site at the root. See the versioning rules in AGENTS.md.
+development:
+  mode: auto
+
+home:
+  sidebar:
+    structure: [links, license, citation, authors, community, dev]
+  title: "terradish: maximum likelihood optimization of landscape conductance surfaces"
+  description: >
+    Fit landscape conductance surfaces to genetic covariance or pairwise
+    genetic distances by maximum likelihood on raster graphs, with spatial
+    cross-validation, Gaussian scale and spline models, and simulation tools.
+
+navbar:
+  structure:
+    left: [getstarted, reference, guides, news]
+    right: [search, github]
+  components:
+    getstarted:
+      text: Get Started
+      icon: fas fa-wand-magic-sparkles
+      href: articles/v01-getting-started.html
+    reference:
+      text: Functions
+      icon: fas fa-gears
+      href: reference/index.html
+    news:
+      text: News
+      icon: fas fa-newspaper
+      href: news/index.html
+    guides:
+      text: Guides
+      icon: fas fa-graduation-cap
+      menu:
+      - text: Start here
+      - text: Getting started with terradish
+        href: articles/v01-getting-started.html
+      - text: -------
+      - text: Genetic responses
+      - text: Choosing and checking a covariance response
+        href: articles/v02-wishart-covariance.html
+      - text: Pairwise genetic distances with MLPE
+        href: articles/v03-mlpe-pairwise-distance.html
+      - text: -------
+      - text: Comparing models
+      - text: Model comparison and selection
+        href: articles/v04-model-comparison.html
+      - text: -------
+      - text: Conductance model forms
+      - text: Categorical landscape covariates
+        href: articles/v05-categorical-conductance.html
+      - text: Spline conductance models
+        href: articles/v06-spline-conductance.html
+      - text: Gaussian scale optimization
+        href: articles/v07-gaussian-scale-optimization.html
+      - text: -------
+      - text: Hypotheses and case studies
+      - text: Isolation by environment and resistance
+        href: articles/v08-ibe-ibr-workflow.html
+      - text: Individual genotypes and nonlinear resistance
+        href: articles/v09-individual-salamanders.html
+      - text: -------
+      - text: Study design and computation
+      - text: Simulating data to plan a study
+        href: articles/v10-simulation-design.html
+      - text: Large landscapes
+        href: articles/v11-large-landscapes.html
+      - text: -------
+      - text: Background
+      - text: How the example data were generated
+        href: articles/v12-data-generation.html
+      - text: -------
+      - text: All guides
+        href: articles/index.html
+
+# The guides are numbered 01 to 12 in their titles so that R, RStudio, and
+# CRAN (which all sort vignettes by title) list them in reading order. The
+# sections below follow the same order, grouped by purpose.
+articles:
+- title: Start here
+  desc: >
+    One complete analysis, from matched genotypes to a fitted conductance
+    map. Read this first; every other guide builds on it.
+  contents:
+  - v01-getting-started
+
+- title: Genetic responses
+  desc: >
+    Choose and check the genetic quantity the model explains: an
+    allele-frequency covariance with a Wishart likelihood, or a pairwise
+    genetic distance with MLPE.
+  contents:
+  - v02-wishart-covariance
+  - v03-mlpe-pairwise-distance
+
+- title: Comparing models
+  desc: >
+    Candidate tables, information criteria, likelihood-ratio tests, and
+    spatial cross-validation.
+  contents:
+  - v04-model-comparison
+
+- title: Conductance model forms
+  desc: >
+    Beyond a linear term: land-cover classes, curved associations, and the
+    spatial scale at which a covariate acts.
+  contents:
+  - v05-categorical-conductance
+  - v06-spline-conductance
+  - v07-gaussian-scale-optimization
+
+- title: Hypotheses and case studies
+  desc: >
+    Separating isolation by environment from isolation by resistance, and a
+    full individual-based analysis with a nonlinear response.
+  contents:
+  - v08-ibe-ibr-workflow
+  - v09-individual-salamanders
+
+- title: Study design and computation
+  desc: >
+    Simulation for planning a study, and solver, storage, and domain choices
+    for large rasters.
+  contents:
+  - v10-simulation-design
+  - v11-large-landscapes
+
+- title: Background
+  desc: How the bundled salamander example data were simulated and sampled.
+  contents:
+  - v12-data-generation
+
+reference:
+- title: Build the graph
+  desc: >
+    Prepare raster covariates and connect sampling locations to a raster
+    graph.
+  contents:
+  - scale_covariates
+  - conductance_surface
+  - crop_to_focal_buffer
+
+- title: Genetic responses
+  desc: >
+    Construct and check the genetic response. The covariance and distance
+    constructors are re-exported from landgraph.
+  contents:
+  - reexports
+  - check_distance_response
+  - pca_dist
+
+- title: Fit and evaluate models
+  desc: >
+    Fit a conductance model by maximum likelihood and work with the fitted
+    object.
+  contents:
+  - terradish
+  - terradish_methods
+  - conductance
+  - terradish_distance
+  - slim_terradish
+
+- title: Conductance models
+  desc: How raster covariates map to cell conductance.
+  contents:
+  - terradish_conductance_model_factory
+  - loglinear_conductance
+  - smooth_loglinear_conductance
+  - gaussian_smoothed_loglinear_conductance
+
+- title: Spatial scale
+  desc: Estimate, profile, and summarize Gaussian smoothing scales.
+  contents:
+  - terradish_scale_optim
+  - gaussian_scale_profile
+  - gaussian_scale_summary
+
+- title: Measurement models
+  desc: >
+    How resistance distance or covariance links to the observed genetic
+    response, including pairwise and site-level environmental covariates.
+  contents:
+  - terradish_measurement_model
+  - mlpe
+  - mlpe_covariates
+  - mlpe_response_change
+  - wishart_covariance
+  - wishart_covariates
+  - generalized_wishart
+  - leastsquares
+  - pairwise_covariates
+  - pairwise_endpoint_covariates
+  - terradish_ibe_ratio
+
+- title: Inference and model comparison
+  desc: >
+    Standard errors and intervals, information criteria, and spatial
+    cross-validation.
+  contents:
+  - terradish_inference
+  - terradish_rescale_nu
+  - aic_table
+  - terradish_folds
+  - terradish_cv_folds
+
+- title: Plotting
+  desc: Diagnostic and interpretive plots of a fitted model.
+  contents:
+  - plot.terradish
+
+- title: Simulation and study design
+  desc: Simulate covariance responses and assess parameter recovery.
+  contents:
+  - simulate_covariance_response
+  - covariance_response_power
+  - print.terradish_covariance_power
+
+- title: Large landscapes and solver settings
+  desc: Solver benchmarks and speed settings for large rasters.
+  contents:
+  - terradish_assess_settings
+  - print.terradish_setting_assessment
+  - terradish_solver_benchmark
+
+- title: Optimizer controls
+  desc: Tuning for the Newton-type optimizers and their line searches.
+  contents:
+  - NewtonRaphsonControl
+  - ArmijoControl
+  - HagerZhangControl
+
+- title: Data sets
+  desc: Bundled example data used in the help pages and guides.
+  contents:
+  - ohio_ponds
+  - individual_salamanders
+  - melip
+
+- title: Compatibility
+  desc: Names kept from the radish package and their terradish replacements.
+  contents:
+  - radish_compatibility
+
+- title: Low-level tools
+  desc: >
+    Direct likelihood evaluation and small helpers. Most analyses do not
+    need these.
+  contents:
+  - terradish_grid
+  - terradish_algorithm
+  - lower
+  - scale_to_0_1

@@ -123,8 +123,8 @@ uncertainty for \code{sigma} at that limit.
 }
 \section{Worked examples}{
 
-\code{vignette("wishart-covariance", package = "terradish")},
-\code{vignette("individual-salamanders", package = "terradish")}.
+\code{vignette("v02-wishart-covariance", package = "terradish")},
+\code{vignette("v09-individual-salamanders", package = "terradish")}.
 }
 
 \section{Effective Wishart information}{
@@ -134,7 +134,7 @@ estimates do not depend on it, but standard errors, likelihood-ratio tests,
 and information criteria do. It is a dispersion parameter that you set,
 rather than the number of markers. Linkage and the population history
 shared by loci can make effective information much smaller than the SNP
-count. In forward-time simulations used to validate terradish, standard
+count. In unpublished forward-time simulations run during development, standard
 errors at the SNP count were three to five times smaller than the spread
 among replicate histories. Those model-based errors understated uncertainty.
 
@@ -151,12 +151,33 @@ E <- matrix(c(1.2, 0.3, 0.2,
               0.3, 1.5, 0.4,
               0.2, 0.4, 1.1), nrow = 3, byrow = TRUE)
 Sigma <- 0.8 * E + 0.2 * diag(3)
-S <- rWishart(1, df = 20, Sigma = Sigma)[,,1] / 20
-wishart_covariance(E, S, phi = c(0.8, log(0.2)), nu = 20)
+set.seed(1)
+S <- rWishart(1, df = 20, Sigma = Sigma)[, , 1] / 20
+# tau multiplies the graph covariance; sigma is the LOG nugget variance.
+value <- wishart_covariance(E, S, phi = c(tau = 0.8, sigma = log(0.2)),
+                            nu = 20)
+value$objective  # negative log-likelihood at these values
+value$fitted     # fitted covariance, tau * E + exp(sigma) * I
 
+}
+\references{
+Hanks EM, Hooten MB (2013). Circuit theory and model-based inference for
+landscape connectivity. Journal of the American Statistical Association,
+108, 22--33. \doi{10.1080/01621459.2012.724647}.
 }
 \seealso{
 \code{\link{cov_from_genetic_data}}, \code{\link{cov_from_biallelic}},
   \code{\link{generalized_wishart}}, \code{\link{wishart_covariates}},
   \code{\link{simulate_covariance_response}}, \code{\link{terradish}}
+
+Other measurement models:
+\code{\link[=generalized_wishart]{generalized_wishart()}},
+\code{\link[=leastsquares]{leastsquares()}},
+\code{\link[=mlpe]{mlpe()}},
+\code{\link[=mlpe_covariates]{mlpe_covariates()}},
+\code{\link[=pairwise_covariates]{pairwise_covariates()}},
+\code{\link[=pairwise_endpoint_covariates]{pairwise_endpoint_covariates()}},
+\code{\link{terradish_measurement_model}},
+\code{\link[=wishart_covariates]{wishart_covariates()}}
 }
+\concept{measurement models}

@@ -1,5 +1,5 @@
 ---
-title: "How the Salamander Example Data Were Generated"
+title: "12. How the Salamander Example Data Were Generated"
 author: "Bill Peterman"
 output:
   rmarkdown::html_vignette:
@@ -9,7 +9,7 @@ output:
     mathjax: null
     pandoc_args: ["--mathml"]
 vignette: >
-  %\VignetteIndexEntry{How the Salamander Example Data Were Generated}
+  %\VignetteIndexEntry{12. How the Salamander Example Data Were Generated}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -23,17 +23,19 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
 animals, and mutations became the datasets used throughout these guides.
 You can analyze the bundled data without running SLiM or downloading rasters.
 
-## Two examples, three kinds of data
+## What is real and what is simulated
 
-Both salamander examples use real southeastern Ohio terrain and land cover,
-but the animals, genetic data, pond locations, and drying index are
-simulated.
+The guides use three kinds of data: a real landscape, genotypes simulated
+in SLiM on that landscape, and covariance matrices drawn directly from a
+statistical model. Both salamander examples use real southeastern Ohio
+terrain and land cover, but the animals, genetic data, pond locations, and
+drying index are simulated.
 
 | Example | Biological question | Sampling and markers | Start here |
 |---|---|---|---|
-| Forest ponds, `ohio_ponds` | Does forest around routes help explain genetic differences among breeding ponds? | 24 ponds, 20 retained diploids per pond, 2,500 SNPs and 24 microsatellites | [Getting Started](getting-started.html) |
-| Terrestrial salamanders, `individual_salamanders` | Can faster, straighter movement in moderately dry terrain produce nonlinear IBR? | 160 adults per scenario, nested 500/1,000/2,500 SNPs and 24 matched microsatellites | [Individual genotypes](individual-salamanders.html) |
-| Statistical examples | Can a method recover a specified effect when its data model is correct? | Covariance matrices drawn directly from specified models | [Study design](simulation-design.html), [categorical covariates](categorical-conductance.html), and [IBE](ibe-ibr-workflow.html) |
+| Forest ponds, `ohio_ponds` | Does forest around routes help explain genetic differences among breeding ponds? | 24 ponds, 20 retained diploids per pond, 2,500 SNPs and 24 microsatellites | [Getting Started](v01-getting-started.html) |
+| Terrestrial salamanders, `individual_salamanders` | Can faster, straighter movement in moderately dry terrain produce nonlinear IBR? | 160 adults per scenario, nested 500/1,000/2,500 SNPs and 24 matched microsatellites | [Individual genotypes](v09-individual-salamanders.html) |
+| Statistical examples | Can a method recover a specified effect when its data model is correct? | Covariance matrices drawn directly from specified models | [Study design](v10-simulation-design.html), [categorical covariates](v05-categorical-conductance.html), and [IBE](v08-ibe-ibr-workflow.html) |
 
 The statistical examples reuse the landscape but contain no salamander
 genotypes. They illustrate a method without testing whether its specified
@@ -42,26 +44,27 @@ relationship describes salamander biology.
 ## Prepare the real landscape
 
 Elevation comes from USGS 3DEP, and land cover from the 2023 Annual NLCD
-product, Collection 1.0. Inputs were aligned in NAD83 / UTM zone 17N
-(EPSG:26917), so distances are in meters. The installed provenance files
-listed below record source requests and file hashes.
+product, Collection 1.0. All inputs share the NAD83 / UTM zone 17N
+projection (EPSG:26917), so distances are in meters. The installed
+provenance files listed below record source requests and file hashes.
 
 The pond analysis retains a 10.2 by 10.2 km landscape at 100 m resolution.
 Forest fraction is the proportion of finer land-cover cells classified as
-deciduous, evergreen, or mixed forest, or woody wetlands. Elevation and slope
-are retained as alternative predictors, although only forest controls pond
-exchange in the simulation. A surrounding input area reduces edge effects
-in forest context.
+deciduous, evergreen, or mixed forest, or woody wetlands. The data keep
+elevation and slope as alternative predictors, although only forest
+controls pond exchange in the simulation. A surrounding input area reduces
+edge effects in forest context.
 
 The terrestrial example uses an 840 by 840 m part of the same landscape,
 with a 300 by 300 m sampling core and a 270 m buffer. Its forest mask uses
 deciduous, evergreen, and mixed forest. Drying is a hypothetical index:
 
-$$D=0.60(1-W)+0.40X,$$
+$$Q=0.60(1-W)+0.40X,$$
 
 where $W$ is the scaled terrain-wetness quantity and $X$ is scaled exposure.
-Nonforest native cells receive $D=1$. These are assumed values, not measured
-water loss. The 10 m analysis grid interpolates the native 30 m information
+Nonforest native cells receive $Q=1$. These are assumed values, not measured
+water loss. The symbol $Q$ is local to this guide; the other guides use
+$D$ for squared genetic distance. The 10 m analysis grid interpolates the native 30 m information
 so nearby individuals can occupy separate graph cells.
 
 ```{r landscape, fig.cap="Real landscape inputs for the two simulated examples: hypothetical ponds on the forest-fraction map (left) and the assumed terrestrial drying index (right)."}
@@ -96,8 +99,8 @@ All 24 hypothetical ponds lie in native forest. Screening required at least
 12 degrees, spacing of at least 600 m, and a 1,500 m domain-edge margin.
 These were simulation design rules, not habitat thresholds estimated from data.
 
-Forest fraction was smoothed with a Gaussian kernel of standard deviation
-500 m. Generating cell conductance was
+A Gaussian kernel of standard deviation 500 m smooths forest fraction.
+The generating cell conductance is
 
 $$C_i=\exp\{6(F_{i,500}-\overline F_{500})\}.$$
 
@@ -113,14 +116,26 @@ varies around a target of 120 diploids rather than staying fixed as in a
 Wright-Fisher model. One parent can come from the exchange distribution,
 and the other is local. Hydroperiod is a hypothetical pond attribute with
 no genetic effect in this history, which makes it a negative control for
-isolation by environment (IBE). The packaged history (seed 79101) was
-fixed before any analysis.
+isolation by environment (IBE). The author specified the packaged history
+(seed 79101) before fitting any model. Development also examined other
+histories and smaller SNP panels, and the bundled history was not chosen
+for the strongest fit (see `?ohio_ponds`).
 
 ## Generate the terrestrial history in SLiM
 
 This model follows individuals annually for 500 years, with local mating,
 crowding, repeated breeding, movement, and survival. Two scenarios share
-parameter values and seed 90401. The control fixes the drying input to the
+parameter values and seed 90401.
+
+The installed files record part of this design: the base seed, ancestry
+settings, and second-assay plan (`provenance/validation_PLAN.json`), the
+sampling roster rules (`provenance/SAMPLING_PROTOCOL.md`), and the
+landscape sources (`provenance/landscape_download_manifest.json`), all
+under `system.file("extdata", "individual-salamanders", package = "terradish")`.
+The package does not ship the SLiM script. The demographic and movement
+values in the two tables below, the drying-index weights above, and the
+exposure hazard therefore describe the simulation as designed, and you
+cannot check them against an installed file. The control fixes the drying input to the
 movement functions at 0.5, while the compensatory scenario uses local
 drying. The scenarios develop different individuals and pedigrees, so
 their animals are not matched.
@@ -148,7 +163,7 @@ Movement functions interpolate linearly between the following drying values:
 
 Heading persistence is the mean cosine of the turning angle, so values near
 one produce straighter paths. Exposure hazard per minute is
-$0.001+0.08\operatorname{mean}(D^8)$, evaluated at four points along each step.
+$0.001+0.08\operatorname{mean}(Q^8)$, evaluated at four points along each step.
 Settlement requires forest, and a surviving animal still outside forest at
 the 60-minute limit dies. Each movement event represents an episodic
 dispersal opportunity, not all daily foraging or surface activity.
@@ -170,8 +185,8 @@ animals.
 Terrestrial sampling drew 160 adults alive in year 500 from sixteen 75 m
 strata, 10 per stratum, with 40 in each 150 m quadrant. Every adult is at
 least five years old, at least 10 m from the others, and in a distinct
-10 m cell. Direct and shared recorded parents and grandparents were
-excluded.
+10 m cell. The roster excludes any pair with a direct or shared recorded
+parent or grandparent.
 
 ```{r sampling-check}
 table(ohio_ponds$samples$pond)
@@ -231,13 +246,15 @@ The pond guides aggregate allele counts by pond and use a covariance that
 weights loci by pooled allele frequency. The individual guide instead uses
 unstandardized allele-frequency profiles averaged across loci, so the two
 responses differ in numerical scale and interpretation.
-`vignette("wishart-covariance", package = "terradish")` covers the
+`vignette("v02-wishart-covariance", package = "terradish")` covers the
 constructors, their mathematical checks, and when to use a covariance or a
 pairwise distance. Always preserve sample order across genotypes,
 coordinates, and environments.
 
-The pond demonstrations assume `nu = 40`, and the individual example uses
-`nu = 1` as a covariance-fitting objective. Neither value is a SNP count.
+`nu` is the effective Wishart information that a Wishart fit assumes. The
+pond demonstrations assume `nu = 40`, and the individual example uses
+`nu = 1` as a covariance-fitting objective. Neither value is a count of
+independent markers.
 
 ## Reproduce an analysis or regenerate a history
 
@@ -253,9 +270,9 @@ file.show(system.file("extdata", "individual-salamanders", "README.md",
                       package = "terradish"))
 
 # Copy an executable analysis source before rendering it.
-file.copy(system.file("vignette-source", "getting-started.Rmd",
-                      package = "terradish"), "getting-started.Rmd")
-rmarkdown::render("getting-started.Rmd")
+file.copy(system.file("vignette-source", "v01-getting-started.Rmd",
+                      package = "terradish"), "v01-getting-started.Rmd")
+rmarkdown::render("v01-getting-started.Rmd")
 ```
 
 Routine package builds use precomputed figures and results for long analyses.
@@ -264,17 +281,38 @@ resume. Regenerating the ancestry requires that undistributed archive plus
 the same software (SLiM 5.2, with msprime 1.4.2 and tskit 1.0.3 for marker
 processing).
 
+## Quick reference: what is real, what is simulated, and where the records live
+
+| Component | Status | Record in the installed package |
+|---|---|---|
+| Elevation, land cover, forest fraction, slope | Real (USGS 3DEP and 2023 Annual NLCD) | `extdata/ohio-ponds/PROVENANCE.md`; `extdata/individual-salamanders/provenance/landscape_download_manifest.json` |
+| Pond locations and hydroperiod | Hypothetical | `?ohio_ponds`; `PROVENANCE.md` |
+| Drying index | Hypothetical, derived from real terrain | `extdata/individual-salamanders/README.md` |
+| Pond genotypes (SNPs, microsatellites) | Simulated in SLiM, then mutated on the tree sequence | `ohio_ponds$simulation`; `PROVENANCE.md` |
+| Terrestrial genotypes | Simulated in SLiM and msprime | `?individual_salamanders`; `provenance/validation_PLAN.json`; `provenance/SAMPLING_PROTOCOL.md` |
+| Terrestrial demographic and movement values | Design description | Not shipped (development archive) |
+| Statistical examples | Drawn from a stated model with a stated seed | The code in each guide |
+| Full ancestry archives and simulation scripts | Not distributed | Development archive |
+
+```{r record-check}
+# The pond simulation settings travel with the data object.
+str(ohio_ponds$simulation[c("history_seed", "generations",
+                            "target_diploids_per_pond",
+                            "forest_log_conductance_coefficient",
+                            "maximum_exchange_probability")])
+```
+
 ## See also
 
-- [`vignette("getting-started", package = "terradish")`](getting-started.html): pond genotypes to fitted forest effects.
-- [`vignette("individual-salamanders", package = "terradish")`](individual-salamanders.html): nonlinear IBR and individual prediction.
-- [`vignette("simulation-design", package = "terradish")`](simulation-design.html): repeated statistical draws for planning, distinct from SLiM histories.
-- [`vignette("wishart-covariance", package = "terradish")`](wishart-covariance.html): turning genotypes into a covariance or distance response.
+- [`vignette("v01-getting-started", package = "terradish")`](v01-getting-started.html): pond genotypes to fitted forest effects.
+- [`vignette("v09-individual-salamanders", package = "terradish")`](v09-individual-salamanders.html): nonlinear IBR and individual prediction.
+- [`vignette("v10-simulation-design", package = "terradish")`](v10-simulation-design.html): repeated statistical draws for planning, distinct from SLiM histories.
+- [`vignette("v02-wishart-covariance", package = "terradish")`](v02-wishart-covariance.html): turning genotypes into a covariance or distance response.
 - `?ohio_ponds` and `?individual_salamanders`: the complete data dictionaries.
 
 ## Reference
 
 Peterman WE, Connette GM, Semlitsch RD, Eggert LS (2014). Ecological resistance
 surfaces predict fine-scale genetic differentiation in a terrestrial woodland
-salamander. *Molecular Ecology*, 23.
-doi:10.1111/mec.12747.
+salamander. *Molecular Ecology*, 23(10), 2402-2413.
+<https://doi.org/10.1111/mec.12747>

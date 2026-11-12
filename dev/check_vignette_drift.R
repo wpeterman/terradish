@@ -1,45 +1,99 @@
-# Smoke-test the wishart-covariance vignette drift-surface chunks end to end.
-suppressMessages(devtools::load_all(".", quiet = TRUE))
-suppressMessages(library(terra))
+# Check precomputed vignettes for prose and code drift from their sources.
+#
+# Each guide in inst/vignette-source/ is the executable source of a static copy
+# in vignettes/ (see dev/refresh-precomputed-vignettes.R). Hand edits must be
+# made in both files. This script compares the two without running any model:
+# it reports every prose or code line present in one file and absent from the
+# other. Run from the package root:
+#
+#   Rscript dev/check_vignette_drift.R
+#
+# Not compared: YAML headers, printed output (lines starting with "#>"), the
+# precomputed-results notice, and figure captions (a chunk option in the source,
+# an image line in the copy). Check captions by eye when you change one.
 
-data(melip)
-melip.altitude    <- terra::unwrap(melip.altitude)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords      <- terra::unwrap(melip.coords)
-covariates <- c(melip.altitude, melip.forestcover)
-names(covariates) <- c("altitude", "forestcover")
-covariates <- scale_covariates(covariates)
-surface <- conductance_surface(covariates, melip.coords, directions = 8)
+if (!file.exists("DESCRIPTION") || !dir.exists("vignettes"))
+  stop("Run this script from the terradish package root.")
 
-# --- drift-simulate chunk ---
-n_site <- length(surface$demes)
-site_drift <- scale(seq_len(n_site))[, 1]
-E_true <- as.matrix(terradish_algorithm(
-  loglinear_conductance(~ forestcover + altitude, surface$x),
-  leastsquares, surface, S = diag(n_site),
-  theta = c(forestcover = 1.0, altitude = -0.5),
-  objective = FALSE, gradient = FALSE, hessian = FALSE, partial = FALSE
-)$covariance)
-Z <- cbind(1, scale(site_drift, scale = FALSE))
-gamma_true <- c(log(0.2), -0.6)
-nugget     <- as.vector(exp(Z %*% gamma_true))
-Sigma_true <- 1.0 * E_true + diag(nugget)
-set.seed(123)
-nu_demo <- 500
-S_drift <- rWishart(1, df = nu_demo, Sigma = Sigma_true / nu_demo)[, , 1]
+sources <- list.files(file.path("inst", "vignette-source"), pattern = "[.]Rmd$")
 
-# --- drift-fit chunk ---
-g_drift <- wishart_drift_covariates(site_drift, model = "wishart_covariance")
-fit_drift <- suppressWarnings(terradish(S_drift ~ forestcover + altitude, data = surface,
-  conductance_model = loglinear_conductance, measurement_model = g_drift, nu = nu_demo))
-fit_scalar <- suppressWarnings(terradish(S_drift ~ forestcover + altitude, data = surface,
-  conductance_model = loglinear_conductance, measurement_model = wishart_covariance, nu = nu_demo))
+# Drop the YAML header and trailing whitespace; return the body lines.
+read_body <- function(path) {
+  lines <- sub("[ \t]+$", "", readLines(path, warn = FALSE, encoding = "UTF-8"))
+  yaml_end <- which(lines == "---")[2L]
+  lines[seq_along(lines) > yaml_end]
+}
 
-cat("phi rownames:", rownames(fit_drift$fit$phi), "\n")
-cat("gamma_var1 (true -0.6):", round(fit_drift$fit$phi["gamma_var1", 1], 3), "\n")
-aic <- function(f) -2 * f$loglik + 2 * (length(coef(f)) + nrow(f$fit$phi))
-cat("AIC drift:", round(aic(fit_drift), 1), " scalar:", round(aic(fit_scalar), 1),
-    " drift better:", aic(fit_drift) < aic(fit_scalar), "\n")
-cat("summary() works:\n")
-print(summary(fit_drift))
-cat("\nVIGNETTE DRIFT CHUNKS OK\n")
+# Remove the knitr setup chunk and every hidden chunk (include = FALSE).
+# knitr leaves hidden chunks out of a precomputed copy, so they are not drift.
+drop_setup <- function(lines) {
+  repeat {
+    hidden <- grep("^```\\{r (setup|[^}]*include *= *FALSE)", lines)
+    if (!length(hidden)) return(lines)
+    start <- hidden[1L]
+    end <- start + which(lines[-seq_len(start)] == "```")[1L]
+    lines <- lines[-(start:end)]
+  }
+}
+
+# Escape regular-expression metacharacters in literal text.
+escape <- function(x) gsub("([][{}()+*^$|\\\\?.])", "\\\\\\1", x)
+
+# Turn a source line with inline R (`r ...`) into a pattern that matches the
+# same line with each expression replaced by its knitted value.
+inline_pattern <- function(line) {
+  parts <- strsplit(line, "`r [^`]+`")[[1]]
+  n_inline <- lengths(regmatches(line, gregexpr("`r [^`]+`", line)))
+  parts <- c(parts, rep("", n_inline + 1L - length(parts)))
+  paste0("^", paste(escape(parts), collapse = ".*"), "$")
+}
+
+drift <- 0L
+for (guide in sources) {
+  src <- read_body(file.path("inst", "vignette-source", guide))
+  copy <- read_body(file.path("vignettes", guide))
+
+  # Source: drop the hidden setup chunk and all chunk fences.
+  src <- drop_setup(src)
+  src <- src[!grepl("^```", src) & nzchar(src)]
+
+  # Copy: a precomputed copy starts with an inserted notice that ends at a
+  # horizontal rule; drop it. A copy that still runs at build time (no
+  # notice) keeps its own setup chunk; drop that instead. Then drop printed
+  # output, image lines, and fences.
+  if (any(grepl("^The displayed results and figures in this guide", copy))) {
+    notice_end <- which(copy == "---")[1L]
+    copy <- copy[seq_along(copy) > notice_end]
+  } else {
+    copy <- drop_setup(copy)
+  }
+  copy <- copy[!grepl("^(#>|!\\[|```)", copy) & nzchar(copy)]
+
+  has_inline <- grepl("`r [^`]+`", src)
+  literal <- src[!has_inline]
+  patterns <- vapply(src[has_inline], inline_pattern, character(1))
+
+  # Source lines missing from the copy.
+  missing_in_copy <- setdiff(literal, copy)
+  unmatched_pattern <- names(patterns)[!vapply(patterns, function(p)
+    any(grepl(p, copy)), logical(1))]
+  # Copy lines that match neither a literal source line nor an inline pattern.
+  extra <- setdiff(copy, literal)
+  if (length(extra) && length(patterns))
+    extra <- extra[!vapply(extra, function(line)
+      any(vapply(patterns, grepl, logical(1), x = line)), logical(1))]
+
+  problems <- c(
+    if (length(missing_in_copy)) paste("  source only:", missing_in_copy),
+    if (length(unmatched_pattern)) paste("  inline line unmatched:", unmatched_pattern),
+    if (length(extra)) paste("  copy only:  ", extra))
+  if (length(problems)) {
+    drift <- drift + length(problems)
+    cat("\n", guide, "\n", paste(problems, collapse = "\n"), "\n", sep = "")
+  } else {
+    cat(guide, ": no drift\n", sep = "")
+  }
+}
+
+if (drift > 0L) stop(drift, " drifted line(s) found.", call. = FALSE)
+cat("\nAll precomputed vignettes match their sources.\n")

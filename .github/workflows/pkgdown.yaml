@@ -1,0 +1,60 @@
+# Based on the r-lib/actions standard pkgdown workflow.
+# Builds the website on every push and pull request to master, and deploys
+# it to the gh-pages branch on pushes to master, on releases, and on manual
+# runs. Pull requests build the site without deploying it.
+name: pkgdown
+
+on:
+  push:
+    branches:
+      - master
+  pull_request:
+    branches:
+      - master
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions: read-all
+
+jobs:
+  pkgdown:
+    runs-on: ubuntu-latest
+    # Only one deployment runs at a time.
+    concurrency:
+      group: pkgdown-${{ github.event_name != 'pull_request' || github.run_id }}
+    env:
+      GITHUB_PAT: ${{ secrets.GITHUB_TOKEN }}
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: r-lib/actions/setup-pandoc@v2
+
+      - uses: r-lib/actions/setup-r@v2
+        with:
+          use-public-rspm: true
+
+      - uses: r-lib/actions/setup-r-dependencies@v2
+        with:
+          extra-packages: any::pkgdown, local::.
+          needs: website
+
+      # pkgdown renders every top-level Markdown file and adds it to the search
+      # index and sitemap. AGENTS.md holds contributor instructions and does
+      # not belong on the website, so drop it from this checkout before building.
+      - name: Remove non-site Markdown
+        run: rm -f AGENTS.md
+
+      - name: Build site
+        run: pkgdown::build_site_github_pages(new_process = FALSE, install = FALSE)
+        shell: Rscript {0}
+
+      - name: Deploy to GitHub pages
+        if: github.event_name != 'pull_request'
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          clean: false
+          branch: gh-pages
+          folder: docs

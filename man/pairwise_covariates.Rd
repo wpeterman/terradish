@@ -2,7 +2,7 @@
 % Please edit documentation in R/pairwise_covariates.R
 \name{pairwise_covariates}
 \alias{pairwise_covariates}
-\title{Combine environmental and other pairwise covariates}
+\title{Combine environmental differences with other pairwise covariates}
 \usage{
 pairwise_covariates(...)
 }
@@ -56,4 +56,15 @@ colnames(z)
 \seealso{
 \code{\link{pairwise_endpoint_covariates}},
   \code{\link{mlpe_covariates}}, \code{\link{wishart_covariates}}
+
+Other measurement models:
+\code{\link[=generalized_wishart]{generalized_wishart()}},
+\code{\link[=leastsquares]{leastsquares()}},
+\code{\link[=mlpe]{mlpe()}},
+\code{\link[=mlpe_covariates]{mlpe_covariates()}},
+\code{\link[=pairwise_endpoint_covariates]{pairwise_endpoint_covariates()}},
+\code{\link{terradish_measurement_model}},
+\code{\link[=wishart_covariance]{wishart_covariance()}},
+\code{\link[=wishart_covariates]{wishart_covariates()}}
 }
+\concept{measurement models}

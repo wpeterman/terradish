@@ -2,7 +2,7 @@
 % Please edit documentation in R/inference.R
 \name{terradish_ibe_ratio}
 \alias{terradish_ibe_ratio}
-\title{Environmental effects in resistance-distance units}
+\title{Express environmental effects in resistance-distance units}
 \usage{
 terradish_ibe_ratio(fit)
 }
@@ -66,4 +66,13 @@ Bradburd GS, Ralph PL, Coop GM (2013). Disentangling the effects
 \seealso{
 \code{\link{pairwise_covariates}}, \code{\link{mlpe_covariates}},
   \code{\link{wishart_covariates}}, \code{\link{terradish_rescale_nu}}
+
+Other inference and model comparison:
+\code{\link[=aic_table]{aic_table()}},
+\code{\link[=mlpe_response_change]{mlpe_response_change()}},
+\code{\link[=terradish_cv_folds]{terradish_cv_folds()}},
+\code{\link[=terradish_folds]{terradish_folds()}},
+\code{\link{terradish_inference}},
+\code{\link[=terradish_rescale_nu]{terradish_rescale_nu()}}
 }
+\concept{inference and model comparison}

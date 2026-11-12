@@ -1,20 +1,47 @@
-#' Covariance and intervals for fitted conductance parameters
+#' Standard errors and confidence intervals for conductance parameters
 #'
-#' Extracts observed-curvature uncertainty from a full or slim fit.
+#' \code{vcov()} and \code{confint()} report the uncertainty of the fitted
+#' conductance parameters from the curvature (observed information) of the
+#' log-likelihood at the estimate. They work on a full or slim fit.
 #' @param object A fitted \code{terradish} object.
 #' @param parm Names or indices of parameters to include.
-#' @param level Confidence level between zero and one.
+#' @param level Confidence level between zero and one. This is the quantity
+#'   that \code{summary()} calls \code{conf.level} and that
+#'   \code{conductance()} and \code{plot()} call \code{quantile}.
 #' @param ... Unused arguments for generic compatibility.
 #' @details
+#' \strong{Reading the output.} Both functions are on the scale of
+#' \code{coef()}: log conductance per unit of each covariate (per standard
+#' deviation for covariates scaled with \code{\link{scale_covariates}}), and
+#' map units for Gaussian \code{sigma.<layer>} smoothing scales.
+#' \code{confint()} returns Wald intervals, the estimate plus or minus a
+#' normal quantile times its standard error.
+#' \code{sqrt(diag(vcov(fit)))} gives the standard errors that
+#' \code{summary()} prints. Exponentiate a log-conductance estimate or
+#' interval endpoint to read it as a conductance multiplier:
+#' \code{exp(confint(fit))} is the interval for the ratio of conductance per
+#' unit increase in the covariate, and an interval that excludes 1 on that
+#' scale excludes zero on the log scale. Do not exponentiate rows for
+#' Gaussian smoothing scales.
+#'
+#' The intervals are conditional on the fitted model. For Wishart fits they
+#' also depend on the supplied \code{nu}: standard errors scale as
+#' \code{1 / sqrt(nu)} (see \code{\link{terradish_rescale_nu}}). Uncertainty
+#' in the nuisance parameters is reported separately by \code{summary()}.
+#'
 #' Gaussian scale intervals are Wald intervals truncated at the fitted bounds.
 #' Stored profile intervals take precedence when their confidence level matches.
 #' The observation count is the number of focal sites (individuals or
 #' populations), the sample size that AICc and BIC use in
 #' \code{\link{aic_table}}. Pairwise observations are not counted, because
 #' pairs that share a site are not independent.
-#' @return \code{vcov()} returns a covariance matrix; \code{confint()} returns
-#' a two-column interval matrix; \code{nobs()} returns the number of focal sites.
+#' @return \code{vcov()} returns the named covariance matrix of the
+#' conductance parameters, the inverse of the observed information, on the
+#' scale of \code{coef()}. \code{confint()} returns a matrix with one row per
+#' parameter and two columns holding the lower and upper Wald limits, labeled
+#' by their percentiles. \code{nobs()} returns the number of focal sites.
 #' @name terradish_inference
+#' @family inference and model comparison
 #' @seealso \code{\link{terradish}}, \code{\link{slim_terradish}},
 #'   \code{\link{gaussian_scale_profile}}, \code{\link{terradish_rescale_nu}}
 #' @template small-wishart-fit
@@ -22,6 +49,7 @@
 #' coef(fit)       # Relative log conductance per unit of x.
 #' vcov(fit)       # Joint uncertainty in conductance parameters.
 #' confint(fit)    # A model-based interval conditional on the supplied nu.
+#' exp(confint(fit))  # The same interval as a conductance multiplier.
 #' nobs(fit)       # Number of focal sites, the sample size for AICc and BIC.
 #' @importFrom stats nobs vcov confint
 NULL
@@ -130,6 +158,7 @@ confint.terradish <- function(object, parm, level = 0.95, ...) {
 #' stays fixed. Report conclusions over a scientifically plausible range.
 #' @seealso \code{\link{terradish_inference}}, \code{\link{aic_table}},
 #'   \code{\link{terradish_cv_folds}}
+#' @family inference and model comparison
 #' @template small-wishart-fit
 #' @examples
 #' sensitivity <- terradish_rescale_nu(fit, nu = 50)
@@ -166,7 +195,7 @@ terradish_rescale_nu <- function(fit, nu) {
   fit
 }
 
-#' Environmental effects in resistance-distance units
+#' Express environmental effects in resistance-distance units
 #'
 #' Reports the resistance-distance equivalent of one unit of environmental
 #' difference, using the environmental coefficient divided by the resistance
@@ -195,6 +224,7 @@ terradish_rescale_nu <- function(fit, nu) {
 #'   Evolution, 67, 3258--3273. \doi{10.1111/evo.12193}.
 #' @seealso \code{\link{pairwise_covariates}}, \code{\link{mlpe_covariates}},
 #'   \code{\link{wishart_covariates}}, \code{\link{terradish_rescale_nu}}
+#' @family inference and model comparison
 #' @template small-wishart-fit
 #' @examples
 #' environment <- pairwise_covariates(

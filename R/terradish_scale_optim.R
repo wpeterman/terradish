@@ -228,7 +228,7 @@
   out
 }
 
-#' Optimize raster smoothing scales around a terradish fit
+#' Search raster smoothing scales by refitting the model
 #'
 #' Performs an outer optimization over raster scale parameters by repeatedly
 #' rescaling raster covariates, rebuilding or updating the conductance surface,
@@ -323,27 +323,38 @@
 #' \item{iterations, convergence}{Number of outer iterations, and \code{0} if
 #'   the coordinate search converged (always \code{0} for a grid search).}
 #'
+#' @seealso \code{\link{gaussian_smoothed_loglinear_conductance}} for joint
+#'   estimation of Gaussian scales, \code{\link{gaussian_scale_summary}},
+#'   \code{\link{terradish}}
+#'
+#' @family spatial scale
+#'
 #' @examples
 #' \donttest{
 #' data(melip)
-#' melip.altitude <- terra::unwrap(melip.altitude)
-#' melip.forestcover <- terra::unwrap(melip.forestcover)
-#' melip.coords <- terra::unwrap(melip.coords)
-#' covariates <- c(melip.altitude, melip.forestcover)
+#' covariates <- c(terra::unwrap(melip.altitude),
+#'                 terra::unwrap(melip.forestcover))
+#' coords <- terra::unwrap(melip.coords)
+#' # Name the layers. Do not scale them here: the default `postprocess`
+#' # re-standardizes each layer after it is smoothed.
 #' names(covariates) <- c("altitude", "forestcover")
 #'
 #' # Every candidate scale re-smooths the rasters and refits, so coarsen the
 #' # grid for the example. Use the full resolution in a real analysis.
 #' covariates <- terra::aggregate(covariates, fact = 3, na.rm = TRUE)
 #'
+#' # Keep one site per raster cell (some melip sites share a cell).
+#' keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+#' Fst <- melip.Fst[keep, keep]
+#'
 #' # Express the bounds in map units, using the coarsened cell width.
 #' cell_width <- mean(terra::res(covariates))
 #' # A 2-point grid over two layers is 4
 #' # candidate fits; use a wider grid in practice.
 #' fit_scale <- terradish_scale_optim(
-#'   melip.Fst ~ altitude + forestcover,
+#'   Fst ~ altitude + forestcover,
 #'   covariates = covariates,
-#'   coords = melip.coords,
+#'   coords = coords[keep],
 #'   lower = cell_width,
 #'   upper = 6 * cell_width,
 #'   search = "grid",
@@ -379,6 +390,10 @@ terradish_scale_optim <- function(formula,
                                   verbose = FALSE,
                                   ...)
 {
+  # Raise the unused-covariate warning once for this call, not once per
+  # internal refit (see .unused_covariate_state).
+  .unused_covariate_scope_open()
+  on.exit(.unused_covariate_scope_close(), add = TRUE)
   covariates <- .as_spatraster(covariates)
   search <- match.arg(search)
   objective <- match.arg(objective)
@@ -547,9 +562,14 @@ terradish_scale_optim <- function(formula,
 
 #' Legacy terradish scale-optimization alias
 #'
-#' Legacy alias retained for backward compatibility with older
-#' \code{terra_radish_scale_optim()} calls.
+#' Deprecated compatibility wrapper retained for older code that still calls
+#' \code{terra_radish_scale_optim()}. It signals a deprecation warning and
+#' forwards its arguments unchanged.
 #'
+#' @param ... Arguments passed through the deprecated
+#'   \code{terra_radish_scale_optim()} compatibility wrapper to
+#'   \code{\link{terradish_scale_optim}}.
+#' @seealso \code{\link{radish_compatibility}}
 #' @name legacy_terra_radish_scale_optim
 #' @inherit terradish_scale_optim return
 #' @keywords internal
@@ -557,4 +577,8 @@ NULL
 
 #' @rdname legacy_terra_radish_scale_optim
 #' @export
-terra_radish_scale_optim <- terradish_scale_optim
+terra_radish_scale_optim <- function(...)
+{
+  .terradish_deprecate("terra_radish_scale_optim", "terradish_scale_optim")
+  .terradish_forward_call(match.call(), "terradish_scale_optim")
+}

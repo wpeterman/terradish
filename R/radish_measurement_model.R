@@ -1,8 +1,55 @@
-#' Measurement models
+#' Measurement models: the likelihood interface
 #'
-#' Functions that fit a matrix observed genetic distances to a submatrix of the inverse graph Laplacian
+#' A measurement model links the graph kernel implied by a conductance surface
+#' to the observed genetic response. It is a function of class
+#' \code{"terradish_measurement_model"} that evaluates a negative
+#' log-likelihood, and its derivatives, for a matrix of observed pairwise
+#' genetic distances or genetic covariance given a submatrix of the
+#' generalized inverse of the graph Laplacian. Pass one to the
+#' \code{measurement_model} argument of \code{\link{terradish}}.
 #'
 #' @details
+#' \strong{Choosing a model.}
+#' \describe{
+#'   \item{\code{\link{mlpe}}}{Pairwise genetic distances (for example
+#'     \eqn{F_{ST}}), with correlation among pairs that share a site. The
+#'     default.}
+#'   \item{\code{\link{leastsquares}}}{Pairwise genetic distances with
+#'     independent errors. Fast; for exploration and diagnostics.}
+#'   \item{\code{\link{wishart_covariance}}}{An allele-frequency covariance
+#'     matrix. Requires the effective degrees of freedom \code{nu}.}
+#'   \item{\code{\link{generalized_wishart}}}{Squared distances derived from a
+#'     covariance matrix. Requires \code{nu} and an admissible response (see
+#'     \code{\link{check_distance_response}}).}
+#'   \item{\code{\link{mlpe_covariates}}, \code{\link{wishart_covariates}}}{
+#'     Constructors that return a measurement model extended with pairwise
+#'     environmental covariates (isolation by environment).}
+#' }
+#'
+#' \strong{Interface.} Every measurement model has the signature
+#' \code{g(E, S, phi, nu, gradient, hessian, partial, nonnegative, validate)}.
+#' \code{E} is the focal-site block of the generalized inverse of the graph
+#' Laplacian, \code{S} is the observed response matrix, \code{phi} is the
+#' vector of nuisance parameters, and \code{nu} is the effective Wishart
+#' degrees of freedom (unused by the distance models). Called without
+#' \code{phi}, the function returns a list with starting values \code{phi}
+#' and the bounds \code{lower} and \code{upper}. Called with \code{phi}, it
+#' returns a list with the negative log-likelihood \code{objective}, the
+#' expected response \code{fitted}, a \code{boundary} flag that is
+#' \code{TRUE} when the resistance coefficient is zero, and, on request,
+#' \code{gradient} and \code{hessian} with respect to \code{phi} and the
+#' derivative pieces (\code{gradient_E}, \code{partial_E}, \code{partial_S},
+#' \code{jacobian_E}, \code{jacobian_S}) that \code{\link{terradish}} uses to
+#' differentiate through the graph. The legacy class
+#' \code{"radish_measurement_model"} is also carried for compatibility.
+#'
+#' \code{\link{terradish}} profiles \code{phi} at every value of the
+#' conductance parameters, so \code{phi} are nuisance parameters. They are
+#' reported by \code{summary()} on each model's own scale; the same name can
+#' mean different things in different models (see the parameter glossary in
+#' \code{\link{terradish-package}}).
+#'
+#' \strong{Wishart nuisance fitting.}
 #' For the ordinary two-component \code{\link{wishart_covariance}} and
 #' \code{\link{generalized_wishart}} models with their standard bounds,
 #' nuisance fitting first profiles the overall covariance variance analytically
@@ -15,8 +62,20 @@
 #' optimum for every possible covariance matrix. A nugget approaching zero
 #' remains a limiting estimate and can imply weak nuisance identification.
 #'
+#' @section Worked examples:
+#' \code{vignette("v02-wishart-covariance", package = "terradish")} for
+#' choosing and checking a covariance response, and
+#' \code{vignette("v03-mlpe-pairwise-distance", package = "terradish")} for
+#' pairwise genetic distances.
+#'
 #' @name terradish_measurement_model
-#' @seealso \code{\link{leastsquares}}, \code{\link{mlpe}}, \code{\link{generalized_wishart}}
+#' @usage NULL
+#' @format NULL
+#' @family measurement models
+#' @seealso \code{\link{mlpe}}, \code{\link{leastsquares}},
+#'   \code{\link{wishart_covariance}}, \code{\link{generalized_wishart}},
+#'   \code{\link{mlpe_covariates}}, \code{\link{wishart_covariates}},
+#'   \code{\link{check_distance_response}}, \code{\link{terradish}}
 terradish_measurement_model <- NULL
 
 #' Legacy radish measurement-model class alias

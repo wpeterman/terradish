@@ -2,7 +2,7 @@
 % Please edit documentation in R/gaussian_scale_conductance.R
 \name{gaussian_smoothed_loglinear_conductance}
 \alias{gaussian_smoothed_loglinear_conductance}
-\title{Gaussian scale-aware log-linear conductance model}
+\title{Log-linear conductance model with estimated Gaussian smoothing scales}
 \usage{
 gaussian_smoothed_loglinear_conductance(
   surface,
@@ -108,13 +108,14 @@ not demonstrate a precisely identified scale.
 
 The current implementation supports numeric raster formulas built from raw
 raster names, interactions, and polynomial/arithmetic terms that can be
-differentiated analytically by \code{\link[stats:D]{D}} after smoothing the base
+differentiated analytically by \code{\link[stats:deriv]{D}} after smoothing the base
 raster layers. Factor-valued raster layers are rejected because Gaussian
 smoothing is only defined here for numeric rasters; use an unscaled fixed
 conductance model if you need categorical raster predictors.
 
-For this conductance model, \code{\link{terradish}} prefers
-\code{optimizer = "bfgs"} when \code{optimizer = "auto"}, and leverage /
+For this conductance model, \code{\link{terradish}} always selects
+\code{optimizer = "bfgs"} when \code{optimizer = "auto"}, whatever the
+number of parameters, and leverage /
 \code{partial_X} calculations are currently disabled because the current
 leverage machinery assumes a one-to-one mapping between fitted conductance
 parameters and design-matrix covariates, which does not hold once separate
@@ -122,57 +123,81 @@ Gaussian \code{sigma} parameters are introduced.
 }
 \section{Worked example}{
 
-See \code{vignette("gaussian-scale-optimization", package = "terradish")}
+See \code{vignette("v07-gaussian-scale-optimization", package = "terradish")}
 for fitting, plotting, and interpreting smoothing scales on the pond landscape.
 }
 
 \examples{
 \donttest{
 data(melip)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords <- terra::unwrap(melip.coords)
+forestcover <- terra::unwrap(melip.forestcover)
+coords <- terra::unwrap(melip.coords)
 
-# Use the raw raster here. The Gaussian model smooths first and then
-# standardizes internally.
-names(melip.forestcover) <- "forestcover"
+# Name the layer, but do not scale it: the Gaussian model smooths the raw
+# raster first and then standardizes internally.
+names(forestcover) <- "forestcover"
 
 # Coarsened so the example runs quickly: the raster is re-smoothed at every
 # candidate sigma. Use the full resolution in a real analysis.
-melip.forestcover <- terra::aggregate(melip.forestcover, fact = 3,
-                                      na.rm = TRUE)
-surface <- conductance_surface(
-  melip.forestcover,
-  melip.coords,
-  directions = 8,
-  saveStack = TRUE
-)
+forestcover <- terra::aggregate(forestcover, fact = 3, na.rm = TRUE)
+
+# Keep one site per raster cell (some melip sites share a cell). The
+# cells of a twice-coarser grid are used so that the coarse-raster warm
+# start below also has one site per cell.
+coarse <- terra::aggregate(forestcover, fact = 2, na.rm = TRUE)
+keep <- !duplicated(terra::cellFromXY(coarse, terra::crds(coords)))
+Fst <- melip.Fst[keep, keep]
+surface <- conductance_surface(forestcover, coords[keep], saveStack = TRUE)
 
 gaussian_model <- gaussian_smoothed_loglinear_conductance(surface)
 fit <- terradish(
-  melip.Fst ~ forestcover,
+  Fst ~ forestcover,
   data = surface,
   conductance_model = gaussian_model,
   measurement_model = mlpe,
-  optimizer = "auto",
-  leverage = FALSE
+  optimizer = "auto"
 )
 
-gaussian_scale_summary(fit)
-plot(fit, type = "sigma")
+# coef() holds the log-conductance coefficient (per SD of the smoothed
+# layer) and sigma.forestcover, the smoothing scale in map units (degrees
+# for these unprojected rasters).
+coef(fit)
+# Roughly 111 km per degree near the equator converts the scale to km.
+gaussian_scale_summary(fit, distance_per_map_unit = 111,
+                       distance_unit = "km")
+plot(fit, type = "sigma", distance_per_map_unit = 111,
+     distance_unit = "km")
 
 # On a full-resolution raster, a coarse-raster warm start cuts the cost of
 # the scale search. With exact_refine = TRUE the reported fit is refined
 # back on the original graph, so the estimates stay exact.
 fit_coarse <- terradish(
-  melip.Fst ~ forestcover,
+  Fst ~ forestcover,
   data = surface,
   conductance_model = gaussian_model,
   measurement_model = mlpe,
   approximation = "coarse_raster",
   approximation_control = list(factor = 2, exact_refine = TRUE),
-  optimizer = "auto",
-  leverage = FALSE
+  optimizer = "auto"
 )
 }
 
 }
+\seealso{
+\code{\link{gaussian_scale_summary}} and
+  \code{\link{gaussian_scale_profile}} to read the fitted scales,
+  \code{\link{terradish_scale_optim}} for an outer search with other
+  kernels, \code{\link{loglinear_conductance}}
+
+Other conductance models:
+\code{\link[=loglinear_conductance]{loglinear_conductance()}},
+\code{\link[=smooth_loglinear_conductance]{smooth_loglinear_conductance()}},
+\code{\link{terradish_conductance_model_factory}}
+
+Other spatial scale:
+\code{\link[=gaussian_scale_profile]{gaussian_scale_profile()}},
+\code{\link[=gaussian_scale_summary]{gaussian_scale_summary()}},
+\code{\link[=terradish_scale_optim]{terradish_scale_optim()}}
+}
+\concept{conductance models}
+\concept{spatial scale}

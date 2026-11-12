@@ -5,7 +5,9 @@
 #' @param delta Sufficient decrease constant (Wolfe condition 1). Must satisfy
 #'   \code{0 < delta < sigma < 1}. Smaller values accept shorter steps more
 #'   readily.
-#' @param sigma Curvature condition constant (Wolfe condition 2). Must satisfy
+#' @param sigma Curvature condition constant (Wolfe condition 2). This line
+#'   search constant is unrelated to the \code{sigma} parameters of the
+#'   measurement and conductance models. Must satisfy
 #'   \code{delta < sigma < 1}. Values close to 1 relax the curvature requirement
 #'   and allow fewer function evaluations per step.
 #' @param alphamax Upper bound on the trial step length. The default \code{Inf}
@@ -43,13 +45,14 @@
 #'   \item \strong{Line-search failures}: increase \code{linesearchmax} or
 #'     loosen \code{sigma} toward 1.
 #'   \item \strong{Slow convergence with many small steps}: tighten \code{sigma}
-#'     (e.g. 0.1) to enforce a stronger curvature condition.
+#'     (e.g. 0.5; it must stay above \code{delta}) to enforce a stronger
+#'     curvature condition.
 #'   \item \strong{Initial non-finite objectives}: increase \code{psi3} to take
 #'     larger backtracking steps when \code{c} is too large.
 #' }
 #'
-#' @return A named list of class \code{"HagerZhangControl"} holding the line
-#'   search settings.  The elements are the arguments above, stored unchanged:
+#' @return A named list of class \code{"terradish_hager_zhang_control"}
+#'   holding the line search settings.  The elements are the arguments above, stored unchanged:
 #'   \code{delta}, \code{sigma}, \code{alphamax}, \code{rho}, \code{epsilon},
 #'   \code{gamma}, \code{linesearchmax}, \code{psi3}, \code{c}, and
 #'   \code{verbose}.  Pass the object to the \code{ls.control} argument of
@@ -60,9 +63,11 @@
 #' @references
 #' Hager WW, Zhang H. 2006. Algorithm 851: \code{CG_DESCENT}, a conjugate gradient
 #' method with guaranteed descent. ACM Transactions on Mathematical Software
-#' 32(1):113-137.
+#' 32(1):113-137. \doi{10.1145/1132973.1132979}.
 #'
 #' @seealso \code{\link{NewtonRaphsonControl}}, \code{\link{ArmijoControl}}
+#'
+#' @family optimizer controls
 #'
 #' @examples
 #' ctrl <- HagerZhangControl(verbose = FALSE, linesearchmax = 10)
@@ -76,7 +81,11 @@
 #'
 #' @export
 HagerZhangControl <- function(delta = 0.1, sigma = 0.9, alphamax = Inf, rho = 5.0, epsilon = 1e-6, gamma = 0.66, linesearchmax = 50, psi3 = 0.1, c = 1.0, verbose = FALSE)
-  list(delta=delta, sigma=sigma, alphamax=alphamax, rho=rho, epsilon=epsilon, gamma=gamma, linesearchmax = linesearchmax, psi3 = psi3, c = c, verbose = verbose)
+  # Classed like ArmijoControl(); the elements and their order are unchanged.
+  structure(
+    list(delta=delta, sigma=sigma, alphamax=alphamax, rho=rho, epsilon=epsilon, gamma=gamma, linesearchmax = linesearchmax, psi3 = psi3, c = c, verbose = verbose),
+    class = c("terradish_hager_zhang_control", "list")
+  )
 
 
 .terradish_line_search_cache_key <- function(alpha)

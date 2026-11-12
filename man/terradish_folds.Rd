@@ -2,7 +2,7 @@
 % Please edit documentation in R/spatial_cv.R
 \name{terradish_folds}
 \alias{terradish_folds}
-\title{Construct reproducible cross-validation folds}
+\title{Assign sampling sites to cross-validation folds}
 \usage{
 terradish_folds(
   pts,
@@ -54,8 +54,29 @@ watersheds, barriers, sampling campaigns, or other design information.
 \examples{
 data(melip)
 coords <- terra::unwrap(melip.coords)
-coords_projected <- terra::project(coords, "EPSG:5070")
+
+# The melip coordinates are longitude and latitude. Project them to a local
+# azimuthal equidistant system centered on the sites, so that k-means
+# distances are in meters.
+lonlat <- terra::crds(coords)
+local_crs <- sprintf(
+  "+proj=aeqd +lat_0=\%f +lon_0=\%f +datum=WGS84 +units=m",
+  mean(lonlat[, 2]), mean(lonlat[, 1]))
+coords_projected <- terra::project(coords, local_crs)
+
 folds <- terradish_folds(coords_projected, k = 3, seed = 1)
-table(folds)
+table(folds)   # number of sites in each spatial block
 
 }
+\seealso{
+\code{\link{terradish_cv_folds}}
+
+Other inference and model comparison:
+\code{\link[=aic_table]{aic_table()}},
+\code{\link[=mlpe_response_change]{mlpe_response_change()}},
+\code{\link[=terradish_cv_folds]{terradish_cv_folds()}},
+\code{\link[=terradish_ibe_ratio]{terradish_ibe_ratio()}},
+\code{\link{terradish_inference}},
+\code{\link[=terradish_rescale_nu]{terradish_rescale_nu()}}
+}
+\concept{inference and model comparison}

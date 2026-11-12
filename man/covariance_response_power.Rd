@@ -2,7 +2,7 @@
 % Please edit documentation in R/covariance_response_power.R
 \name{covariance_response_power}
 \alias{covariance_response_power}
-\title{Assess covariance-response parameter recovery by simulation}
+\title{Simulation-based power and parameter recovery for sampling designs}
 \usage{
 covariance_response_power(
   theta,
@@ -37,7 +37,7 @@ covariance_response_power(
 }
 \arguments{
 \item{theta}{True conductance parameters. By default these are interpreted on
-the same external scale returned by \code{\link{coef}} for fitted
+the same external scale returned by \code{coef()} for fitted
 \code{terradish} models. For most conductance models the internal and
 external scales are identical. For
 \code{\link{gaussian_smoothed_loglinear_conductance}}, the external scale
@@ -67,7 +67,8 @@ and \code{leverage}. When omitted, the true model is refit.}
 matrix during simulation.}
 
 \item{sigma}{Nonnegative nugget variance added to the covariance diagonal
-during simulation.}
+during simulation, on its natural (variance) scale. The fitted Wishart
+\code{sigma} is the logarithm of this quantity.}
 
 \item{nu}{Effective Wishart information used to simulate the response.
 Larger values reduce simulated sampling noise. The fitting value defaults
@@ -79,7 +80,7 @@ least the largest assessed covariance-matrix dimension.}
 \item{nsim}{Number of covariance-response simulations per sampling design.}
 
 \item{n_designs}{Number of independent site designs per sample size for
-\code{strategy = "random"}. Deterministic strategies are evaluated once.}
+the \code{"random"} strategy. Deterministic strategies are evaluated once.}
 
 \item{seed}{Optional random seed for reproducible site and response
 simulation.}
@@ -157,19 +158,21 @@ whether the non-linear conductance surface was recovered.
 }
 \examples{
 \donttest{
-data(melip)
-melip.altitude <- terra::unwrap(melip.altitude)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords <- terra::unwrap(melip.coords)
-
-covariates <- c(melip.altitude, melip.forestcover)
-names(covariates) <- c("altitude", "forestcover")
-covariates <- scale_covariates(covariates)
-# Coarsen the raster: a power sweep refits many times, so cell count is the
+# Coarsened: a power sweep refits many times, so cell count is the
 # dominant cost. Use the full resolution for a real design study.
-covariates <- terra::aggregate(covariates, fact = 3, na.rm = TRUE)
-surface <- conductance_surface(covariates, melip.coords,
-                               directions = 8, saveStack = TRUE)
+data(melip)
+covariates <- c(terra::unwrap(melip.altitude),
+                terra::unwrap(melip.forestcover))
+coords <- terra::unwrap(melip.coords)
+names(covariates) <- c("altitude", "forestcover")
+# Coarsened so the example runs quickly; name layers, then scale.
+covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+                                                na.rm = TRUE))
+# Keep one site per raster cell (some melip sites share a cell).
+keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+coords <- coords[keep]
+Fst <- melip.Fst[keep, keep]
+surface <- conductance_surface(covariates, coords)
 
 spline_model <- smooth_loglinear_conductance(
   ~ forestcover + s(altitude, df = 4), surface$x)
@@ -207,3 +210,12 @@ power$parameter_summary
 }
 
 }
+\seealso{
+\code{\link{simulate_covariance_response}},
+  \code{\link{print.terradish_covariance_power}}
+
+Other simulation and study design:
+\code{\link[=print.terradish_covariance_power]{print.terradish_covariance_power()}},
+\code{\link[=simulate_covariance_response]{simulate_covariance_response()}}
+}
+\concept{simulation and study design}

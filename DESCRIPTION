@@ -1,8 +1,8 @@
 Package: terradish
 Type: Package
 Title: Fast Gradient-Based Optimization of Resistance Surfaces
-Version: 1.1.0
-Date: 2026-10-28
+Version: 1.1.1
+Date: 2026-11-08
 Language: en-US
 Authors@R: c(
   person(
@@ -18,6 +18,12 @@ Authors@R: c(
     role = "aut",
     email = "nspope@utexas.edu",
     comment = c(ORCID = "0000-0001-8409-7812")
+  ),
+  person(
+    given = "Denis",
+    family = "Demidov",
+    role = "cph",
+    comment = "Bundled AMGCL library in inst/include/amgcl"
   )
   )
 Description: Maximum likelihood estimation of landscape conductance surfaces
@@ -37,7 +43,8 @@ Description: Maximum likelihood estimation of landscape conductance surfaces
   and Raybould (2002)
   <doi:10.1198/108571102320> and Hanks and Hooten (2013)
   <doi:10.1080/01621459.2012.724647>, respectively.
-URL: https://github.com/wpeterman/terradish,
+URL: https://wpeterman.github.io/terradish/,
+  https://github.com/wpeterman/terradish,
   https://doi.org/10.5281/zenodo.21225711
 BugReports: https://github.com/wpeterman/terradish/issues
 License: BSD_3_clause + file LICENSE

@@ -1,4 +1,4 @@
-#' Check a generalized-Wishart distance response
+#' Check that a squared-distance response is admissible
 #'
 #' Tests whether a matrix supplied as the response to
 #' \code{\link{generalized_wishart}} has squared-Euclidean geometry. The check
@@ -64,6 +64,8 @@
 #'
 #' @seealso \code{\link{generalized_wishart}},
 #'   \code{\link{wishart_covariance}}, \code{\link{mlpe}}
+#'
+#' @family genetic responses
 #'
 #' @examples
 #' # Squared Euclidean distances from known coordinates are admissible.

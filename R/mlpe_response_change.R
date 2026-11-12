@@ -1,4 +1,4 @@
-#' Response-scale change for MLPE pairwise covariates
+#' Change in genetic distance across an MLPE pairwise covariate contrast
 #'
 #' Computes the expected change in the genetic-distance response associated
 #' with changing one or more pairwise covariates in an
@@ -38,30 +38,36 @@
 #'   change, confidence limits, and confidence level.
 #'
 #' @section Worked examples:
-#' \code{vignette("ibe-ibr-workflow", package = "terradish")}.
+#' \code{vignette("v08-ibe-ibr-workflow", package = "terradish")}.
 #'
 #' @seealso \code{\link{mlpe_covariates}},
 #'   \code{\link{pairwise_endpoint_covariates}}, \code{\link{terradish}}
 #'
+#' @family inference and model comparison
+#'
 #' @examples
 #' \donttest{
 #' data(melip)
-#' altitude    <- terra::unwrap(melip.altitude)
-#' forestcover <- terra::unwrap(melip.forestcover)
-#' coords      <- terra::unwrap(melip.coords)
-#'
-#' covariates <- c(altitude, forestcover)
+#' covariates <- c(terra::unwrap(melip.altitude),
+#'                 terra::unwrap(melip.forestcover))
+#' coords <- terra::unwrap(melip.coords)
 #' names(covariates) <- c("altitude", "forestcover")
+#' # Coarsened so the example runs quickly; name layers, then scale.
 #' covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
 #'                                                 na.rm = TRUE))
-#' surface <- conductance_surface(covariates, coords, directions = 8)
+#' # Keep one site per raster cell (some melip sites share a cell).
+#' keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+#' coords <- coords[keep]
+#' Fst <- melip.Fst[keep, keep]
+#' surface <- conductance_surface(covariates, coords)
 #'
 #' # site-level altitude, turned into a pairwise |difference| IBE predictor
-#' site_altitude <- data.frame(altitude = terra::extract(altitude, coords)[, 2])
+#' site_altitude <- data.frame(
+#'   altitude = terra::extract(terra::unwrap(melip.altitude), coords)[, 2])
 #' g_joint <- mlpe_covariates(site_altitude)
 #'
 #' # joint isolation by environment and isolation by resistance
-#' fit_joint <- terradish(melip.Fst ~ altitude + forestcover, data = surface,
+#' fit_joint <- terradish(Fst ~ altitude + forestcover, data = surface,
 #'                        conductance_model = loglinear_conductance,
 #'                        measurement_model = g_joint)
 #'

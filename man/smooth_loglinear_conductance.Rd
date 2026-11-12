@@ -2,7 +2,7 @@
 % Please edit documentation in R/radish_conductance_model.R
 \name{smooth_loglinear_conductance}
 \alias{smooth_loglinear_conductance}
-\title{Smooth log-link conductance model}
+\title{Log-linear conductance model with spline terms}
 \usage{
 smooth_loglinear_conductance(
   formula,
@@ -83,7 +83,7 @@ diagnostic, not an uncertainty test.
 }
 \section{Worked example}{
 
-See \code{vignette("spline-conductance", package = "terradish")} for
+See \code{vignette("v06-spline-conductance", package = "terradish")} for
 fitted conductance curves, genetic-response plots, and model comparison.
 }
 
@@ -97,6 +97,13 @@ fit$conductance
 
 }
 \seealso{
-\code{\link{loglinear_conductance}}, \code{\link{mlpe}},
+\code{\link{loglinear_conductance}},
+  \code{\link{gaussian_smoothed_loglinear_conductance}},
   \code{\link{conductance_surface}}, \code{\link{terradish}}
+
+Other conductance models:
+\code{\link[=gaussian_smoothed_loglinear_conductance]{gaussian_smoothed_loglinear_conductance()}},
+\code{\link[=loglinear_conductance]{loglinear_conductance()}},
+\code{\link{terradish_conductance_model_factory}}
 }
+\concept{conductance models}

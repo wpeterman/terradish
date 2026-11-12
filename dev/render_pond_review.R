@@ -1,7 +1,7 @@
 review <- 'C:/Users/peterman.73/Downloads/terradish_pond_vignettes_review_20261013'
 dir.create(review, recursive = TRUE, showWarnings = FALSE)
-guides <- c('getting-started', 'gaussian-scale-optimization', 'model-comparison',
-            'spline-conductance', 'ibe-ibr-workflow', 'categorical-conductance')
+guides <- c('v01-getting-started', 'v07-gaussian-scale-optimization', 'v04-model-comparison',
+            'v06-spline-conductance', 'v08-ibe-ibr-workflow', 'v05-categorical-conductance')
 for (guide in guides) {
   rmarkdown::render(file.path('vignettes', paste0(guide, '.Rmd')),
     output_dir = review, output_file = paste0(guide, '.html'),

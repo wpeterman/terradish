@@ -1,4 +1,4 @@
-#' Rank fitted terradish models by information criterion
+#' Rank fitted models by AIC, AICc, or BIC
 #'
 #' Creates a model-selection table from fitted \code{terradish} models using
 #' AIC, AICc, or BIC.
@@ -39,46 +39,55 @@
 #' recorded \code{nu}, and retained graph signatures. Older fits without
 #' signatures require the user to verify the graph domain.
 #'
-#' @return A data frame containing model ranks, parameter counts, information
-#'   criterion values, delta values, weights, cumulative weights, and
-#'   log-likelihoods. The \code{converged} column is true only when both the
+#' @return A data frame with one row per model, sorted from best to worst:
+#'   \code{model} (the label), \code{K} (number of estimated parameters,
+#'   conductance plus nuisance), the criterion (\code{AIC}, \code{AICc}, or
+#'   \code{BIC}; smaller is better), its difference from the best model
+#'   (\code{Delta_AIC} and so on), the model weight and cumulative weight,
+#'   and \code{loglik}. The \code{converged} column is true only when both the
 #'   outer optimizer and final nuisance optimization record code 0. Missing
 #'   convergence diagnostics in older objects are treated as unverified (false);
 #'   \code{boundary} marks active parameter bounds or no resistance structure.
 #'   A warning identifies tables containing nonconverged or boundary fits.
 #'
 #' @section Worked example:
-#' See \code{vignette("model-comparison", package = "terradish")} for
+#' See \code{vignette("v04-model-comparison", package = "terradish")} for
 #' compatible model rankings, coefficient plots, and predictive comparisons.
+#'
+#' @seealso \code{\link{terradish_cv_folds}} for predictive comparison,
+#'   \code{\link{terradish_rescale_nu}} for sensitivity to \code{nu}, and
+#'   \code{\link[=terradish_methods]{anova()}} for nested likelihood-ratio
+#'   tests.
+#'
+#' @family inference and model comparison
 #'
 #' @examples
 #' \donttest{
 #' library(terra)
 #'
 #' data(melip)
-#' melip.altitude <- terra::unwrap(melip.altitude)
-#' melip.forestcover <- terra::unwrap(melip.forestcover)
-#' melip.coords <- terra::unwrap(melip.coords)
-#'
-#' keep <- 1:10
-#' melip.Fst_small <- melip.Fst[keep, keep]
-#' # Coarsen the rasters so this example remains quick on CRAN.
-#' covariates <- terra::aggregate(c(melip.altitude, melip.forestcover),
-#'                                fact = 3, na.rm = TRUE)
-#' covariates <- scale_covariates(covariates)
+#' covariates <- c(terra::unwrap(melip.altitude),
+#'                 terra::unwrap(melip.forestcover))
+#' coords <- terra::unwrap(melip.coords)
 #' names(covariates) <- c("altitude", "forestcover")
-#' surface_small <- conductance_surface(covariates, melip.coords[keep], directions = 8)
+#' # Coarsened so the example runs quickly; name layers, then scale.
+#' covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+#'                                                 na.rm = TRUE))
+#' # Keep one site per raster cell (some melip sites share a cell).
+#' keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+#' coords <- coords[keep]
+#' Fst <- melip.Fst[keep, keep]
+#' surface <- conductance_surface(covariates, coords)
 #'
-#' fit1 <- terradish(melip.Fst_small ~ altitude, surface_small,
-#'                   loglinear_conductance, leastsquares,
-#'                   control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
-#' fit2 <- terradish(melip.Fst_small ~ altitude + forestcover, surface_small,
-#'                   loglinear_conductance, leastsquares,
-#'                   control = NewtonRaphsonControl(maxit = 2, verbose = FALSE))
+#' fit1 <- terradish(Fst ~ altitude + forestcover, surface,
+#'                   measurement_model = mlpe)
+#' fit2 <- terradish(Fst ~ altitude * forestcover, surface,
+#'                   measurement_model = mlpe)
 #'
+#' # One row per model, best first. K counts conductance plus nuisance
+#' # parameters; Delta_AIC is the difference from the best model.
 #' aic_table(list(fit1, fit2))
 #' aic_table(list(fit1, fit2), AICc = TRUE)
-#'
 #' }
 #' @export
 aic_table <- function(mod_list, AICc = FALSE, BIC = FALSE, mod_names = NULL, verbose = FALSE)

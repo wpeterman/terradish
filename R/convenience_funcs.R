@@ -109,10 +109,16 @@ scale_to_0_1 <- function(x)
 #' \code{crop_to_focal_buffer} and \code{conductance_surface} preserve this
 #' attribute.
 #'
+#' Name the layers before scaling. The stored centers and scales are keyed by
+#' layer name, so renaming a raster after scaling leaves stale names in the
+#' \code{"terradish_scale"} attribute and breaks back-transformation.
+#'
 #' @return A \code{SpatRaster} with transformed values and a
 #'   \code{"terradish_scale"} attribute.
 #'
 #' @seealso \code{\link{scale_to_0_1}}, \code{\link{conductance_surface}}
+#'
+#' @family graph setup
 #'
 #' @examples
 #' library(terra)
@@ -203,9 +209,12 @@ scale_covariates <- function(covariates,
 #' @details
 #' This is a thin wrapper around \code{x[lower.tri(x)]}.  It is provided as a
 #' convenience for extracting vectorized pairwise measurements from symmetric
-#' matrices such as distance or covariance matrices.
+#' matrices such as distance or covariance matrices. The order matches the
+#' rows of \code{\link{pairwise_covariates}} and of R's \code{dist()}.
 #'
 #' @seealso \code{\link[base]{lower.tri}}
+#'
+#' @family genetic responses
 #'
 #' @examples
 #' m <- matrix(1:9, nrow = 3)
@@ -252,6 +261,8 @@ lower <- function(x)
 #'   individual in \code{gi}.
 #'
 #' @seealso \code{\link{dist_from_biallelic}}, \code{\link{cov_from_genetic_data}}
+#'
+#' @family genetic responses
 #'
 #' @examples
 #' if (requireNamespace("adegenet", quietly = TRUE)) {

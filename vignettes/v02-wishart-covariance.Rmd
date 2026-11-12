@@ -1,5 +1,5 @@
 ---
-title: "Choosing and Checking a Genetic Covariance Response"
+title: "02. Choosing and Checking a Genetic Covariance Response"
 author: "Bill Peterman"
 output:
   rmarkdown::html_vignette:
@@ -9,7 +9,7 @@ output:
     mathjax: null
     pandoc_args: ["--mathml"]
 vignette: >
-  %\VignetteIndexEntry{Choosing and Checking a Genetic Covariance Response}
+  %\VignetteIndexEntry{02. Choosing and Checking a Genetic Covariance Response}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -21,16 +21,16 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
 
 **Goal.** Choose a genetic response, preserve its sample order, and check its mathematical properties before fitting.
 
-The [data-generation guide](data-generation.html) explains the landscapes,
+The [data-generation guide](v12-data-generation.html) explains the landscapes,
 SLiM histories, sampling, and matched markers used in these examples. Open it
-in R with `vignette("data-generation", package = "terradish")`.
+in R with `vignette("v12-data-generation", package = "terradish")`.
 
 ## What genetic quantity are you modeling?
 
 A genotype table needs a biological sampling unit and a documented
 transformation before it becomes a model response. This guide checks that
 transformation for the Ohio pond samples fitted in
-[`vignette("getting-started", package = "terradish")`](getting-started.html).
+[`vignette("v01-getting-started", package = "terradish")`](v01-getting-started.html).
 
 The 24 ponds are demes (local breeding populations), each with 20 retained
 diploid animals genotyped at matched SNPs and microsatellites. Grouping
@@ -49,7 +49,8 @@ measurement assessment.
 - Use a **covariance response** with `measurement_model = wishart_covariance`
   when you have genotypes, can build the covariance with
   `cov_from_biallelic()` or `cov_from_genetic_data()`, and can defend a
-  value of `nu`, the assumed number of independent genetic features. Its
+  value of `nu`, the effective Wishart information (not a count of
+  independent markers). Its
   squared distances from `dist_from_cov()` give the same likelihood under
   `generalized_wishart`.
 - Use a **pairwise distance** with `measurement_model = mlpe` when you
@@ -58,7 +59,7 @@ measurement assessment.
   (maximum likelihood population effects) regresses genetic distance on
   resistance distance, accounts for correlation between pairs that share a
   site, and estimates its own residual variance, so it needs no `nu`.
-  [`vignette("mlpe-pairwise-distance", package = "terradish")`](mlpe-pairwise-distance.html)
+  [`vignette("v03-mlpe-pairwise-distance", package = "terradish")`](v03-mlpe-pairwise-distance.html)
   fits one and reads its summary.
 
 Passing the geometry check below shows that a response is a valid
@@ -94,7 +95,7 @@ c(ponds = nrow(S_snp), haploid_copies_per_pond = N[1],
 genotype matrices have 480 rows. Every pond contributes 40 sampled allele
 copies at each SNP, so dividing the count covariance by the common `N[1]`
 gives a standardized frequency covariance. Do not apply that shortcut to
-unequal sample sizes (Getting Started gives the derivation).
+unequal sample sizes (Getting Started gives the formula).
 
 `normalize = "features"` puts the microsatellite covariance on a
 per-feature scale, and expanded allele features are not loci. SNPs and
@@ -106,7 +107,8 @@ not ecological replicates.
 ## Check covariance and distance geometry
 
 A positive semidefinite covariance gives no negative variance for any
-linear combination of its entries. Centering across ponds removes the
+linear combination of the ponds' allele-frequency deviations. Centering
+across ponds removes the
 common mean direction, so expect a zero eigenvalue. Tiny negative values
 from floating-point rounding are not substantial violations.
 
@@ -126,7 +128,9 @@ diagnostic[c("admissible", "relative_min_eigenvalue", "n_negative")]
 ```
 
 **How to read the output.** Near-zero symmetry errors and row sums support
-the intended centered construction. `admissible = TRUE` means the squared
+the intended centered construction. They do not test sample order, because
+a covariance is symmetric and centered under any ordering of its rows.
+`admissible = TRUE` means the squared
 distances have acceptable covariance geometry within numerical tolerance.
 It says nothing about marker filtering, relatedness, unequal sampling
 variance, or the biological adequacy of the measurement likelihood.
@@ -173,12 +177,18 @@ ggplot(covariance_cells, aes(pond_i, pond_j, fill = covariance)) +
   labs(x = "Pond index", y = "Pond index")
 ```
 
-**How to read the map.** The matrix should be symmetric about the
-diagonal, and an asymmetric pattern signals a row-ordering mistake. Red
-blocks mark ponds that share allele-frequency departures, usually because
-they are close or well connected. Negative values are expected after
-centering. After fitting, `plot(fit, type = "fit")` shows observed versus
-fitted covariance, as in Getting Started.
+**How to read the map.** Red cells mark pond pairs that share
+allele-frequency departures, usually because the two ponds are close or
+well connected. Negative values are expected after centering. Ponds appear
+in table order (P01 to P24), which is an identifier order and not a
+spatial one, so do not expect contiguous blocks unless you reorder ponds
+along a spatial axis.
+
+This map cannot reveal a mismatch between genotype rows and ponds. The
+covariance is symmetric under any row order, so a misaligned response
+still looks like a valid matrix. Only the `stopifnot()` checks on row
+names in the first chunk guard the order. A misaligned response tends to
+show up later, as a fit that does no better than uniform conductance.
 
 ## Separate marker count from assumed information
 
@@ -191,7 +201,8 @@ coefficients $\theta$, and $\tau \ge 0$ scales it. The diagonal nugget
 absorbs variation the graph misses and does not estimate population size
 or raster context.
 
-You supply `nu`, which weights the likelihood. The pond guides assume 40,
+You supply `nu`, the effective Wishart information, which weights the
+likelihood. The pond guides assume 40,
 which is neither the 2,500 SNPs nor the 40 allele copies sampled per pond.
 Linkage and shared history prevent any simple conversion from marker count
 to independent information.
@@ -202,6 +213,48 @@ $1/\sqrt{\nu}$ and changes the size of likelihood gains relative to the
 AIC penalty. Boundary estimates require separate treatment. Use
 `terradish_rescale_nu()` to report sensitivity and held-out ponds to check
 transfer, but neither estimates the correct `nu`.
+
+## Fit the checked response
+
+The checks above establish that `S_snp` is a coherent response. The fit
+below uses it with the fixed 500 m forest context from Getting Started,
+then refits the matching squared distances to confirm that the two
+representations carry the same information. Both fits run when this guide
+is built and take a few seconds.
+
+```{r fit}
+library(terra)
+# One standardized layer is enough here: forest fraction in a 500 m context.
+forest500 <- scale_covariates(unwrap(ohio_ponds$forest500))
+surface <- conductance_surface(forest500, ponds[c("x", "y")], directions = 8)
+control <- NewtonRaphsonControl(maxit = 200, ctol = 1e-8, ftol = 1e-8)
+
+# Covariance response with the Wishart covariance likelihood.
+fit <- terradish(S_snp ~ forest500, surface,
+  measurement_model = wishart_covariance, nu = 40,
+  optimizer = "bfgs", control = control)
+# Matching squared distances with the generalized Wishart likelihood.
+fit_distance <- terradish(D ~ forest500, surface,
+  measurement_model = generalized_wishart, nu = 40,
+  optimizer = "bfgs", control = control)
+
+# Require convergence of the conductance and nuisance optimizations.
+stopifnot(fit$convergence$code == 0, fit$fit$subproblem$convergence == 0,
+          fit_distance$convergence$code == 0,
+          fit_distance$fit$subproblem$convergence == 0)
+rbind(covariance = c(coef(fit), summary(fit)$phi, logLik = as.numeric(logLik(fit))),
+      distance = c(coef(fit_distance), summary(fit_distance)$phi,
+                   logLik = as.numeric(logLik(fit_distance))))
+```
+
+**How to read the output.** The two rows agree, which is the numerical
+form of the round-trip check above. `forest500` is the change in log
+conductance per SD of forest context, so one SD multiplies conductance by
+about `r round(exp(coef(fit)[["forest500"]]), 2)`. `tau` weights the graph
+covariance, and `sigma` is the log of the nugget variance. Each standard
+error in `summary(fit)` scales with $1/\sqrt{\nu}$, so report the
+conclusion over a plausible range of `nu` with `terradish_rescale_nu()`.
+Getting Started interprets this fit in full.
 
 ## Adapt the construction to your data
 
@@ -219,12 +272,46 @@ pairwise dissimilarities, assess an MLPE model and its assumptions instead.
 
 For individual sampling, `groups = NULL` requests an individual-level
 covariance from `cov_from_genetic_data()`, as worked through in
-`vignette("individual-salamanders", package = "terradish")`.
+`vignette("v09-individual-salamanders", package = "terradish")`.
+
+## Quick reference: from genotypes to a checked, fitted response
+
+```{r quick-reference, eval = FALSE}
+library(terradish)
+library(terra)
+data(ohio_ponds)
+
+# 1. Confirm sample order, then summarize SNP dosage by pond.
+ponds <- ohio_ponds$ponds
+stopifnot(identical(rownames(ohio_ponds$snp), ohio_ponds$samples$individual))
+g <- factor(ohio_ponds$samples$pond, levels = ponds$pond)
+Y <- rowsum(ohio_ponds$snp, g, reorder = FALSE)[ponds$pond, , drop = FALSE]
+N <- 2 * as.numeric(table(g))            # sampled allele copies per pond
+stopifnot(all(N == N[1]))                # the shortcut below needs equal sizes
+S <- cov_from_biallelic(Y, N) / N[1]
+
+# 2. Check the covariance and its squared-distance representation.
+max(abs(rowSums(S)))                      # near zero: centered across ponds
+D <- dist_from_cov(S)                     # already squared; do not square again
+check_distance_response(D)$admissible     # TRUE: coherent distance geometry
+
+# 3. Fit the covariance; nu is the effective Wishart information you assume.
+x <- scale_covariates(unwrap(ohio_ponds$forest500))
+graph <- conductance_surface(x, ponds[c("x", "y")], directions = 8)
+fit <- terradish(S ~ forest500, graph,
+  measurement_model = wishart_covariance, nu = 40, optimizer = "bfgs",
+  control = NewtonRaphsonControl(maxit = 200, ctol = 1e-8, ftol = 1e-8))
+summary(fit)                              # check the Convergence line first
+
+# 4. Report sensitivity to nu; estimates stay fixed and intervals rescale.
+confint(terradish_rescale_nu(fit, nu = 20))
+```
 
 ## Summary of key functions
 
 | Function | Purpose |
 |---|---|
+| `terradish()` | Fit conductance and measurement parameters to the checked response |
 | `cov_from_biallelic()` | Construct covariance from allele counts and sampled totals |
 | `cov_from_genetic_data()` | Construct covariance from numeric features or labeled alleles |
 | `dist_from_cov()` | Obtain matching squared distances |
@@ -233,10 +320,10 @@ covariance from `cov_from_genetic_data()`, as worked through in
 
 ## See also
 
-- [`vignette("getting-started", package = "terradish")`](getting-started.html): fit and interpret both pond marker panels.
-- [`vignette("model-comparison", package = "terradish")`](model-comparison.html): information sensitivity and held-out prediction.
-- [`vignette("mlpe-pairwise-distance", package = "terradish")`](mlpe-pairwise-distance.html): fit a pairwise genetic distance with MLPE and read its summary.
-- [`vignette("ibe-ibr-workflow", package = "terradish")`](ibe-ibr-workflow.html): paired environmental differences versus covariance components.
-- [`vignette("simulation-design", package = "terradish")`](simulation-design.html): conditional study-design benchmarks, distinct from SLiM genetics.
-- [`vignette("individual-salamanders", package = "terradish")`](individual-salamanders.html): individual-level covariance from matched SNPs and microsatellites.
-- [`vignette("large-landscapes", package = "terradish")`](large-landscapes.html): `generalized_wishart` and solver choices on large rasters.
+- [`vignette("v01-getting-started", package = "terradish")`](v01-getting-started.html): fit and interpret both pond marker panels.
+- [`vignette("v04-model-comparison", package = "terradish")`](v04-model-comparison.html): information sensitivity and held-out prediction.
+- [`vignette("v03-mlpe-pairwise-distance", package = "terradish")`](v03-mlpe-pairwise-distance.html): fit a pairwise genetic distance with MLPE and read its summary.
+- [`vignette("v08-ibe-ibr-workflow", package = "terradish")`](v08-ibe-ibr-workflow.html): paired environmental differences versus covariance components.
+- [`vignette("v10-simulation-design", package = "terradish")`](v10-simulation-design.html): conditional study-design benchmarks, distinct from SLiM genetics.
+- [`vignette("v09-individual-salamanders", package = "terradish")`](v09-individual-salamanders.html): individual-level covariance from matched SNPs and microsatellites.
+- [`vignette("v11-large-landscapes", package = "terradish")`](v11-large-landscapes.html): `generalized_wishart` and solver choices on large rasters.

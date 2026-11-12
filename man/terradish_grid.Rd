@@ -2,7 +2,7 @@
 % Please edit documentation in R/radish_grid.R
 \name{terradish_grid}
 \alias{terradish_grid}
-\title{Evaluate likelihood of a parameterized conductance surface}
+\title{Profile likelihood on a grid of conductance parameters}
 \usage{
 terradish_grid(
   theta,
@@ -75,37 +75,51 @@ A list of class \code{c("terradish_grid", "radish_grid")}, with one
 }
 \description{
 Calculates the profile likelihood of a parameterized conductance surface across
-a grid of parameter values (e.g. the nuisance parameters are optimized at each
-point on the grid).
+a grid of parameter values (that is, the nuisance parameters are optimized at
+each point on the grid).
 }
 \examples{
 \donttest{
-
 library(terra)
 
 data(melip)
-melip.altitude <- terra::unwrap(melip.altitude)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords <- terra::unwrap(melip.coords)
-
-covariates <- c(terra::scale(melip.altitude),
-                terra::scale(melip.forestcover))
+covariates <- c(terra::unwrap(melip.altitude),
+                terra::unwrap(melip.forestcover))
+coords <- terra::unwrap(melip.coords)
 names(covariates) <- c("altitude", "forestcover")
-surface <- conductance_surface(covariates, melip.coords, directions = 8,
-                               saveStack = TRUE)
+# Coarsened so the example runs quickly; name layers, then scale.
+covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+                                                na.rm = TRUE))
+# Keep one site per raster cell (some melip sites share a cell).
+keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+Fst <- melip.Fst[keep, keep]
+surface <- conductance_surface(covariates, coords[keep])
 
-fit_mlpe <- terradish(melip.Fst ~ altitude + forestcover, data = surface,
-                   terradish::loglinear_conductance, terradish::mlpe,
-                   control = NewtonRaphsonControl(maxit = 5, verbose = FALSE))
+fit_mlpe <- terradish(Fst ~ altitude + forestcover, data = surface,
+                      measurement_model = mlpe)
 
 theta <- as.matrix(expand.grid(forestcover = seq(-0.5, 0.5, length.out = 3),
                                altitude = seq(-0.5, 0.5, length.out = 3)))
 
-grid <- terradish_grid(theta, melip.Fst ~ forestcover + altitude, surface,
-                    terradish::loglinear_conductance, terradish::mlpe, cores = 1)
+grid <- terradish_grid(theta, Fst ~ forestcover + altitude, surface,
+                       measurement_model = mlpe)
 
+# Profile log-likelihood at each grid point; the maximum should lie near
+# the fitted coefficients.
 cbind(grid$theta, loglik = grid$loglik)
 coef(fit_mlpe)
+}
+}
+\seealso{
+\code{\link{terradish}} for the optimizer and
+  \code{\link{terradish_distance}} for resistance distances on the same
+  kind of grid.
 
+Other model fitting:
+\code{\link[=conductance]{conductance()}},
+\code{\link[=terradish]{terradish()}},
+\code{\link[=terradish_algorithm]{terradish_algorithm()}},
+\code{\link[=terradish_distance]{terradish_distance()}},
+\code{\link{terradish_methods}}
 }
-}
+\concept{model fitting}

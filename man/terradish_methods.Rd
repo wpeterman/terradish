@@ -12,7 +12,7 @@
 \alias{logLik.terradish}
 \alias{AIC.terradish}
 \alias{residuals.terradish}
-\title{Methods for fitted terradish models}
+\title{Print, summarize, compare, and extract from a fitted model}
 \usage{
 \method{print}{terradish}(x, digits = max(3L, getOption("digits") - 3L), ...)
 
@@ -29,13 +29,7 @@
 
 \method{fitted}{terradish}(object, type = c("response", "distance", "covariance"), ...)
 
-\method{simulate}{terradish}(
-  object,
-  nsim = 1,
-  seed = NULL,
-  method = c("permutation", "parametric"),
-  ...
-)
+\method{simulate}{terradish}(object, nsim = 1, seed = NULL, method = "permutation", ...)
 
 \method{anova}{terradish}(object, ..., alternative = NULL)
 
@@ -56,35 +50,73 @@
 
 \item{conf.level}{Confidence level for nuisance-parameter confidence
 intervals reported by \code{summary()}.  These intervals are conditional on
-the fitted conductance surface.}
+the fitted conductance surface. \code{confint()} calls the same quantity
+\code{level}; \code{conductance()} and \code{plot()} call it
+\code{quantile}.}
 
 \item{signif.stars}{Should significance stars be printed in coefficient
 tables?}
 
-\item{type}{Type of fitted values to return.}
+\item{type}{Type of fitted values to return: \code{"response"} (default)
+gives the expected response matrix on the scale of the data (genetic
+distance or covariance, according to the measurement model),
+\code{"distance"} gives the fitted resistance distances among focal
+sites, and \code{"covariance"} gives the fitted graph covariance (the
+focal-site block of the generalized inverse of the graph Laplacian).}
 
 \item{nsim}{Number of simulated response matrices to generate.}
 
 \item{seed}{Optional random seed used by \code{simulate()}.}
 
-\item{method}{Simulation method.}
+\item{method}{Simulation method. \code{"permutation"} is the only
+method: it adds the residual matrix, with sites permuted jointly in
+rows and columns, to the fitted response. Any other value stops with an
+error.}
 
 \item{k}{Penalty multiplier supplied to \code{AIC()}.}
 }
 \value{
 \itemize{
-  \item \code{print()} returns its input invisibly.
-  \item \code{summary()} returns an object of class
-    \code{summary.terradish}, with legacy \code{summary.radish}
-    compatibility retained.
-  \item \code{coef()} returns the fitted conductance coefficients.
-  \item \code{fitted()} returns fitted responses, distances, or covariance.
-  \item \code{simulate()} returns one or more simulated response matrices.
-  \item \code{anova()} returns a likelihood-ratio comparison table.
-  \item \code{logLik()} returns a \code{logLik} object.
-  \item \code{AIC()} returns \eqn{-2\ell + kK}; the default \code{k = 2}
-    gives Akaike's Information Criterion.
-  \item \code{residuals()} returns the residual response matrix.
+  \item \code{print()} returns its input invisibly after printing it.
+  \item \code{summary()} returns a list of class \code{summary.terradish}
+    (also \code{summary.radish}). Its main elements are \code{ztable}
+    (conductance estimates on the log-conductance scale, standard errors,
+    z values, and p values), \code{vcov} and \code{vcor} (their covariance
+    and correlation matrices), \code{phi} and \code{phi_table}
+    (nuisance-parameter estimates, standard errors, and intervals on the
+    measurement model's scale, conditional on the fitted conductance
+    surface), \code{phi_vcov}, \code{phi_at_bound} (flags for kernel
+    weights at zero), \code{convergence}, \code{boundary} and
+    \code{no_structure_boundary}, \code{loglik}, \code{df}, \code{aic},
+    \code{gradnorm}, \code{fcalls}, \code{iters}, \code{diagnostics},
+    \code{call}, and \code{dim}. \code{ibe_ratio} holds the output of
+    \code{\link{terradish_ibe_ratio}} (zero rows without environmental
+    terms). Gaussian scale fits add \code{sigma_table}, with one row per
+    smoothing scale: the estimate and standard error in map units, the
+    fitting bounds, and a \code{near_bound} flag for estimates within one
+    percent of a bound. Spline fits add \code{spline_monotonicity}.
+  \item \code{coef()} returns a named numeric vector of fitted conductance
+    coefficients on the log-conductance scale, or an empty vector when
+    they are unidentified.
+  \item \code{fitted()} returns a numeric focal-site matrix of expected
+    responses, resistance distances, or graph covariances, selected by
+    \code{type}.
+  \item \code{simulate()} returns a numeric response matrix for
+    \code{nsim = 1}, or a three-dimensional array with simulations along
+    the third dimension otherwise.
+  \item \code{anova()} returns a matrix of class \code{anova}, comparing
+    two nested fits by log-likelihood, parameter count, likelihood-ratio
+    statistic, and its reference-distribution p-value.
+  \item \code{logLik()} returns a numeric scalar of class \code{logLik},
+    with parameter-count (\code{df}) and focal-site-count (\code{nobs})
+    attributes.
+  \item \code{AIC()} returns \eqn{-2\ell + kK}, where \eqn{K} is the number
+    of estimated parameters; the default \code{k = 2} gives Akaike's
+    Information Criterion. Smaller values favor a fit when response and
+    likelihood are comparable.
+  \item \code{residuals()} returns a numeric matrix of observed minus
+    fitted responses, centered on both site dimensions for
+    covariance-response models.
 }
 }
 \description{
@@ -92,6 +124,21 @@ S3 methods for working with fitted objects returned by \code{\link{terradish}}
 and summaries returned by \code{\link[base:summary]{summary()}}.
 }
 \details{
+\strong{Reading \code{summary()}.} The coefficient table reports each
+conductance coefficient on the log-conductance scale with its Wald
+standard error, z value, and p value; \code{exp()} of an estimate is the
+multiplicative change in conductance per unit of the covariate. Use
+\code{\link[=terradish_inference]{confint()}} for intervals on the
+conductance coefficients. The nuisance table reports the measurement-model
+parameters with conditional Wald intervals.
+
+Parameter names repeat across measurement models with different meanings.
+In \code{\link{mlpe}} and \code{\link{leastsquares}}, \code{tau} is the log
+residual precision. In \code{\link{wishart_covariance}} and
+\code{\link{generalized_wishart}}, \code{tau} is the nonnegative multiplier
+on the graph covariance and \code{sigma} is the log nugget variance. See
+the parameter glossary in \code{\link{terradish-package}}.
+
 Nuisance-parameter estimates and intervals from \code{summary()} remain on
 the parameterization used by the measurement model. For example, MLPE
 \code{tau} is log precision and its stored \code{rho} is unconstrained; the
@@ -107,7 +154,7 @@ covariance matrices retain their full \eqn{n\times n} form.
 
 \code{anova()} is a likelihood-ratio test for nested conductance formulas
 fitted to the same response, sites, graph domain, conductance-model factory,
-measurement model, and pair subset; Wishart fits must also use the same
+and measurement model; Wishart fits must also use the same
 \code{nu}. Both fits must record successful outer and final nuisance
 convergence; missing diagnostics require refitting. The function checks
 formula-term nesting, but the analyst must
@@ -116,18 +163,27 @@ substantively nested. Its chi-squared reference distribution assumes the
 tested parameters are regular interior parameters. It can be unreliable when
 a null value is on a parameter boundary or other regularity conditions fail;
 use a justified alternative or simulation calibration in those cases.
+One boundary case is handled automatically: when the larger model adds
+only Wishart environmental kernel weights (\code{lambda_*}, which are
+bounded at zero), \code{anova()} warns and reports a chi-bar-square
+reference with binomial weights instead of the ordinary chi-square. The
+table heading names the reference distribution that was used.
 }
 \examples{
 \donttest{
 data(melip)
 covariates <- c(terra::unwrap(melip.altitude), terra::unwrap(melip.forestcover))
+coords <- terra::unwrap(melip.coords)
 names(covariates) <- c("altitude", "forestcover")
+# Coarsened so the example runs quickly; name layers, then scale.
 covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
                                                 na.rm = TRUE))
-surface <- conductance_surface(covariates, terra::unwrap(melip.coords),
-                               directions = 8)
+# Keep one site per raster cell (some melip sites share a cell).
+keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+Fst <- melip.Fst[keep, keep]
+surface <- conductance_surface(covariates, coords[keep])
 
-fit <- terradish(melip.Fst ~ altitude + forestcover, data = surface,
+fit <- terradish(Fst ~ altitude + forestcover, data = surface,
                  conductance_model = loglinear_conductance,
                  measurement_model = mlpe)
 
@@ -145,11 +201,11 @@ AIC(fit)               # compare only fits using the same response and likelihoo
 head(fitted(fit)[, 1:4])     # fitted genetic distances
 head(residuals(fit)[, 1:4])  # observed minus fitted
 
-# A nested comparison: is forest cover worth its parameter?
-fit_alt <- terradish(melip.Fst ~ altitude, data = surface,
+# A nested comparison: is the interaction worth its parameter?
+fit_int <- terradish(Fst ~ altitude * forestcover, data = surface,
                      conductance_model = loglinear_conductance,
                      measurement_model = mlpe)
-anova(fit_alt, fit)
+anova(fit, fit_int)
 }
 
 }
@@ -159,8 +215,16 @@ anova(fit_alt, fit)
   diagnostic plot types, \code{\link{aic_table}} for ranking a model set,
   and \code{\link{mlpe_response_change}} for putting an MLPE covariate
   association on the response scale.  See
-  \code{vignette("getting-started", package = "terradish")} for a walkthrough
+  \code{vignette("v01-getting-started", package = "terradish")} for a walkthrough
   of reading these outputs and
-  \code{vignette("model-comparison", package = "terradish")} for
+  \code{vignette("v04-model-comparison", package = "terradish")} for
   \code{anova()} and \code{AIC()} in context.
+
+Other model fitting:
+\code{\link[=conductance]{conductance()}},
+\code{\link[=terradish]{terradish()}},
+\code{\link[=terradish_algorithm]{terradish_algorithm()}},
+\code{\link[=terradish_distance]{terradish_distance()}},
+\code{\link[=terradish_grid]{terradish_grid()}}
 }
+\concept{model fitting}

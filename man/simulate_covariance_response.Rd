@@ -2,7 +2,7 @@
 % Please edit documentation in R/genetic_distance.R
 \name{simulate_covariance_response}
 \alias{simulate_covariance_response}
-\title{Simulate covariance responses from a conductance surface}
+\title{Simulate genetic covariance matrices from a known conductance surface}
 \usage{
 simulate_covariance_response(
   theta,
@@ -32,9 +32,14 @@ hand side, if supplied, is ignored.}
 \code{\link{loglinear_conductance}}.}
 
 \item{tau}{Nonnegative scaling applied to the conductance-implied covariance
-matrix.}
+matrix, on the same scale as the fitted Wishart \code{tau}.}
 
-\item{sigma}{Nonnegative nugget variance added to the diagonal.}
+\item{sigma}{Nonnegative nugget variance added to the diagonal, on its
+natural (variance) scale. This differs from the fitted \code{sigma}
+reported for \code{\link{wishart_covariance}} and
+\code{\link{generalized_wishart}}, which is the logarithm of the nugget
+variance. To simulate from a fitted model, pass \code{exp()} of the
+fitted \code{sigma}.}
 
 \item{nu}{Effective Wishart degrees of freedom: controls the amount of
 sampling noise in the simulated covariance: larger \code{nu} gives tighter
@@ -62,7 +67,7 @@ A list containing:
   \code{\link{terradish_distance}(covariance = TRUE)}.}
 \item{theta}{The validated conductance parameter matrix used for simulation.}
 \item{tau}{The supplied \code{tau}.}
-\item{sigma}{The supplied \code{sigma}.}
+\item{sigma}{The supplied \code{sigma} (nugget variance, natural scale).}
 \item{nu}{The supplied \code{nu}.}
 }
 \description{
@@ -82,8 +87,10 @@ at the same incorrect \code{nu} cannot reveal that error. Use
 \code{nu_fit} to examine its effect on coverage.
 }
 \examples{
-r1 <- terra::rast(nrows = 3, ncols = 3, vals = 1:9)
-r2 <- terra::rast(nrows = 3, ncols = 3, vals = c(9, 1, 4, 3, 8, 2, 5, 7, 6))
+r1 <- terra::rast(nrows = 3, ncols = 3, xmin = 0, xmax = 3, ymin = 0,
+                  ymax = 3, vals = 1:9)
+r2 <- terra::rast(nrows = 3, ncols = 3, xmin = 0, xmax = 3, ymin = 0,
+                  ymax = 3, vals = c(9, 1, 4, 3, 8, 2, 5, 7, 6))
 covariates <- c(r1, r2)
 names(covariates) <- c("x1", "x2")
 pts <- terra::vect(matrix(c(0.5, 0.5,
@@ -103,3 +110,12 @@ sim <- simulate_covariance_response(
 sim$covariance
 
 }
+\seealso{
+\code{\link{covariance_response_power}},
+  \code{\link{wishart_covariance}}
+
+Other simulation and study design:
+\code{\link[=covariance_response_power]{covariance_response_power()}},
+\code{\link[=print.terradish_covariance_power]{print.terradish_covariance_power()}}
+}
+\concept{simulation and study design}

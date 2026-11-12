@@ -2,7 +2,7 @@
 % Please edit documentation in R/covariance_response_power.R
 \name{print.terradish_covariance_power}
 \alias{print.terradish_covariance_power}
-\title{Print a covariance-response power assessment}
+\title{Print and read a power assessment}
 \usage{
 \method{print}{terradish_covariance_power}(x, ...)
 }
@@ -51,8 +51,10 @@ names(covariates) <- c("altitude", "forestcover")
 # coarsened, and only a handful of simulations, so the example is quick
 covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
                                                 na.rm = TRUE))
-surface <- conductance_surface(covariates, terra::unwrap(melip.coords),
-                               directions = 8, saveStack = TRUE)
+# Keep one site per raster cell (some melip sites share a cell).
+coords <- terra::unwrap(melip.coords)
+keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+surface <- conductance_surface(covariates, coords[keep])
 
 power <- covariance_response_power(
   theta        = c(forestcover = 0.5, altitude = -0.4),
@@ -76,6 +78,11 @@ power$parameter_summary   # per-coefficient power, bias, RMSE, coverage
   what each returned component contains,
   \code{\link{simulate_covariance_response}} for a single simulated data
   set, and \code{\link{terradish}} for fitting one.  See
-  \code{vignette("simulation-design", package = "terradish")} for a worked
+  \code{vignette("v10-simulation-design", package = "terradish")} for a worked
   study-design walkthrough.
+
+Other simulation and study design:
+\code{\link[=covariance_response_power]{covariance_response_power()}},
+\code{\link[=simulate_covariance_response]{simulate_covariance_response()}}
 }
+\concept{simulation and study design}

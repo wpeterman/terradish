@@ -1,3 +1,46 @@
+# "Removed unused spatial covariates" is raised every time a conductance
+# model is built. One user-level call can build the same model many times
+# (cross-validation folds, simulation replicates, warm-start stages), so the
+# user-level functions open a scope with .unused_covariate_scope_open(). Inside a
+# scope each distinct message is raised once. Outside any scope, for example
+# in a direct call to a conductance-model factory, it is always raised.
+.unused_covariate_state <- new.env(parent = emptyenv())
+.unused_covariate_state$depth <- 0L
+.unused_covariate_state$seen <- character()
+
+# A user-level function opens a scope on entry and registers the matching
+# close with on.exit(), so the scope also closes on error:
+#   .unused_covariate_scope_open()
+#   on.exit(.unused_covariate_scope_close(), add = TRUE)
+.unused_covariate_scope_open <- function()
+{
+  state <- .unused_covariate_state
+  state$depth <- state$depth + 1L
+  invisible(NULL)
+}
+
+.unused_covariate_scope_close <- function()
+{
+  state <- .unused_covariate_state
+  state$depth <- max(state$depth - 1L, 0L)
+  if (state$depth == 0L) state$seen <- character()
+  invisible(NULL)
+}
+
+.warn_unused_covariates <- function(unused_covariates)
+{
+  message <- paste0("Removed unused spatial covariates: ",
+                    paste(unused_covariates, collapse = " "))
+  state <- .unused_covariate_state
+  if (state$depth > 0L)
+  {
+    if (message %in% state$seen) return(invisible(FALSE))
+    state$seen <- c(state$seen, message)
+  }
+  warning(message, call. = FALSE)
+  invisible(TRUE)
+}
+
 assemble_model_matrix <- function(formula, spdat, check_rank = TRUE)
 {
   stopifnot(inherits(formula, "formula"))
@@ -18,8 +61,7 @@ assemble_model_matrix <- function(formula, spdat, check_rank = TRUE)
     if (any(missing_covariates))
     {
       unused_covariates <- colnames(spdat)[missing_covariates]
-      warning("Removed unused spatial covariates: ", 
-              paste(unused_covariates, collapse = " "))
+      .warn_unused_covariates(unused_covariates)
       spdat <- spdat[,!missing_covariates,drop=FALSE]
     }
   }
@@ -289,19 +331,64 @@ assemble_model_matrix <- function(formula, spdat, check_rank = TRUE)
   conductance_model
 }
 
-#' Conductance model factories
+#' Conductance models: the factory interface
 #'
-#' Functions that generate objects of class \code{"terradish_conductance_model"}
-#' that represent mappings from spatial data (e.g. rasters) to conductance.
+#' A conductance model maps the spatial covariates at each raster cell to a
+#' positive conductance. Conductance models are created by factories, which
+#' are functions of class \code{"terradish_conductance_model_factory"}. Pass a
+#' factory to the \code{conductance_model} argument of
+#' \code{\link{terradish}}.
+#'
+#' @details
+#' \strong{Choosing a model.}
+#' \describe{
+#'   \item{\code{\link{loglinear_conductance}}}{Log-linear conductance in the
+#'     formula terms, including factors, interactions, and polynomial terms.
+#'     The default.}
+#'   \item{\code{\link{smooth_loglinear_conductance}}}{Log-linear conductance
+#'     with fixed-degree regression splines for \code{s()} terms.}
+#'   \item{\code{\link{gaussian_smoothed_loglinear_conductance}}}{A
+#'     constructor that returns a factory. Selected rasters are Gaussian
+#'     smoothed and each smoothing scale is estimated with the coefficients.}
+#' }
+#'
+#' \strong{Interface.} A factory has the signature \code{factory(formula, x)},
+#' where \code{formula} is the conductance formula (its left-hand side is
+#' ignored) and \code{x} is the data frame of covariates stored in a
+#' \code{\link{conductance_surface}} object (\code{surface$x}).
+#' \code{\link{terradish}} calls the factory for you. It returns a function
+#' of class \code{"terradish_conductance_model"} that takes the conductance
+#' parameter vector \code{theta} and returns a list with
+#' \code{conductance} (one positive value per graph vertex), \code{confint}
+#' (a function giving pointwise intervals from a parameter covariance
+#' matrix), and the derivative functions \code{df__dtheta},
+#' \code{df__dx}, \code{d2f__dtheta_dtheta}, and \code{d2f__dtheta_dx} that
+#' the optimizer uses. The returned function carries a \code{"default"}
+#' attribute with named starting values, and may carry \code{"lower"} and
+#' \code{"upper"} bounds. The legacy class names
+#' \code{"radish_conductance_model_factory"} and
+#' \code{"radish_conductance_model"} are also carried for compatibility.
+#'
+#' All built-in models use a log link, so every coefficient is a change in
+#' log conductance and \code{exp()} of a coefficient is a conductance
+#' multiplier. No intercept is estimated, because a common conductance
+#' multiplier is absorbed by the measurement model.
 #'
 #' @name terradish_conductance_model_factory
+#' @usage NULL
+#' @format NULL
+#' @family conductance models
 #' @section Worked examples:
-#' See \code{vignette("getting-started", package = "terradish")} for a
-#' log-linear model, \code{vignette("categorical-conductance", package = "terradish")}
-#' for class contrasts, and \code{vignette("spline-conductance", package = "terradish")}
-#' for nonlinear curves and their plots.
+#' See \code{vignette("v01-getting-started", package = "terradish")} for a
+#' log-linear model, \code{vignette("v05-categorical-conductance", package = "terradish")}
+#' for class contrasts, \code{vignette("v06-spline-conductance", package = "terradish")}
+#' for nonlinear curves and their plots, and
+#' \code{vignette("v07-gaussian-scale-optimization", package = "terradish")}
+#' for estimated smoothing scales.
 #' @seealso \code{\link{loglinear_conductance}},
-#'   \code{\link{smooth_loglinear_conductance}}
+#'   \code{\link{smooth_loglinear_conductance}},
+#'   \code{\link{gaussian_smoothed_loglinear_conductance}},
+#'   \code{\link{terradish}}
 terradish_conductance_model_factory <- NULL
 
 #' Legacy radish conductance-model class alias
@@ -313,7 +400,7 @@ terradish_conductance_model_factory <- NULL
 #' @keywords internal
 NULL
 
-#' Log-link conductance model
+#' Log-linear conductance model
 #'
 #' Returns a function of class \code{"terradish_conductance_model"} that
 #' represents a log-linear mapping from spatial covariates to conductance.
@@ -371,8 +458,11 @@ NULL
 #'   conductance values), \code{confint} (a function for confidence intervals),
 #'   and derivative functions used internally by the optimizer.
 #'
-#' @seealso \code{\link{gaussian_smoothed_loglinear_conductance}},
+#' @seealso \code{\link{smooth_loglinear_conductance}},
+#'   \code{\link{gaussian_smoothed_loglinear_conductance}},
 #'   \code{\link{conductance_surface}}, \code{\link{terradish}}
+#'
+#' @family conductance models
 #'
 #' @examples
 #' x <- data.frame(altitude = c(-1, 0, 1), forestcover = c(0.2, 0.6, 0.5))
@@ -458,7 +548,7 @@ loglinear_conductance <- function(formula, x)
 class(loglinear_conductance) <- c("terradish_conductance_model_factory",
                                   "radish_conductance_model_factory")
 
-#' Smooth log-link conductance model
+#' Log-linear conductance model with spline terms
 #'
 #' Returns a function of class \code{"terradish_conductance_model"} that
 #' represents a log-linear conductance surface after expanding selected
@@ -521,11 +611,14 @@ class(loglinear_conductance) <- c("terradish_conductance_model_factory",
 #'   the optimizer. Derivatives are with respect to the expanded basis columns.
 #'
 #' @section Worked example:
-#' See \code{vignette("spline-conductance", package = "terradish")} for
+#' See \code{vignette("v06-spline-conductance", package = "terradish")} for
 #' fitted conductance curves, genetic-response plots, and model comparison.
 #'
-#' @seealso \code{\link{loglinear_conductance}}, \code{\link{mlpe}},
+#' @seealso \code{\link{loglinear_conductance}},
+#'   \code{\link{gaussian_smoothed_loglinear_conductance}},
 #'   \code{\link{conductance_surface}}, \code{\link{terradish}}
+#'
+#' @family conductance models
 #'
 #' @examples
 #' x <- data.frame(altitude = seq(-1, 1, length.out = 8),

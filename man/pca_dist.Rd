@@ -46,4 +46,9 @@ if (requireNamespace("adegenet", quietly = TRUE)) {
 }
 \seealso{
 \code{\link{dist_from_biallelic}}, \code{\link{cov_from_genetic_data}}
+
+Other genetic responses:
+\code{\link[=check_distance_response]{check_distance_response()}},
+\code{\link[=lower]{lower()}}
 }
+\concept{genetic responses}

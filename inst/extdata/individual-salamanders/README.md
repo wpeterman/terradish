@@ -1,7 +1,7 @@
 # Individual salamander teaching data
 
 Use `data(individual_salamanders)` and
-`vignette("individual-salamanders", package = "terradish")`.
+`vignette("v09-individual-salamanders", package = "terradish")`.
 
 The primary 2,500-SNP analysis is a positive nonlinear IBR demonstration.
 The 24 matched microsatellites have mixed predictive evidence and remain an

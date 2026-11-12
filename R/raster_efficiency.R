@@ -28,9 +28,9 @@
 #' \code{conductance_surface()} also accepts \code{crop_buffer = } and applies
 #' this helper before graph construction.
 #' Cropping can increase resistance by removing paths outside the retained
-#' extent. The supplied release audit found increases of 15--23 percent at a
-#' two-cell buffer and 1--2 percent at ten cells. These results are specific to
-#' that landscape. Compare fits over larger buffers as a sensitivity check.
+#' extent. An unpublished development check on one landscape found increases
+#' of 15--23 percent at a two-cell buffer and 1--2 percent at ten cells. These
+#' results are specific to that landscape. Compare fits over larger buffers as a sensitivity check.
 #' Keep the response, focal sites, covariate scaling, and formula fixed, then
 #' refit with successively larger buffers. Compare coefficients, confidence
 #' intervals, and fitted resistance distances. Report the buffer and whether
@@ -39,6 +39,10 @@
 #'
 #' @return A cropped \code{terra::SpatRaster}. Any \code{terradish_scale}
 #'   metadata attached by \code{\link{scale_covariates}} is preserved.
+#'
+#' @seealso \code{\link{conductance_surface}}, \code{\link{scale_covariates}}
+#'
+#' @family graph setup
 #'
 #' @examples
 #' library(terra)

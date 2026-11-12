@@ -2,7 +2,7 @@
 % Please edit documentation in R/mlpe_response_change.R
 \name{mlpe_response_change}
 \alias{mlpe_response_change}
-\title{Response-scale change for MLPE pairwise covariates}
+\title{Change in genetic distance across an MLPE pairwise covariate contrast}
 \usage{
 mlpe_response_change(
   object,
@@ -58,28 +58,32 @@ IBR or other spatially correlated predictors.
 }
 \section{Worked examples}{
 
-\code{vignette("ibe-ibr-workflow", package = "terradish")}.
+\code{vignette("v08-ibe-ibr-workflow", package = "terradish")}.
 }
 
 \examples{
 \donttest{
 data(melip)
-altitude    <- terra::unwrap(melip.altitude)
-forestcover <- terra::unwrap(melip.forestcover)
-coords      <- terra::unwrap(melip.coords)
-
-covariates <- c(altitude, forestcover)
+covariates <- c(terra::unwrap(melip.altitude),
+                terra::unwrap(melip.forestcover))
+coords <- terra::unwrap(melip.coords)
 names(covariates) <- c("altitude", "forestcover")
+# Coarsened so the example runs quickly; name layers, then scale.
 covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
                                                 na.rm = TRUE))
-surface <- conductance_surface(covariates, coords, directions = 8)
+# Keep one site per raster cell (some melip sites share a cell).
+keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+coords <- coords[keep]
+Fst <- melip.Fst[keep, keep]
+surface <- conductance_surface(covariates, coords)
 
 # site-level altitude, turned into a pairwise |difference| IBE predictor
-site_altitude <- data.frame(altitude = terra::extract(altitude, coords)[, 2])
+site_altitude <- data.frame(
+  altitude = terra::extract(terra::unwrap(melip.altitude), coords)[, 2])
 g_joint <- mlpe_covariates(site_altitude)
 
 # joint isolation by environment and isolation by resistance
-fit_joint <- terradish(melip.Fst ~ altitude + forestcover, data = surface,
+fit_joint <- terradish(Fst ~ altitude + forestcover, data = surface,
                        conductance_model = loglinear_conductance,
                        measurement_model = g_joint)
 
@@ -96,4 +100,13 @@ mlpe_response_change(fit_joint, probs = c(0.25, 0.75))
 \seealso{
 \code{\link{mlpe_covariates}},
   \code{\link{pairwise_endpoint_covariates}}, \code{\link{terradish}}
+
+Other inference and model comparison:
+\code{\link[=aic_table]{aic_table()}},
+\code{\link[=terradish_cv_folds]{terradish_cv_folds()}},
+\code{\link[=terradish_folds]{terradish_folds()}},
+\code{\link[=terradish_ibe_ratio]{terradish_ibe_ratio()}},
+\code{\link{terradish_inference}},
+\code{\link[=terradish_rescale_nu]{terradish_rescale_nu()}}
 }
+\concept{inference and model comparison}

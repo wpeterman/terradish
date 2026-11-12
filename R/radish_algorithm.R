@@ -733,17 +733,25 @@
   sum(as.numeric(value), na.rm = TRUE)
 }
 
-#' Likelihood of parameterized conductance surface
+#' Low-level likelihood and derivatives at one parameter value
 #'
-#' Calculates likelihood, gradient, hessian, and partial derivatives of a
+#' Calculates likelihood, gradient, Hessian, and partial derivatives of a
 #' parameterized conductance surface, given a function mapping spatial data to
 #' conductance and a function mapping resistance distance (covariance) to
-#' genetic distance; using the algorithm in Pope (in prep).
+#' the genetic response. This is the evaluation that \code{\link{terradish}}
+#' calls at every optimizer step; most users never call it directly. The
+#' approach of fitting one parameterized surface is described by Peterman and
+#' Pope (2021).
 #'
-#' @param f A function of class 'conductance_model'
-#' @param g A function of class 'measurement_model'
+#' @param f A function of class \code{"terradish_conductance_model"}, as
+#'   returned by a conductance-model factory such as
+#'   \code{\link{loglinear_conductance}} (see
+#'   \code{\link{terradish_conductance_model_factory}}).
+#' @param g A function of class \code{"terradish_measurement_model"} (see
+#'   \code{\link{terradish_measurement_model}}).
 #' @param s An object of class \code{"terradish_graph"}
-#' @param S A matrix of observed genetic distances
+#' @param S A matrix of observed genetic distances or covariance, as required
+#'   by \code{g}
 #' @param theta Parameters for conductance surface (e.g. inputs to 'f')
 #' @param phi Optional warm-start values for the nuisance-parameter subproblem.
 #' @param nu Effective Wishart degrees of freedom, passed through to
@@ -824,23 +832,41 @@
 #'  \item{partial_X}{(if 'partial') Jacobian of the gradient with respect to the spatial covariates}
 #'  \item{partial_S}{(if 'partial') Jacobian of the gradient with respect to the observed genetic distances}
 #'
+#' @references
+#' Peterman WE, Pope NS (2021). The use and misuse of regression models in
+#' landscape genetic analyses. Molecular Ecology, 30, 37--47.
+#' \doi{10.1111/mec.15716}.
+#'
+#' @seealso \code{\link{terradish}}, \code{\link{terradish_grid}}
+#'
+#' @family model fitting
+#'
 #' @examples
 #' \donttest{
 #' library(terra)
 #'
 #' data(melip)
-#' melip.altitude <- terra::unwrap(melip.altitude)
-#' melip.forestcover <- terra::unwrap(melip.forestcover)
-#' melip.coords <- terra::unwrap(melip.coords)
-#'
-#' covariates <- c(melip.altitude, melip.forestcover)
+#' covariates <- c(terra::unwrap(melip.altitude),
+#'                 terra::unwrap(melip.forestcover))
+#' coords <- terra::unwrap(melip.coords)
 #' names(covariates) <- c("altitude", "forestcover")
-#' surface <- conductance_surface(covariates, melip.coords, directions = 8)
+#' # Coarsened so the example runs quickly; name layers, then scale.
+#' covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+#'                                                 na.rm = TRUE))
+#' # Keep one site per raster cell (some melip sites share a cell).
+#' keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+#' Fst <- melip.Fst[keep, keep]
+#' surface <- conductance_surface(covariates, coords[keep])
 #' conductance_model <- loglinear_conductance(~ altitude + forestcover, surface$x)
 #'
-#' terradish_algorithm(conductance_model, terradish::leastsquares,
-#'                     surface, melip.Fst, theta = c(-0.3, 0.3))
-#'
+#' # One evaluation at theta = (-0.3, 0.3): negative log-likelihood, its
+#' # gradient and Hessian with respect to theta, and the profiled nuisance
+#' # parameters.
+#' value <- terradish_algorithm(conductance_model, leastsquares,
+#'                              surface, Fst, theta = c(-0.3, 0.3))
+#' value$objective
+#' value$gradient
+#' value$phi
 #' }
 #' @export
 terradish_algorithm <- function(f, g, s, S, theta, nu = NULL, phi = NULL, objective = TRUE, gradient = TRUE, hessian = TRUE, partial = TRUE, nonnegative = TRUE, validate = FALSE, cores = 1L, curvature = c("exact", "gauss_newton"), solver = c("direct", "auto", "amg"), solver_control = NULL, solver_warm_start = NULL, solver_reuse_state = NULL, measurement_control = NULL, worker_pool = NULL)

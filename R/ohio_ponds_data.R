@@ -1,4 +1,4 @@
-#' Simulated Ohio Forest-Pond Genetic Data
+#' Simulated Ohio forest-pond SNP and microsatellite data
 #'
 #' Matched SNP and microsatellite genotypes for 20 retained diploid animals in
 #' each of 24 hypothetical forest ponds on a real southeastern Ohio landscape.
@@ -87,13 +87,13 @@
 #'   \code{system.file("extdata", "ohio-ponds", "PROVENANCE.md",
 #'   package = "terradish")}.
 #' @section Worked examples:
-#' \code{vignette("data-generation", package = "terradish")},
-#' \code{vignette("getting-started", package = "terradish")}.
+#' \code{vignette("v12-data-generation", package = "terradish")},
+#' \code{vignette("v01-getting-started", package = "terradish")}.
 #'
 #' @seealso \code{\link{cov_from_biallelic}},
 #'   \code{\link{cov_from_genetic_data}}, \code{\link{conductance_surface}},
-#'   \code{vignette("getting-started", package = "terradish")},
-#'   \code{vignette("gaussian-scale-optimization", package = "terradish")}.
+#'   \code{vignette("v01-getting-started", package = "terradish")},
+#'   \code{vignette("v07-gaussian-scale-optimization", package = "terradish")}.
 #' @examples
 #' data(ohio_ponds)
 #' covariates <- terra::unwrap(ohio_ponds$covariates)
@@ -110,6 +110,7 @@
 #' S <- cov_from_biallelic(Y, N) / N[1]
 #' round(S[1:4, 1:4], 3)
 #' @usage data(ohio_ponds)
+#' @family datasets
 #' @name ohio_ponds
 #' @docType data
 #' @keywords datasets

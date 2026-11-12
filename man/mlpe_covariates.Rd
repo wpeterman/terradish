@@ -2,7 +2,7 @@
 % Please edit documentation in R/mlpe_covariates.R
 \name{mlpe_covariates}
 \alias{mlpe_covariates}
-\title{MLPE measurement model with pairwise endpoint-difference covariates}
+\title{MLPE measurement model with pairwise environmental covariates}
 \usage{
 mlpe_covariates(
   x,
@@ -79,7 +79,7 @@ Unclassed matrices are interpreted as pairwise columns and must
 }
 \section{Worked example}{
 
-See \code{vignette("ibe-ibr-workflow", package = "terradish")} for
+See \code{vignette("v08-ibe-ibr-workflow", package = "terradish")} for
 paired environmental differences, genetic-response contrasts, and their
 distinction from covariance kernels.
 }
@@ -108,29 +108,48 @@ Ratios are undefined when that denominator is zero.
 library(terra)
 
 data(melip)
-melip.altitude <- terra::unwrap(melip.altitude)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords <- terra::unwrap(melip.coords)
-
-covariates <- c(terra::scale(melip.altitude), terra::scale(melip.forestcover))
+covariates <- c(terra::unwrap(melip.altitude),
+                terra::unwrap(melip.forestcover))
+coords <- terra::unwrap(melip.coords)
 names(covariates) <- c("altitude", "forestcover")
-surface <- conductance_surface(covariates, melip.coords, directions = 8)
+# Coarsened so the example runs quickly; name layers, then scale.
+covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+                                                na.rm = TRUE))
+# Keep one site per raster cell (some melip sites share a cell).
+keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+coords <- coords[keep]
+Fst <- melip.Fst[keep, keep]
+surface <- conductance_surface(covariates, coords)
 
-g_joint <- mlpe_covariates(melip.altitude, melip.coords,
+# Site-level altitude becomes a pairwise absolute difference (IBE term).
+g_joint <- mlpe_covariates(terra::unwrap(melip.altitude), coords,
                            transform = "absdiff", scale = TRUE)
-fit_joint <- terradish(melip.Fst ~ altitude + forestcover, surface,
-                    terradish::loglinear_conductance, g_joint)
+fit_joint <- terradish(Fst ~ altitude + forestcover, surface,
+                       measurement_model = g_joint)
+# The nuisance table adds absdiff_altitude, the change in genetic distance
+# per unit (here one SD) of altitude difference, conditional on resistance.
 summary(fit_joint)
-
+terradish_ibe_ratio(fit_joint)
 }
 }
 \references{
-Clarke RT, Rothery P, Raybould AF. 2002. Confidence limits for regression
+Clarke RT, Rothery P, Raybould AF (2002). Confidence limits for regression
 relationships between distance matrices: estimating gene flow with distance.
-Journal of Agricultural, Biological, and Environmental Statistics
-7(3):361-372.
+Journal of Agricultural, Biological, and Environmental Statistics, 7,
+361--372. \doi{10.1198/108571102320}.
 }
 \seealso{
 \code{\link{mlpe}}, \code{\link{pairwise_endpoint_covariates}},
   \code{\link{terradish_cv_folds}}
+
+Other measurement models:
+\code{\link[=generalized_wishart]{generalized_wishart()}},
+\code{\link[=leastsquares]{leastsquares()}},
+\code{\link[=mlpe]{mlpe()}},
+\code{\link[=pairwise_covariates]{pairwise_covariates()}},
+\code{\link[=pairwise_endpoint_covariates]{pairwise_endpoint_covariates()}},
+\code{\link{terradish_measurement_model}},
+\code{\link[=wishart_covariance]{wishart_covariance()}},
+\code{\link[=wishart_covariates]{wishart_covariates()}}
 }
+\concept{measurement models}

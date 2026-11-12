@@ -1,4 +1,4 @@
-#' Simulated Individual Salamander Genotypes and Resistance Analyses
+#' Simulated individual salamander genotypes and resistance analyses
 #'
 #' Matched SNP and microsatellite genotypes for 160 adult terrestrial salamanders
 #' in each of two simulated movement scenarios on a real southeastern Ohio
@@ -86,12 +86,12 @@
 #'   See \code{system.file("extdata", "individual-salamanders", "README.md",
 #'   package = "terradish")} for data sources, processing, and limitations.
 #' @section Worked examples:
-#' \code{vignette("data-generation", package = "terradish")},
-#' \code{vignette("individual-salamanders", package = "terradish")}.
+#' \code{vignette("v12-data-generation", package = "terradish")},
+#' \code{vignette("v09-individual-salamanders", package = "terradish")}.
 #'
 #' @seealso \code{\link{cov_from_genetic_data}},
 #'   \code{\link{cov_from_biallelic}}, \code{\link{dist_from_cov}},
-#'   \code{vignette("individual-salamanders", package = "terradish")}.
+#'   \code{vignette("v09-individual-salamanders", package = "terradish")}.
 #' @examples
 #' data(individual_salamanders)
 #' animals <- individual_salamanders$data$compensatory_500
@@ -102,6 +102,7 @@
 #' range(as.matrix(dist_from_cov(S)))   # squared allele-frequency distance
 #' table(animals$samples$fold)           # 40 withheld adults per spatial fold
 #' @usage data(individual_salamanders)
+#' @family datasets
 #' @name individual_salamanders
 #' @docType data
 #' @keywords datasets

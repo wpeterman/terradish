@@ -18,12 +18,17 @@
   }
 
   if (!is.character(model) || length(model) != 1L)
-    stop("`model` must be a measurement-model function or one of 'mlpe', 'wishart', or 'ls'")
+    stop("`model` must be a measurement-model function or one of 'mlpe', ",
+         "'ls', 'generalized_wishart', 'wishart_covariance', or 'wishart'")
 
+  # "wishart" keeps its original meaning (generalized_wishart, a
+  # squared-distance response). The full names remove the ambiguity with
+  # wishart_covariance, which takes a covariance-matrix response.
   switch(tolower(model),
          mlpe = mlpe,
          wishart = generalized_wishart,
          generalized_wishart = generalized_wishart,
+         wishart_covariance = wishart_covariance,
          ls = leastsquares,
          leastsquares = leastsquares,
          stop("Unknown measurement model: ", model))

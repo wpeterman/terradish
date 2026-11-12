@@ -1,9 +1,9 @@
-#' Pairwise endpoint-difference covariates
+#' Pairwise environmental differences from site-level covariates
 #'
 #' Constructs pairwise environmental-mismatch covariates from site-level
 #' values.  The result can be used alongside isolation-by-resistance (IBR)
 #' terms to model isolation by environment (IBE) within
-#' \code{\link{mlpe_covariates}}.
+#' \code{\link{mlpe_covariates}} or \code{\link{wishart_covariates}}.
 #'
 #' @param x Site-level covariates.  Supported inputs:
 #'   \itemize{
@@ -59,23 +59,29 @@
 #'   chosen transform (e.g. \code{"absdiff_altitude"},
 #'   \code{"euclidean"}).
 #'
-#' @seealso \code{\link{mlpe_covariates}}, \code{\link{terradish_cv_folds}},
+#' @seealso \code{\link{pairwise_covariates}}, \code{\link{mlpe_covariates}},
+#'   \code{\link{wishart_covariates}}, \code{\link{terradish_cv_folds}},
 #'   \code{\link{terradish}}
+#'
+#' @family measurement models
 #'
 #' @examples
 #' library(terra)
 #'
 #' data(melip)
-#' melip.altitude <- terra::unwrap(melip.altitude)
-#' melip.coords <- terra::unwrap(melip.coords)
+#' altitude <- terra::unwrap(melip.altitude)
+#' coords <- terra::unwrap(melip.coords)
 #'
-#' z_abs <- pairwise_endpoint_covariates(melip.altitude, melip.coords,
+#' # Absolute altitude difference for every pair of sites, after
+#' # standardizing the site values. One row per pair, in dist() order.
+#' z_abs <- pairwise_endpoint_covariates(altitude, coords,
 #'                                       transform = "absdiff", scale = TRUE)
 #' head(z_abs)
 #'
+#' # Several site-level columns collapsed into one Euclidean difference.
 #' site_env <- data.frame(
-#'   altitude = scale(as.numeric(terra::extract(melip.altitude, melip.coords)[, 2])),
-#'   xcoord = scale(terra::geom(melip.coords)[, "x"])
+#'   altitude = scale(as.numeric(terra::extract(altitude, coords)[, 2])),
+#'   xcoord = scale(terra::geom(coords)[, "x"])
 #' )
 #' z_env <- pairwise_endpoint_covariates(site_env, transform = "euclidean")
 #' head(z_env)
@@ -97,7 +103,7 @@ pairwise_endpoint_covariates <- function(x,
   .make_pairwise_endpoint_covariates(site_covariates, transform = transform)
 }
 
-#' MLPE measurement model with pairwise endpoint-difference covariates
+#' MLPE measurement model with pairwise environmental covariates
 #'
 #' Creates an MLPE measurement model whose mean structure includes both an IBR
 #' term (resistance distance) and one or more fixed pairwise environmental
@@ -156,35 +162,45 @@ pairwise_endpoint_covariates <- function(x,
 #'   \code{\link{terradish_cv_folds}}
 #'
 #' @section Worked example:
-#' See \code{vignette("ibe-ibr-workflow", package = "terradish")} for
+#' See \code{vignette("v08-ibe-ibr-workflow", package = "terradish")} for
 #' paired environmental differences, genetic-response contrasts, and their
 #' distinction from covariance kernels.
 #'
 #' @references
-#' Clarke RT, Rothery P, Raybould AF. 2002. Confidence limits for regression
+#' Clarke RT, Rothery P, Raybould AF (2002). Confidence limits for regression
 #' relationships between distance matrices: estimating gene flow with distance.
-#' Journal of Agricultural, Biological, and Environmental Statistics
-#' 7(3):361-372.
+#' Journal of Agricultural, Biological, and Environmental Statistics, 7,
+#' 361--372. \doi{10.1198/108571102320}.
+#'
+#' @family measurement models
 #'
 #' @examples
 #' \donttest{
 #' library(terra)
 #'
 #' data(melip)
-#' melip.altitude <- terra::unwrap(melip.altitude)
-#' melip.forestcover <- terra::unwrap(melip.forestcover)
-#' melip.coords <- terra::unwrap(melip.coords)
-#'
-#' covariates <- c(terra::scale(melip.altitude), terra::scale(melip.forestcover))
+#' covariates <- c(terra::unwrap(melip.altitude),
+#'                 terra::unwrap(melip.forestcover))
+#' coords <- terra::unwrap(melip.coords)
 #' names(covariates) <- c("altitude", "forestcover")
-#' surface <- conductance_surface(covariates, melip.coords, directions = 8)
+#' # Coarsened so the example runs quickly; name layers, then scale.
+#' covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+#'                                                 na.rm = TRUE))
+#' # Keep one site per raster cell (some melip sites share a cell).
+#' keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+#' coords <- coords[keep]
+#' Fst <- melip.Fst[keep, keep]
+#' surface <- conductance_surface(covariates, coords)
 #'
-#' g_joint <- mlpe_covariates(melip.altitude, melip.coords,
+#' # Site-level altitude becomes a pairwise absolute difference (IBE term).
+#' g_joint <- mlpe_covariates(terra::unwrap(melip.altitude), coords,
 #'                            transform = "absdiff", scale = TRUE)
-#' fit_joint <- terradish(melip.Fst ~ altitude + forestcover, surface,
-#'                     terradish::loglinear_conductance, g_joint)
+#' fit_joint <- terradish(Fst ~ altitude + forestcover, surface,
+#'                        measurement_model = g_joint)
+#' # The nuisance table adds absdiff_altitude, the change in genetic distance
+#' # per unit (here one SD) of altitude difference, conditional on resistance.
 #' summary(fit_joint)
-#'
+#' terradish_ibe_ratio(fit_joint)
 #' }
 #' @export
 #' @details Unclassed matrices are interpreted as pairwise columns and must

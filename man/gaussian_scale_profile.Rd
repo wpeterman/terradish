@@ -2,7 +2,7 @@
 % Please edit documentation in R/gaussian_scale_profile.R
 \name{gaussian_scale_profile}
 \alias{gaussian_scale_profile}
-\title{Profile a Gaussian smoothing scale}
+\title{Profile-likelihood interval for a Gaussian smoothing scale}
 \usage{
 gaussian_scale_profile(fit, layer, n = 25, level = 0.95)
 }
@@ -37,7 +37,7 @@ The interval is the connected likelihood-ratio support region
 }
 \section{Worked example}{
 
-See \code{vignette("gaussian-scale-optimization", package = "terradish")}
+See \code{vignette("v07-gaussian-scale-optimization", package = "terradish")}
 for scale profiles, forest-effect plots, and interpretation in map units.
 }
 
@@ -67,4 +67,10 @@ confint(profile$fit)
 \code{\link{gaussian_scale_summary}},
   \code{\link{gaussian_smoothed_loglinear_conductance}},
   \code{\link{terradish_inference}}
+
+Other spatial scale:
+\code{\link[=gaussian_scale_summary]{gaussian_scale_summary()}},
+\code{\link[=gaussian_smoothed_loglinear_conductance]{gaussian_smoothed_loglinear_conductance()}},
+\code{\link[=terradish_scale_optim]{terradish_scale_optim()}}
 }
+\concept{spatial scale}

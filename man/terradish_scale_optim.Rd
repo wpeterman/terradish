@@ -2,7 +2,7 @@
 % Please edit documentation in R/terradish_scale_optim.R
 \name{terradish_scale_optim}
 \alias{terradish_scale_optim}
-\title{Optimize raster smoothing scales around a terradish fit}
+\title{Search raster smoothing scales by refitting the model}
 \usage{
 terradish_scale_optim(
   formula,
@@ -142,24 +142,29 @@ returned evaluation table.
 \examples{
 \donttest{
 data(melip)
-melip.altitude <- terra::unwrap(melip.altitude)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords <- terra::unwrap(melip.coords)
-covariates <- c(melip.altitude, melip.forestcover)
+covariates <- c(terra::unwrap(melip.altitude),
+                terra::unwrap(melip.forestcover))
+coords <- terra::unwrap(melip.coords)
+# Name the layers. Do not scale them here: the default `postprocess`
+# re-standardizes each layer after it is smoothed.
 names(covariates) <- c("altitude", "forestcover")
 
 # Every candidate scale re-smooths the rasters and refits, so coarsen the
 # grid for the example. Use the full resolution in a real analysis.
 covariates <- terra::aggregate(covariates, fact = 3, na.rm = TRUE)
 
+# Keep one site per raster cell (some melip sites share a cell).
+keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+Fst <- melip.Fst[keep, keep]
+
 # Express the bounds in map units, using the coarsened cell width.
 cell_width <- mean(terra::res(covariates))
 # A 2-point grid over two layers is 4
 # candidate fits; use a wider grid in practice.
 fit_scale <- terradish_scale_optim(
-  melip.Fst ~ altitude + forestcover,
+  Fst ~ altitude + forestcover,
   covariates = covariates,
-  coords = melip.coords,
+  coords = coords[keep],
   lower = cell_width,
   upper = 6 * cell_width,
   search = "grid",
@@ -175,3 +180,14 @@ coef(fit_scale$fit)    # conductance coefficients at the selected scale
 }
 
 }
+\seealso{
+\code{\link{gaussian_smoothed_loglinear_conductance}} for joint
+  estimation of Gaussian scales, \code{\link{gaussian_scale_summary}},
+  \code{\link{terradish}}
+
+Other spatial scale:
+\code{\link[=gaussian_scale_profile]{gaussian_scale_profile()}},
+\code{\link[=gaussian_scale_summary]{gaussian_scale_summary()}},
+\code{\link[=gaussian_smoothed_loglinear_conductance]{gaussian_smoothed_loglinear_conductance()}}
+}
+\concept{spatial scale}

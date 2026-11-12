@@ -1,0 +1,20 @@
+# Codecov settings. Coverage is reported for information; it does not fail
+# a pull request unless project coverage drops by more than one point.
+comment: false
+
+coverage:
+  status:
+    project:
+      default:
+        target: auto
+        threshold: 1%
+        informational: true
+    patch:
+      default:
+        target: auto
+        threshold: 1%
+        informational: true
+
+# Bundled third-party headers are not terradish code.
+ignore:
+  - "inst/include/amgcl"

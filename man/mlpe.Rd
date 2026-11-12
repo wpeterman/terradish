@@ -76,8 +76,9 @@ not admissible for \code{\link{generalized_wishart}}.
 The likelihood uses maximum likelihood (ML), not restricted maximum
 likelihood (REML). AIC can therefore compare different conductance formulas
 fitted to the same response, sites, graph, and likelihood family. That
-comparison does not validate the correlation model: in package validation,
-model-based standard errors understated replicate variation about 1.7-fold.
+comparison does not validate the correlation model: in unpublished
+development simulations, model-based standard errors understated
+replicate variation about 1.7-fold.
 Use spatial CV to assess out-of-sample support for conductance terms.
 
 With the standard nuisance bounds, fitting profiles the regression
@@ -94,10 +95,13 @@ because a regular finite nuisance optimum has not been established.
 Wald interval on that scale. Convert an estimate or interval endpoint with
 \code{plogis(rho) / 2} to obtain the shared-site correlation, which lies
 between 0 and 0.5. A value near 0.5 means site identity explains most of
-the residual variation. When the correlation approaches zero, the logit
-parameter is poorly identified, so \code{summary()} reports \code{rho} as 0
-with no standard error and prints a boundary note. This boundary differs
-from a zero resistance coefficient, which leaves conductance unidentified.
+the residual variation. When the correlation approaches zero (fitted
+internal logit below -8), the logit parameter is poorly identified, so
+\code{summary()} reports \code{rho} as 0 with no standard error and prints
+a boundary note. The parameter remains in the degrees of freedom because
+it was estimated; fixing it in advance would define a different model.
+This boundary differs from a zero resistance coefficient, which leaves
+conductance unidentified.
 
 To read the other nuisance parameters, \code{alpha} is the expected
 genetic distance at zero resistance distance, \code{beta} is the increase
@@ -110,7 +114,9 @@ The nuisance parameters are:
   \item{\code{beta}}{Resistance-distance (IBR) slope; constrained
     \eqn{\geq 0} when \code{nonnegative = TRUE}.}
   \item{\code{tau}}{Log-precision parameter: residual variance is
-    \eqn{\exp(-\tau)}.}
+    \eqn{\exp(-\tau)}. In the Wishart measurement models the same name
+    denotes a different quantity, the multiplier on graph covariance (see
+    \code{\link{wishart_covariance}}).}
   \item{\code{rho}}{Unconstrained optimization-scale parameter. The actual
     shared-site correlation is
     \eqn{\rho_{MLPE} = \text{plogis}(\rho)/2 \in (0, 0.5)}.}
@@ -127,15 +133,10 @@ Use \code{\link{mlpe_covariates}} to extend the mean structure with
 additional fixed pairwise covariates (isolation by environment).
 Coefficients describe conditional associations under the specified mean and
 correlation structure; they do not isolate causal environmental effects.
-
-When the fitted internal correlation logit is below -8,
-  \code{summary()} reports the shared-site correlation at zero and omits its
-  Wald uncertainty. The parameter remains in the degrees of freedom because
-  it was estimated; fixing it in advance would define a different model.
 }
 \section{Worked example}{
 
-\code{vignette("mlpe-pairwise-distance", package = "terradish")} fits and
+\code{vignette("v03-mlpe-pairwise-distance", package = "terradish")} fits and
 interprets MLPE models for a pairwise \eqn{F_{ST}} matrix.
 }
 
@@ -143,34 +144,54 @@ interprets MLPE models for a pairwise \eqn{F_{ST}} matrix.
 library(terra)
 
 data(melip)
-melip.altitude <- terra::unwrap(melip.altitude)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords <- terra::unwrap(melip.coords)
-
-covariates <- c(melip.altitude, melip.forestcover)
+covariates <- c(terra::unwrap(melip.altitude),
+                terra::unwrap(melip.forestcover))
+coords <- terra::unwrap(melip.coords)
 names(covariates) <- c("altitude", "forestcover")
-surface <- conductance_surface(covariates, melip.coords, directions = 8)
+# Coarsened so the example runs quickly; name layers, then scale.
+covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+                                                na.rm = TRUE))
+# Keep one site per raster cell (some melip sites share a cell).
+keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+coords <- coords[keep]
+Fst <- melip.Fst[keep, keep]
+surface <- conductance_surface(covariates, coords)
 
-# inverse of graph Laplacian at null model (IBD) 
-laplacian_inv <- terradish_distance(theta = matrix(0, 1, 2), 
-                                 formula = ~forestcover + altitude,
-                                 data = surface,
-                                 terradish::loglinear_conductance, 
-                                 covariance = TRUE)$covariance[,,1]
+# Graph covariance (generalized inverse of the graph Laplacian) among the
+# focal sites under uniform conductance (all coefficients zero).
+laplacian_inv <- terradish_distance(theta = matrix(0, 1, 2),
+                                    formula = ~ forestcover + altitude,
+                                    data = surface,
+                                    covariance = TRUE)$covariance[, , 1]
 
-mlpe(laplacian_inv, melip.Fst) #without 'phi': return MLE of phi
-# Set the actual shared-site correlation to 0.2 with qlogis(2 * 0.2)
-mlpe(laplacian_inv, melip.Fst,
-     phi = c(0, 0.5, -0.1, qlogis(2 * 0.2)))
+# Without 'phi': starting values and bounds for the nuisance parameters
+mlpe(laplacian_inv, Fst)
+# With 'phi': the negative log-likelihood and derivatives at those values.
+# qlogis(2 * 0.2) sets the actual shared-site correlation to 0.2.
+value <- mlpe(laplacian_inv, Fst,
+              phi = c(alpha = 0, beta = 0.5, tau = -0.1,
+                      rho = qlogis(2 * 0.2)))
+value$objective
 
 }
 \references{
-Clarke RT, Rothery P, Raybould AF. 2002. Confidence limits for regression
+Clarke RT, Rothery P, Raybould AF (2002). Confidence limits for regression
 relationships between distance matrices: estimating gene flow with distance.
-Journal of Agricultural, Biological, and Environmental Statistics
-7(3):361-372.
+Journal of Agricultural, Biological, and Environmental Statistics, 7,
+361--372. \doi{10.1198/108571102320}.
 }
 \seealso{
 \code{\link{leastsquares}}, \code{\link{mlpe_covariates}},
   \code{\link{generalized_wishart}}, \code{\link{terradish}}
+
+Other measurement models:
+\code{\link[=generalized_wishart]{generalized_wishart()}},
+\code{\link[=leastsquares]{leastsquares()}},
+\code{\link[=mlpe_covariates]{mlpe_covariates()}},
+\code{\link[=pairwise_covariates]{pairwise_covariates()}},
+\code{\link[=pairwise_endpoint_covariates]{pairwise_endpoint_covariates()}},
+\code{\link{terradish_measurement_model}},
+\code{\link[=wishart_covariance]{wishart_covariance()}},
+\code{\link[=wishart_covariates]{wishart_covariates()}}
 }
+\concept{measurement models}

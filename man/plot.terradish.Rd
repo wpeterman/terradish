@@ -2,7 +2,7 @@
 % Please edit documentation in R/plot_terradish.R
 \name{plot.terradish}
 \alias{plot.terradish}
-\title{Plot methods for fitted terradish models}
+\title{Plot a fitted model: fit, surface, marginal curves, and smoothing kernels}
 \usage{
 \method{plot}{terradish}(
   x,
@@ -29,7 +29,10 @@
 
 \item{data}{The \code{terradish_graph} used when fitting \code{x}. Required
 for \code{type = "surface"}, \code{type = "marginal"}, and
-\code{type = "marginal_response"}.}
+\code{type = "marginal_response"}; these types stop with an error when
+they are requested explicitly and \code{data} is missing. When both
+\code{type} and \code{data} are omitted, the \code{"fit"} plot is drawn
+with a message.}
 
 \item{covariates}{Optional \code{SpatRaster} of covariates on their
 \strong{original (unscaled)} scale. When supplied for
@@ -55,7 +58,8 @@ unit such as kilometers.}
 \item{distance_unit}{Optional label used with
 \code{distance_per_map_unit} for \code{type = "sigma"}.}
 
-\item{quantile}{Confidence level for interval bands. Default \code{0.95}.}
+\item{quantile}{Confidence level for interval bands. Default \code{0.95}.
+This is the quantity that \code{confint()} calls \code{level}.}
 
 \item{n}{Number of evaluation points for each marginal-association curve.
 Defaults to \code{100} for \code{"marginal_response"} (each point
@@ -78,9 +82,10 @@ trimming, values like \code{c(0.01, 0.99)} are often useful.}
 when \code{support = "focal"}. Defaults to all numeric covariates used by
 each plot type.}
 
-\item{...}{Additional graphical parameters forwarded to
-\code{\link[graphics]{plot}} (for \code{"fit"}) or ignored for the other
-types.}
+\item{...}{For \code{type = "fit"}, the base-style arguments
+\code{xlab}, \code{ylab}, \code{main}, \code{pch}, \code{cex}, and
+\code{col}; anything else is passed to the point layer
+(\code{ggplot2::geom_point()}). Ignored for the other types.}
 }
 \value{
 A plot object that is returned visibly so base R auto-printing works as
@@ -95,7 +100,14 @@ expected:
 }
 }
 \description{
-Five plot types for objects returned by \code{\link{terradish}}:
+Five plot types for objects returned by \code{\link{terradish}}. The
+default type, \code{"marginal_response"}, and the \code{"surface"} and
+\code{"marginal"} types need the graph, so call
+\code{plot(fit, data = surface)}. \code{plot(fit)} alone, with neither
+\code{type} nor \code{data}, shows the \code{"fit"} plot instead and says
+so in a message. A type that needs the graph and is requested explicitly
+without \code{data} stops with an error. Only \code{type = "fit"} and
+\code{type = "sigma"} work without \code{data}.
 \describe{
   \item{\code{"fit"}}{Observed vs. fitted response values. Distance-response
     models are shown as pairwise genetic distance against fitted resistance
@@ -106,8 +118,9 @@ Five plot types for objects returned by \code{\link{terradish}}:
     interval bounds, displayed in three side-by-side panels.}
   \item{\code{"marginal"}}{Marginal association of each raster covariate with
     conductance, varying one covariate at a time while averaging over the
-    observed values of all other model covariates, with a 95\% pointwise
-    confidence band via the delta method. For Gaussian scale-aware
+    observed values of all other model covariates, with a pointwise
+    confidence band (95\% by default; see \code{quantile}) via the delta
+    method. For Gaussian scale-aware
     conductance models, these curves are conditional on the fitted
     \code{sigma} values and are shown on the smoothed covariate scale. For
     spline-expanded conductance models from
@@ -145,41 +158,44 @@ empirical focal-site support before prediction.
 }
 \section{Worked examples}{
 
-\code{vignette("getting-started", package = "terradish")},
-\code{vignette("gaussian-scale-optimization", package = "terradish")},
-\code{vignette("spline-conductance", package = "terradish")}.
+\code{vignette("v01-getting-started", package = "terradish")},
+\code{vignette("v07-gaussian-scale-optimization", package = "terradish")},
+\code{vignette("v06-spline-conductance", package = "terradish")}.
 }
 
 \examples{
 \donttest{
 data(melip)
-melip.altitude    <- terra::unwrap(melip.altitude)
-melip.forestcover <- terra::unwrap(melip.forestcover)
-melip.coords      <- terra::unwrap(melip.coords)
+covariates <- c(terra::unwrap(melip.altitude),
+                terra::unwrap(melip.forestcover))
+coords <- terra::unwrap(melip.coords)
+names(covariates) <- c("altitude", "forestcover")
+# Coarsened so the example runs quickly; name layers, then scale.
+covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+                                                na.rm = TRUE))
+# Keep one site per raster cell (some melip sites share a cell).
+keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+coords <- coords[keep]
+Fst <- melip.Fst[keep, keep]
+surface <- conductance_surface(covariates, coords)
 
-# Build surface with scaled covariates. The raster is coarsened so the
-# example runs quickly; use the full resolution in a real analysis.
-covariates_scaled <- c(melip.altitude, melip.forestcover)
-names(covariates_scaled) <- c("altitude", "forestcover")
-covariates_scaled <- terra::aggregate(covariates_scaled, fact = 3, na.rm = TRUE)
-covariates_scaled <- scale_covariates(covariates_scaled)
-surface <- conductance_surface(covariates_scaled, melip.coords,
-                               directions = 8, saveStack = TRUE)
+fit <- terradish(Fst ~ altitude + forestcover, surface,
+                 measurement_model = mlpe)
 
-fit <- terradish(melip.Fst ~ altitude + forestcover, surface,
-                 loglinear_conductance, mlpe)
+# The default type needs the graph: approximate response-scale marginal
+# associations with predictive bands.
+plot(fit, data = surface)
 
-# Observed vs. fitted pairwise genetic distances
+# Observed vs. fitted pairwise genetic distances (no graph needed).
+# plot(fit) with no other arguments draws this plot and says so.
 plot(fit, type = "fit")
 
 # Fitted conductance surface with 95\% CI (three-panel figure)
 plot(fit, type = "surface", data = surface)
 
-# Marginal-association plots on the original covariate scale
+# Marginal-association plots. Because the layers were scaled with
+# scale_covariates(), the x-axes are back-transformed to original units.
 plot(fit, type = "marginal", data = surface)
-
-# Approximate response-scale marginal associations with predictive bands
-plot(fit, type = "marginal_response", data = surface)
 
 # For Gaussian scale-aware fits, visualize the fitted sigma kernels
 # plot(fit_gaussian, type = "sigma")

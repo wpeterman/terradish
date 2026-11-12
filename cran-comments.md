@@ -1,62 +1,28 @@
-## Resubmission
+## Patch release
 
-This is a resubmission of the new package terradish, first submitted as
-version 1.0.0 and now version 1.1.0. In response to the CRAN review, I have:
-
-- Added references describing the methods to the Description field, in the
-  requested form: Peterman and Pope (2021) <doi:10.1111/mec.15716>, Clarke,
-  Rothery and Raybould (2002) <doi:10.1198/108571102320>, and Hanks and
-  Hooten (2013) <doi:10.1080/01621459.2012.724647>.
-- Added `\value` sections to every exported method, including the nine
-  topics listed in the review (`legacy_radish_*.Rd`,
-  `legacy_terra_radish_scale_optim.Rd`, and `print.terradish_plot_list.Rd`).
-  Each describes the class and structure of the result and what it means;
-  the print method documents that it returns its input invisibly and is
-  called for its side effect.
-- Removed the `setwd()` calls that parallel workers used to load package
-  sources. Workers now source files by absolute path, so no function changes
-  the working directory. No package function changes `options()` or `par()`.
-  The two vignette chunks that set `par()` restore it with `on.exit()`
-  immediately after the change.
-
-Since the previous submission I also added two example datasets
-(`ohio_ponds`, `individual_salamanders`), four vignettes, and numerical
-safeguards for nuisance-parameter fitting, with regression tests.
+terradish 1.1.1 is a small patch to the 1.1.0 candidate, prepared shortly
+after that version. Sparse projection made graph construction impractical
+on the largest benchmark rasters (above about 250,000 cells). Principal-
+submatrix indexing forms the same reduced Laplacian without that bottleneck.
+Numerical results and public interfaces are unchanged.
 
 ## R CMD check results
 
+Windows 11 x86_64, R 4.6.0: `R CMD check --as-cran` on a freshly compiled
+source archive, including examples, tests, vignette rebuilding, and the PDF
+manual.
+
 0 errors | 0 warnings | 1 note
 
-- This is a new submission.
-- The possibly misspelled words in DESCRIPTION (Hooten, Peterman, Raybould,
-  Rothery) are author surnames in the method references added at CRAN's
-  request.
+The incoming-feasibility NOTE is "New submission". On November 8, 2026,
+CRAN's public package index did not list terradish. The public package page
+returned HTTP 404. This does not establish its manual-review queue status.
 
-The installed size is about 8.4 Mb (data 1.3, doc 2.1, extdata 1.5, and
-libs 1.6 Mb). The data and extdata hold the example datasets and the
-rasters and stored results the vignettes need to run without downloads;
-doc holds the twelve vignettes, whose precomputed figures keep check time
-low. The help-page logo was resized to reduce the size.
-
-## Test environments
-
-- win-builder, R-devel (2026-10-28 r90783 ucrt): 1 NOTE, the incoming
-  feasibility NOTE described above.
-- GitHub Actions, R CMD check: macOS (R release), Windows (R release and
-  R-devel), and Ubuntu (R-devel, release, and oldrel-1): OK.
-- Windows 11 x86_64, R 4.6.1: `R CMD check --as-cran --no-manual` on the
-  built archive: 0 errors, 0 warnings, and the "New submission" NOTE. A
-  second, local-only NOTE reported that README.md and NEWS.md could not be
-  checked because pandoc was not on the check's PATH; both convert cleanly
-  with pandoc.
-
-## Dependency on landgraph
-
-terradish imports landgraph (>= 0.0.3), which is on CRAN. An update to
-landgraph 0.0.4 is being submitted at the same time. terradish 1.1.0 passes
-`R CMD check --as-cran` with both landgraph 0.0.3 and 0.0.4, so the two
-submissions can be processed in either order.
-
-## Reverse dependencies
-
-This is a new submission, so there are no reverse dependencies.
+The constructor regression test passed eight expectations in 0.37 seconds.
+The extended suite passed 1,814 expectations with no failures or warnings.
+One source-loaded worker test was deliberately skipped in installed-package mode.
+Three complete fits (melip MLPE, synthetic Wishart log-linear, and synthetic
+Wishart with a Gaussian scale) reproduced 1.1.0 exactly, including standard
+errors and predictions. A million-cell graph built in 14.08 seconds on one
+thread. Cross-platform checks and reverse-dependency checks were not run
+for this candidate. No submission to win-builder or R-hub was made.

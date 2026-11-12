@@ -2,7 +2,7 @@
 % Please edit documentation in R/check_distance_response.R
 \name{check_distance_response}
 \alias{check_distance_response}
-\title{Check a generalized-Wishart distance response}
+\title{Check that a squared-distance response is admissible}
 \usage{
 check_distance_response(S, tol = 1e-07)
 }
@@ -91,4 +91,9 @@ check_distance_response(bad)$admissible
 \seealso{
 \code{\link{generalized_wishart}},
   \code{\link{wishart_covariance}}, \code{\link{mlpe}}
+
+Other genetic responses:
+\code{\link[=lower]{lower()}},
+\code{\link[=pca_dist]{pca_dist()}}
 }
+\concept{genetic responses}

@@ -712,7 +712,7 @@
 .gaussian_scale_unit_suffix <- function(unit)
   gsub("[^[:alnum:]_]+", "_", tolower(unit))
 
-#' Gaussian scale-aware log-linear conductance model
+#' Log-linear conductance model with estimated Gaussian smoothing scales
 #'
 #' Creates a conductance-model factory that smooths selected raster layers with a
 #' native Gaussian FFT operator and treats the corresponding Gaussian scale
@@ -796,13 +796,14 @@
 #'
 #' The current implementation supports numeric raster formulas built from raw
 #' raster names, interactions, and polynomial/arithmetic terms that can be
-#' differentiated analytically by \code{\link[stats:D]{D}} after smoothing the base
+#' differentiated analytically by \code{\link[stats:deriv]{D}} after smoothing the base
 #' raster layers. Factor-valued raster layers are rejected because Gaussian
 #' smoothing is only defined here for numeric rasters; use an unscaled fixed
 #' conductance model if you need categorical raster predictors.
 #'
-#' For this conductance model, \code{\link{terradish}} prefers
-#' \code{optimizer = "bfgs"} when \code{optimizer = "auto"}, and leverage /
+#' For this conductance model, \code{\link{terradish}} always selects
+#' \code{optimizer = "bfgs"} when \code{optimizer = "auto"}, whatever the
+#' number of parameters, and leverage /
 #' \code{partial_X} calculations are currently disabled because the current
 #' leverage machinery assumes a one-to-one mapping between fitted conductance
 #' parameters and design-matrix covariates, which does not hold once separate
@@ -813,55 +814,69 @@
 #'   \code{\link{terradish}}.
 #'
 #' @section Worked example:
-#' See \code{vignette("gaussian-scale-optimization", package = "terradish")}
+#' See \code{vignette("v07-gaussian-scale-optimization", package = "terradish")}
 #' for fitting, plotting, and interpreting smoothing scales on the pond landscape.
+#'
+#' @seealso \code{\link{gaussian_scale_summary}} and
+#'   \code{\link{gaussian_scale_profile}} to read the fitted scales,
+#'   \code{\link{terradish_scale_optim}} for an outer search with other
+#'   kernels, \code{\link{loglinear_conductance}}
+#'
+#' @family conductance models
+#' @family spatial scale
 #'
 #' @examples
 #' \donttest{
 #' data(melip)
-#' melip.forestcover <- terra::unwrap(melip.forestcover)
-#' melip.coords <- terra::unwrap(melip.coords)
+#' forestcover <- terra::unwrap(melip.forestcover)
+#' coords <- terra::unwrap(melip.coords)
 #'
-#' # Use the raw raster here. The Gaussian model smooths first and then
-#' # standardizes internally.
-#' names(melip.forestcover) <- "forestcover"
+#' # Name the layer, but do not scale it: the Gaussian model smooths the raw
+#' # raster first and then standardizes internally.
+#' names(forestcover) <- "forestcover"
 #'
 #' # Coarsened so the example runs quickly: the raster is re-smoothed at every
 #' # candidate sigma. Use the full resolution in a real analysis.
-#' melip.forestcover <- terra::aggregate(melip.forestcover, fact = 3,
-#'                                       na.rm = TRUE)
-#' surface <- conductance_surface(
-#'   melip.forestcover,
-#'   melip.coords,
-#'   directions = 8,
-#'   saveStack = TRUE
-#' )
+#' forestcover <- terra::aggregate(forestcover, fact = 3, na.rm = TRUE)
+#'
+#' # Keep one site per raster cell (some melip sites share a cell). The
+#' # cells of a twice-coarser grid are used so that the coarse-raster warm
+#' # start below also has one site per cell.
+#' coarse <- terra::aggregate(forestcover, fact = 2, na.rm = TRUE)
+#' keep <- !duplicated(terra::cellFromXY(coarse, terra::crds(coords)))
+#' Fst <- melip.Fst[keep, keep]
+#' surface <- conductance_surface(forestcover, coords[keep], saveStack = TRUE)
 #'
 #' gaussian_model <- gaussian_smoothed_loglinear_conductance(surface)
 #' fit <- terradish(
-#'   melip.Fst ~ forestcover,
+#'   Fst ~ forestcover,
 #'   data = surface,
 #'   conductance_model = gaussian_model,
 #'   measurement_model = mlpe,
-#'   optimizer = "auto",
-#'   leverage = FALSE
+#'   optimizer = "auto"
 #' )
 #'
-#' gaussian_scale_summary(fit)
-#' plot(fit, type = "sigma")
+#' # coef() holds the log-conductance coefficient (per SD of the smoothed
+#' # layer) and sigma.forestcover, the smoothing scale in map units (degrees
+#' # for these unprojected rasters).
+#' coef(fit)
+#' # Roughly 111 km per degree near the equator converts the scale to km.
+#' gaussian_scale_summary(fit, distance_per_map_unit = 111,
+#'                        distance_unit = "km")
+#' plot(fit, type = "sigma", distance_per_map_unit = 111,
+#'      distance_unit = "km")
 #'
 #' # On a full-resolution raster, a coarse-raster warm start cuts the cost of
 #' # the scale search. With exact_refine = TRUE the reported fit is refined
 #' # back on the original graph, so the estimates stay exact.
 #' fit_coarse <- terradish(
-#'   melip.Fst ~ forestcover,
+#'   Fst ~ forestcover,
 #'   data = surface,
 #'   conductance_model = gaussian_model,
 #'   measurement_model = mlpe,
 #'   approximation = "coarse_raster",
 #'   approximation_control = list(factor = 2, exact_refine = TRUE),
-#'   optimizer = "auto",
-#'   leverage = FALSE
+#'   optimizer = "auto"
 #' )
 #' }
 #'
@@ -1262,7 +1277,9 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
 #' If the retained raster is in longitude/latitude, the native-unit results are
 #' in degrees. In that case, use a projected raster for direct distance
 #' interpretation, or provide an approximate \code{distance_per_map_unit}
-#' conversion if you need a quick descriptive summary.
+#' conversion if you need a quick descriptive summary. Without a conversion
+#' the function warns once per session, and the \code{native_unit} column
+#' reads \code{"degrees"} on every call.
 #'
 #' @return A data frame with one row per fitted \code{sigma} parameter.
 #'   \code{covariate} identifies the layer. \code{sigma} is its fitted map-unit
@@ -1276,10 +1293,16 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
 #'   when requested, converted units. They describe the untruncated Gaussian;
 #'   retained raster windows can omit some of that mass.
 #'
+#' @seealso \code{\link{gaussian_smoothed_loglinear_conductance}},
+#'   \code{\link{gaussian_scale_profile}}, \code{\link{plot.terradish}}
+#'
+#' @family spatial scale
+#'
 #' @examples
 #' \donttest{
 #' data(melip)
 #' forestcover <- terra::unwrap(melip.forestcover)
+#' coords <- terra::unwrap(melip.coords)
 #' names(forestcover) <- "forestcover"
 #'
 #' # Coarsen the raster so the example runs quickly; the Gaussian model
@@ -1287,11 +1310,14 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
 #' # count. Use the full resolution in a real analysis.
 #' forestcover <- terra::aggregate(forestcover, fact = 3, na.rm = TRUE)
 #'
+#' # Keep one site per raster cell (some melip sites share a cell).
+#' keep <- !duplicated(terra::cellFromXY(forestcover, terra::crds(coords)))
+#' Fst <- melip.Fst[keep, keep]
+#'
 #' # Feed the model the raw (unsmoothed, unstandardized) raster: it smooths and
 #' # standardizes internally at each candidate sigma.
-#' surface <- conductance_surface(forestcover, terra::unwrap(melip.coords),
-#'                                directions = 8, saveStack = TRUE)
-#' fit <- terradish(melip.Fst ~ forestcover,
+#' surface <- conductance_surface(forestcover, coords[keep], saveStack = TRUE)
+#' fit <- terradish(Fst ~ forestcover,
 #'                  data = surface,
 #'                  conductance_model =
 #'                    gaussian_smoothed_loglinear_conductance(surface),
@@ -1299,10 +1325,14 @@ gaussian_smoothed_loglinear_conductance <- function(surface,
 #'                  optimizer = "bfgs")
 #'
 #' # sigma is in map units. The melip rasters are unprojected, so those units
-#' # are degrees; distance_per_map_unit rescales the reported distances.
-#' gaussian_scale_summary(fit)
-#' gaussian_scale_summary(fit, distance_per_map_unit = 111,
-#'                        distance_unit = "km")
+#' # are degrees; distance_per_map_unit rescales the reported distances
+#' # (roughly 111 km per degree near the equator). Without a conversion the
+#' # function warns that the scale is in degrees.
+#' scales <- gaussian_scale_summary(fit, distance_per_map_unit = 111,
+#'                                  distance_unit = "km")
+#' scales
+#' # One row per smoothed layer: sigma, its bounds, and the kernel radii.
+#' scales[, c("covariate", "sigma", "sigma_lower", "sigma_upper")]
 #' }
 #'
 #' @export
@@ -1386,10 +1416,17 @@ gaussian_scale_summary <- function(object,
     }
   }
 
-  if (isTRUE(info$is_lonlat) && is.null(distance_per_map_unit))
+  # The degrees warning is raised once per session: `native_unit` already
+  # labels every row, and repeating it on each call adds no information.
+  if (isTRUE(info$is_lonlat) && is.null(distance_per_map_unit) &&
+      !isTRUE(.terradish_notice_state$lonlat_sigma))
+  {
+    .terradish_notice_state$lonlat_sigma <- TRUE
     warning("The retained raster is in longitude/latitude, so sigma is reported in degrees. ",
-            "Use a projected raster or provide `distance_per_map_unit` for a descriptive conversion.",
+            "Use a projected raster or provide `distance_per_map_unit` for a descriptive conversion. ",
+            "This warning is shown once per session.",
             call. = FALSE)
+  }
 
   out
 }

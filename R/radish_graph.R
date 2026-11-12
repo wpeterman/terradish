@@ -53,7 +53,7 @@
   rhs
 }
 
-#' Create a parameterized conductance surface
+#' Build the raster graph from covariates and sampling sites
 #'
 #' Reads spatial covariates and focal-point coordinates and builds a weighted
 #' graph suitable for computing conductance-weighted resistance distances.
@@ -62,8 +62,8 @@
 #' @param covariates A \code{SpatRaster} (or \code{PackedSpatRaster}) whose
 #'   layers contain the spatial covariates to be used in the conductance model.
 #'   Layer names must match the right-hand side of the formula passed to
-#'   \code{\link{terradish}}.  Scale continuous layers with
-#'   \code{\link{scale_covariates}} before calling this function.
+#'   \code{\link{terradish}}.  Name the layers first, then scale continuous
+#'   layers with \code{\link{scale_covariates}} before calling this function.
 #' @param coords Locations of the focal sampling sites, in the same coordinate
 #'   reference system as \code{covariates}.  Supported inputs:
 #'   \code{terra::SpatVector} of points, a two-column numeric matrix (x in
@@ -105,31 +105,30 @@
 #'
 #' \strong{Cropping:} when \code{crop_buffer} is supplied, cropping changes
 #' the graph domain.  Always use the same \code{terradish_graph} for all
-#' models you intend to compare.  A buffer that is too tight may cut off
-#' landscape corridors that affect resistance distances; check stability by
-#' refitting with several buffer values.
+#' models you intend to compare.  Cropping removes possible movement paths
+#' and can inflate resistance. In an unpublished development check on one
+#' landscape, resistance increased by 15--23 percent with a two-cell buffer
+#' and by 1--2 percent with ten cells. These are case-specific results;
+#' refit with several buffer values before interpreting a cropped landscape.
 #'
 #' \strong{Categorical covariates:} raster layers representing categorical
 #' variables must be stored as factor-valued \code{SpatRaster} layers (see
-#' \code{\link[terra]{as.factor}} and the example below).  Level names are
+#' \code{\link[terra:is.bool]{as.factor}} and the example below).  Level names are
 #' taken from the \code{VALUE} column of the levels table when present;
 #' otherwise the first non-\code{ID} column is used.  Factor levels are
 #' dummy-coded by \code{\link[stats]{model.matrix}} during model fitting, with
 #' one level as the reference.
 #'
-#' \strong{Directions:} \code{directions = 4} gives a more conservative graph
-#' that can underestimate resistance in diagonal corridors.
-#' \code{directions = 8} is preferred unless there is a specific reason to
-#' restrict movement to the cardinal directions.
-#' Eight-neighbor adjacency is the default. Each edge has conductance
-#' \eqn{c_i + c_j}; diagonal edges receive no additional distance weighting.
-#' Duplicate focal cells trigger a warning. Focal sites on pruned disconnected
-#' components cannot be fitted on the retained graph.
+#' \strong{Directions:} eight-neighbor adjacency is the default and is
+#' preferred unless there is a specific reason to restrict movement to the
+#' cardinal directions. \code{directions = 4} removes the diagonal edges, so
+#' it can overstate resistance (understate connectivity) along diagonal
+#' corridors. Each edge has conductance \eqn{c_i + c_j}; diagonal edges
+#' receive no additional distance weighting.
 #'
-#' Cropping removes possible movement paths and can inflate resistance. The
-#' supplied release audit measured increases of 15--23 percent with a two-cell
-#' buffer and 1--2 percent with ten cells. These are case-specific results;
-#' compare a larger-buffer fit before interpreting a cropped landscape.
+#' \strong{Sites sharing a cell:} two or more focal sites that fall in the
+#' same raster cell trigger a warning, because their resistance distance is
+#' zero. Use a finer raster, or keep one site per cell as in the example.
 #'
 #' @return An object of class \code{"terradish_graph"} (also inheriting
 #'   \code{"radish_graph"}) containing:
@@ -141,45 +140,59 @@
 #'   \item{\code{vertex_coordinates}}{xy-coordinate matrix of active cells.}
 #'   \item{\code{directions}}{The adjacency rule (4 or 8).}
 #'   \item{\code{covariates}}{Names of the covariate columns.}
+#'   \item{\code{laplacian}, \code{rhs}, \code{reduced_index},
+#'     \code{choleski_templates}, \code{choleski}}{Internal solver state: the
+#'     reduced graph Laplacian template, the right-hand sides for the focal
+#'     sites, the retained vertex index, and symbolic sparse Cholesky
+#'     factorizations. These are reused by the fitting functions and are not
+#'     meant to be modified.}
 #'   \item{\code{stack}}{The masked \code{SpatRaster} (or \code{NULL} if
 #'     \code{saveStack = FALSE}).}
 #' }
 #'
-#' @examples
+#' @family graph setup
 #'
+#' @examples
 #' library(terra)
 #'
 #' data(melip)
-#' melip.altitude <- terra::unwrap(melip.altitude)
-#' melip.forestcover <- terra::unwrap(melip.forestcover)
-#' melip.coords <- terra::unwrap(melip.coords)
+#' covariates <- c(terra::unwrap(melip.altitude),
+#'                 terra::unwrap(melip.forestcover))
+#' coords <- terra::unwrap(melip.coords)
 #'
-#' covariates <- c(terra::scale(melip.altitude),
-#'                 terra::scale(melip.forestcover))
+#' # Name the layers first, then scale them.
 #' names(covariates) <- c("altitude", "forestcover")
+#' covariates <- scale_covariates(covariates)
 #'
-#' surface <- conductance_surface(covariates, melip.coords, directions = 8)
+#' # A few melip sites fall in the same raster cell. Keep one site per cell
+#' # (and the matching rows and columns of the genetic matrix).
+#' keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+#' coords <- coords[keep]
+#' Fst <- melip.Fst[keep, keep]
+#'
+#' surface <- conductance_surface(covariates, coords)  # eight neighbors
+#' surface$directions
+#' nrow(surface$x)       # number of graph vertices (non-missing cells)
+#' length(surface$demes) # number of focal sites
 #'
 #' # For large rasters where sites occupy only part of the map, crop first.
-#' surface_cropped <- conductance_surface(
-#'   covariates,
-#'   melip.coords,
-#'   directions = 8,
-#'   crop_buffer = 0.05
-#' )
+#' surface_cropped <- conductance_surface(covariates, coords,
+#'                                        crop_buffer = 0.05)
 #'
-#' # categorical covariates:
-#' # raster layers of categorical covariates should be factor-valued, see 'details'
-#' forestcover_class <- cut(terra::values(melip.forestcover)[,1], breaks = c(0, 1/6, 1/3, 1))
-#' melip.forestcover_cat <- terra::setValues(melip.forestcover, as.numeric(forestcover_class))
-#' melip.forestcover_cat <- terra::as.factor(melip.forestcover_cat)
-#'
-#' RAT <- levels(melip.forestcover_cat)[[1]]
+#' # Categorical covariates must be factor-valued layers (see Details).
+#' forestcover <- terra::unwrap(melip.forestcover)
+#' forestcover_class <- cut(terra::values(forestcover)[, 1],
+#'                          breaks = c(0, 1/6, 1/3, 1))
+#' forestcover_cat <- terra::setValues(forestcover,
+#'                                     as.numeric(forestcover_class))
+#' forestcover_cat <- terra::as.factor(forestcover_cat)
+#' RAT <- levels(forestcover_cat)[[1]]
 #' RAT$VALUE <- levels(forestcover_class) # explicitly define level names
-#' levels(melip.forestcover_cat) <- RAT
+#' levels(forestcover_cat) <- RAT
+#' names(forestcover_cat) <- "forestcover"
 #'
-#' covariates_cat <- c(melip.forestcover_cat, melip.altitude)
-#' names(covariates_cat) <- c("forestcover", "altitude")
+#' surface_cat <- conductance_surface(forestcover_cat, coords)
+#' levels(surface_cat$x$forestcover)
 #'
 #' @export
 
@@ -275,8 +288,7 @@ conductance_surface <- function(covariates, coords, directions=8, saveStack=TRUE
                        use.last.ij = TRUE)
   Q    <- forceSymmetric(Q)
   Qd   <- Diagonal(N, x = -rowSums(Q))
-  In   <- Diagonal(N)[-N,]
-  Qn   <- forceSymmetric(In %*% (Q + Qd) %*% t(In))
+  Qn   <- forceSymmetric((Q + Qd)[seq_len(N - 1L), seq_len(N - 1L), drop = FALSE])
   adj  <- rbind(Q@i, rep(1:Q@Dim[2] - 1, diff(Q@p))) #upper-triangular, 0-based
   LQn  <- Cholesky(Qn, LDL = TRUE) 
   rhs  <- .reduced_rhs(N, cells)
@@ -298,7 +310,7 @@ conductance_surface <- function(covariates, coords, directions=8, saveStack=TRUE
   out
 }
 
-#' Estimate conductance from a fitted model
+#' Predict the fitted conductance surface with intervals
 #'
 #' Extracts per-cell conductance values and pointwise confidence intervals from
 #' a fitted \code{terradish} model, returning either a raster (when the graph
@@ -309,7 +321,9 @@ conductance_surface <- function(covariates, coords, directions=8, saveStack=TRUE
 #' @param fit A fitted model returned by \code{\link{terradish}}.
 #' @param quantile Confidence level for the pointwise conductance interval.
 #'   The default \code{0.95} gives a 95% interval computed via the delta method
-#'   applied to the MLE of \code{theta} and its inverse Hessian.
+#'   applied to the MLE of \code{theta} and its inverse Hessian. This is the
+#'   same quantity that \code{confint()} calls \code{level} and
+#'   \code{summary()} calls \code{conf.level}.
 #' @param support Optional support constraint for conductance evaluation.
 #'   Use \code{"none"} (default) to evaluate the fitted conductance model over
 #'   the full graph covariate domain, or \code{"focal"} to clamp selected
@@ -359,30 +373,38 @@ conductance_surface <- function(covariates, coords, directions=8, saveStack=TRUE
 #' Otherwise, a numeric matrix with one row per active cell and columns
 #' \code{est}, \code{lower<Q>}, and \code{upper<Q>}.
 #'
+#' Conductance is relative: a common multiplier is absorbed by the measurement
+#' model, so compare values among cells of one surface instead of reading
+#' them as absolute rates.
+#'
 #' @seealso \code{\link{terradish}}, \code{\link{conductance_surface}},
 #'   \code{\link{plot.terradish}}
+#'
+#' @family model fitting
 #'
 #' @examples
 #' \donttest{
 #' library(terra)
 #'
 #' data(melip)
-#' melip.altitude <- terra::unwrap(melip.altitude)
-#' melip.forestcover <- terra::unwrap(melip.forestcover)
-#' melip.coords <- terra::unwrap(melip.coords)
-#'
-#' covariates <- c(terra::scale(melip.altitude),
-#'                 terra::scale(melip.forestcover))
+#' covariates <- c(terra::unwrap(melip.altitude),
+#'                 terra::unwrap(melip.forestcover))
+#' coords <- terra::unwrap(melip.coords)
 #' names(covariates) <- c("altitude", "forestcover")
-#' surface <- conductance_surface(covariates, melip.coords, directions = 8)
+#' # Coarsened so the example runs quickly; name layers, then scale.
+#' covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
+#'                                                 na.rm = TRUE))
+#' # Keep one site per raster cell.
+#' keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+#' Fst <- melip.Fst[keep, keep]
+#' surface <- conductance_surface(covariates, coords[keep])
 #'
-#' fit <- terradish(melip.Fst ~ forestcover + altitude, surface,
-#'               loglinear_conductance, leastsquares,
-#'               control = NewtonRaphsonControl(maxit = 5))
+#' fit <- terradish(Fst ~ forestcover + altitude, surface,
+#'                  measurement_model = mlpe)
 #'
 #' cond <- conductance(surface, fit)
 #' names(cond)   # "est", "lower95", "upper95"
-#' plot(cond)
+#' plot(cond)    # relative conductance and its pointwise 95% limits
 #'
 #' }
 #' @export
@@ -501,6 +523,7 @@ conductance.terradish_graph <- function(x, fit, quantile = 0.95,
 #'   clamp when \code{support = "focal"}.
 #' @param ... Additional arguments passed to methods.
 #' @name legacy_radish_graph_methods
+#' @seealso \code{\link{radish_compatibility}}
 #' @inherit conductance.terradish_graph return
 #' @keywords internal
 NULL

@@ -66,6 +66,10 @@ layer; each element is a named numeric vector with entries \code{center} and
 \code{scale} (the subtracted offset and the divisor, respectively).
 \code{crop_to_focal_buffer} and \code{conductance_surface} preserve this
 attribute.
+
+Name the layers before scaling. The stored centers and scales are keyed by
+layer name, so renaming a raster after scaling leaves stale names in the
+\code{"terradish_scale"} attribute and breaks back-transformation.
 }
 \examples{
 library(terra)
@@ -87,4 +91,9 @@ terra::values(new_scaled)
 }
 \seealso{
 \code{\link{scale_to_0_1}}, \code{\link{conductance_surface}}
+
+Other graph setup:
+\code{\link[=conductance_surface]{conductance_surface()}},
+\code{\link[=crop_to_focal_buffer]{crop_to_focal_buffer()}}
 }
+\concept{graph setup}

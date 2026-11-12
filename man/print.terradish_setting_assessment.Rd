@@ -2,7 +2,7 @@
 % Please edit documentation in R/settings_assessment.R
 \name{print.terradish_setting_assessment}
 \alias{print.terradish_setting_assessment}
-\title{Print a terradish settings assessment}
+\title{Print and read a settings assessment}
 \usage{
 \method{print}{terradish_setting_assessment}(x, digits = max(3L, getOption("digits") - 3L), ...)
 }
@@ -64,11 +64,14 @@ names(covariates) <- c("altitude", "forestcover")
 # coarsened for the example; assessment earns its keep on large graphs
 covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
                                                 na.rm = TRUE))
-surface <- conductance_surface(covariates, terra::unwrap(melip.coords),
-                               directions = 8, saveStack = TRUE)
+# Keep one site per raster cell (some melip sites share a cell).
+coords <- terra::unwrap(melip.coords)
+keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+Fst <- melip.Fst[keep, keep]
+surface <- conductance_surface(covariates, coords[keep])
 
 assessment <- terradish_assess_settings(
-  melip.Fst ~ forestcover + altitude,
+  Fst ~ forestcover + altitude,
   data = surface, measurement_model = mlpe, probe_maxit = 2)
 
 assessment                      # the four-part report described above
@@ -82,6 +85,12 @@ assessment$recommended$solver   # the settings, ready to reuse
   and what each component holds, \code{\link{terradish_solver_benchmark}}
   for benchmarking solvers alone, and \code{\link{terradish}} for the fit
   the recommendations feed.  See
-  \code{vignette("large-landscapes", package = "terradish")} for when this
+  \code{vignette("v11-large-landscapes", package = "terradish")} for when this
   is worth running.
+
+Other solver settings:
+\code{\link[=slim_terradish]{slim_terradish()}},
+\code{\link[=terradish_assess_settings]{terradish_assess_settings()}},
+\code{\link[=terradish_solver_benchmark]{terradish_solver_benchmark()}}
 }
+\concept{solver settings}

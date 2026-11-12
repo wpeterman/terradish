@@ -2,7 +2,7 @@
 % Please edit documentation in R/mlpe_covariates.R
 \name{pairwise_endpoint_covariates}
 \alias{pairwise_endpoint_covariates}
-\title{Pairwise endpoint-difference covariates}
+\title{Pairwise environmental differences from site-level covariates}
 \usage{
 pairwise_endpoint_covariates(
   x,
@@ -57,7 +57,7 @@ A numeric matrix of class \code{"terradish_pairwise_covariates"}
 Constructs pairwise environmental-mismatch covariates from site-level
 values.  The result can be used alongside isolation-by-resistance (IBR)
 terms to model isolation by environment (IBE) within
-\code{\link{mlpe_covariates}}.
+\code{\link{mlpe_covariates}} or \code{\link{wishart_covariates}}.
 }
 \details{
 The function produces a \eqn{n(n-1)/2 \times p} matrix of pairwise
@@ -99,22 +99,37 @@ Ratios are undefined when that denominator is zero.
 library(terra)
 
 data(melip)
-melip.altitude <- terra::unwrap(melip.altitude)
-melip.coords <- terra::unwrap(melip.coords)
+altitude <- terra::unwrap(melip.altitude)
+coords <- terra::unwrap(melip.coords)
 
-z_abs <- pairwise_endpoint_covariates(melip.altitude, melip.coords,
+# Absolute altitude difference for every pair of sites, after
+# standardizing the site values. One row per pair, in dist() order.
+z_abs <- pairwise_endpoint_covariates(altitude, coords,
                                       transform = "absdiff", scale = TRUE)
 head(z_abs)
 
+# Several site-level columns collapsed into one Euclidean difference.
 site_env <- data.frame(
-  altitude = scale(as.numeric(terra::extract(melip.altitude, melip.coords)[, 2])),
-  xcoord = scale(terra::geom(melip.coords)[, "x"])
+  altitude = scale(as.numeric(terra::extract(altitude, coords)[, 2])),
+  xcoord = scale(terra::geom(coords)[, "x"])
 )
 z_env <- pairwise_endpoint_covariates(site_env, transform = "euclidean")
 head(z_env)
 
 }
 \seealso{
-\code{\link{mlpe_covariates}}, \code{\link{terradish_cv_folds}},
+\code{\link{pairwise_covariates}}, \code{\link{mlpe_covariates}},
+  \code{\link{wishart_covariates}}, \code{\link{terradish_cv_folds}},
   \code{\link{terradish}}
+
+Other measurement models:
+\code{\link[=generalized_wishart]{generalized_wishart()}},
+\code{\link[=leastsquares]{leastsquares()}},
+\code{\link[=mlpe]{mlpe()}},
+\code{\link[=mlpe_covariates]{mlpe_covariates()}},
+\code{\link[=pairwise_covariates]{pairwise_covariates()}},
+\code{\link{terradish_measurement_model}},
+\code{\link[=wishart_covariance]{wishart_covariance()}},
+\code{\link[=wishart_covariates]{wishart_covariates()}}
 }
+\concept{measurement models}

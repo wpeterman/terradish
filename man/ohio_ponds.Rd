@@ -3,7 +3,7 @@
 \docType{data}
 \name{ohio_ponds}
 \alias{ohio_ponds}
-\title{Simulated Ohio Forest-Pond Genetic Data}
+\title{Simulated Ohio forest-pond SNP and microsatellite data}
 \format{
 A list with 12 elements:
 \describe{
@@ -99,8 +99,8 @@ model. See the installed provenance file for sources and processing details.
 }
 \section{Worked examples}{
 
-\code{vignette("data-generation", package = "terradish")},
-\code{vignette("getting-started", package = "terradish")}.
+\code{vignette("v12-data-generation", package = "terradish")},
+\code{vignette("v01-getting-started", package = "terradish")}.
 }
 
 \examples{
@@ -122,7 +122,12 @@ round(S[1:4, 1:4], 3)
 \seealso{
 \code{\link{cov_from_biallelic}},
   \code{\link{cov_from_genetic_data}}, \code{\link{conductance_surface}},
-  \code{vignette("getting-started", package = "terradish")},
-  \code{vignette("gaussian-scale-optimization", package = "terradish")}.
+  \code{vignette("v01-getting-started", package = "terradish")},
+  \code{vignette("v07-gaussian-scale-optimization", package = "terradish")}.
+
+Other datasets:
+\code{\link{individual_salamanders}},
+\code{\link{melip}}
 }
+\concept{datasets}
 \keyword{datasets}

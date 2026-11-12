@@ -1,5 +1,5 @@
 ---
-title: "Categorical Landscape Covariates"
+title: "05. Categorical Landscape Covariates"
 author: "Bill Peterman"
 output:
   rmarkdown::html_vignette:
@@ -9,7 +9,7 @@ output:
     mathjax: null
     pandoc_args: ["--mathml"]
 vignette: >
-  %\VignetteIndexEntry{Categorical Landscape Covariates}
+  %\VignetteIndexEntry{05. Categorical Landscape Covariates}
   %\VignetteEngine{knitr::rmarkdown}
   %\VignetteEncoding{UTF-8}
 ---
@@ -22,7 +22,7 @@ knitr::opts_chunk$set(collapse = TRUE, comment = "#>",
 **Goal.** Turn a land-cover code into a named class contrast, then interpret its conductance ratio.
 
 This guide reuses the Ohio landscape and pond locations from
-[`vignette("getting-started", package = "terradish")`](getting-started.html),
+[`vignette("v01-getting-started", package = "terradish")`](v01-getting-started.html),
 so start there if you are new to `terradish`.
 
 ## What does a categorical coefficient mean?
@@ -34,8 +34,8 @@ nominal raster classes as factors, choose a reference class, and interpret
 each coefficient as a conductance contrast relative to that reference.
 
 The genetic response here is simulated directly from a known class effect,
-not from the SLiM pond history, so you can check whether the fit recovers
-it.
+not from the SLiM pond history, so you can compare the fit with the value
+that generated the data.
 
 ## Load a factor-valued raster
 
@@ -106,8 +106,9 @@ points(ponds$x, ponds$y, pch = 21, bg = "white", cex = 0.6)
 
 The known nonforest/forest conductance ratio is $\exp(-1)$, about 0.37.
 `simulate_covariance_response()` builds the model covariance from that
-conductance surface, then draws a noisy sample covariance from it. Larger
-`nu` (here 120) gives a response closer to the true covariance.
+conductance surface, then draws a noisy sample covariance from it. `nu` is
+the effective Wishart information, and a larger value (here 120) gives a
+response closer to the true covariance.
 
 ```{r benchmark}
 benchmark <- simulate_covariance_response(
@@ -119,6 +120,10 @@ S <- benchmark$covariance
 The simulator's `sigma = 0.02` is the nugget **variance itself**, whereas
 the fitted measurement `sigma` is its log. Slope has no effect in this
 simulation.
+
+The graph carries a `slope` layer that the class-only formula does not use.
+When you run the fits below, `terradish()` warns that it removed the unused
+layer. That warning is expected here, and this guide does not print it.
 
 ## Fit and interpret the class contrast
 
@@ -145,9 +150,14 @@ gives a ratio below one. Here the estimated nonforest/forest ratio is
 `r sprintf("%.2f", ratio)`: nonforest cells conduct about
 `r round(100 * (1 - ratio))`% less than forest cells, with a 95% interval
 for the ratio of `r paste(sprintf("%.2f", exp(confint(fit))), collapse = " to ")`.
-That interval contains the true ratio of 0.37, so the fit recovers the
-simulated class effect. The ratio is a contrast in graph conductance, not
-the fraction of animals that cross open habitat.
+That interval contains the true ratio of 0.37, so this fit is consistent
+with the simulated class effect. It does not show reliable recovery. The
+estimate is well below the truth, the interval spans more than a tenfold
+range, and this is one simulated draw. Repeated draws, as in
+[`vignette("v10-simulation-design", package = "terradish")`](v10-simulation-design.html),
+are what show how often a design recovers an effect. The ratio is a
+contrast in graph conductance, not the fraction of animals that cross open
+habitat.
 
 | Parameter | Where it appears | What it measures |
 |---|---|---|
@@ -156,6 +166,19 @@ the fraction of animals that cross open habitat.
 | `tau` | `summary(fit)$phi` | Weight of the graph covariance (true value 1) |
 | Measurement `sigma` | `summary(fit)$phi`, log scale | Log of the extra variance added to each pond (true variance 0.02) |
 
+**Why the nuisance intervals miss their true values.** In the summary
+above, the `tau` interval lies below its true value of 1, and the `sigma`
+interval lies just above $\log(0.02)=-3.91$. The fitted nugget variance,
+`r signif(exp(summary(fit)$phi[["sigma"]]), 2)`, is about twice the
+simulated 0.02. These intervals are **conditional on the fitted conductance
+surface**, as the block header says, so they ignore uncertainty in the
+class coefficient and are too narrow to read as stand-alone intervals. The
+parameters also trade off. This draw overestimates the class effect
+(a coefficient of `r sprintf("%.2f", coef(fit)[["landcovernonforest"]])`
+against a true -1), which lengthens resistance distances and pulls `tau`
+down to compensate. Read `tau` and `sigma` as descriptions of this fit,
+not as tests of the simulated values.
+
 In an interaction model such as `landcover * slope`, each class contrast
 applies at slope zero (the full-domain mean after standardization), and
 the interaction lets the slope association differ by class. Fit such a
@@ -163,9 +186,12 @@ model only when the design can identify those extra parameters.
 
 ## Plot a class contrast and its map
 
-The package's `type = "marginal"` plot skips factor predictors, so plot
-the estimated class ratio directly. A line between forest and nonforest
-would have no meaning.
+The package's `type = "marginal"` plot draws curves for continuous
+predictors only. In a mixed model it skips factor predictors with a
+warning, and for a class-only model such as this one it stops with an
+error because no continuous predictor remains. Plot the estimated class
+ratio directly instead. A line between forest and nonforest would have no
+meaning.
 
 ```{r class-contrast, fig.cap = "Nonforest conductance relative to forest. Forest is fixed at one as the reference; the nonforest interval comes from the fitted coefficient."}
 ci <- exp(confint(fit))
@@ -180,7 +206,7 @@ ggplot(classes, aes(class, estimate)) +
 **How to read the plot.** A ratio below one means nonforest conducts less
 than forest. The reference has no interval because it defines the scale.
 
-```{r class-map, fig.cap = "Estimated conductance and pointwise model bounds for the class-only model. The map assigns each cell the value for its named class. Colors use a shared logarithmic scale, with legend labels in conductance units."}
+```{r class-map, fig.cap = c("Estimated conductance for the class-only model. The map assigns each cell the value for its named class. Colors use a logarithmic scale shared with the two bound maps, with legend labels in conductance units.", "Lower 95% pointwise bound of conductance for the class-only model, on the same logarithmic color scale as the estimate.", "Upper 95% pointwise bound of conductance for the class-only model, on the same logarithmic color scale as the estimate.")}
 maps <- plot(fit, type = "surface", data = surface)
 C <- conductance(surface, fit)
 map_limits <- range(terra::values(C), na.rm = TRUE)
@@ -238,14 +264,20 @@ stopifnot(all(cv$results$error == ""),
 cv$summary
 ```
 
-**How to read the table.** Larger held-out log-likelihood is better. The
+**How to read the table.** `terradish_cv_folds()` scores only the pairs
+of ponds within each held-out block, not pairs that join a training pond
+to a held-out pond (see
+[how spatial cross-validation scores models](v04-model-comparison.html#compare-spatial-prediction)).
+Larger held-out log-likelihood is better. The
 categorical model scores highest, but only
 `r round(cv$summary$total_loglik_gain[cv$summary$model == "categorical"], 2)`
-units above uniform conductance summed over three blocks, and both
-`uniform` and `mixed` are `within_one_se` of it. With 24 ponds, held-out
-prediction cannot distinguish this class effect from uniform conductance,
-even though the full-data interval recovers it. Adding slope lowers
-prediction, as expected for a covariate with no simulated effect. Every
+units above uniform conductance summed over three blocks. `within_one_se`
+is `TRUE` for both `uniform` and `mixed`. Read that column as a descriptive
+tie flag, not a decision, because its standard error comes from only three
+blocks. With 24 ponds, held-out prediction cannot distinguish this class
+effect from uniform conductance, even though the full-data interval is
+consistent with it. Adding slope lowers the summed score slightly, which
+is the expected direction for a covariate with no simulated effect. Every
 fold keeps the full landscape graph, so both classes stay present and only
 the scored ponds change.
 
@@ -254,13 +286,12 @@ the scored ponds change.
 Do not Gaussian-smooth integer class codes (the Gaussian conductance
 model rejects factors). If forest **context** is the question, derive a
 forest indicator or fraction and smooth that continuous quantity, as in
-[`vignette("gaussian-scale-optimization", package = "terradish")`](gaussian-scale-optimization.html).
-For several class proportions that sum to one, omit a reference class or
-otherwise address their exact linear dependence. Including every
-proportion plus a redundant intercept leaves the contrasts unidentifiable.
-
-<details>
-<summary>Quick reference: expand for the complete copyable workflow</summary>
+[`vignette("v07-gaussian-scale-optimization", package = "terradish")`](v07-gaussian-scale-optimization.html).
+For several class proportions that sum to one, omit one class as the
+reference. The conductance model has no intercept because a constant
+multiplier on conductance is not identifiable, and proportions that sum
+to one add up to exactly such a constant. Including every proportion
+therefore leaves the contrasts unidentifiable.
 
 ## Quick reference: a categorical conductance workflow
 
@@ -280,6 +311,7 @@ S <- simulate_covariance_response(c(landcovernonforest = -1), ~ landcover,
   graph, tau = 1, sigma = 0.02, nu = 120, seed = 61303)$covariance
 
 # 3. Fit a class contrast, then exponentiate to a relative conductance ratio.
+#    nu is the effective Wishart information assumed for this response.
 fit <- terradish(S ~ landcover, graph,
   measurement_model = wishart_covariance, nu = 120, optimizer = "bfgs",
   control = NewtonRaphsonControl(maxit = 200, ctol = 1e-8, ftol = 1e-8))
@@ -293,10 +325,8 @@ cv <- terradish_cv_folds(graph, list(categorical = S ~ landcover),
   folds = ohio_ponds$ponds$fold, model = wishart_covariance, nu = 120,
   nuisance = "fixed", optimizer = "bfgs",
   control = NewtonRaphsonControl(maxit = 200, ctol = 1e-8, ftol = 1e-8))
-cv$summary
+cv$summary   # scores pairs within each held-out block; within_one_se is a tie flag
 ```
-
-</details>
 
 ## Summary of key functions
 
@@ -312,14 +342,14 @@ cv$summary
 
 ## See also
 
-- [`vignette("getting-started", package = "terradish")`](getting-started.html): genotype
+- [`vignette("v01-getting-started", package = "terradish")`](v01-getting-started.html): genotype
   construction, graph, and measurement parameters.
-- [`vignette("gaussian-scale-optimization", package = "terradish")`](gaussian-scale-optimization.html):
+- [`vignette("v07-gaussian-scale-optimization", package = "terradish")`](v07-gaussian-scale-optimization.html):
   estimate the context of continuous forest fraction.
-- [`vignette("spline-conductance", package = "terradish")`](spline-conductance.html): response
+- [`vignette("v06-spline-conductance", package = "terradish")`](v06-spline-conductance.html): response
   shape for continuous covariates.
-- [`vignette("model-comparison", package = "terradish")`](model-comparison.html):
+- [`vignette("v04-model-comparison", package = "terradish")`](v04-model-comparison.html):
   ranking candidate formulas by AIC, likelihood-ratio tests, and prediction.
-- [`vignette("simulation-design", package = "terradish")`](simulation-design.html):
+- [`vignette("v10-simulation-design", package = "terradish")`](v10-simulation-design.html):
   simulating responses with `simulate_covariance_response()` to plan a study.
 - `?conductance_surface`: factor-valued raster support and graph metadata.

@@ -2,7 +2,7 @@
 % Please edit documentation in R/radish_conductance_model.R
 \name{loglinear_conductance}
 \alias{loglinear_conductance}
-\title{Log-link conductance model}
+\title{Log-linear conductance model}
 \usage{
 loglinear_conductance(formula, x)
 }
@@ -81,6 +81,13 @@ model2 <- loglinear_conductance(~ altitude + I(altitude^2) + fc, x2)
 
 }
 \seealso{
-\code{\link{gaussian_smoothed_loglinear_conductance}},
+\code{\link{smooth_loglinear_conductance}},
+  \code{\link{gaussian_smoothed_loglinear_conductance}},
   \code{\link{conductance_surface}}, \code{\link{terradish}}
+
+Other conductance models:
+\code{\link[=gaussian_smoothed_loglinear_conductance]{gaussian_smoothed_loglinear_conductance()}},
+\code{\link[=smooth_loglinear_conductance]{smooth_loglinear_conductance()}},
+\code{\link{terradish_conductance_model_factory}}
 }
+\concept{conductance models}

@@ -487,7 +487,7 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
   optimizer
 }
 
-#' Optimize a parameterized conductance surface
+#' Fit a conductance model by maximum likelihood
 #'
 #' Uses maximum likelihood to fit a parameterized conductance surface to genetic data,
 #' given a function relating spatial data to conductance (a "conductance model")
@@ -511,8 +511,19 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   It controls effective information, not a marker count. Report sensitivity
 #'   across plausible values with \code{\link{terradish_rescale_nu}}.
 #'   Ignored by non-Wishart measurement models.
-#' @param theta Starting values for optimization
-#' @param leverage Compute influence measures and leverage?
+#' @param theta Optional starting values for the conductance parameters, on
+#'   the scale reported by \code{coef()} (log conductance per unit of each
+#'   covariate; map units for Gaussian \code{sigma.<layer>} terms) and in the
+#'   order of the model terms. The default \code{NULL} uses the conductance
+#'   model's default start, which is zero for every log-linear coefficient.
+#' @param leverage Logical. Compute leverage (influence) arrays? When
+#'   \code{TRUE}, the fit stores \code{leverage$S}, a focal-site by focal-site
+#'   by parameter array giving the first-order change in each conductance
+#'   estimate per unit change in each entry of the response matrix, and
+#'   \code{leverage$X}, the corresponding array for the spatial covariates
+#'   (the change in each estimate per unit change in a covariate value at a
+#'   graph vertex). Large absolute values flag observations or cells that
+#'   drive an estimate. Unavailable for Gaussian scale-aware models.
 #' @param nonnegative Force regression-like \code{measurement_model} to have nonnegative slope?
 #' @param conductance Retained for backward compatibility. Only
 #'   \code{conductance = TRUE} is currently implemented.
@@ -521,7 +532,9 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   linearly with the number of parameters; \code{bfgs} uses an approximate
 #'   Hessian during optimization with cheaper iterations but often more steps;
 #'   and \code{auto} selects \code{bfgs} when there are more than three
-#'   conductance parameters and \code{newton} otherwise. Regardless of the
+#'   conductance parameters and \code{newton} otherwise, unless the
+#'   conductance model declares a preferred optimizer (the Gaussian
+#'   scale-aware model always prefers \code{bfgs}). Regardless of the
 #'   optimizer, \code{terradish()} evaluates the fitted model once more at the
 #'   final parameter values using the requested \code{curvature}, so standard
 #'   errors and summaries use the selected final derivative machinery.
@@ -537,7 +550,10 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   it on with
 #'   \code{control = NewtonRaphsonControl(ls.control = HagerZhangControl(verbose = TRUE))}.
 #' @param control A list containing options for the optimization routine (see \code{\link{NewtonRaphsonControl}} for list)
-#' @param validate Numerical validation of leverage via package \code{numDeriv} (very slow, use for debugging small examples)
+#' @param validate Deprecated and ignored. Numerical validation of leverage
+#'   is not implemented in \code{terradish()}. Any value other than
+#'   \code{FALSE} gives a deprecation warning and the fit proceeds unchanged.
+#'   The argument will be removed in a future release.
 #' @param cores Number of worker processes. \code{1} evaluates serially.
 #'   Parallel execution is experimental and uses PSOCK workers on every
 #'   operating system. Only Hessian and partial solves run in parallel; AMG
@@ -565,7 +581,11 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   residual-weighted second-derivative terms and requires only first
 #'   derivatives of the conductance model. It equals the exact Hessian only when
 #'   those omitted terms are zero or negligible; convergence alone does not
-#'   guarantee agreement.
+#'   guarantee agreement. For \code{\link{mlpe}} the two can differ
+#'   materially: in the package's tests on the \code{melip} data,
+#'   Gauss-Newton standard errors differed from the exact ones by 3 to 14
+#'   percent in three configurations and by about a factor of two in a
+#'   fourth, so report \code{"exact"} standard errors for MLPE fits.
 #'   Standard errors from \code{summary()} are then the asymptotic
 #'   information-based errors. With \code{leverage = TRUE} the leverage
 #'   diagnostics inherit the same approximation.
@@ -671,8 +691,10 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' done via Newton's method (default; requires computation of Hessian during
 #' optimization), via the BFGS algorithm (requires gradient only during
 #' optimization) if \code{optimizer = "bfgs"}, or via a simple parameter-count
-#' heuristic if \code{optimizer = "auto"}. In all cases, the final returned fit
-#' is evaluated at the optimized parameters using the requested
+#' heuristic if \code{optimizer = "auto"}. Fitting one parameterized surface
+#' to the genetic data, instead of regressing on separately computed
+#' resistance distances, follows Peterman and Pope (2021). In all cases, the
+#' final returned fit is evaluated at the optimized parameters using the requested
 #' \code{curvature} for inference.
 #'
 #' Conductance coefficients are conditional model associations. Their sign and
@@ -690,9 +712,10 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' reduce runtime. First, build the graph with
 #' \code{conductance_surface(..., crop_buffer = )} when focal sites occupy only
 #' part of the raster. This removes vertices outside the buffered sampling
-#' extent before fitting. Cropping changes resistance: one sensitivity audit
-#' found increases of 15--23\% with a two-cell buffer and 1--2\% with a
-#' ten-cell buffer. These values are case-specific. Refit with a larger buffer
+#' extent before fitting. Cropping changes resistance: an unpublished
+#' development check on one landscape found increases of 15--23\% with a
+#' two-cell buffer and 1--2\% with a ten-cell buffer. These values are
+#' case-specific. Refit with a larger buffer
 #' to assess sensitivity on your landscape. Second, use
 #' \code{approximation = "coarse_raster"} with
 #' \code{approximation_control = list(factor = c(4, 2), exact_refine = TRUE)}
@@ -743,7 +766,8 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #' starting-value sensitivity when distinct solutions remain plausible.
 #'
 #' @return An object of class \code{c("terradish", "radish")}, a list. Most
-#'   users need only the methods: \code{summary()} for estimates and intervals,
+#'   users need only the methods: \code{summary()} for estimates, standard
+#'   errors, and nuisance-parameter intervals,
 #'   \code{coef()} and \code{confint()} for conductance coefficients,
 #'   \code{conductance()} and \code{plot()} for maps and curves, and
 #'   \code{AIC()}, \code{anova()}, or \code{\link{aic_table}} for comparison
@@ -789,67 +813,92 @@ setRefClass("FunctionCall", fields = list(count = "integer"))
 #'   \item{storage}{Present only when \code{slim = TRUE}; records the model
 #'     closures and leverage arrays that were removed.}
 #'
+#' @references
+#' Peterman WE, Pope NS (2021). The use and misuse of regression models in
+#' landscape genetic analyses. Molecular Ecology, 30, 37--47.
+#' \doi{10.1111/mec.15716}.
+#'
+#' Clarke RT, Rothery P, Raybould AF (2002). Confidence limits for regression
+#' relationships between distance matrices: estimating gene flow with distance.
+#' Journal of Agricultural, Biological, and Environmental Statistics, 7,
+#' 361--372. \doi{10.1198/108571102320}.
+#'
+#' Hanks EM, Hooten MB (2013). Circuit theory and model-based inference for
+#' landscape connectivity. Journal of the American Statistical Association,
+#' 108, 22--33. \doi{10.1080/01621459.2012.724647}.
+#'
+#' @seealso \code{\link{conductance_surface}} to build \code{data},
+#'   \code{\link{terradish_methods}} and \code{\link{terradish_inference}} to
+#'   read a fit, \code{\link{terradish_conductance_model_factory}} and
+#'   \code{\link{terradish_measurement_model}} for the model choices.
+#'
+#' @family model fitting
+#'
 #' @examples
 #' \donttest{
-#'
 #' library(terra)
-#' 
-#' data(melip)
-#' melip.altitude <- terra::unwrap(melip.altitude)
-#' melip.forestcover <- terra::unwrap(melip.forestcover)
-#' melip.coords <- terra::unwrap(melip.coords)
-#' 
-#' # scaling spatial covariates helps avoid numeric overflow
-#' covariates <- c(terra::scale(melip.altitude),
-#'                 terra::scale(melip.forestcover))
-#' names(covariates) <- c("altitude", "forestcover")
-#' 
-#' # create parameterized conductance surface
-#' surface <- conductance_surface(covariates, melip.coords, directions = 8)
-#' 
-#' fit_nnls <- terradish(melip.Fst ~ altitude * forestcover, data = surface, 
-#'                    terradish::loglinear_conductance, terradish::leastsquares)
-#' summary(fit_nnls)
-#' 
-#' # a different "measurement_model" that incorporates dependence
-#' # among pairwise measurements
-#' fit_mlpe <- terradish(melip.Fst ~ altitude + forestcover, data = surface,
-#'                    terradish::loglinear_conductance, terradish::mlpe)
-#' summary(fit_mlpe)
 #'
-#' # conductance surface with 95% CI
+#' data(melip)
+#' covariates <- c(terra::unwrap(melip.altitude),
+#'                 terra::unwrap(melip.forestcover))
+#' coords <- terra::unwrap(melip.coords)
+#'
+#' # Name the layers first, then scale them. Scaling avoids numeric overflow
+#' # and makes each coefficient a per-standard-deviation effect.
+#' names(covariates) <- c("altitude", "forestcover")
+#' covariates <- scale_covariates(covariates)
+#'
+#' # A few melip sites share a raster cell; keep one site per cell.
+#' keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+#' coords <- coords[keep]
+#' Fst <- melip.Fst[keep, keep]
+#'
+#' # Build the graph (eight neighbors by default).
+#' surface <- conductance_surface(covariates, coords)
+#'
+#' # MLPE (the default) accounts for pairs that share a sampling site.
+#' fit_mlpe <- terradish(Fst ~ altitude + forestcover, data = surface,
+#'                       measurement_model = mlpe)
+#' fit_mlpe$convergence$code   # 0 means converged; check before reading on
+#' summary(fit_mlpe)
+#' exp(coef(fit_mlpe))         # conductance multiplier per one SD
+#'
+#' # Least squares ignores shared-site dependence; useful for exploration.
+#' fit_ls <- terradish(Fst ~ altitude + forestcover, data = surface,
+#'                     measurement_model = leastsquares)
+#'
+#' # Conductance surface with a 95% pointwise interval
 #' fitted_conductance <- conductance(surface, fit_mlpe, quantile = 0.95)
-#' 
-#' # test for an interaction using a likelihood ratio test
-#' fit_mlpe_interaction <- terradish(melip.Fst ~ forestcover * altitude, data = surface, 
-#'                                terradish::loglinear_conductance, terradish::mlpe)
+#'
+#' # Test for an interaction using a likelihood-ratio test
+#' fit_mlpe_interaction <- terradish(Fst ~ forestcover * altitude,
+#'                                   data = surface, measurement_model = mlpe)
 #' anova(fit_mlpe, fit_mlpe_interaction)
-#' 
-#' # test against null model of IBD using a LRT
-#' fit_mlpe_ibd <- terradish(melip.Fst ~ 1, data = surface, 
-#'                        terradish::loglinear_conductance, terradish::mlpe)
+#'
+#' # Test against the uniform-conductance (isolation by distance) model
+#' fit_mlpe_ibd <- terradish(Fst ~ 1, data = surface, measurement_model = mlpe)
 #' anova(fit_mlpe, fit_mlpe_ibd)
 #'
-#' # categorical covariates:
-#' # categorical raster layers should be factor-valued, see ?terra::as.factor
-#' # and 'details' section of ?conductance_surface
-#' forestcover_class <- cut(terra::values(melip.forestcover)[,1], breaks = c(0, 1/6, 1/3, 1))
-#' melip.forestcover_cat <- terra::setValues(melip.forestcover, as.numeric(forestcover_class))
-#' melip.forestcover_cat <- terra::as.factor(melip.forestcover_cat)
+#' # Categorical covariates must be factor-valued layers; see the Details of
+#' # ?conductance_surface.
+#' forestcover <- terra::unwrap(melip.forestcover)
+#' forestcover_class <- cut(terra::values(forestcover)[, 1],
+#'                          breaks = c(0, 1/6, 1/3, 1))
+#' forestcover_cat <- terra::setValues(forestcover,
+#'                                     as.numeric(forestcover_class))
+#' forestcover_cat <- terra::as.factor(forestcover_cat)
+#' RAT <- levels(forestcover_cat)[[1]]
+#' RAT$VALUE <- levels(forestcover_class) # explicitly define level names
+#' levels(forestcover_cat) <- RAT
 #'
-#' RAT <- levels(melip.forestcover_cat)[[1]]
-#' RAT$VALUE <- levels(forestcover_class) #explicitly define level names
-#' levels(melip.forestcover_cat) <- RAT
-#' 
-#' covariates_cat <- c(melip.forestcover_cat, melip.altitude)
+#' covariates_cat <- c(forestcover_cat, covariates[["altitude"]])
 #' names(covariates_cat) <- c("forestcover", "altitude")
-#' 
-#' surface_cat <- conductance_surface(covariates_cat, melip.coords, directions = 8)
-#' 
-#' fit_mlpe_cat <- terradish(melip.Fst ~ forestcover + altitude, surface_cat, 
-#'                        terradish::loglinear_conductance, terradish::mlpe)
-#' summary(fit_mlpe_cat)
+#' surface_cat <- conductance_surface(covariates_cat, coords)
 #'
+#' # Coefficients for forestcover are contrasts against the first class.
+#' fit_mlpe_cat <- terradish(Fst ~ forestcover + altitude, surface_cat,
+#'                           measurement_model = mlpe)
+#' summary(fit_mlpe_cat)
 #' }
 #' @export
 
@@ -876,6 +925,10 @@ terradish <- function(formula,
                    measurement_control = NULL,
                    slim = FALSE)
 {
+  # Raise the unused-covariate warning once for this call, not once per
+  # internal refit (see .unused_covariate_state).
+  .unused_covariate_scope_open()
+  on.exit(.unused_covariate_scope_close(), add = TRUE)
   requested_leverage <- leverage
   stopifnot(inherits(formula, "formula"))
   stopifnot(inherits(data, c("terradish_graph", "radish_graph")))
@@ -888,6 +941,16 @@ terradish <- function(formula,
     stop("`slim` must be TRUE or FALSE.", call. = FALSE)
   if (!isTRUE(conductance))
     stop("`conductance = FALSE` is not currently supported.", call. = FALSE)
+  # `validate` never did anything in terradish(). Say so plainly and carry on
+  # with the fit unchanged.
+  if (!identical(validate, FALSE))
+  {
+    warning("The `validate` argument of terradish() is deprecated and ignored: ",
+            "numerical leverage validation is not implemented. ",
+            "The argument will be removed in a future release.",
+            call. = FALSE)
+    validate <- FALSE
+  }
 
   # `verbose` is the simple switch; `control$verbose` is the fine-grained one.
   # Supplying `verbose` explicitly wins, so `terradish(..., verbose = TRUE)`
@@ -1300,13 +1363,8 @@ terradish <- function(formula,
   num_leverage_X <- NULL
 
   # numerical validation of derivatives
-  validate <- validate && !no_coef
-  if (validate)
-  {
-    warning("`validate = TRUE` is not currently implemented for `terradish()`; skipping numerical leverage validation.",
-            call. = FALSE)
-    validate <- FALSE
-  }
+  # `validate` was reset to FALSE with a deprecation warning at entry.
+  validate <- FALSE
 
   out <- list(call           = match.call(),
               formula        = formula,
@@ -1385,6 +1443,7 @@ terradish <- function(formula,
 #' @param ... Arguments passed through the deprecated \code{radish()}
 #'   compatibility wrapper to \code{\link{terradish}}.
 #' @name legacy_radish_fit_wrapper
+#' @seealso \code{\link{radish_compatibility}}
 #' @inherit terradish return
 #' @keywords internal
 NULL
@@ -1397,7 +1456,7 @@ radish <- function(...)
   .terradish_forward_call(match.call(), "terradish")
 }
 
-#' Methods for fitted terradish models
+#' Print, summarize, compare, and extract from a fitted model
 #'
 #' S3 methods for working with fitted objects returned by \code{\link{terradish}}
 #' and summaries returned by \code{\link[base:summary]{summary()}}.
@@ -1407,17 +1466,42 @@ radish <- function(...)
 #' @param digits Number of digits to print.
 #' @param signif.stars Should significance stars be printed in coefficient
 #'   tables?
-#' @param type Type of fitted values to return.
+#' @param type Type of fitted values to return: \code{"response"} (default)
+#'   gives the expected response matrix on the scale of the data (genetic
+#'   distance or covariance, according to the measurement model),
+#'   \code{"distance"} gives the fitted resistance distances among focal
+#'   sites, and \code{"covariance"} gives the fitted graph covariance (the
+#'   focal-site block of the generalized inverse of the graph Laplacian).
 #' @param nsim Number of simulated response matrices to generate.
 #' @param seed Optional random seed used by \code{simulate()}.
 #' @param k Penalty multiplier supplied to \code{AIC()}.
-#' @param method Simulation method.
+#' @param method Simulation method. \code{"permutation"} is the only
+#'   method: it adds the residual matrix, with sites permuted jointly in
+#'   rows and columns, to the fitted response. Any other value stops with an
+#'   error.
 #' @param conf.level Confidence level for nuisance-parameter confidence
 #'   intervals reported by \code{summary()}.  These intervals are conditional on
-#'   the fitted conductance surface.
+#'   the fitted conductance surface. \code{confint()} calls the same quantity
+#'   \code{level}; \code{conductance()} and \code{plot()} call it
+#'   \code{quantile}.
 #' @param ... Additional arguments passed through to generic methods.
 #'
 #' @details
+#' \strong{Reading \code{summary()}.} The coefficient table reports each
+#' conductance coefficient on the log-conductance scale with its Wald
+#' standard error, z value, and p value; \code{exp()} of an estimate is the
+#' multiplicative change in conductance per unit of the covariate. Use
+#' \code{\link[=terradish_inference]{confint()}} for intervals on the
+#' conductance coefficients. The nuisance table reports the measurement-model
+#' parameters with conditional Wald intervals.
+#'
+#' Parameter names repeat across measurement models with different meanings.
+#' In \code{\link{mlpe}} and \code{\link{leastsquares}}, \code{tau} is the log
+#' residual precision. In \code{\link{wishart_covariance}} and
+#' \code{\link{generalized_wishart}}, \code{tau} is the nonnegative multiplier
+#' on the graph covariance and \code{sigma} is the log nugget variance. See
+#' the parameter glossary in \code{\link{terradish-package}}.
+#'
 #' Nuisance-parameter estimates and intervals from \code{summary()} remain on
 #' the parameterization used by the measurement model. For example, MLPE
 #' \code{tau} is log precision and its stored \code{rho} is unconstrained; the
@@ -1433,7 +1517,7 @@ radish <- function(...)
 #'
 #' \code{anova()} is a likelihood-ratio test for nested conductance formulas
 #' fitted to the same response, sites, graph domain, conductance-model factory,
-#' measurement model, and pair subset; Wishart fits must also use the same
+#' and measurement model; Wishart fits must also use the same
 #' \code{nu}. Both fits must record successful outer and final nuisance
 #' convergence; missing diagnostics require refitting. The function checks
 #' formula-term nesting, but the analyst must
@@ -1442,21 +1526,54 @@ radish <- function(...)
 #' tested parameters are regular interior parameters. It can be unreliable when
 #' a null value is on a parameter boundary or other regularity conditions fail;
 #' use a justified alternative or simulation calibration in those cases.
+#' One boundary case is handled automatically: when the larger model adds
+#' only Wishart environmental kernel weights (\code{lambda_*}, which are
+#' bounded at zero), \code{anova()} warns and reports a chi-bar-square
+#' reference with binomial weights instead of the ordinary chi-square. The
+#' table heading names the reference distribution that was used.
 #'
 #' @return
 #' \itemize{
-#'   \item \code{print()} returns its input invisibly.
-#'   \item \code{summary()} returns an object of class
-#'     \code{summary.terradish}, with legacy \code{summary.radish}
-#'     compatibility retained.
-#'   \item \code{coef()} returns the fitted conductance coefficients.
-#'   \item \code{fitted()} returns fitted responses, distances, or covariance.
-#'   \item \code{simulate()} returns one or more simulated response matrices.
-#'   \item \code{anova()} returns a likelihood-ratio comparison table.
-#'   \item \code{logLik()} returns a \code{logLik} object.
-#'   \item \code{AIC()} returns \eqn{-2\ell + kK}; the default \code{k = 2}
-#'     gives Akaike's Information Criterion.
-#'   \item \code{residuals()} returns the residual response matrix.
+#'   \item \code{print()} returns its input invisibly after printing it.
+#'   \item \code{summary()} returns a list of class \code{summary.terradish}
+#'     (also \code{summary.radish}). Its main elements are \code{ztable}
+#'     (conductance estimates on the log-conductance scale, standard errors,
+#'     z values, and p values), \code{vcov} and \code{vcor} (their covariance
+#'     and correlation matrices), \code{phi} and \code{phi_table}
+#'     (nuisance-parameter estimates, standard errors, and intervals on the
+#'     measurement model's scale, conditional on the fitted conductance
+#'     surface), \code{phi_vcov}, \code{phi_at_bound} (flags for kernel
+#'     weights at zero), \code{convergence}, \code{boundary} and
+#'     \code{no_structure_boundary}, \code{loglik}, \code{df}, \code{aic},
+#'     \code{gradnorm}, \code{fcalls}, \code{iters}, \code{diagnostics},
+#'     \code{call}, and \code{dim}. \code{ibe_ratio} holds the output of
+#'     \code{\link{terradish_ibe_ratio}} (zero rows without environmental
+#'     terms). Gaussian scale fits add \code{sigma_table}, with one row per
+#'     smoothing scale: the estimate and standard error in map units, the
+#'     fitting bounds, and a \code{near_bound} flag for estimates within one
+#'     percent of a bound. Spline fits add \code{spline_monotonicity}.
+#'   \item \code{coef()} returns a named numeric vector of fitted conductance
+#'     coefficients on the log-conductance scale, or an empty vector when
+#'     they are unidentified.
+#'   \item \code{fitted()} returns a numeric focal-site matrix of expected
+#'     responses, resistance distances, or graph covariances, selected by
+#'     \code{type}.
+#'   \item \code{simulate()} returns a numeric response matrix for
+#'     \code{nsim = 1}, or a three-dimensional array with simulations along
+#'     the third dimension otherwise.
+#'   \item \code{anova()} returns a matrix of class \code{anova}, comparing
+#'     two nested fits by log-likelihood, parameter count, likelihood-ratio
+#'     statistic, and its reference-distribution p-value.
+#'   \item \code{logLik()} returns a numeric scalar of class \code{logLik},
+#'     with parameter-count (\code{df}) and focal-site-count (\code{nobs})
+#'     attributes.
+#'   \item \code{AIC()} returns \eqn{-2\ell + kK}, where \eqn{K} is the number
+#'     of estimated parameters; the default \code{k = 2} gives Akaike's
+#'     Information Criterion. Smaller values favor a fit when response and
+#'     likelihood are comparable.
+#'   \item \code{residuals()} returns a numeric matrix of observed minus
+#'     fitted responses, centered on both site dimensions for
+#'     covariance-response models.
 #' }
 #'
 #' @seealso \code{\link{terradish}} for fitting, \code{\link{conductance}} for
@@ -1464,22 +1581,28 @@ radish <- function(...)
 #'   diagnostic plot types, \code{\link{aic_table}} for ranking a model set,
 #'   and \code{\link{mlpe_response_change}} for putting an MLPE covariate
 #'   association on the response scale.  See
-#'   \code{vignette("getting-started", package = "terradish")} for a walkthrough
+#'   \code{vignette("v01-getting-started", package = "terradish")} for a walkthrough
 #'   of reading these outputs and
-#'   \code{vignette("model-comparison", package = "terradish")} for
+#'   \code{vignette("v04-model-comparison", package = "terradish")} for
 #'   \code{anova()} and \code{AIC()} in context.
+#'
+#' @family model fitting
 #'
 #' @examples
 #' \donttest{
 #' data(melip)
 #' covariates <- c(terra::unwrap(melip.altitude), terra::unwrap(melip.forestcover))
+#' coords <- terra::unwrap(melip.coords)
 #' names(covariates) <- c("altitude", "forestcover")
+#' # Coarsened so the example runs quickly; name layers, then scale.
 #' covariates <- scale_covariates(terra::aggregate(covariates, fact = 3,
 #'                                                 na.rm = TRUE))
-#' surface <- conductance_surface(covariates, terra::unwrap(melip.coords),
-#'                                directions = 8)
+#' # Keep one site per raster cell (some melip sites share a cell).
+#' keep <- !duplicated(terra::cellFromXY(covariates, terra::crds(coords)))
+#' Fst <- melip.Fst[keep, keep]
+#' surface <- conductance_surface(covariates, coords[keep])
 #'
-#' fit <- terradish(melip.Fst ~ altitude + forestcover, data = surface,
+#' fit <- terradish(Fst ~ altitude + forestcover, data = surface,
 #'                  conductance_model = loglinear_conductance,
 #'                  measurement_model = mlpe)
 #'
@@ -1497,11 +1620,11 @@ radish <- function(...)
 #' head(fitted(fit)[, 1:4])     # fitted genetic distances
 #' head(residuals(fit)[, 1:4])  # observed minus fitted
 #'
-#' # A nested comparison: is forest cover worth its parameter?
-#' fit_alt <- terradish(melip.Fst ~ altitude, data = surface,
+#' # A nested comparison: is the interaction worth its parameter?
+#' fit_int <- terradish(Fst ~ altitude * forestcover, data = surface,
 #'                      conductance_model = loglinear_conductance,
 #'                      measurement_model = mlpe)
-#' anova(fit_alt, fit)
+#' anova(fit, fit_int)
 #' }
 #'
 #' @name terradish_methods
@@ -1527,6 +1650,7 @@ NULL
 #'   the fitted conductance surface.
 #' @param ... Additional arguments passed through to generic methods.
 #' @name legacy_radish_methods
+#' @seealso \code{\link{radish_compatibility}}
 #' @return
 #' \itemize{
 #'   \item \code{print()} returns its input invisibly after printing it.
@@ -1779,7 +1903,7 @@ fitted.radish <- function(object, type = c("response", "distance", "covariance")
 #' @rdname legacy_radish_methods
 #' @method simulate radish
 #' @export
-simulate.radish <- function(object, nsim = 1, seed = NULL, method = c("permutation", "parametric"), ...)
+simulate.radish <- function(object, nsim = 1, seed = NULL, method = "permutation", ...)
 {
   old_seed_exists <- exists(".Random.seed", envir = .GlobalEnv, inherits = FALSE)
   if (old_seed_exists)
@@ -1792,12 +1916,13 @@ simulate.radish <- function(object, nsim = 1, seed = NULL, method = c("permutati
   }, add = TRUE)
   if (!is.null(seed))
     set.seed(seed)
-  method <- match.arg(method)
-  if (method == "parametric")
-  {
-    stop("Parametric simulation not yet supported")
-  } 
-  else if (method == "permutation") 
+  # Residual permutation is the only implemented method. Anything else,
+  # including the formerly listed "parametric", is rejected by name.
+  if (!is.character(method) || length(method) != 1L ||
+      !identical(method, "permutation"))
+    stop("`method` must be \"permutation\", the only simulation method ",
+         "that is implemented.", call. = FALSE)
+  if (method == "permutation")
   {
     fit <- fitted(object)
     resid  <- residuals(object)
