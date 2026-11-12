@@ -1,9 +1,9 @@
 # terradish <img src="man/figures/terradish-sticker.png" align="right" height="139" alt="terradish logo" />
 
-| CI | CRAN | License | Archive |
-|:---|:---|:---|:---|
-| [![R-CMD-check](https://github.com/wpeterman/terradish/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/wpeterman/terradish/actions/workflows/R-CMD-check.yaml) | [![CRAN status](https://www.r-pkg.org/badges/version/terradish)](https://CRAN.R-project.org/package=terradish) | [![License: BSD 3-Clause](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause) | [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21225711.svg)](https://doi.org/10.5281/zenodo.21225711) |
-| [![codecov](https://codecov.io/gh/wpeterman/terradish/graph/badge.svg)](https://app.codecov.io/gh/wpeterman/terradish) [![pkgdown](https://github.com/wpeterman/terradish/actions/workflows/pkgdown.yaml/badge.svg)](https://github.com/wpeterman/terradish/actions/workflows/pkgdown.yaml) | [![CRAN downloads](https://cranlogs.r-pkg.org/badges/grand-total/terradish)](https://CRAN.R-project.org/package=terradish) | | |
+| CI | CRAN | R-universe | License | Archive |
+|:---|:---|:---|:---|:---|
+| [![R-CMD-check](https://github.com/wpeterman/terradish/actions/workflows/R-CMD-check.yaml/badge.svg)](https://github.com/wpeterman/terradish/actions/workflows/R-CMD-check.yaml) | [![CRAN status](https://www.r-pkg.org/badges/version/terradish)](https://CRAN.R-project.org/package=terradish) | [![R-universe version](https://wpeterman.r-universe.dev/terradish/badges/version)](https://wpeterman.r-universe.dev/terradish) | [![License: BSD 3-Clause](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](https://opensource.org/licenses/BSD-3-Clause) | [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.21225711.svg)](https://doi.org/10.5281/zenodo.21225711) |
+| [![codecov](https://codecov.io/gh/wpeterman/terradish/graph/badge.svg)](https://app.codecov.io/gh/wpeterman/terradish) [![pkgdown](https://github.com/wpeterman/terradish/actions/workflows/pkgdown.yaml/badge.svg)](https://github.com/wpeterman/terradish/actions/workflows/pkgdown.yaml) | [![CRAN downloads](https://cranlogs.r-pkg.org/badges/grand-total/terradish)](https://CRAN.R-project.org/package=terradish) | [![R-universe checks](https://wpeterman.r-universe.dev/terradish/badges/checks)](https://wpeterman.r-universe.dev/terradish) | | |
 
 ## Overview
 
@@ -21,18 +21,26 @@ Fitting one parameterized conductance surface to genetic data, in place of regre
 
 ## Installation
 
-There are two ways to install terradish:
+There are three ways to install terradish:
 
 ```r
 # Get the released version from CRAN
 install.packages("terradish")
 
-# Alternatively, install the development version from GitHub
+# Get the development version as a prebuilt binary from R-universe
+install.packages(
+  "terradish",
+  repos = c("https://wpeterman.r-universe.dev", "https://cloud.r-project.org")
+)
+
+# Alternatively, build the development version from GitHub source
 # install.packages("remotes")
 remotes::install_github("wpeterman/terradish")
 ```
 
-terradish requires the companion package landgraph, version 0.0.3 or later. Both routes install it from CRAN automatically.
+R-universe rebuilds terradish from GitHub after each change and provides binaries for Windows and macOS, so the development version installs without a compiler. Building from GitHub source compiles the package's C++ code, which requires Rtools on Windows or the Xcode command line tools on macOS.
+
+terradish requires the companion package landgraph, version 0.0.3 or later. All three routes install it automatically.
 
 ## Using terradish
 

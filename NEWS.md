@@ -12,6 +12,8 @@ terradish (development version)
   `vignette("v01-getting-started", package = "terradish")`.
 * Added a package website, <https://wpeterman.github.io/terradish/>, with the
   guides grouped by purpose and the help pages grouped by task.
+* The development version is available as prebuilt binaries from R-universe,
+  <https://wpeterman.r-universe.dev>. The README gives the install command.
 * Documentation review. Help pages now describe the code where the two
   disagreed: the `nu` guidance in `terradish_assess_settings()`, the plain-list
   return of `NewtonRaphsonControl()` and `HagerZhangControl()`, the reserved
