@@ -1,5 +1,5 @@
-terradish 1.1.1
-----------------
+terradish (development version)
+-------------------------------
 * `conductance_surface()` now forms the reduced graph Laplacian as a principal
   submatrix of the full Laplacian instead of through a sparse projection. The
   result is identical; graph construction on a raster of one million pixels

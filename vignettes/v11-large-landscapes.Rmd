@@ -101,7 +101,7 @@ its form at any size. Larger analyses can include more focal sites, and
 Wishart precision still depends on the supplied effective degrees of freedom,
 `nu` (see the information section below).
 
-As a calibration, in one development test on a single machine, version 1.1.1
+As a calibration, in one development test on a single machine, version 1.1.0.9000
 built the graph for a one-million-cell raster in under a minute and fitted
 models on it in minutes to tens of minutes on one core. Read that as one
 machine's result, not a guarantee. There is no universal cell-count limit,
