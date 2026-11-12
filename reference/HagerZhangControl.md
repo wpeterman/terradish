@@ -80,9 +80,9 @@ HagerZhangControl(
 
 ## Value
 
-A named list holding the line search settings (a plain list with no
-additional class). The elements are the arguments above, stored
-unchanged: `delta`, `sigma`, `alphamax`, `rho`, `epsilon`, `gamma`,
+A named list of class `"terradish_hager_zhang_control"` holding the line
+search settings. The elements are the arguments above, stored unchanged:
+`delta`, `sigma`, `alphamax`, `rho`, `epsilon`, `gamma`,
 `linesearchmax`, `psi3`, `c`, and `verbose`. Pass the object to the
 `ls.control` argument of
 [`NewtonRaphsonControl`](https://wpeterman.github.io/terradish/reference/NewtonRaphsonControl.md)
@@ -144,6 +144,7 @@ str(ctrl)
 #>  $ psi3         : num 0.1
 #>  $ c            : num 1
 #>  $ verbose      : logi FALSE
+#>  - attr(*, "class")= chr [1:2] "terradish_hager_zhang_control" "list"
 
 # Use inside NewtonRaphsonControl:
 opt_ctrl <- NewtonRaphsonControl(

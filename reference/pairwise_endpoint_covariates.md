@@ -153,13 +153,13 @@ coords <- terra::unwrap(melip.coords)
 z_abs <- pairwise_endpoint_covariates(altitude, coords,
                                       transform = "absdiff", scale = TRUE)
 head(z_abs)
-#>      absdiff_spatial_template_lowres
-#> [1,]                       0.5217511
-#> [2,]                       1.6264202
-#> [3,]                       0.6761406
-#> [4,]                       0.1773603
-#> [5,]                       1.1508445
-#> [6,]                       0.4351686
+#>      absdiff_altitude
+#> [1,]        0.5217511
+#> [2,]        1.6264202
+#> [3,]        0.6761406
+#> [4,]        0.1773603
+#> [5,]        1.1508445
+#> [6,]        0.4351686
 
 # Several site-level columns collapsed into one Euclidean difference.
 site_env <- data.frame(

@@ -82,9 +82,9 @@ different scales, so run
 [`scale_covariates`](https://wpeterman.github.io/terradish/reference/scale_covariates.md)
 before fitting, as the fitting examples in this package do.
 
-Both raster layers ship with the same layer name
-(`"spatial_template_lowres"`). Rename them, for example with
-`names(covariates) <- c("altitude", "forestcover")`, before calling
+The raster layers are named `"altitude"` and `"forestcover"`, so
+`c(altitude, forestcover)` can be used in a model formula directly. Make
+sure layers carry the names you want before calling
 [`scale_covariates`](https://wpeterman.github.io/terradish/reference/scale_covariates.md),
 because the stored scaling is keyed by layer name and model formulas
 refer to layers by name.
@@ -125,9 +125,9 @@ altitude                      # 156 x 180 grid, values on ~[0, 1]
 #> extent      : -42.9125, -34.8125, -9.4975, -2.4775  (xmin, xmax, ymin, ymax)
 #> coord. ref. : +proj=longlat +ellps=WGS84 +towgs84=0,0,0,0,0,0,0 +no_defs
 #> source(s)   : memory
-#> name        : spatial_template_lowres
-#> min value   :               -0.000118
-#> max value   :                1.063207
+#> name        :  altitude
+#> min value   : -0.000118
+#> max value   :  1.063207
 nrow(coords)                  # 37 sampled populations
 #> [1] 37
 dim(melip.Fst)                # 37 x 37 pairwise Fst
@@ -148,11 +148,10 @@ terra::plot(altitude, main = "Altitude (rescaled)")
 terra::points(coords, pch = 19, cex = 0.7, col = "red")
 
 
-# Both layers share one name, so name them before scaling.
+# The layers are already named; scale them before fitting.
 covariates <- c(altitude, forestcover)
 names(covariates)
-#> [1] "spatial_template_lowres" "spatial_template_lowres"
-names(covariates) <- c("altitude", "forestcover")
+#> [1] "altitude"    "forestcover"
 covariates <- scale_covariates(covariates)
 
 # Sites that share a raster cell with an earlier site

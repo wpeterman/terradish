@@ -149,8 +149,8 @@ values) be printed to the console?</p></dd>
 </dl></div>
     <div class="section level2">
     <h2 id="value">Value<a class="anchor" aria-label="anchor" href="#value"></a></h2>
-    <p>A named list holding the line search settings (a plain list with
-  no additional class).  The elements are the arguments above, stored unchanged:
+    <p>A named list of class <code>"terradish_hager_zhang_control"</code>
+  holding the line search settings.  The elements are the arguments above, stored unchanged:
   <code>delta</code>, <code>sigma</code>, <code>alphamax</code>, <code>rho</code>, <code>epsilon</code>,
   <code>gamma</code>, <code>linesearchmax</code>, <code>psi3</code>, <code>c</code>, and
   <code>verbose</code>.  Pass the object to the <code>ls.control</code> argument of
@@ -204,6 +204,7 @@ method with guaranteed descent. ACM Transactions on Mathematical Software
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ psi3         : num 0.1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ c            : num 1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  $ verbose      : logi FALSE</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  - attr(*, "class")= chr [1:2] "terradish_hager_zhang_control" "list"</span>
 <span class="r-in"><span></span></span>
 <span class="r-in"><span><span class="co"># Use inside NewtonRaphsonControl:</span></span></span>
 <span class="r-in"><span><span class="va">opt_ctrl</span> <span class="op">&lt;-</span> <span class="fu"><a href="NewtonRaphsonControl.html">NewtonRaphsonControl</a></span><span class="op">(</span></span></span>

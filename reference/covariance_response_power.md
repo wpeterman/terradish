@@ -290,10 +290,10 @@ power$summary
 #> 2            0.8064656                 0.7996254         0.3333333
 #> 4                   NA                        NA         0.0000000
 #>   selected_AICc_rate mean_elapsed conductance_cor_threshold all_parameter_power
-#> 1          0.6666667    0.6566667                       0.9                   0
-#> 3          0.0000000    0.3966667                       0.9                   0
-#> 2          0.3333333    0.7066667                       0.9                   0
-#> 4          0.0000000    0.5000000                       0.9                   0
+#> 1          0.6666667    0.5000000                       0.9                   0
+#> 3          0.0000000    0.4466667                       0.9                   0
+#> 2          0.3333333    0.6066667                       0.9                   0
+#> 4          0.0000000    0.4633333                       0.9                   0
 power$parameter_summary
 #>     strategy sample_size    model     parameter  true n_replicates  fit_rate
 #> 1  spacefill           8 gaussian   forestcover -0.15            3 0.6666667

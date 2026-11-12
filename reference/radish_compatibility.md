@@ -24,15 +24,12 @@ The wrappers
 [`radish()`](https://wpeterman.github.io/terradish/reference/legacy_radish_fit_wrapper.md),
 [`radish_grid()`](https://wpeterman.github.io/terradish/reference/legacy_radish_grid_wrapper.md),
 [`radish_distance()`](https://wpeterman.github.io/terradish/reference/legacy_radish_distance_wrapper.md),
+[`radish_algorithm()`](https://wpeterman.github.io/terradish/reference/legacy_radish_algorithm_wrapper.md),
 and
-[`radish_algorithm()`](https://wpeterman.github.io/terradish/reference/legacy_radish_algorithm_wrapper.md)
-pass their arguments unchanged to the replacement and signal a
-deprecation warning.
 [`terra_radish_scale_optim()`](https://wpeterman.github.io/terradish/reference/legacy_terra_radish_scale_optim.md)
-is an alias with the same arguments as
-[`terradish_scale_optim`](https://wpeterman.github.io/terradish/reference/terradish_scale_optim.md).
-Objects created by terradish carry both the new and the legacy class
-names, so either set of methods dispatches on them.
+pass their arguments unchanged to the replacement and signal a
+deprecation warning. Objects created by terradish carry both the new and
+the legacy class names, so either set of methods dispatches on them.
 
 Arguments, defaults, and returned values are documented on the
 replacement pages. Full compatibility with every historical radish entry

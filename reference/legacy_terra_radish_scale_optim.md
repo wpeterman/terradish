@@ -1,33 +1,22 @@
 # Legacy terradish scale-optimization alias
 
-Legacy alias retained for backward compatibility with older
-`terra_radish_scale_optim()` calls.
+Deprecated compatibility wrapper retained for older code that still
+calls `terra_radish_scale_optim()`. It signals a deprecation warning and
+forwards its arguments unchanged.
 
 ## Usage
 
 ``` r
-terra_radish_scale_optim(
-  formula,
-  covariates,
-  coords,
-  scales = NULL,
-  lower = NULL,
-  upper = NULL,
-  scale_grid = NULL,
-  search = c("coordinate", "grid"),
-  objective = c("aic", "logLik"),
-  grid_points = 5L,
-  maxit = 10L,
-  tol = 0.1,
-  scale_fun = "terradish",
-  scale_args = NULL,
-  postprocess = scale_covariates,
-  directions = 8L,
-  theta = NULL,
-  verbose = FALSE,
-  ...
-)
+terra_radish_scale_optim(...)
 ```
+
+## Arguments
+
+- ...:
+
+  Arguments passed through the deprecated `terra_radish_scale_optim()`
+  compatibility wrapper to
+  [`terradish_scale_optim`](https://wpeterman.github.io/terradish/reference/terradish_scale_optim.md).
 
 ## Value
 
@@ -77,3 +66,7 @@ An object of class `"terradish_scale_optim"`, a list with:
 
   Number of outer iterations, and `0` if the coordinate search converged
   (always `0` for a grid search).
+
+## See also
+
+[`radish_compatibility`](https://wpeterman.github.io/terradish/reference/radish_compatibility.md)

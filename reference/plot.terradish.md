@@ -3,9 +3,11 @@
 Five plot types for objects returned by
 [`terradish`](https://wpeterman.github.io/terradish/reference/terradish.md).
 The default type, `"marginal_response"`, and the `"surface"` and
-`"marginal"` types need the graph, so call `plot(fit, data = surface)`;
-`plot(fit)` alone stops with an error. Only `type = "fit"` and
-`type = "sigma"` work without `data`.
+`"marginal"` types need the graph, so call `plot(fit, data = surface)`.
+`plot(fit)` alone, with neither `type` nor `data`, shows the `"fit"`
+plot instead and says so in a message. A type that needs the graph and
+is requested explicitly without `data` stops with an error. Only
+`type = "fit"` and `type = "sigma"` work without `data`.
 
 - `"fit"`:
 
@@ -96,9 +98,10 @@ plot(
 - data:
 
   The `terradish_graph` used when fitting `x`. Required for
-  `type = "surface"`, `type = "marginal"`, and the default
-  `type = "marginal_response"`; these types stop with an error when it
-  is missing.
+  `type = "surface"`, `type = "marginal"`, and
+  `type = "marginal_response"`; these types stop with an error when they
+  are requested explicitly and `data` is missing. When both `type` and
+  `data` are omitted, the `"fit"` plot is drawn with a message.
 
 - covariates:
 
@@ -236,7 +239,8 @@ plot(fit, data = surface)
 
 
 
-# Observed vs. fitted pairwise genetic distances (no graph needed)
+# Observed vs. fitted pairwise genetic distances (no graph needed).
+# plot(fit) with no other arguments draws this plot and says so.
 plot(fit, type = "fit")
 
 

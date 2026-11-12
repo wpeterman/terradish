@@ -609,9 +609,15 @@ struggles with an indefinite Hessian far from the optimum, or when you
 want strictly information-based standard errors. The package tests check
 <code>gauss_newton</code> for <code>leastsquares</code> and
 <code>wishart_covariance</code>, and the shipped benchmark exercises it
-with <code>generalized_wishart</code>. Treat any other pairing,
-including <code>mlpe</code>, as unverified and compare both options
-before relying on it.</p>
+with <code>generalized_wishart</code>.</p>
+<p>For <code>mlpe</code> the two curvatures can disagree. A package test
+evaluates both at the same optimum on the <code>melip</code> data. The
+coefficients agree, but the Gauss-Newton standard errors differed from
+the exact ones by 3% to 14% in three configurations and by about a
+factor of two in a fourth, with no consistent direction. Report
+<code>exact</code> standard errors for <code>mlpe</code> fits, and
+compare both options before relying on <code>gauss_newton</code> with
+any other pairing.</p>
 <p>The benchmark in
 <code>inst/benchmarks/benchmark-curvature-large-landscape.R</code>
 reproduces this comparison at a chosen size. It simulates a

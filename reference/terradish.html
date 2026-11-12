@@ -201,9 +201,10 @@ it on with
 
 
 <dt id="arg-validate">validate<a class="anchor" aria-label="anchor" href="#arg-validate"></a></dt>
-<dd><p>Reserved. Numerical validation of leverage is not
-currently implemented in <code>terradish()</code>: <code>validate = TRUE</code> is
-ignored with a warning. Leave at <code>FALSE</code>.</p></dd>
+<dd><p>Deprecated and ignored. Numerical validation of leverage
+is not implemented in <code>terradish()</code>. Any value other than
+<code>FALSE</code> gives a deprecation warning and the fit proceeds unchanged.
+The argument will be removed in a future release.</p></dd>
 
 
 <dt id="arg-cores">cores<a class="anchor" aria-label="anchor" href="#arg-cores"></a></dt>
@@ -223,7 +224,11 @@ covariance matrix. <code>"exact"</code> (default) uses the exact Hessian.
 residual-weighted second-derivative terms and requires only first
 derivatives of the conductance model. It equals the exact Hessian only when
 those omitted terms are zero or negligible; convergence alone does not
-guarantee agreement.
+guarantee agreement. For <code><a href="mlpe.html">mlpe</a></code> the two can differ
+materially: in the package's tests on the <code>melip</code> data,
+Gauss-Newton standard errors differed from the exact ones by 3 to 14
+percent in three configurations and by about a factor of two in a
+fourth, so report <code>"exact"</code> standard errors for MLPE fits.
 Standard errors from <code><a href="https://rspatial.github.io/terra/reference/summary.html" class="external-link">summary()</a></code> are then the asymptotic
 information-based errors. With <code>leverage = TRUE</code> the leverage
 diagnostics inherit the same approximation.</p></dd>

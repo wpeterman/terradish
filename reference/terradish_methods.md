@@ -29,13 +29,7 @@ coef(object, ...)
 fitted(object, type = c("response", "distance", "covariance"), ...)
 
 # S3 method for class 'terradish'
-simulate(
-  object,
-  nsim = 1,
-  seed = NULL,
-  method = c("permutation", "parametric"),
-  ...
-)
+simulate(object, nsim = 1, seed = NULL, method = "permutation", ...)
 
 # S3 method for class 'terradish'
 anova(object, ..., alternative = NULL)
@@ -104,10 +98,9 @@ residuals(object, ...)
 
 - method:
 
-  Simulation method. Only `"permutation"` (default) is implemented: it
-  adds the residual matrix, with sites permuted jointly in rows and
-  columns, to the fitted response. `"parametric"` is reserved and
-  currently stops with an error.
+  Simulation method. `"permutation"` is the only method: it adds the
+  residual matrix, with sites permuted jointly in rows and columns, to
+  the fitted response. Any other value stops with an error.
 
 - k:
 

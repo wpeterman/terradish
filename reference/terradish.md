@@ -135,9 +135,10 @@ terradish(
 
 - validate:
 
-  Reserved. Numerical validation of leverage is not currently
-  implemented in `terradish()`: `validate = TRUE` is ignored with a
-  warning. Leave at `FALSE`.
+  Deprecated and ignored. Numerical validation of leverage is not
+  implemented in `terradish()`. Any value other than `FALSE` gives a
+  deprecation warning and the fit proceeds unchanged. The argument will
+  be removed in a future release.
 
 - cores:
 
@@ -157,7 +158,13 @@ terradish(
   second-derivative terms and requires only first derivatives of the
   conductance model. It equals the exact Hessian only when those omitted
   terms are zero or negligible; convergence alone does not guarantee
-  agreement. Standard errors from
+  agreement. For
+  [`mlpe`](https://wpeterman.github.io/terradish/reference/mlpe.md) the
+  two can differ materially: in the package's tests on the `melip` data,
+  Gauss-Newton standard errors differed from the exact ones by 3 to 14
+  percent in three configurations and by about a factor of two in a
+  fourth, so report `"exact"` standard errors for MLPE fits. Standard
+  errors from
   [`summary()`](https://rspatial.github.io/terra/reference/summary.html)
   are then the asymptotic information-based errors. With
   `leverage = TRUE` the leverage diagnostics inherit the same

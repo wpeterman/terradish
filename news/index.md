@@ -46,6 +46,45 @@
   AMGCL library.
 - [`print()`](https://rdrr.io/r/base/print.html) for cross-validation
   results lists each measurement model once.
+- `plot(fit)` with neither `type` nor `data` now draws the fit plot with
+  a message. Before, it stopped because the default type needs `data`.
+  An explicitly requested type that needs `data` still stops.
+- [`simulate()`](https://rdrr.io/r/stats/simulate.html) accepts only
+  `method = "permutation"`, the one implemented method; `"parametric"`
+  always stopped with an error and is no longer offered.
+  `terradish(validate = TRUE)` now warns that the argument is deprecated
+  and ignored.
+- [`NewtonRaphsonControl()`](https://wpeterman.github.io/terradish/reference/NewtonRaphsonControl.md)
+  and
+  [`HagerZhangControl()`](https://wpeterman.github.io/terradish/reference/HagerZhangControl.md)
+  return classed lists, as
+  [`ArmijoControl()`](https://wpeterman.github.io/terradish/reference/ArmijoControl.md)
+  does. Their elements are unchanged.
+- [`generalized_wishart()`](https://wpeterman.github.io/terradish/reference/generalized_wishart.md)
+  names its nuisance parameters `tau` and `sigma`, as the other
+  measurement models do. Estimates are unchanged, but `fit$fit$phi` and
+  `summary()$phi_table` gain row names, the zero-variance rule for
+  `sigma` now applies to these fits, and cross-validation checkpoints
+  made with this model must be recomputed.
+- [`terra_radish_scale_optim()`](https://wpeterman.github.io/terradish/reference/legacy_terra_radish_scale_optim.md)
+  signals a deprecation warning, like the other legacy radish wrappers.
+- “Removed unused spatial covariates” is raised once per call to
+  [`terradish()`](https://wpeterman.github.io/terradish/reference/terradish.md),
+  [`terradish_cv_folds()`](https://wpeterman.github.io/terradish/reference/terradish_cv_folds.md),
+  [`covariance_response_power()`](https://wpeterman.github.io/terradish/reference/covariance_response_power.md),
+  [`terradish_scale_optim()`](https://wpeterman.github.io/terradish/reference/terradish_scale_optim.md),
+  [`gaussian_scale_profile()`](https://wpeterman.github.io/terradish/reference/gaussian_scale_profile.md),
+  and
+  [`terradish_assess_settings()`](https://wpeterman.github.io/terradish/reference/terradish_assess_settings.md),
+  not once per fold or refit.
+- The two `melip` rasters now carry distinct layer names, `altitude` and
+  `forestcover`. Their values are unchanged.
+- New test comparing `curvature = "gauss_newton"` with the exact
+  curvature for `mlpe`. Coefficients agree, but standard errors can
+  differ materially (by about a factor of two in one configuration), so
+  [`?terradish`](https://wpeterman.github.io/terradish/reference/terradish.md)
+  and the large-landscapes guide now advise exact standard errors for
+  MLPE fits.
 
 ## terradish 1.1.0
 

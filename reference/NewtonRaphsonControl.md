@@ -79,8 +79,8 @@ NewtonRaphsonControl(
 
 ## Value
 
-A named list holding the settings passed to the optimizer (a plain list
-with no additional class). The elements are the arguments above,
+A named list of class `"terradish_newton_raphson_control"` holding the
+settings passed to the optimizer. The elements are the arguments above,
 validated and stored unchanged: `maxit`, `ctol`, `ftol`, `etol`,
 `verbose`, `eps`, `del`, and `ls.control` (itself a `HagerZhangControl`
 or `ArmijoControl` list). Pass the object to the `control` argument of
@@ -142,6 +142,8 @@ str(ctrl)
 #>   ..$ psi3         : num 0.1
 #>   ..$ c            : num 1
 #>   ..$ verbose      : logi FALSE
+#>   ..- attr(*, "class")= chr [1:2] "terradish_hager_zhang_control" "list"
+#>  - attr(*, "class")= chr [1:2] "terradish_newton_raphson_control" "list"
 
 # Relaxed tolerances for a quick exploratory run:
 ctrl_quick <- NewtonRaphsonControl(maxit = 10, ctol = 1e-3, ftol = 1e-3)

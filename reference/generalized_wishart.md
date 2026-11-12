@@ -78,9 +78,9 @@ generalized_wishart(
 
 ## Value
 
-When `phi` is missing, a list with elements `phi` (starting values
-`tau = 1` and `sigma = 0`), `lower` (`c(0, -Inf)`), and `upper`.
-Otherwise a list containing:
+When `phi` is missing, a list with elements `phi` (named starting values
+`c(tau = 1, sigma = 0)`), `lower` (`c(0, -Inf)`), and `upper`. Otherwise
+a list containing:
 
 - objective:
 

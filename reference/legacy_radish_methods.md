@@ -27,13 +27,7 @@ coef(object, ...)
 fitted(object, type = c("response", "distance", "covariance"), ...)
 
 # S3 method for class 'radish'
-simulate(
-  object,
-  nsim = 1,
-  seed = NULL,
-  method = c("permutation", "parametric"),
-  ...
-)
+simulate(object, nsim = 1, seed = NULL, method = "permutation", ...)
 
 # S3 method for class 'radish'
 anova(object, ..., alternative = NULL)

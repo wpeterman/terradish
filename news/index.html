@@ -76,6 +76,19 @@
 <code>DESCRIPTION</code> names Denis Demidov as copyright holder of the bundled AMGCL library.</li>
 <li>
 <code><a href="https://rdrr.io/r/base/print.html" class="external-link">print()</a></code> for cross-validation results lists each measurement model once.</li>
+<li>
+<code>plot(fit)</code> with neither <code>type</code> nor <code>data</code> now draws the fit plot with a message. Before, it stopped because the default type needs <code>data</code>. An explicitly requested type that needs <code>data</code> still stops.</li>
+<li>
+<code><a href="https://rdrr.io/r/stats/simulate.html" class="external-link">simulate()</a></code> accepts only <code>method = "permutation"</code>, the one implemented method; <code>"parametric"</code> always stopped with an error and is no longer offered. <code>terradish(validate = TRUE)</code> now warns that the argument is deprecated and ignored.</li>
+<li>
+<code><a href="../reference/NewtonRaphsonControl.html">NewtonRaphsonControl()</a></code> and <code><a href="../reference/HagerZhangControl.html">HagerZhangControl()</a></code> return classed lists, as <code><a href="../reference/ArmijoControl.html">ArmijoControl()</a></code> does. Their elements are unchanged.</li>
+<li>
+<code><a href="../reference/generalized_wishart.html">generalized_wishart()</a></code> names its nuisance parameters <code>tau</code> and <code>sigma</code>, as the other measurement models do. Estimates are unchanged, but <code>fit$fit$phi</code> and <code>summary()$phi_table</code> gain row names, the zero-variance rule for <code>sigma</code> now applies to these fits, and cross-validation checkpoints made with this model must be recomputed.</li>
+<li>
+<code><a href="../reference/legacy_terra_radish_scale_optim.html">terra_radish_scale_optim()</a></code> signals a deprecation warning, like the other legacy radish wrappers.</li>
+<li>“Removed unused spatial covariates” is raised once per call to <code><a href="../reference/terradish.html">terradish()</a></code>, <code><a href="../reference/terradish_cv_folds.html">terradish_cv_folds()</a></code>, <code><a href="../reference/covariance_response_power.html">covariance_response_power()</a></code>, <code><a href="../reference/terradish_scale_optim.html">terradish_scale_optim()</a></code>, <code><a href="../reference/gaussian_scale_profile.html">gaussian_scale_profile()</a></code>, and <code><a href="../reference/terradish_assess_settings.html">terradish_assess_settings()</a></code>, not once per fold or refit.</li>
+<li>The two <code>melip</code> rasters now carry distinct layer names, <code>altitude</code> and <code>forestcover</code>. Their values are unchanged.</li>
+<li>New test comparing <code>curvature = "gauss_newton"</code> with the exact curvature for <code>mlpe</code>. Coefficients agree, but standard errors can differ materially (by about a factor of two in one configuration), so <code><a href="../reference/terradish.html">?terradish</a></code> and the large-landscapes guide now advise exact standard errors for MLPE fits.</li>
 </ul></div>
     <div class="section level2">
 <h2 class="pkg-version" data-toc-text="1.1.0" id="terradish-110">terradish 1.1.0<a class="anchor" aria-label="anchor" href="#terradish-110"></a></h2>

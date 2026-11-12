@@ -175,13 +175,13 @@ solver that failed to converge during probing.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Recommended settings:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   optimizer: newton (fastest acceptable probe: newton_hager_zhang)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   line search: HagerZhangControl</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   solver: direct (fastest direct solver probe: simplicial_ldl + matrix)</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   solver: direct (fastest direct solver probe: simplicial_ldl + cholmod_cpp)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   solver_control:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $factorization</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] "simplicial_ldl"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> $solve_backend</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "matrix"</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span> [1] "cholmod_cpp"</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>   approximation: none (exact full-resolution fit)</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
@@ -189,19 +189,19 @@ solver that failed to converge during probing.</p>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Optimizer probes:</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>               label elapsed loglik gradient_evaluations hessian_evaluations</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  newton_hager_zhang    0.41   1495                   10                   4</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>    bfgs_hager_zhang    0.25   1494                    8                   1</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>         bfgs_armijo    0.18   1492                    5                   1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  newton_hager_zhang    0.19   1495                   10                   4</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>    bfgs_hager_zhang    0.14   1494                    8                   1</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>         bfgs_armijo    0.14   1492                    5                   1</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>  line_search_trials status</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   6     OK</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   5     OK</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span>                   2     OK</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> Fastest direct solver probes:</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   factorization      solve_backend setup_time solve_time total_time</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  simplicial_ldl             matrix          0  0.0000000          0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>  simplicial_ldl cholmod_cpp_cached          0  0.0007197          0</span>
-<span class="r-out co"><span class="r-pr">#&gt;</span>   simplicial_ll             matrix          0  0.0000000          0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   factorization solve_backend setup_time solve_time total_time</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>  simplicial_ldl   cholmod_cpp          0   0.000691          0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   simplicial_ll        matrix          0   0.000000          0</span>
+<span class="r-out co"><span class="r-pr">#&gt;</span>   supernodal_ll        matrix          0   0.000000          0</span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> </span>
 <span class="r-in"><span><span class="va">assessment</span><span class="op">$</span><span class="va">comparison</span><span class="op">$</span><span class="va">summary</span>   <span class="co"># one-line verdict against the defaults</span></span></span>
 <span class="r-out co"><span class="r-pr">#&gt;</span> [1] "Assessment differs from terradish defaults: solver_control tuned from terradish defaults."</span>

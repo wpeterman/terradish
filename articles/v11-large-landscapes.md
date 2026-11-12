@@ -563,9 +563,15 @@ this fit, so report which curvature produced an interval.
 far from the optimum, or when you want strictly information-based
 standard errors. The package tests check `gauss_newton` for
 `leastsquares` and `wishart_covariance`, and the shipped benchmark
-exercises it with `generalized_wishart`. Treat any other pairing,
-including `mlpe`, as unverified and compare both options before relying
-on it.
+exercises it with `generalized_wishart`.
+
+For `mlpe` the two curvatures can disagree. A package test evaluates
+both at the same optimum on the `melip` data. The coefficients agree,
+but the Gauss-Newton standard errors differed from the exact ones by 3%
+to 14% in three configurations and by about a factor of two in a fourth,
+with no consistent direction. Report `exact` standard errors for `mlpe`
+fits, and compare both options before relying on `gauss_newton` with any
+other pairing.
 
 The benchmark in `inst/benchmarks/benchmark-curvature-large-landscape.R`
 reproduces this comparison at a chosen size. It simulates a

@@ -192,16 +192,16 @@ summary(fit_joint)
 #> Norm of gradient at MLE: 5.801505e-09 
 #> 
 #> Nuisance parameters (conditional on fitted conductance surface; measurement-model scale):
-#>                                  Estimate   Std. Error  Lower 95%  Upper 95%
-#> alpha                            -0.055479   0.017745   -0.090258  -0.020699
-#> beta                              0.387706   0.013284    0.361669   0.413743
-#> absdiff_spatial_template_lowres   0.014297   0.001392    0.011569   0.017024
-#> tau                               5.323936   0.243868    4.845964   5.801908
-#> rho                               2.587655   0.271940    2.054663   3.120647
+#>                   Estimate   Std. Error  Lower 95%  Upper 95%
+#> alpha             -0.055479   0.017745   -0.090258  -0.020699
+#> beta               0.387706   0.013284    0.361669   0.413743
+#> absdiff_altitude   0.014297   0.001392    0.011569   0.017024
+#> tau                5.323936   0.243868    4.845964   5.801908
+#> rho                2.587655   0.271940    2.054663   3.120647
 #> 
 #> Resistance-distance equivalent of one unit of environmental difference:
-#>                        covariate      ratio          SE      lower      upper
-#>  absdiff_spatial_template_lowres 0.03687554 0.005040606 0.02699613 0.04675495
+#>         covariate      ratio          SE      lower      upper
+#>  absdiff_altitude 0.03687554 0.005040606 0.02699613 0.04675495
 #>             family
 #>  gaussian_distance
 #> Coefficients:
@@ -215,8 +215,8 @@ summary(fit_joint)
 #>              altitude
 #> forestcover 0.7029914
 terradish_ibe_ratio(fit_joint)
-#>                         covariate      ratio          SE      lower      upper
-#> 1 absdiff_spatial_template_lowres 0.03687554 0.005040606 0.02699613 0.04675495
+#>          covariate      ratio          SE      lower      upper
+#> 1 absdiff_altitude 0.03687554 0.005040606 0.02699613 0.04675495
 #>              family
 #> 1 gaussian_distance
 # }

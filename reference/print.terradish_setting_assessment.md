@@ -109,13 +109,13 @@ assessment                      # the four-part report described above
 #> Recommended settings:
 #>   optimizer: newton (fastest acceptable probe: newton_hager_zhang)
 #>   line search: HagerZhangControl
-#>   solver: direct (fastest direct solver probe: simplicial_ldl + matrix)
+#>   solver: direct (fastest direct solver probe: simplicial_ldl + cholmod_cpp)
 #>   solver_control:
 #> $factorization
 #> [1] "simplicial_ldl"
 #> 
 #> $solve_backend
-#> [1] "matrix"
+#> [1] "cholmod_cpp"
 #> 
 #>   approximation: none (exact full-resolution fit)
 #> 
@@ -123,19 +123,19 @@ assessment                      # the four-part report described above
 #> 
 #> Optimizer probes:
 #>               label elapsed loglik gradient_evaluations hessian_evaluations
-#>  newton_hager_zhang    0.41   1495                   10                   4
-#>    bfgs_hager_zhang    0.25   1494                    8                   1
-#>         bfgs_armijo    0.18   1492                    5                   1
+#>  newton_hager_zhang    0.19   1495                   10                   4
+#>    bfgs_hager_zhang    0.14   1494                    8                   1
+#>         bfgs_armijo    0.14   1492                    5                   1
 #>  line_search_trials status
 #>                   6     OK
 #>                   5     OK
 #>                   2     OK
 #> 
 #> Fastest direct solver probes:
-#>   factorization      solve_backend setup_time solve_time total_time
-#>  simplicial_ldl             matrix          0  0.0000000          0
-#>  simplicial_ldl cholmod_cpp_cached          0  0.0007197          0
-#>   simplicial_ll             matrix          0  0.0000000          0
+#>   factorization solve_backend setup_time solve_time total_time
+#>  simplicial_ldl   cholmod_cpp          0   0.000691          0
+#>   simplicial_ll        matrix          0   0.000000          0
+#>   supernodal_ll        matrix          0   0.000000          0
 #> 
 assessment$comparison$summary   # one-line verdict against the defaults
 #> [1] "Assessment differs from terradish defaults: solver_control tuned from terradish defaults."

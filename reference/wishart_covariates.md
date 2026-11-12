@@ -296,20 +296,16 @@ summary(fit_joint_w)
 #> Norm of gradient at MLE: 9.585887e-13 
 #> 
 #> Nuisance parameters (conditional on fitted conductance surface; measurement-model scale):
-#>                                         Estimate   Std. Error  Lower 95%
-#> tau                                      0.990540   0.166938    0.663347
-#> lambda_absdiff_spatial_template_lowres   0.017644   0.014093   -0.009977
-#> sigma                                   -1.625156   0.118411   -1.857237
-#>                                         Upper 95%
-#> tau                                      1.317733
-#> lambda_absdiff_spatial_template_lowres   0.045265
-#> sigma                                   -1.393075
+#>                          Estimate   Std. Error  Lower 95%  Upper 95%
+#> tau                       0.990540   0.166938    0.663347   1.317733
+#> lambda_absdiff_altitude   0.017644   0.014093   -0.009977   0.045265
+#> sigma                    -1.625156   0.118411   -1.857237  -1.393075
 #> 
 #> Resistance-distance equivalent of one unit of environmental difference:
-#>                               covariate     ratio         SE       lower
-#>  lambda_absdiff_spatial_template_lowres 0.0178124 0.01543092 -0.01243165
-#>       upper             family
-#>  0.04805646 wishart_covariance
+#>                covariate     ratio         SE       lower      upper
+#>  lambda_absdiff_altitude 0.0178124 0.01543092 -0.01243165 0.04805646
+#>              family
+#>  wishart_covariance
 #> Coefficients:
 #>             Estimate Std. Error z value Pr(>|z|)
 #> altitude    -0.04533    0.12550  -0.361    0.718
